@@ -65,6 +65,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
             ->middlewareFor(['store', 'update', 'destroy'], "company_permission:{$uri}.manage");
     }
 
+    Route::post('/holidays/import', [HolidayController::class, 'import'])->middleware('company_permission:holidays.manage');
+
     Route::middleware('company_permission:work_locations.manage')->group(function () {
         Route::post('/work_locations/{work_location}/regenerate-qr', [WorkLocationController::class, 'regenerateQrCode']);
     });
@@ -72,6 +74,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
     Route::get('/calendar', [CalendarController::class, 'index'])->middleware('company_permission:schedules.view');
 
     Route::middleware('company_permission:schedules.manage')->group(function () {
+        Route::get('/calendar/team', [CalendarController::class, 'team']);
+        Route::get('/calendar/weekly-off-days', [CalendarController::class, 'weeklyOffDays']);
         Route::put('/calendar/weekly-off-days', [CalendarController::class, 'setWeeklyOffDays']);
         Route::post('/days-off', [DayOffController::class, 'store']);
         Route::delete('/days-off/{day_off}', [DayOffController::class, 'destroy']);

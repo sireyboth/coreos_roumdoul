@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PartyPopper, Pencil, Plus, Trash2 } from "lucide-react";
+import { Flag, PartyPopper, Pencil, Plus, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KhmerHolidayImportDialog } from "@/components/dashboard/khmer-holiday-import-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Holiday } from "@/lib/api";
@@ -112,6 +113,7 @@ export default function HolidaysPage() {
   const [editing, setEditing] = useState<Holiday | null>(null);
   // Bumped on every open so the form always starts from fresh values.
   const [formKey, setFormKey] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
 
   function load() {
     api.holidays.list().then((res) => setHolidays(res.data)).catch(() => setHolidays([]));
@@ -177,10 +179,16 @@ export default function HolidaysPage() {
           description="Company-wide non-working days."
           action={
             canManage && (
-              <Button onClick={() => openForm(null)}>
-                <Plus className="size-4" />
-                Add holiday
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setImportOpen(true)}>
+                  <Flag className="size-4" />
+                  Import Cambodian holidays
+                </Button>
+                <Button onClick={() => openForm(null)}>
+                  <Plus className="size-4" />
+                  Add holiday
+                </Button>
+              </div>
             )
           }
         />
@@ -214,6 +222,12 @@ export default function HolidaysPage() {
         />
       </div>
 
+      <KhmerHolidayImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existingDates={new Set((holidays ?? []).map((h) => dateOnly(h.date)))}
+        onImported={load}
+      />
       <HolidayFormDialog key={formKey} holiday={editing} open={formOpen} onOpenChange={setFormOpen} onSaved={load} />
     </div>
   );

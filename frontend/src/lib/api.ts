@@ -83,13 +83,42 @@ export type Branch = {
   qr_token: string | null;
 };
 
+// What the employee form sends — every optional field is null when cleared.
+export type EmployeeInput = {
+  name?: string;
+  employee_code?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  job_title?: string | null;
+  branch_id?: number;
+  employment_status?: string;
+  employment_type?: string | null;
+  hire_date?: string | null;
+  termination_date?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  address?: string | null;
+  notes?: string | null;
+};
+
 export type Employee = {
   id: number;
   name: string;
   employee_code: string | null;
   email: string | null;
   job_title: string | null;
+  phone: string | null;
   employment_status: string;
+  // full_time / part_time / contract / temporary
+  employment_type: string | null;
+  // Serialized as an ISO datetime — take the first 10 chars for a date input.
+  hire_date: string | null;
+  termination_date: string | null;
+  // Personal details: the API only sends these to people who can manage employees.
+  gender?: string | null;
+  date_of_birth?: string | null;
+  address?: string | null;
+  notes?: string | null;
   branch_id: number | null;
   branch: Branch | null;
   // Whether this employee has a login linked to them — without one they
@@ -126,6 +155,25 @@ export type CalendarMonth = {
   weekly_off_days: number[];
   summary: { work_days: number; holidays: number; days_off: number; present: number; late: number; absent: number };
   days: CalendarDay[];
+};
+
+export type TeamCalendarEmployee = {
+  id: number;
+  name: string;
+  employee_code: string | null;
+  branch: string | null;
+  summary: CalendarMonth["summary"];
+  days: CalendarDay[];
+};
+
+export type TeamCalendar = {
+  month: string;
+  today: string;
+  timezone: string;
+  total: number;
+  // True when there are more employees than the roster returns — filter by branch.
+  truncated: boolean;
+  employees: TeamCalendarEmployee[];
 };
 
 export type Notification = {
@@ -274,14 +322,9 @@ export const api = {
 
   employees: {
     list: () => request<Paginated<Employee>>("/api/employees"),
-    create: (data: {
-      name: string;
-      branch_id: number;
-      job_title?: string | null;
-      email?: string;
-      password?: string;
-    }) => request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: { name?: string; job_title?: string | null; branch_id?: number; employment_status?: string }) =>
+    create: (data: EmployeeInput & { name: string; branch_id: number; password?: string }) =>
+      request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: EmployeeInput) =>
       request<Employee>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/employees/${id}`, { method: "DELETE" }),
     createLogin: (id: number, data: { email: string; password: string }) =>
@@ -344,11 +387,19 @@ export const api = {
     update: (id: number, data: Partial<Holiday>) =>
       request<Holiday>(`/api/holidays/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/holidays/${id}`, { method: "DELETE" }),
+    import: (holidays: { name: string; date: string }[]) =>
+      request<{ created: number; skipped: string[] }>("/api/holidays/import", {
+        method: "POST",
+        body: JSON.stringify({ holidays }),
+      }),
   },
 
   calendar: {
+    team: (month: string, branchId?: number) =>
+      request<TeamCalendar>(`/api/calendar/team?month=${month}${branchId ? `&branch_id=${branchId}` : ""}`),
     month: (month: string, employeeId?: number) =>
       request<CalendarMonth>(`/api/calendar?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+    weeklyOffDays: () => request<{ weekly_off_days: number[] }>("/api/calendar/weekly-off-days"),
     setWeeklyOffDays: (days: number[]) =>
       request<{ weekly_off_days: number[] }>("/api/calendar/weekly-off-days", {
         method: "PUT",

@@ -184,4 +184,100 @@ class EmployeeCreationTest extends TestCase
             ->postJson("/api/employees/{$employeeId}/login", ['email' => 'x@permco.test', 'password' => 'password123'])
             ->assertForbidden();
     }
+
+    public function test_the_full_profile_can_be_saved_and_read_back(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Profile Co', 'Boss', 'boss@profileco.test', 'password123');
+        $admin = $company->users()->first();
+        $branch = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+
+        $this->actingAs($admin)
+            ->postJson('/api/employees', [
+                'name' => 'Sokha Dara',
+                'branch_id' => $branch->id,
+                'employee_code' => 'E-001',
+                'phone' => '012 345 678',
+                'gender' => 'female',
+                'date_of_birth' => '1995-04-12',
+                'address' => 'Phnom Penh',
+                'employment_type' => 'full_time',
+                'hire_date' => '2026-01-05',
+                'notes' => 'Prefers morning shifts',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('phone', '012 345 678')
+            ->assertJsonPath('employment_type', 'full_time')
+            ->assertJsonPath('gender', 'female')
+            ->assertJsonPath('address', 'Phnom Penh');
+
+        $this->actingAs($admin)
+            ->getJson('/api/employees')
+            ->assertOk()
+            ->assertJsonPath('data.0.notes', 'Prefers morning shifts')
+            ->assertJsonPath('data.0.hire_date', '2026-01-05T00:00:00.000000Z');
+    }
+
+    public function test_personal_details_are_hidden_from_people_who_cannot_manage_employees(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Privacy Co', 'Boss', 'boss@privacyco.test', 'password123');
+        $admin = $company->users()->first();
+        $branch = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+
+        $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Sokha',
+            'email' => 'sokha@privacyco.test',
+            'password' => 'password123',
+            'branch_id' => $branch->id,
+            'phone' => '012 345 678',
+            'gender' => 'female',
+            'date_of_birth' => '1995-04-12',
+            'address' => 'Phnom Penh',
+            'notes' => 'private',
+        ])->assertCreated();
+
+        $sokha = \App\Models\User::query()->where('email', 'sokha@privacyco.test')->firstOrFail();
+        $this->app['auth']->forgetGuards();
+
+        $row = $this->actingAs($sokha)->getJson('/api/employees')->assertOk()->json('data.0');
+
+        // The work profile is visible, the personal details are not.
+        $this->assertSame('012 345 678', $row['phone']);
+        foreach (['gender', 'date_of_birth', 'address', 'notes'] as $field) {
+            $this->assertArrayNotHasKey($field, $row);
+        }
+    }
+
+    public function test_employee_code_must_be_unique_within_the_company(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Code Co', 'Boss', 'boss@codeco.test', 'password123');
+        $admin = $company->users()->first();
+        $branch = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+
+        $this->actingAs($admin)
+            ->postJson('/api/employees', ['name' => 'First', 'branch_id' => $branch->id, 'employee_code' => 'E-1'])
+            ->assertCreated();
+
+        $this->actingAs($admin)
+            ->postJson('/api/employees', ['name' => 'Second', 'branch_id' => $branch->id, 'employee_code' => 'E-1'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('employee_code');
+    }
+
+    public function test_profile_fields_are_validated(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Valid Co', 'Boss', 'boss@validco.test', 'password123');
+        $admin = $company->users()->first();
+        $branch = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+
+        $this->actingAs($admin)
+            ->postJson('/api/employees', [
+                'name' => 'Bad',
+                'branch_id' => $branch->id,
+                'gender' => 'robot',
+                'employment_type' => 'forever',
+                'date_of_birth' => '2999-01-01',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['gender', 'employment_type', 'date_of_birth']);
+    }
 }

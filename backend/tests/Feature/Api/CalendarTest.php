@@ -197,4 +197,122 @@ class CalendarTest extends TestCase
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->admin)->postJson('/api/days-off', ['employee_id' => $stranger->id, 'date' => '2026-09-18'])->assertNotFound();
     }
+
+    private function team(?User $as = null, string $query = '')
+    {
+        $this->app['auth']->forgetGuards();
+
+        return $this->actingAs($as ?? $this->admin)->getJson('/api/calendar/team?month=2026-09'.$query);
+    }
+
+    public function test_the_team_roster_shows_every_employee_with_the_same_day_types_as_their_own_calendar(): void
+    {
+        $other = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Aardvark']);
+        $this->schedule('2026-09-10');
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Big Day', 'date' => '2026-09-24']);
+
+        $team = $this->team()->assertOk()->json();
+
+        $this->assertSame(['Aardvark', 'Worker'], collect($team['employees'])->pluck('name')->all());
+        $this->assertFalse($team['truncated']);
+
+        $worker = collect($team['employees'])->firstWhere('id', $this->employee->id);
+        $this->assertCount(30, $worker['days']);
+        $this->assertSame('work', collect($worker['days'])->firstWhere('date', '2026-09-10')['type']);
+        $this->assertSame('holiday', collect($worker['days'])->firstWhere('date', '2026-09-24')['type']);
+
+        // The roster and the personal calendar are built by the same code.
+        $this->assertEquals($this->month($this->admin, "&employee_id={$this->employee->id}")['days'], $worker['days']);
+        $this->assertSame('none', collect(collect($team['employees'])->firstWhere('id', $other->id)['days'])->firstWhere('date', '2026-09-10')['type']);
+    }
+
+    public function test_a_regular_employee_cannot_open_the_team_roster(): void
+    {
+        $this->team($this->user)->assertForbidden();
+    }
+
+    public function test_the_team_roster_can_be_filtered_by_branch_and_respects_branch_access(): void
+    {
+        $branchA = \App\Models\Branch::query()->create(['company_id' => $this->company->id, 'name' => 'A']);
+        $branchB = \App\Models\Branch::query()->create(['company_id' => $this->company->id, 'name' => 'B']);
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin)->postJson('/api/employees', ['name' => 'Alice', 'branch_id' => $branchA->id])->assertCreated();
+        $this->actingAs($this->admin)->postJson('/api/employees', ['name' => 'Bob', 'branch_id' => $branchB->id])->assertCreated();
+
+        $names = fn ($response) => collect($response->assertOk()->json('employees'))->pluck('name')->all();
+
+        $this->assertSame(['Bob'], $names($this->team(null, "&branch_id={$branchB->id}")));
+
+        // A manager limited to branch A never sees Bob, even without a filter.
+        $manager = $this->createUserWithRole($this->company, 'manager');
+        \App\Models\MembershipBranchAccess::query()->create([
+            'company_membership_id' => $manager->membership->id, 'branch_id' => $branchA->id, 'created_at' => now(),
+        ]);
+
+        $this->assertSame(['Alice'], $names($this->team($manager)));
+    }
+
+    public function test_the_team_roster_leaves_out_people_who_left_before_the_month(): void
+    {
+        Employee::query()->create([
+            'company_id' => $this->company->id, 'name' => 'Gone', 'employment_status' => 'terminated', 'termination_date' => '2026-08-01',
+        ]);
+        Employee::query()->create([
+            'company_id' => $this->company->id, 'name' => 'Leaving', 'employment_status' => 'terminated', 'termination_date' => '2026-09-20',
+        ]);
+
+        $names = collect($this->team()->assertOk()->json('employees'))->pluck('name')->all();
+
+        $this->assertContains('Leaving', $names);
+        $this->assertNotContains('Gone', $names);
+    }
+
+    public function test_the_team_roster_does_not_leak_another_companys_employees(): void
+    {
+        $rival = app(CompanyProvisioner::class)->provision('Rival', 'Boss', 'boss@rival.test', 'password123');
+        Employee::query()->create(['company_id' => $rival->id, 'name' => 'Spy']);
+
+        $names = collect($this->team()->assertOk()->json('employees'))->pluck('name')->all();
+
+        $this->assertNotContains('Spy', $names);
+    }
+
+    public function test_managers_can_import_holidays_but_existing_dates_are_kept_and_others_cannot(): void
+    {
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Renamed by admin', 'date' => '2026-05-01']);
+
+        $payload = ['holidays' => [
+            ['name' => 'Labour Day', 'date' => '2026-05-01'],
+            ['name' => 'Visak Bochea', 'date' => '2026-05-02'],
+        ]];
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin)->postJson('/api/holidays/import', $payload)
+            ->assertOk()
+            ->assertJsonPath('created', 1)
+            ->assertJsonPath('skipped.0', '2026-05-01');
+
+        $this->assertSame('Renamed by admin', Holiday::query()->whereDate('date', '2026-05-01')->value('name'));
+        $this->assertSame(2, Holiday::query()->count());
+
+        // Importing the same list again adds nothing.
+        $this->actingAs($this->admin)->postJson('/api/holidays/import', $payload)->assertOk()->assertJsonPath('created', 0);
+        $this->assertSame(2, Holiday::query()->count());
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->user)->postJson('/api/holidays/import', $payload)->assertForbidden();
+    }
+
+    public function test_managers_can_read_the_current_weekly_days_off_and_others_cannot(): void
+    {
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin)->putJson('/api/calendar/weekly-off-days', ['days' => [0, 6]])->assertOk();
+
+        $this->actingAs($this->admin)->getJson('/api/calendar/weekly-off-days')
+            ->assertOk()->assertJsonPath('weekly_off_days', [0, 6]);
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->user)->getJson('/api/calendar/weekly-off-days')->assertForbidden();
+    }
 }

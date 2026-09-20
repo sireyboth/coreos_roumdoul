@@ -38,11 +38,25 @@ class Employee extends Model
         'name',
         'email',
         'phone',
+        'gender',
+        'date_of_birth',
+        'address',
         'employment_status',
+        'employment_type',
         'hire_date',
         'termination_date',
+        'notes',
         'rest_days',
     ];
+
+    /**
+     * Personal details are hidden by default so they can't leak through the
+     * many places an employee is nested (attendance, calendar, ...). Only
+     * EmployeeController reveals them, and only to employees.manage.
+     */
+    public const PERSONAL_FIELDS = ['gender', 'date_of_birth', 'address', 'notes'];
+
+    protected $hidden = self::PERSONAL_FIELDS;
 
     protected $appends = [
         'name',
@@ -55,6 +69,7 @@ class Employee extends Model
         return [
             'hire_date' => 'date',
             'termination_date' => 'date',
+            'date_of_birth' => 'date',
             'rest_days' => 'array',
         ];
     }

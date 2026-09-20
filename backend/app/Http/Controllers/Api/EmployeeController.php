@@ -30,9 +30,45 @@ class EmployeeController extends Controller
         return $branchIds === null ? ['exists:branches,id'] : [Rule::in($branchIds)];
     }
 
-    public function index()
+    /** Rules for the profile fields shared by create and update. */
+    private function profileRules(Request $request, ?Employee $employee = null): array
     {
-        return Employee::query()->with(['branch', 'department', 'team'])->latest()->paginate(25);
+        return [
+            // Unique per company (the table has a matching unique index) —
+            // checked here so a duplicate is a form error, not a 500.
+            'employee_code' => [
+                'nullable', 'string', 'max:50',
+                Rule::unique('employees', 'employee_code')
+                    ->where('company_id', $request->user()->company_id)
+                    ->ignore($employee?->id),
+            ],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'gender' => ['nullable', 'in:male,female,other'],
+            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'employment_type' => ['nullable', 'in:full_time,part_time,contract,temporary'],
+            'hire_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ];
+    }
+
+    /**
+     * Personal details (gender, date of birth, address, notes) are only for
+     * people who can manage employees; everyone else gets the work profile.
+     */
+    private function reveal(Request $request, Employee $employee): Employee
+    {
+        return $request->user()->hasCompanyPermission('employees.manage')
+            ? $employee->makeVisible(Employee::PERSONAL_FIELDS)
+            : $employee;
+    }
+
+    public function index(Request $request)
+    {
+        $employees = Employee::query()->with(['branch', 'department', 'team'])->latest()->paginate(25);
+        $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e));
+
+        return $employees;
     }
 
     public function store(Request $request)
@@ -48,16 +84,14 @@ class EmployeeController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'employee_code' => ['nullable', 'string', 'max:255'],
+            ...$this->profileRules($request),
             // The email doubles as the login when a password is given.
             'email' => $withLogin
                 ? ['required', 'email', 'max:255', Rule::unique('users', 'email')]
                 : ['nullable', 'email', 'max:255'],
             'password' => ['nullable', 'string', 'min:8'],
-            'phone' => ['nullable', 'string', 'max:255'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
-            'hire_date' => ['nullable', 'date'],
             'branch_id' => ['required', ...$this->branchRule($request)],
             'department_id' => ['nullable', 'exists:departments,id'],
             'team_id' => ['nullable', 'exists:teams,id'],
@@ -77,7 +111,7 @@ class EmployeeController extends Controller
             return $employee;
         });
 
-        return response()->json($employee->fresh(['branch', 'department', 'team']), 201);
+        return response()->json($this->reveal($request, $employee->fresh(['branch', 'department', 'team'])), 201);
     }
 
     /**
@@ -103,7 +137,7 @@ class EmployeeController extends Controller
             $employee->update(['email' => $data['email']]);
         });
 
-        return $employee->fresh(['branch', 'department', 'team']);
+        return $this->reveal($request, $employee->fresh(['branch', 'department', 'team']));
     }
 
     private function linkNewLogin(Request $request, Employee $employee, string $email, string $password): void
@@ -119,21 +153,19 @@ class EmployeeController extends Controller
         $employee->update(['user_id' => $user->id]);
     }
 
-    public function show(Employee $employee)
+    public function show(Request $request, Employee $employee)
     {
-        return $employee->load(['branch', 'department', 'team']);
+        return $this->reveal($request, $employee->load(['branch', 'department', 'team']));
     }
 
     public function update(Request $request, Employee $employee)
     {
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'employee_code' => ['nullable', 'string', 'max:255'],
+            ...$this->profileRules($request, $employee),
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:255'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
-            'hire_date' => ['nullable', 'date'],
             'termination_date' => ['nullable', 'date'],
             'branch_id' => ['nullable', ...$this->branchRule($request)],
             'department_id' => ['nullable', 'exists:departments,id'],
@@ -146,7 +178,7 @@ class EmployeeController extends Controller
 
         $this->assignments->reassign($employee, $data);
 
-        return $employee->fresh(['branch', 'department', 'team']);
+        return $this->reveal($request, $employee->fresh(['branch', 'department', 'team']));
     }
 
     public function destroy(Request $request, Employee $employee)

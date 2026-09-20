@@ -25,6 +25,16 @@ import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_TYPES,
+  EmployeeFormFields,
+  emptyEmployeeForm,
+  formFromEmployee,
+  labelFor,
+  toPayload,
+  type EmployeeForm,
+} from "@/components/dashboard/employee-form";
 
 function CreateLoginDialog({
   employee,
@@ -103,13 +113,6 @@ function CreateLoginDialog({
   );
 }
 
-const EMPLOYMENT_STATUSES = [
-  { value: "active", label: "Active" },
-  { value: "on_leave", label: "On leave" },
-  { value: "suspended", label: "Suspended" },
-  { value: "terminated", label: "Terminated" },
-];
-
 function EditEmployeeDialog({
   employee,
   branches,
@@ -121,10 +124,7 @@ function EditEmployeeDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const [name, setName] = useState(employee?.name ?? "");
-  const [jobTitle, setJobTitle] = useState(employee?.job_title ?? "");
-  const [branchId, setBranchId] = useState(employee?.branch_id != null ? String(employee.branch_id) : "");
-  const [status, setStatus] = useState(employee?.employment_status ?? "active");
+  const [form, setForm] = useState<EmployeeForm>(() => (employee ? formFromEmployee(employee) : emptyEmployeeForm()));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -135,12 +135,11 @@ function EditEmployeeDialog({
     setSaving(true);
 
     try {
-      await api.employees.update(employee.id, {
-        name,
-        job_title: jobTitle || null,
-        ...(branchId ? { branch_id: Number(branchId) } : {}),
-        employment_status: status,
-      });
+      const payload = toPayload(form);
+      // With a login the email is their sign-in — it's changed from Users, not here.
+      if (employee.has_login) delete payload.email;
+
+      await api.employees.update(employee.id, payload);
       notifySuccess("Employee updated");
       onOpenChange(false);
       onSaved();
@@ -154,61 +153,22 @@ function EditEmployeeDialog({
 
   return (
     <Dialog open={employee !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit {employee?.name}</DialogTitle>
           <DialogDescription>
             Moving someone to another branch also moves where they&apos;re allowed to check in.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-name">Name</Label>
-            <Input id="edit-name" required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-branch">Branch</Label>
-            <select
-              id="edit-branch"
-              required
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
-            >
-              {branchId === "" && (
-                <option value="" disabled>
-                  Select…
-                </option>
-              )}
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-job-title">Job title (optional)</Label>
-            <Input id="edit-job-title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="edit-status">Status</Label>
-            <select
-              id="edit-status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
-            >
-              {EMPLOYMENT_STATUSES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Suspended and terminated employees can&apos;t check in.
-            </p>
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <EmployeeFormFields
+            idPrefix="edit"
+            form={form}
+            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+            branches={branches}
+            emailDisabled={employee?.has_login}
+            emailHint={employee?.has_login ? "This is their sign-in email — change it from Users." : undefined}
+          />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -228,10 +188,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [branchId, setBranchId] = useState("");
-  const [loginEmail, setLoginEmail] = useState("");
+  const [form, setForm] = useState<EmployeeForm>(() => emptyEmployeeForm());
   const [loginPassword, setLoginPassword] = useState("");
   const [loginFor, setLoginFor] = useState<Employee | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -242,7 +199,7 @@ export default function EmployeesPage() {
     api.employees.list().then((res) => setEmployees(res.data)).catch(() => setEmployees([]));
     api.branches.list().then((res) => {
       setBranches(res.data);
-      setBranchId((current) => current || String(res.data[0]?.id ?? ""));
+      setForm((f) => (f.branch_id ? f : { ...f, branch_id: String(res.data[0]?.id ?? "") }));
     });
   }
 
@@ -257,16 +214,15 @@ export default function EmployeesPage() {
 
     try {
       await api.employees.create({
-        name,
-        job_title: jobTitle || null,
-        branch_id: Number(branchId),
-        ...(loginPassword ? { email: loginEmail, password: loginPassword } : {}),
+        ...toPayload(form),
+        name: form.name.trim(),
+        branch_id: Number(form.branch_id),
+        // The email above doubles as their sign-in when a password is set.
+        ...(loginPassword ? { password: loginPassword } : {}),
       });
-      notifySuccess("Employee added", loginPassword ? `${loginEmail} can now sign in.` : undefined);
+      notifySuccess("Employee added", loginPassword ? `${form.email} can now sign in.` : undefined);
       refresh();
-      setName("");
-      setJobTitle("");
-      setLoginEmail("");
+      setForm(emptyEmployeeForm(form.branch_id));
       setLoginPassword("");
       setOpen(false);
       load();
@@ -305,9 +261,18 @@ export default function EmployeesPage() {
       id: "name",
       header: "Name",
       primary: true,
-      cell: (employee) => <span className="font-medium">{employee.name}</span>,
+      cell: (employee) => (
+        <div className="flex flex-col leading-tight">
+          <span className="font-medium">{employee.name}</span>
+          {(employee.employee_code || employee.email) && (
+            <span className="text-xs text-muted-foreground">
+              {[employee.employee_code, employee.email].filter(Boolean).join(" · ")}
+            </span>
+          )}
+        </div>
+      ),
       sortValue: (employee) => employee.name,
-      searchValue: (employee) => employee.name,
+      searchValue: (employee) => [employee.name, employee.employee_code, employee.email].filter(Boolean).join(" "),
     },
     {
       id: "branch",
@@ -324,11 +289,55 @@ export default function EmployeesPage() {
       searchValue: (employee) => employee.job_title,
     },
     {
+      id: "phone",
+      header: "Phone",
+      hideOnMobile: true,
+      cell: (employee) => <span className="text-muted-foreground">{employee.phone ?? "—"}</span>,
+      searchValue: (employee) => employee.phone,
+    },
+    {
+      id: "type",
+      header: "Type",
+      cell: (employee) =>
+        employee.employment_type ? (
+          <Badge variant="info">{labelFor(EMPLOYMENT_TYPES, employee.employment_type)}</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      sortValue: (employee) => employee.employment_type,
+    },
+    {
+      id: "hired",
+      header: "Hired",
+      cell: (employee) => (
+        <span className="text-muted-foreground">
+          {employee.hire_date
+            ? new Date(employee.hire_date.slice(0, 10) + "T00:00:00").toLocaleDateString([], {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })
+            : "—"}
+        </span>
+      ),
+      sortValue: (employee) => employee.hire_date,
+    },
+    {
       id: "status",
       header: "Status",
       cell: (employee) => (
-        <Badge variant={employee.employment_status === "active" ? "success" : "secondary"}>
-          {employee.employment_status}
+        <Badge
+          variant={
+            employee.employment_status === "active"
+              ? "success"
+              : employee.employment_status === "on_leave"
+                ? "warning"
+                : employee.employment_status === "terminated"
+                  ? "destructive"
+                  : "secondary"
+          }
+        >
+          {labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}
         </Badge>
       ),
       sortValue: (employee) => employee.employment_status,
@@ -356,13 +365,15 @@ export default function EmployeesPage() {
       type: "select",
       id: "status",
       label: "Status",
-      options: [
-        { value: "active", label: "Active" },
-        { value: "on_leave", label: "On leave" },
-        { value: "suspended", label: "Suspended" },
-        { value: "terminated", label: "Terminated" },
-      ],
+      options: EMPLOYMENT_STATUSES,
       getValue: (employee) => employee.employment_status,
+    },
+    {
+      type: "select",
+      id: "type",
+      label: "Type",
+      options: EMPLOYMENT_TYPES,
+      getValue: (employee) => employee.employment_type,
     },
     {
       type: "select",
@@ -402,57 +413,32 @@ export default function EmployeesPage() {
                     </Button>
                   }
                 />
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Add an employee</DialogTitle>
-                    <DialogDescription>Every employee belongs to a branch.</DialogDescription>
+                    <DialogDescription>Every employee belongs to a branch. Only the name is required.</DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="name">Name</Label>
-                      <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="branch">Branch</Label>
-                      <select
-                        id="branch"
-                        required
-                        value={branchId}
-                        onChange={(e) => setBranchId(e.target.value)}
-                        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
-                      >
-                        {branches.map((branch) => (
-                          <option key={branch.id} value={branch.id}>
-                            {branch.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="job_title">Job title (optional)</Label>
-                      <Input id="job_title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-                      <p className="text-sm font-medium">Login (optional)</p>
+                  <form onSubmit={handleCreate} className="flex flex-col gap-5">
+                    <EmployeeFormFields
+                      idPrefix="new"
+                      form={form}
+                      onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+                      branches={branches}
+                      emailRequired={loginPassword !== ""}
+                    />
+                    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
+                      <p className="text-sm font-medium">Sign-in (optional)</p>
                       <p className="text-xs text-muted-foreground">
-                        Fill both in so this employee can sign in and check in. You can also add it later.
+                        Set a temporary password so this employee can sign in and check in with the email above. You
+                        can also do this later.
                       </p>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="login_email">Email</Label>
-                        <Input
-                          id="login_email"
-                          type="email"
-                          required={loginPassword !== ""}
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
-                        />
-                      </div>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="login_password">Temporary password</Label>
                         <Input
                           id="login_password"
                           type="password"
                           minLength={8}
+                          autoComplete="new-password"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                         />
@@ -492,7 +478,7 @@ export default function EmployeesPage() {
           getRowId={(employee) => employee.id}
           columns={columns}
           filters={filters}
-          searchPlaceholder="Search by name, branch or job title…"
+          searchPlaceholder="Search by name, code, email, phone, branch or job title…"
           initialSort={{ columnId: "name", direction: "asc" }}
           emptyState={{
             icon: Users,
