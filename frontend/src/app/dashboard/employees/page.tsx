@@ -153,8 +153,8 @@ export default function EmployeesPage() {
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Employees"
           description="The canonical record every module builds on."
@@ -281,7 +281,7 @@ export default function EmployeesPage() {
                   <TableCell className="text-muted-foreground">{employee.branch?.name ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{employee.job_title ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={employee.employment_status === "active" ? "default" : "secondary"}>
+                    <Badge variant={employee.employment_status === "active" ? "success" : "secondary"}>
                       {employee.employment_status}
                     </Badge>
                   </TableCell>

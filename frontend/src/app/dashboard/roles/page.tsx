@@ -153,8 +153,8 @@ export default function RolesPage() {
   const canManage = me?.permissions.includes("roles.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Roles & Permissions"
           description="Define what each position at your company can see and do."

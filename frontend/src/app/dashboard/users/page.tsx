@@ -184,8 +184,8 @@ export default function UsersPage() {
   const canManageRoles = me?.permissions.includes("roles.view") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Users"
           description={
@@ -300,7 +300,7 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       {user.is_active ? (
-                        <Badge>Active</Badge>
+                        <Badge variant="success">Active</Badge>
                       ) : (
                         <Badge variant="secondary">Deactivated</Badge>
                       )}

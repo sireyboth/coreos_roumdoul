@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Clock, LogIn, LogOut, QrCode } from "lucide-react";
+import { Clock, Eye, LogIn, LogOut, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { AttendancePreviewDialog } from "@/components/dashboard/attendance-preview-dialog";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
@@ -37,6 +38,7 @@ export default function AttendancePage() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [previewSession, setPreviewSession] = useState<AttendanceSession | null>(null);
   const scanGpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   function load() {
@@ -121,8 +123,8 @@ export default function AttendancePage() {
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Attendance"
           description={
@@ -133,7 +135,8 @@ export default function AttendancePage() {
         />
 
         {me?.employee && (
-          <Card>
+          <div className="grid items-stretch gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Today</CardTitle>
               <CardDescription>
@@ -155,10 +158,10 @@ export default function AttendancePage() {
                   </Button>
                 </div>
               )}
-              {todaySession?.check_out_event && <Badge>Completed for today</Badge>}
+              {todaySession?.check_out_event && <Badge variant="success">Completed for today</Badge>}
               <div className="flex items-center gap-2">
                 {todaySession && todaySession.late_minutes > 0 && (
-                  <Badge variant="secondary">{todaySession.late_minutes}m late</Badge>
+                  <Badge variant="warning">{todaySession.late_minutes}m late</Badge>
                 )}
                 {error && <p className="text-sm text-destructive">{error}</p>}
               </div>
@@ -167,9 +170,7 @@ export default function AttendancePage() {
               </Link>
             </CardContent>
           </Card>
-        )}
 
-        {me?.employee && (
           <Card>
             <CardHeader>
               <CardTitle>Set up a one-tap shortcut</CardTitle>
@@ -180,6 +181,7 @@ export default function AttendancePage() {
               </CardDescription>
             </CardHeader>
           </Card>
+          </div>
         )}
 
         {!me?.employee && (
@@ -200,10 +202,12 @@ export default function AttendancePage() {
               <TableRow>
                 {canManage && <TableHead>Employee</TableHead>}
                 <TableHead>Date</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Check in</TableHead>
                 <TableHead>Check out</TableHead>
                 <TableHead>Worked</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -211,6 +215,9 @@ export default function AttendancePage() {
                 <TableRow key={session.id}>
                   {canManage && <TableCell className="font-medium">{session.employee.name}</TableCell>}
                   <TableCell>{session.date}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {session.check_in_event?.work_location?.name ?? "—"}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatTime(session.check_in_event?.event_time)}
                   </TableCell>
@@ -222,14 +229,20 @@ export default function AttendancePage() {
                     <Badge
                       variant={
                         session.status === "completed"
-                          ? "default"
-                          : session.status === "missing_checkout"
-                            ? "destructive"
-                            : "secondary"
+                        ? "success"
+                        : session.status === "missing_checkout"
+                          ? "destructive"
+                          : "info"
                       }
                     >
                       {session.status.replace("_", " ")}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm" onClick={() => setPreviewSession(session)}>
+                      <Eye className="size-3.5" />
+                      Preview
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -239,6 +252,12 @@ export default function AttendancePage() {
       </div>
 
       <QrScanDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />
+      <AttendancePreviewDialog
+        session={previewSession}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setPreviewSession(null);
+        }}
+      />
     </div>
   );
 }

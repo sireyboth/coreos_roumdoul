@@ -62,8 +62,8 @@ export default function WorkLocationsPage() {
   const canManage = me?.permissions.includes("work_locations.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Work Locations"
           description="Where employees can check in from, with a geofence radius for future GPS verification."
@@ -144,7 +144,7 @@ export default function WorkLocationsPage() {
                   <TableCell className="text-muted-foreground">{location.address ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{location.radius_meters}m</TableCell>
                   <TableCell>
-                    <Badge variant={location.is_active ? "default" : "secondary"}>
+                    <Badge variant={location.is_active ? "success" : "secondary"}>
                       {location.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>

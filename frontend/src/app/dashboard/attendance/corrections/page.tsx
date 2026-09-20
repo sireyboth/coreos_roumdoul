@@ -84,8 +84,8 @@ export default function AttendanceCorrectionsPage() {
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Correction requests"
           description="Fix a missed check-in or check-out."
@@ -183,10 +183,10 @@ export default function AttendanceCorrectionsPage() {
                     <Badge
                       variant={
                         correction.status === "approved"
-                          ? "default"
+                          ? "success"
                           : correction.status === "rejected"
                             ? "destructive"
-                            : "secondary"
+                            : "warning"
                       }
                     >
                       {correction.status}

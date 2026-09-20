@@ -302,8 +302,8 @@ export default function BranchesPage() {
   const canManage = me?.permissions.includes("branches.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Branches"
           description="Physical or virtual locations your employees belong to."
@@ -378,7 +378,7 @@ export default function BranchesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={branch.is_active ? "default" : "secondary"}>
+                    <Badge variant={branch.is_active ? "success" : "secondary"}>
                       {branch.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>

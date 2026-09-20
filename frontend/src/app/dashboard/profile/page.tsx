@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
 
@@ -74,15 +75,14 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-          <p className="text-sm text-muted-foreground">
-            {me.roles.join(", ") || "no role"} at {me.company?.name ?? "Business OS"}
-          </p>
-        </div>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
+        <PageHeader
+          title="Profile"
+          description={`${me.roles.join(", ") || "no role"} at ${me.company?.name ?? "Business OS"}`}
+        />
 
+        <div className="grid items-start gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Account details</CardTitle>
@@ -105,7 +105,7 @@ export default function ProfilePage() {
                 />
               </div>
               {profileError && <p className="text-sm text-destructive">{profileError}</p>}
-              {profileSaved && <Badge variant="secondary">Saved</Badge>}
+              {profileSaved && <Badge variant="success">Saved</Badge>}
               <Button type="submit" disabled={savingProfile} className="self-start">
                 {savingProfile ? "Saving…" : "Save changes"}
               </Button>
@@ -154,13 +154,14 @@ export default function ProfilePage() {
                 />
               </div>
               {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-              {passwordSaved && <Badge variant="secondary">Password updated</Badge>}
+              {passwordSaved && <Badge variant="success">Password updated</Badge>}
               <Button type="submit" disabled={savingPassword} className="self-start">
                 {savingPassword ? "Updating…" : "Update password"}
               </Button>
             </form>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );

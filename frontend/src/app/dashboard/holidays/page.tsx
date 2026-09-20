@@ -68,8 +68,8 @@ export default function HolidaysPage() {
   const canManage = me?.permissions.includes("holidays.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Holidays"
           description="Company-wide non-working days."

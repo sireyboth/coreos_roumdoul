@@ -66,8 +66,8 @@ export default function ShiftsPage() {
   const canManage = me?.permissions.includes("shifts.manage") ?? false;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Shifts"
           description="Reusable start/end times and break rules employees get scheduled onto."
@@ -170,7 +170,7 @@ export default function ShiftsPage() {
                     {shift.break_minutes > 0 ? `${shift.break_minutes} min` : "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={shift.is_active ? "default" : "secondary"}>
+                    <Badge variant={shift.is_active ? "success" : "secondary"}>
                       {shift.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>

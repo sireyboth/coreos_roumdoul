@@ -153,6 +153,22 @@ export type AttendanceEvent = {
   id: number;
   event_type: "check_in" | "check_out";
   event_time: string;
+  // qr / gps / correction / none — how presence was verified.
+  method: "qr" | "gps" | "correction" | "none" | null;
+  latitude: number | null;
+  longitude: number | null;
+  // Meters from the work location, when both sides had coordinates.
+  distance_meters: number | null;
+  device_id: string | null;
+  notes: string | null;
+  work_location: {
+    id: number;
+    name: string;
+    address: string | null;
+    latitude: number | string | null;
+    longitude: number | string | null;
+  } | null;
+  recorded_by: { id: number; name: string } | null;
 };
 
 export type AttendanceSession = {
@@ -162,6 +178,7 @@ export type AttendanceSession = {
   worked_minutes: number | null;
   late_minutes: number;
   employee: Employee;
+  schedule: { shift: { name: string; start_time: string; end_time: string } | null } | null;
   check_in_event: AttendanceEvent | null;
   check_out_event: AttendanceEvent | null;
 };
