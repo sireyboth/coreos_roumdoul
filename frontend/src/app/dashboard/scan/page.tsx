@@ -26,18 +26,36 @@ function formatTime(iso: string): string {
 export default function ScanPage() {
   const { me } = useMe();
   const [status, setStatus] = useState<Status>({ kind: "scanning" });
-  const [todaySession, setTodaySession] = useState<AttendanceSession | null>(null);
+  const [openSession, setOpenSession] = useState<AttendanceSession | null>(null);
   const gpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
-  const isCheckingOut = Boolean(todaySession?.check_in_event && !todaySession?.check_out_event);
+  // Any shift that has a check-in but no check-out yet — not "today's" record,
+  // so an overnight shift (in before midnight, out after) still checks out.
+  const isCheckingOut = openSession !== null;
+
+  const loadOpenSession = useCallback(() => {
+    api.attendance
+      .list()
+      .then((res) => {
+        setOpenSession(res.data.find((s) => s.check_in_event && !s.check_out_event) ?? null);
+      })
+      .catch(() => {});
+  }, []);
+
+  const hasEmployee = Boolean(me?.employee);
 
   useEffect(() => {
-    if (!me?.employee) return;
-    const today = new Date().toISOString().slice(0, 10);
-    api.attendance.list().then((res) => {
-      setTodaySession(res.data.find((s) => s.date === today) ?? null);
-    });
-  }, [me?.employee]);
+    if (!hasEmployee) return;
+    loadOpenSession();
+
+    // The home-screen app can sit open in the background for hours — refresh
+    // when it comes back so the next scan is treated correctly.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadOpenSession();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [hasEmployee, loadOpenSession]);
 
   useEffect(() => {
     if (status.kind !== "scanning") return;
@@ -64,6 +82,7 @@ export default function ScanPage() {
           ...gpsRef.current,
         });
         setStatus({ kind: "success", action, time: event.event_time });
+        loadOpenSession();
       } catch (err) {
         setStatus({
           kind: "error",
@@ -71,7 +90,7 @@ export default function ScanPage() {
         });
       }
     },
-    [isCheckingOut],
+    [isCheckingOut, loadOpenSession],
   );
 
   const { videoRef, canvasRef, error: cameraError } = useQrScanner(status.kind === "scanning", handleScan);
@@ -128,6 +147,11 @@ export default function ScanPage() {
               {status.action === "check_in" ? "Checked in" : "Checked out"}
             </p>
             <p className="text-white/70">at {formatTime(status.time)}</p>
+            {status.action === "check_in" && (
+              <p className="mt-3 text-sm text-white/60">
+                When you finish work, open this again and scan the same QR code to check out.
+              </p>
+            )}
           </div>
           <Button onClick={scanAgain} variant="secondary" size="lg" className="mt-4">
             {status.action === "check_in" ? <LogIn className="size-4" /> : <LogOut className="size-4" />}

@@ -12,13 +12,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AttendancePreviewDialog } from "@/components/dashboard/attendance-preview-dialog";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
+import { dateOnly, isToday } from "@/lib/date";
 
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
@@ -49,9 +49,11 @@ export default function AttendancePage() {
     load();
   }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todaySession = sessions?.find((s) => s.date === today);
-  const isCheckingOut = Boolean(todaySession?.check_in_event && !todaySession?.check_out_event);
+  const todaySession = sessions?.find((s) => isToday(s.date));
+  // Any shift with a check-in but no check-out — not just today's, so an
+  // overnight shift can still be checked out of after midnight.
+  const openSession = sessions?.find((s) => s.check_in_event && !s.check_out_event);
+  const isCheckingOut = Boolean(openSession);
 
   useEffect(() => {
     if (!scannerOpen) return;
@@ -122,6 +124,109 @@ export default function AttendancePage() {
 
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
 
+  const columns: DataTableColumn<AttendanceSession>[] = [
+    ...(canManage
+      ? [
+          {
+            id: "employee",
+            header: "Employee",
+            primary: true,
+            cell: (session: AttendanceSession) => <span className="font-medium">{session.employee.name}</span>,
+            sortValue: (session: AttendanceSession) => session.employee.name,
+            searchValue: (session: AttendanceSession) => session.employee.name,
+          },
+        ]
+      : []),
+    {
+      id: "date",
+      header: "Date",
+      primary: !canManage,
+      cell: (session) => dateOnly(session.date),
+      sortValue: (session) => session.date,
+    },
+    {
+      id: "location",
+      header: "Location",
+      cell: (session) => (
+        <span className="text-muted-foreground">{session.check_in_event?.work_location?.name ?? "—"}</span>
+      ),
+      sortValue: (session) => session.check_in_event?.work_location?.name,
+      searchValue: (session) => session.check_in_event?.work_location?.name,
+    },
+    {
+      id: "check_in",
+      header: "Check in",
+      cell: (session) => (
+        <span className="text-muted-foreground">{formatTime(session.check_in_event?.event_time)}</span>
+      ),
+      sortValue: (session) => session.check_in_event?.event_time,
+    },
+    {
+      id: "check_out",
+      header: "Check out",
+      cell: (session) => (
+        <span className="text-muted-foreground">{formatTime(session.check_out_event?.event_time)}</span>
+      ),
+      sortValue: (session) => session.check_out_event?.event_time,
+    },
+    {
+      id: "worked",
+      header: "Worked",
+      cell: (session) => <span className="text-muted-foreground">{formatMinutes(session.worked_minutes)}</span>,
+      sortValue: (session) => session.worked_minutes,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (session) => (
+        <Badge
+          variant={
+            session.status === "completed"
+              ? "success"
+              : session.status === "missing_checkout"
+                ? "destructive"
+                : "info"
+          }
+        >
+          {session.status.replace("_", " ")}
+        </Badge>
+      ),
+      sortValue: (session) => session.status,
+    },
+  ];
+
+  const employeeOptions = Array.from(
+    new Map((sessions ?? []).map((session) => [session.employee.id, session.employee.name])).entries(),
+  )
+    .map(([value, label]) => ({ value: String(value), label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const filters: DataTableFilter<AttendanceSession>[] = [
+    {
+      type: "select",
+      id: "status",
+      label: "Status",
+      options: [
+        { value: "open", label: "Open" },
+        { value: "completed", label: "Completed" },
+        { value: "missing_checkout", label: "Missing checkout" },
+      ],
+      getValue: (session) => session.status,
+    },
+    ...(canManage
+      ? [
+          {
+            type: "select" as const,
+            id: "employee",
+            label: "Employee",
+            options: employeeOptions,
+            getValue: (session: AttendanceSession) => String(session.employee.id),
+          },
+        ]
+      : []),
+    { type: "date-range", id: "date", label: "Date", getValue: (session) => dateOnly(session.date) },
+  ];
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
@@ -146,7 +251,7 @@ export default function AttendancePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col items-start gap-3">
-              {!todaySession?.check_out_event && (
+              {(isCheckingOut || !todaySession?.check_out_event) && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button onClick={() => setScannerOpen(true)} disabled={working} size="lg">
                     <QrCode className="size-4" />
@@ -190,65 +295,25 @@ export default function AttendancePage() {
           </p>
         )}
 
-        {sessions === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {sessions?.length === 0 && (
-          <EmptyState icon={Clock} title="No attendance yet" description="Check-ins will show up here." />
-        )}
-
-        {sessions && sessions.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canManage && <TableHead>Employee</TableHead>}
-                <TableHead>Date</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Check in</TableHead>
-                <TableHead>Check out</TableHead>
-                <TableHead>Worked</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessions.map((session) => (
-                <TableRow key={session.id}>
-                  {canManage && <TableCell className="font-medium">{session.employee.name}</TableCell>}
-                  <TableCell>{session.date}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {session.check_in_event?.work_location?.name ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatTime(session.check_in_event?.event_time)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatTime(session.check_out_event?.event_time)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatMinutes(session.worked_minutes)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        session.status === "completed"
-                        ? "success"
-                        : session.status === "missing_checkout"
-                          ? "destructive"
-                          : "info"
-                      }
-                    >
-                      {session.status.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => setPreviewSession(session)}>
-                      <Eye className="size-3.5" />
-                      Preview
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          data={sessions}
+          getRowId={(session) => session.id}
+          columns={columns}
+          filters={filters}
+          searchPlaceholder="Search by employee or location…"
+          initialSort={{ columnId: "date", direction: "desc" }}
+          emptyState={{
+            icon: Clock,
+            title: "No attendance yet",
+            description: "Check-ins will show up here.",
+          }}
+          rowActions={(session) => (
+            <Button variant="outline" size="sm" onClick={() => setPreviewSession(session)}>
+              <Eye className="size-3.5" />
+              Preview
+            </Button>
+          )}
+        />
       </div>
 
       <QrScanDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />

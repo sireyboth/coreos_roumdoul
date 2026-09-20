@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AttendanceEvent, AttendanceSession } from "@/lib/api";
+import { dateOnly } from "@/lib/date";
 
 const METHOD_LABELS: Record<NonNullable<AttendanceEvent["method"]>, string> = {
   qr: "QR scan",
@@ -163,7 +164,7 @@ export function AttendancePreviewDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{session?.employee.name}</DialogTitle>
-          <DialogDescription>{session?.date}</DialogDescription>
+          <DialogDescription>{session ? dateOnly(session.date) : ""}</DialogDescription>
         </DialogHeader>
 
         {session && (

@@ -17,8 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Employee } from "@/lib/api";
@@ -150,6 +149,89 @@ export default function EmployeesPage() {
   }
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
+
+  const columns: DataTableColumn<Employee>[] = [
+    {
+      id: "name",
+      header: "Name",
+      primary: true,
+      cell: (employee) => <span className="font-medium">{employee.name}</span>,
+      sortValue: (employee) => employee.name,
+      searchValue: (employee) => employee.name,
+    },
+    {
+      id: "branch",
+      header: "Branch",
+      cell: (employee) => <span className="text-muted-foreground">{employee.branch?.name ?? "—"}</span>,
+      sortValue: (employee) => employee.branch?.name,
+      searchValue: (employee) => employee.branch?.name,
+    },
+    {
+      id: "job_title",
+      header: "Job title",
+      cell: (employee) => <span className="text-muted-foreground">{employee.job_title ?? "—"}</span>,
+      sortValue: (employee) => employee.job_title,
+      searchValue: (employee) => employee.job_title,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (employee) => (
+        <Badge variant={employee.employment_status === "active" ? "success" : "secondary"}>
+          {employee.employment_status}
+        </Badge>
+      ),
+      sortValue: (employee) => employee.employment_status,
+    },
+    {
+      id: "login",
+      header: "Login",
+      sortValue: (employee) => (employee.has_login ? 1 : 0),
+      cell: (employee) =>
+        employee.has_login ? (
+          <Badge variant="outline">Has login</Badge>
+        ) : canManage ? (
+          <Button variant="outline" size="sm" onClick={() => setLoginFor(employee)}>
+            <KeyRound className="size-3.5" />
+            Create login
+          </Button>
+        ) : (
+          <span className="text-muted-foreground">No login</span>
+        ),
+    },
+  ];
+
+  const filters: DataTableFilter<Employee>[] = [
+    {
+      type: "select",
+      id: "status",
+      label: "Status",
+      options: [
+        { value: "active", label: "Active" },
+        { value: "on_leave", label: "On leave" },
+        { value: "suspended", label: "Suspended" },
+        { value: "terminated", label: "Terminated" },
+      ],
+      getValue: (employee) => employee.employment_status,
+    },
+    {
+      type: "select",
+      id: "branch",
+      label: "Branch",
+      options: branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
+      getValue: (employee) => (employee.branch ? String(employee.branch.id) : null),
+    },
+    {
+      type: "select",
+      id: "login",
+      label: "Login",
+      options: [
+        { value: "yes", label: "Has login" },
+        { value: "no", label: "No login yet" },
+      ],
+      getValue: (employee) => (employee.has_login ? "yes" : "no"),
+    },
+  ];
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
 
   return (
@@ -253,55 +335,19 @@ export default function EmployeesPage() {
           </p>
         )}
 
-        {employees === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {employees?.length === 0 && (
-          <EmptyState
-            icon={Users}
-            title="No employees yet"
-            description="Add your first employee to start building your team directory."
-          />
-        )}
-
-        {employees && employees.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Branch</TableHead>
-                <TableHead>Job title</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Login</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {employees.map((employee) => (
-                <TableRow key={employee.id}>
-                  <TableCell className="font-medium">{employee.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{employee.branch?.name ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{employee.job_title ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={employee.employment_status === "active" ? "success" : "secondary"}>
-                      {employee.employment_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {employee.has_login ? (
-                      <Badge variant="outline">Has login</Badge>
-                    ) : canManage ? (
-                      <Button variant="outline" size="sm" onClick={() => setLoginFor(employee)}>
-                        <KeyRound className="size-3.5" />
-                        Create login
-                      </Button>
-                    ) : (
-                      <span className="text-muted-foreground">No login</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          data={employees}
+          getRowId={(employee) => employee.id}
+          columns={columns}
+          filters={filters}
+          searchPlaceholder="Search by name, branch or job title…"
+          initialSort={{ columnId: "name", direction: "asc" }}
+          emptyState={{
+            icon: Users,
+            title: "No employees yet",
+            description: "Add your first employee to start building your team directory.",
+          }}
+        />
       </div>
 
       <CreateLoginDialog

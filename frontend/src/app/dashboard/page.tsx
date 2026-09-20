@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { api, AttendanceSession } from "@/lib/api";
+import { dateOnly } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 const MODULE_LABELS: Record<string, string> = {
@@ -107,7 +108,7 @@ function WeekChart({ sessions }: { sessions: AttendanceSession[] | null }) {
       out.push({
         key,
         label: d.toLocaleDateString([], { weekday: "short" }),
-        count: sessions?.filter((s) => s.date === key).length ?? 0,
+        count: sessions?.filter((s) => dateOnly(s.date) === key).length ?? 0,
         today: i === 0,
       });
     }
@@ -251,7 +252,7 @@ export default function DashboardPage() {
   const today = isoDate(new Date());
   const enabledModules = Object.values(me.modules).filter(Boolean).length;
   const totalModules = Object.keys(me.modules).length;
-  const presentToday = sessions?.filter((s) => s.date === today).length ?? null;
+  const presentToday = sessions?.filter((s) => dateOnly(s.date) === today).length ?? null;
 
   const kpis: Kpi[] = [];
   if (canAttendance)

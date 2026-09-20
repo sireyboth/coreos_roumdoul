@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist_Mono, Inter, Noto_Sans_Khmer } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-// Aeonik is a paid commercial font with no free/Google Fonts distribution.
-// Plus Jakarta Sans is the closest free match to its geometric, rounded
-// letterforms. Swap this for next/font/local pointing at real Aeonik files
-// if a license is purchased later — nothing else needs to change.
-const sans = Plus_Jakarta_Sans({
-  variable: "--font-jakarta-sans",
-  subsets: ["latin"],
+// Inter for English text and numbers (built for data-heavy screens, with
+// digits that line up in columns), Noto Sans Khmer for Khmer text — the
+// browser picks per character, so mixed English/Khmer lines stay consistent.
+const sans = Inter({
+  variable: "--font-inter",
+  subsets: ["latin", "latin-ext"],
+});
+
+const khmer = Noto_Sans_Khmer({
+  variable: "--font-khmer",
+  subsets: ["khmer"],
 });
 
 const geistMono = Geist_Mono({
@@ -39,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${sans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${sans.variable} ${khmer.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
