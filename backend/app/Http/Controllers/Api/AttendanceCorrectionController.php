@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceCorrection;
+use App\Models\Employee;
 use App\Services\AttendanceService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -51,13 +53,20 @@ class AttendanceCorrectionController extends Controller
             abort(403);
         }
 
+        // The times were typed on the employee's wall clock — read them in the
+        // company's timezone, then store them as the same instant in UTC.
+        $timezone = Employee::query()->findOrFail($employeeId)->company?->timezone ?: config('attendance.default_timezone');
+        $toUtc = fn (?string $value) => $value
+            ? Carbon::parse($value, $timezone)->setTimezone(config('app.timezone'))
+            : null;
+
         $correction = AttendanceCorrection::query()->create([
             'employee_id' => $employeeId,
             'date' => $data['date'],
             'requested_by' => $request->user()->id,
             'reason' => $data['reason'],
-            'requested_check_in' => $data['requested_check_in'] ?? null,
-            'requested_check_out' => $data['requested_check_out'] ?? null,
+            'requested_check_in' => $toUtc($data['requested_check_in'] ?? null),
+            'requested_check_out' => $toUtc($data['requested_check_out'] ?? null),
         ]);
 
         return response()->json($correction->load('employee'), 201);

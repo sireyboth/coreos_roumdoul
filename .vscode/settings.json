@@ -1,0 +1,20 @@
+{
+    "sqltools.connections": [
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": true
+                }
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "ep-gentle-dream-aogkav4m.c-2.aws-ap-southeast-1.pg.laravel.cloud",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "coreos",
+            "database": "production",
+            "username": "laravel",
+            "password": "npg_vXOex4oSrEG2"
+        }
+    ]
+}

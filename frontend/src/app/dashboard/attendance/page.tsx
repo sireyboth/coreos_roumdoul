@@ -52,9 +52,13 @@ export default function AttendancePage() {
   }, []);
 
   const todaySession = sessions?.find((s) => isToday(s.date));
-  // Any shift with a check-in but no check-out — not just today's, so an
-  // overnight shift can still be checked out of after midnight.
-  const openSession = sessions?.find((s) => s.check_in_event && !s.check_out_event);
+  // The shift the server still has open — not just today's, so an overnight
+  // shift can still be checked out of after midnight. Shifts forgotten for
+  // too long become "missing_checkout" and stop counting as open.
+  const openSession = sessions?.find((s) => s.status === "open");
+  const myForgottenShifts = (sessions ?? []).filter(
+    (s) => s.status === "missing_checkout" && s.employee.id === me?.employee?.id,
+  );
   const isCheckingOut = Boolean(openSession);
 
   useEffect(() => {
@@ -243,6 +247,25 @@ export default function AttendancePage() {
             </Link>
           }
         />
+
+        {myForgottenShifts.length > 0 && (
+          <Alert
+            variant="warning"
+            title={
+              myForgottenShifts.length === 1
+                ? "You forgot to check out once"
+                : `You forgot to check out ${myForgottenShifts.length} times`
+            }
+            action={
+              <Link href="/dashboard/attendance/corrections" className="text-sm font-medium underline">
+                Request a correction
+              </Link>
+            }
+          >
+            No check-out was recorded on {myForgottenShifts.map((s) => dateOnly(s.date)).join(", ")}, so those hours
+            aren&apos;t counted yet. Ask for a correction so your manager can fix it.
+          </Alert>
+        )}
 
         {me?.employee && (
           <div className="grid items-stretch gap-6 lg:grid-cols-3">

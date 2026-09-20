@@ -226,7 +226,7 @@ class AttendanceQrCheckInTest extends TestCase
         $this->assertNull($record['check_out_event']);
     }
 
-    public function test_a_check_in_with_no_qr_and_no_gps_is_recorded_as_unverified(): void
+    public function test_a_check_in_with_neither_a_qr_scan_nor_gps_is_rejected(): void
     {
         $company = app(CompanyProvisioner::class)->provision('Lambda', 'Boss', 'boss@lambda.test', 'password123');
         $this->subscribeToGrowth($company->id);
@@ -235,7 +235,7 @@ class AttendanceQrCheckInTest extends TestCase
         Employee::query()->create(['company_id' => $company->id, 'name' => 'Bare', 'user_id' => $user->id]);
 
         $this->actingAs($user)->postJson('/api/attendance/check-in')
-            ->assertCreated()
-            ->assertJsonPath('method', 'none');
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('verification');
     }
 }

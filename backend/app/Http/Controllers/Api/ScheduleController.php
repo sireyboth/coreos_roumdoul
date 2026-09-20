@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DayOff;
 use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -41,6 +42,7 @@ class ScheduleController extends Controller
         ]);
 
         $this->assertNotDoubleBooked($data['employee_id'], $data['date']);
+        $this->assertNotOnDayOff($data['employee_id'], $data['date']);
 
         return response()->json(Schedule::query()->create($data)->load(['employee', 'shift', 'workLocation']), 201);
     }
@@ -65,6 +67,7 @@ class ScheduleController extends Controller
             $data['date'] ?? $schedule->date,
             ignoreScheduleId: $schedule->id,
         );
+        $this->assertNotOnDayOff($data['employee_id'] ?? $schedule->employee_id, $data['date'] ?? $schedule->date);
 
         $schedule->update($data);
 
@@ -96,6 +99,15 @@ class ScheduleController extends Controller
         if ($exists) {
             throw ValidationException::withMessages([
                 'date' => ['This employee already has a schedule for that date.'],
+            ]);
+        }
+    }
+
+    private function assertNotOnDayOff(int $employeeId, mixed $date): void
+    {
+        if (DayOff::query()->where('employee_id', $employeeId)->whereDate('date', $date)->exists()) {
+            throw ValidationException::withMessages([
+                'date' => ['This employee is marked as off that day. Remove the day off first.'],
             ]);
         }
     }

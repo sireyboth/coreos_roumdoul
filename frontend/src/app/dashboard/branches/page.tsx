@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { Building2, MapPin, Plus, QrCode } from "lucide-react";
+import { Building2, MapPin, Pencil, Plus, QrCode, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,89 +16,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
-
-function BranchQrDialog({
-  branch,
-  open,
-  onOpenChange,
-  onRegenerated,
-}: {
-  branch: Branch | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onRegenerated: (branch: Branch) => void;
-}) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [regenerating, setRegenerating] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const token = branch?.qr_token;
-
-    (token
-      ? QRCode.toDataURL(token, { width: 320, margin: 1 })
-      : Promise.resolve(null)
-    ).then((url) => {
-      if (!cancelled) setImageUrl(url);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [branch?.qr_token]);
-
-  async function handleRegenerate() {
-    if (!branch) return;
-    if (!confirm("Regenerate this QR code? The old poster will stop working immediately.")) return;
-    setRegenerating(true);
-    try {
-      const updated = await api.branches.regenerateQr(branch.id);
-      onRegenerated(updated);
-      notifySuccess("New QR code generated", "The old poster no longer works.");
-    } catch (err) {
-      notifyError(err);
-      notifyError(err);
-    } finally {
-      setRegenerating(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Check-in QR code for &quot;{branch?.name}&quot;</DialogTitle>
-          <DialogDescription>
-            Print this and place it where employees check in. Scanning it checks them in at this branch —
-            no GPS needed.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col items-center gap-4 py-2">
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt={`QR code for ${branch?.name}`} className="rounded-md border border-border" />
-          ) : (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          )}
-        </div>
-        <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="outline" onClick={handleRegenerate} disabled={regenerating}>
-            {regenerating ? "Regenerating…" : "Regenerate code"}
-          </Button>
-          <DialogClose render={<Button type="button" />}>Done</DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { QrCodeDialog } from "@/components/dashboard/qr-code-dialog";
 
 type BranchFormState = {
   name: string;
@@ -226,6 +151,7 @@ function BranchFormFields({
 
 export default function BranchesPage() {
   const { me, refresh } = useMe();
+  const confirm = useConfirm();
   const [branches, setBranches] = useState<Branch[] | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -279,6 +205,25 @@ export default function BranchesPage() {
     }
   }
 
+  async function handleDelete(branch: Branch) {
+    const ok = await confirm({
+      title: `Delete "${branch.name}"?`,
+      description:
+        "Its check-in location and QR code are removed too. Past attendance keeps its history. If employees are still assigned here, move them first — or just deactivate the branch instead.",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await api.branches.remove(branch.id);
+      notifySuccess(`"${branch.name}" deleted`);
+      refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+    load();
+  }
+
   function openEdit(branch: Branch) {
     setEditingBranch(branch);
     setEditForm({
@@ -312,6 +257,45 @@ export default function BranchesPage() {
   }
 
   const canManage = me?.permissions.includes("branches.manage") ?? false;
+
+  const columns: DataTableColumn<Branch>[] = [
+    {
+      id: "name",
+      header: "Name",
+      primary: true,
+      cell: (branch) => <span className="font-medium">{branch.name}</span>,
+      sortValue: (branch) => branch.name,
+      searchValue: (branch) => `${branch.name} ${branch.address ?? ""}`,
+    },
+    {
+      id: "code",
+      header: "Code",
+      cell: (branch) => <span className="text-muted-foreground">{branch.code ?? "—"}</span>,
+      sortValue: (branch) => branch.code,
+      searchValue: (branch) => branch.code,
+    },
+    {
+      id: "location",
+      header: "Location",
+      cell: (branch) =>
+        branch.latitude != null ? (
+          <Badge variant="outline">
+            <MapPin className="size-3" />
+            GPS set
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (branch) => (
+        <Badge variant={branch.is_active ? "success" : "secondary"}>{branch.is_active ? "Active" : "Inactive"}</Badge>
+      ),
+      sortValue: (branch) => (branch.is_active ? 1 : 0),
+    },
+  ];
   const atBranchLimit = me?.plan?.max_branches != null && (me.usage?.branches ?? 0) >= me.plan.max_branches;
 
   return (
@@ -356,65 +340,37 @@ export default function BranchesPage() {
 
         <PlanLimitAlert resource="branches" />
 
-        {branches === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {branches?.length === 0 && (
-          <EmptyState
-            icon={Building2}
-            title="No branches yet"
-            description="Add your first branch to start organizing your team."
-          />
-        )}
-
-        {branches && branches.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Status</TableHead>
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {branches.map((branch) => (
-                <TableRow key={branch.id}>
-                  <TableCell className="font-medium">{branch.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{branch.code ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {branch.latitude != null ? (
-                      <Badge variant="outline">
-                        <MapPin className="size-3" />
-                        GPS set
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={branch.is_active ? "success" : "secondary"}>
-                      {branch.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setQrBranch(branch)}>
-                          <QrCode className="size-3.5" />
-                          QR code
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => openEdit(branch)}>
-                          Edit
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          data={branches}
+          getRowId={(branch) => branch.id}
+          columns={columns}
+          searchPlaceholder="Search branches…"
+          emptyState={{
+            icon: Building2,
+            title: "No branches yet",
+            description: "Add your first branch to start organizing your team.",
+          }}
+          rowActions={
+            canManage
+              ? (branch) => (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setQrBranch(branch)}>
+                      <QrCode className="size-3.5" />
+                      QR code
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openEdit(branch)}>
+                      <Pencil className="size-3.5" />
+                      Edit
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(branch)}>
+                      <Trash2 className="size-3.5" />
+                      Delete
+                    </Button>
+                  </>
+                )
+              : undefined
+          }
+        />
 
         <Dialog open={!!editingBranch} onOpenChange={(open) => !open && setEditingBranch(null)}>
           <DialogContent>
@@ -445,13 +401,16 @@ export default function BranchesPage() {
         </Dialog>
       </div>
 
-      <BranchQrDialog
-        branch={qrBranch}
+      <QrCodeDialog
+        name={qrBranch?.name}
+        token={qrBranch?.qr_token}
         open={qrBranch !== null}
         onOpenChange={(isOpen) => {
           if (!isOpen) setQrBranch(null);
         }}
-        onRegenerated={(updated) => {
+        onRegenerate={async () => {
+          if (!qrBranch) return;
+          const updated = await api.branches.regenerateQr(qrBranch.id);
           setQrBranch(updated);
           setBranches((current) => current?.map((b) => (b.id === updated.id ? updated : b)) ?? current);
         }}

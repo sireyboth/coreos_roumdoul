@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\WorkLocation;
 use App\Services\CompanyProvisioner;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -31,6 +32,17 @@ class AttendanceTest extends TestCase
         Subscription::query()->create(['company_id' => $companyId, 'plan_id' => $growth->id, 'status' => 'active']);
     }
 
+    /** A phone standing inside the company's (single) branch. */
+    private function gps($company): array
+    {
+        WorkLocation::query()->firstOrCreate(
+            ['company_id' => $company->id, 'name' => 'HQ'],
+            ['latitude' => 11.5564, 'longitude' => 104.9282, 'radius_meters' => 100],
+        );
+
+        return ['latitude' => 11.5564, 'longitude' => 104.9282];
+    }
+
     public function test_company_without_attendance_module_is_blocked(): void
     {
         $company = app(CompanyProvisioner::class)->provision('NoModule Co', 'Boss', 'boss@nomodule.test', 'password123');
@@ -51,11 +63,11 @@ class AttendanceTest extends TestCase
         $user = $this->createUserWithRole($company, 'employee');
         $employee = Employee::query()->create(['company_id' => $company->id, 'name' => 'Worker', 'user_id' => $user->id]);
 
-        $this->actingAs($user)->postJson('/api/attendance/check-in')->assertCreated();
+        $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
 
         $this->travel(4)->hours();
 
-        $this->actingAs($user)->postJson('/api/attendance/check-out')->assertCreated();
+        $this->actingAs($user)->postJson('/api/attendance/check-out', $this->gps($company))->assertCreated();
 
         $session = $employee->fresh();
         $response = $this->actingAs($admin)->getJson('/api/attendance');
@@ -74,10 +86,10 @@ class AttendanceTest extends TestCase
         $user = $this->createUserWithRole($company, 'employee');
         Employee::query()->create(['company_id' => $company->id, 'name' => 'Worker', 'user_id' => $user->id]);
 
-        $this->actingAs($user)->postJson('/api/attendance/check-out')->assertStatus(422);
+        $this->actingAs($user)->postJson('/api/attendance/check-out', $this->gps($company))->assertStatus(422);
 
-        $this->actingAs($user)->postJson('/api/attendance/check-in')->assertCreated();
-        $this->actingAs($user)->postJson('/api/attendance/check-in')->assertStatus(422);
+        $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
+        $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertStatus(422);
     }
 
     public function test_employee_can_only_see_own_attendance(): void
@@ -91,8 +103,8 @@ class AttendanceTest extends TestCase
         $userB = $this->createUserWithRole($company, 'employee');
         Employee::query()->create(['company_id' => $company->id, 'name' => 'B', 'user_id' => $userB->id]);
 
-        $this->actingAs($userA)->postJson('/api/attendance/check-in')->assertCreated();
-        $this->actingAs($userB)->postJson('/api/attendance/check-in')->assertCreated();
+        $this->actingAs($userA)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
+        $this->actingAs($userB)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
 
         $response = $this->actingAs($userA)->getJson('/api/attendance');
         $names = collect($response->json('data'))->pluck('employee.name');

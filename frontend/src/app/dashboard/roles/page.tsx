@@ -23,6 +23,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, PermissionGroup, Role } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function permissionLabel(permission: string): string {
   const action = permission.split(".")[1];
@@ -78,6 +79,7 @@ function PermissionCheckboxes({
 
 export default function RolesPage() {
   const { me } = useMe();
+  const confirm = useConfirm();
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
 
@@ -147,7 +149,12 @@ export default function RolesPage() {
   }
 
   async function handleDelete(role: Role) {
-    if (!confirm(`Delete the "${role.name}" role?`)) return;
+    const ok = await confirm({
+      title: `Delete the "${role.name}" role?`,
+      description: "This can't be undone. A role that's still assigned to someone can't be deleted.",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await api.roles.remove(role.id);
       notifySuccess(`"${role.name}" role deleted`);

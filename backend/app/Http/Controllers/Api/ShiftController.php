@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Schedule;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 
@@ -50,8 +51,19 @@ class ShiftController extends Controller
         return $shift;
     }
 
-    public function destroy(Shift $shift)
+    public function destroy(Request $request, Shift $shift)
     {
+        $today = now($request->user()->company->timezone ?: config('attendance.default_timezone'))->toDateString();
+
+        $upcoming = Schedule::query()->where('shift_id', $shift->id)->whereDate('date', '>=', $today)->count();
+
+        if ($upcoming > 0) {
+            return response()->json([
+                'message' => "\"{$shift->name}\" is still scheduled on {$upcoming} upcoming ".($upcoming === 1 ? 'day' : 'days').'. Remove those schedules first, or deactivate the shift instead.',
+                'code' => 'in_use',
+            ], 422);
+        }
+
         $shift->delete();
 
         return response()->noContent();

@@ -99,6 +99,35 @@ export type Employee = {
 
 type Paginated<T> = { data: T[] };
 
+export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "none";
+export type CalendarAttendance = "present" | "late" | "absent" | "missing_checkout";
+
+export type CalendarDay = {
+  date: string;
+  type: CalendarDayType;
+  label: string | null;
+  day_off_id: number | null;
+  shift: { name: string; start_time: string; end_time: string } | null;
+  schedule_id: number | null;
+  work_location: string | null;
+  // What actually happened; null for future days and days with nothing planned.
+  attendance: CalendarAttendance | null;
+  late_minutes: number | null;
+  check_in: string | null;
+  check_out: string | null;
+};
+
+export type CalendarMonth = {
+  employee: { id: number; name: string };
+  month: string;
+  today: string;
+  timezone: string;
+  // 0 = Sunday .. 6 = Saturday
+  weekly_off_days: number[];
+  summary: { work_days: number; holidays: number; days_off: number; present: number; late: number; absent: number };
+  days: CalendarDay[];
+};
+
 export type Notification = {
   id: number;
   data: { title: string; body?: string; [key: string]: unknown };
@@ -132,8 +161,14 @@ export type WorkLocation = {
   id: number;
   name: string;
   address: string | null;
+  latitude: number | string | null;
+  longitude: number | string | null;
   radius_meters: number;
   is_active: boolean;
+  qr_token?: string | null;
+  // Set when this is a branch's own check-in point (managed through the branch).
+  branch_id: number | null;
+  branch?: { id: number; name: string } | null;
 };
 
 export type Shift = {
@@ -234,6 +269,7 @@ export const api = {
     update: (id: number, data: Partial<Branch>) =>
       request<Branch>(`/api/branches/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     regenerateQr: (id: number) => request<Branch>(`/api/branches/${id}/regenerate-qr`, { method: "POST" }),
+    remove: (id: number) => request<void>(`/api/branches/${id}`, { method: "DELETE" }),
   },
 
   employees: {
@@ -245,6 +281,9 @@ export const api = {
       email?: string;
       password?: string;
     }) => request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: { name?: string; job_title?: string | null; branch_id?: number; employment_status?: string }) =>
+      request<Employee>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/employees/${id}`, { method: "DELETE" }),
     createLogin: (id: number, data: { email: string; password: string }) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
   },
@@ -282,25 +321,53 @@ export const api = {
     list: () => request<Paginated<WorkLocation>>("/api/work_locations"),
     create: (data: Partial<WorkLocation>) =>
       request<WorkLocation>("/api/work_locations", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<WorkLocation>) =>
+      request<WorkLocation>(`/api/work_locations/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    regenerateQr: (id: number) =>
+      request<WorkLocation>(`/api/work_locations/${id}/regenerate-qr`, { method: "POST" }),
+    remove: (id: number) => request<void>(`/api/work_locations/${id}`, { method: "DELETE" }),
   },
 
   shifts: {
     list: () => request<Paginated<Shift>>("/api/shifts"),
     create: (data: Partial<Shift>) =>
       request<Shift>("/api/shifts", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Shift>) =>
+      request<Shift>(`/api/shifts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/shifts/${id}`, { method: "DELETE" }),
   },
 
   holidays: {
     list: () => request<Paginated<Holiday>>("/api/holidays"),
     create: (data: Partial<Holiday>) =>
       request<Holiday>("/api/holidays", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Holiday>) =>
+      request<Holiday>(`/api/holidays/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/holidays/${id}`, { method: "DELETE" }),
+  },
+
+  calendar: {
+    month: (month: string, employeeId?: number) =>
+      request<CalendarMonth>(`/api/calendar?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+    setWeeklyOffDays: (days: number[]) =>
+      request<{ weekly_off_days: number[] }>("/api/calendar/weekly-off-days", {
+        method: "PUT",
+        body: JSON.stringify({ days }),
+      }),
+  },
+
+  daysOff: {
+    create: (data: { employee_id: number; date: string; reason?: string | null }) =>
+      request<{ id: number }>("/api/days-off", { method: "POST", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/days-off/${id}`, { method: "DELETE" }),
   },
 
   schedules: {
     list: () => request<Paginated<Schedule>>("/api/schedules"),
     create: (data: { employee_id: number; shift_id: number; work_location_id?: number | null; date: string; notes?: string }) =>
       request<Schedule>("/api/schedules", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: { employee_id?: number; shift_id?: number; work_location_id?: number | null; date?: string; notes?: string | null }) =>
+      request<Schedule>(`/api/schedules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/schedules/${id}`, { method: "DELETE" }),
   },
 

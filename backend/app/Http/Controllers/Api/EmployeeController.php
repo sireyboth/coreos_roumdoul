@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\Schedule;
+use App\Services\AuditLogger;
 use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
 use Illuminate\Http\Request;
@@ -147,9 +149,22 @@ class EmployeeController extends Controller
         return $employee->fresh(['branch', 'department', 'team']);
     }
 
-    public function destroy(Employee $employee)
+    public function destroy(Request $request, Employee $employee)
     {
-        $employee->delete();
+        $today = now($request->user()->company->timezone ?: config('attendance.default_timezone'))->toDateString();
+
+        DB::transaction(function () use ($employee, $today) {
+            // A removed employee must not keep a working login or a future rota.
+            Schedule::query()->where('employee_id', $employee->id)->whereDate('date', '>=', $today)->delete();
+
+            if ($user = $employee->user) {
+                $user->update(['is_active' => false]);
+                $user->tokens()->delete();
+                AuditLogger::record('user.deactivated', $user, ['reason' => 'employee removed']);
+            }
+
+            $employee->delete();
+        });
 
         return response()->noContent();
     }

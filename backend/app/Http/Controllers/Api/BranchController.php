@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\EmployeeAssignment;
 use App\Models\WorkLocation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class BranchController extends Controller
 {
@@ -71,7 +73,26 @@ class BranchController extends Controller
 
     public function destroy(Branch $branch)
     {
-        $branch->delete();
+        $employees = EmployeeAssignment::query()
+            ->where('branch_id', $branch->id)
+            ->whereNull('effective_to')
+            ->whereHas('employee', fn ($query) => $query->withoutGlobalScope('branch_access'))
+            ->count();
+
+        if ($employees > 0) {
+            return response()->json([
+                'message' => "{$branch->name} still has {$employees} ".($employees === 1 ? 'employee' : 'employees').'. Move them to another branch first.',
+                'code' => 'in_use',
+            ], 422);
+        }
+
+        // Its check-in location (and QR code) goes with it. Any access
+        // restrictions naming this branch are left alone on purpose: removing
+        // them would turn a restricted manager into an unrestricted one.
+        DB::transaction(function () use ($branch) {
+            $branch->workLocation?->delete();
+            $branch->delete();
+        });
 
         return response()->noContent();
     }

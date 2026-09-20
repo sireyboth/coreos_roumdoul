@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceCorrectionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
+use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\HolidayController;
@@ -62,6 +64,18 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
             ->middlewareFor(['index', 'show'], "company_permission:{$uri}.view")
             ->middlewareFor(['store', 'update', 'destroy'], "company_permission:{$uri}.manage");
     }
+
+    Route::middleware('company_permission:work_locations.manage')->group(function () {
+        Route::post('/work_locations/{work_location}/regenerate-qr', [WorkLocationController::class, 'regenerateQrCode']);
+    });
+
+    Route::get('/calendar', [CalendarController::class, 'index'])->middleware('company_permission:schedules.view');
+
+    Route::middleware('company_permission:schedules.manage')->group(function () {
+        Route::put('/calendar/weekly-off-days', [CalendarController::class, 'setWeeklyOffDays']);
+        Route::post('/days-off', [DayOffController::class, 'store']);
+        Route::delete('/days-off/{day_off}', [DayOffController::class, 'destroy']);
+    });
 
     Route::middleware('company_permission:employees.manage')->group(function () {
         Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);

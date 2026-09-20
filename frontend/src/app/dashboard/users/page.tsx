@@ -24,6 +24,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, CompanyUser, Role } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function BranchAccessDialog({
   user,
@@ -126,6 +127,7 @@ function RoleSelect({
 
 export default function UsersPage() {
   const { me } = useMe();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<CompanyUser[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -195,7 +197,13 @@ export default function UsersPage() {
   }
 
   async function handleRemove(user: CompanyUser) {
-    if (!confirm(`Remove ${user.name}? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Remove ${user.name}?`,
+      description: "They will lose access immediately. This can't be undone.",
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await api.users.remove(user.id);
       notifySuccess(`${user.name} removed`);

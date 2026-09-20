@@ -56,12 +56,12 @@ class AttendanceEvent extends Model
 
     public function employee(): BelongsTo
     {
-        return $this->belongsTo(Employee::class);
+        return $this->belongsTo(Employee::class)->withTrashed();
     }
 
     public function workLocation(): BelongsTo
     {
-        return $this->belongsTo(WorkLocation::class);
+        return $this->belongsTo(WorkLocation::class)->withTrashed();
     }
 
     public function recordedBy(): BelongsTo

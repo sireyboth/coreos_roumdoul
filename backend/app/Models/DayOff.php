@@ -4,21 +4,18 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCompany;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Schedule extends Model
+class DayOff extends Model
 {
-    use Auditable, BelongsToCompany, HasFactory;
+    use Auditable, BelongsToCompany;
 
     protected $fillable = [
         'company_id',
         'employee_id',
-        'shift_id',
-        'work_location_id',
         'date',
-        'notes',
+        'reason',
     ];
 
     protected function casts(): array
@@ -31,15 +28,5 @@ class Schedule extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class)->withTrashed();
-    }
-
-    public function shift(): BelongsTo
-    {
-        return $this->belongsTo(Shift::class)->withTrashed();
-    }
-
-    public function workLocation(): BelongsTo
-    {
-        return $this->belongsTo(WorkLocation::class)->withTrashed();
     }
 }

@@ -29,15 +29,16 @@ export default function ScanPage() {
   const [openSession, setOpenSession] = useState<AttendanceSession | null>(null);
   const gpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
-  // Any shift that has a check-in but no check-out yet — not "today's" record,
-  // so an overnight shift (in before midnight, out after) still checks out.
+  // The shift the server still has open — not "today's" record, so an overnight
+  // shift (in before midnight, out after) still checks out. A forgotten one is
+  // marked missing_checkout by the server and no longer counts.
   const isCheckingOut = openSession !== null;
 
   const loadOpenSession = useCallback(() => {
     api.attendance
       .list()
       .then((res) => {
-        setOpenSession(res.data.find((s) => s.check_in_event && !s.check_out_event) ?? null);
+        setOpenSession(res.data.find((s) => s.status === "open") ?? null);
       })
       .catch(() => {});
   }, []);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { KeyRound, Plus, Users } from "lucide-react";
+import { KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { api, ApiError, Branch, Employee } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function CreateLoginDialog({
   employee,
@@ -102,8 +103,128 @@ function CreateLoginDialog({
   );
 }
 
+const EMPLOYMENT_STATUSES = [
+  { value: "active", label: "Active" },
+  { value: "on_leave", label: "On leave" },
+  { value: "suspended", label: "Suspended" },
+  { value: "terminated", label: "Terminated" },
+];
+
+function EditEmployeeDialog({
+  employee,
+  branches,
+  onOpenChange,
+  onSaved,
+}: {
+  employee: Employee | null;
+  branches: Branch[];
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(employee?.name ?? "");
+  const [jobTitle, setJobTitle] = useState(employee?.job_title ?? "");
+  const [branchId, setBranchId] = useState(employee?.branch_id != null ? String(employee.branch_id) : "");
+  const [status, setStatus] = useState(employee?.employment_status ?? "active");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!employee) return;
+    setError(null);
+    setSaving(true);
+
+    try {
+      await api.employees.update(employee.id, {
+        name,
+        job_title: jobTitle || null,
+        ...(branchId ? { branch_id: Number(branchId) } : {}),
+        employment_status: status,
+      });
+      notifySuccess("Employee updated");
+      onOpenChange(false);
+      onSaved();
+    } catch (err) {
+      notifyError(err);
+      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={employee !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit {employee?.name}</DialogTitle>
+          <DialogDescription>
+            Moving someone to another branch also moves where they&apos;re allowed to check in.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-name">Name</Label>
+            <Input id="edit-name" required value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-branch">Branch</Label>
+            <select
+              id="edit-branch"
+              required
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
+            >
+              {branchId === "" && (
+                <option value="" disabled>
+                  Select…
+                </option>
+              )}
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-job-title">Job title (optional)</Label>
+            <Input id="edit-job-title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="edit-status">Status</Label>
+            <select
+              id="edit-status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
+            >
+              {EMPLOYMENT_STATUSES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Suspended and terminated employees can&apos;t check in.
+            </p>
+          </div>
+          {error && <Alert variant="destructive">{error}</Alert>}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function EmployeesPage() {
   const { me, refresh } = useMe();
+  const confirm = useConfirm();
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [open, setOpen] = useState(false);
@@ -113,6 +234,7 @@ export default function EmployeesPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginFor, setLoginFor] = useState<Employee | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -154,6 +276,25 @@ export default function EmployeesPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleDelete(employee: Employee) {
+    const ok = await confirm({
+      title: `Delete ${employee.name}?`,
+      description:
+        "Their upcoming schedule is cleared and their login is deactivated. Past attendance keeps its history. If they've only left, set their status to Terminated instead.",
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      await api.employees.remove(employee.id);
+      notifySuccess(`${employee.name} deleted`);
+      refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+    load();
   }
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
@@ -358,8 +499,34 @@ export default function EmployeesPage() {
             title: "No employees yet",
             description: "Add your first employee to start building your team directory.",
           }}
+          rowActions={
+            canManage
+              ? (employee) => (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setEditingEmployee(employee)}>
+                      <Pencil className="size-3.5" />
+                      Edit
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(employee)}>
+                      <Trash2 className="size-3.5" />
+                      Delete
+                    </Button>
+                  </>
+                )
+              : undefined
+          }
         />
       </div>
+
+      <EditEmployeeDialog
+        key={`edit-${editingEmployee?.id ?? "none"}`}
+        employee={editingEmployee}
+        branches={branches}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setEditingEmployee(null);
+        }}
+        onSaved={load}
+      />
 
       <CreateLoginDialog
         key={loginFor?.id ?? "none"}
