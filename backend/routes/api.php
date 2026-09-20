@@ -63,6 +63,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
             ->middlewareFor(['store', 'update', 'destroy'], "company_permission:{$uri}.manage");
     }
 
+    Route::middleware('company_permission:employees.manage')->group(function () {
+        Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);
+    });
+
     Route::middleware('company_permission:branches.manage')->group(function () {
         Route::post('/branches/{branch}/regenerate-qr', [BranchController::class, 'regenerateQrCode']);
     });

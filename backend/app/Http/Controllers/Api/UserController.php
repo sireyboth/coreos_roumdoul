@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyRole;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\CompanyUserService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -31,27 +32,15 @@ class UserController extends Controller
             'role' => ['required', Rule::in($this->companyRoleNames($request))],
         ]);
 
-        $companyId = $request->user()->company_id;
+        $user = app(CompanyUserService::class)->create(
+            $request->user()->company_id,
+            $data['name'],
+            $data['email'],
+            $data['password'],
+            $data['role'],
+        );
 
-        $user = User::query()->create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => $data['password'],
-            'is_active' => true,
-        ]);
-
-        $membership = $user->membership()->create([
-            'company_id' => $companyId,
-            'status' => 'active',
-            'joined_at' => now(),
-        ]);
-
-        $role = CompanyRole::query()->where('company_id', $companyId)->where('name', $data['role'])->firstOrFail();
-        $membership->roles()->attach($role->id, ['created_at' => now()]);
-
-        AuditLogger::record('user.invited', $user, ['name' => $user->name, 'email' => $user->email, 'role' => $data['role']]);
-
-        return response()->json($this->present($user->fresh()), 201);
+        return response()->json($this->present($user), 201);
     }
 
     public function update(Request $request, User $user)

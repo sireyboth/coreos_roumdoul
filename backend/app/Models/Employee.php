@@ -47,6 +47,7 @@ class Employee extends Model
     protected $appends = [
         'name',
         'job_title',
+        'has_login',
     ];
 
     protected function casts(): array
@@ -84,6 +85,11 @@ class Employee extends Model
     public function setNameAttribute(string $value): void
     {
         $this->attributes['display_name'] = $value;
+    }
+
+    public function getHasLoginAttribute(): bool
+    {
+        return $this->user_id !== null;
     }
 
     public function getJobTitleAttribute(): ?string

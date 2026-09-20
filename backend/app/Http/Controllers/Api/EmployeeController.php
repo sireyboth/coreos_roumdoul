@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeController extends Controller
 {
@@ -38,10 +41,16 @@ class EmployeeController extends Controller
             ], 422);
         }
 
+        $withLogin = $request->filled('password');
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'employee_code' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            // The email doubles as the login when a password is given.
+            'email' => $withLogin
+                ? ['required', 'email', 'max:255', Rule::unique('users', 'email')]
+                : ['nullable', 'email', 'max:255'],
+            'password' => ['nullable', 'string', 'min:8'],
             'phone' => ['nullable', 'string', 'max:255'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
@@ -51,13 +60,60 @@ class EmployeeController extends Controller
             'team_id' => ['nullable', 'exists:teams,id'],
         ]);
 
-        $employee = Employee::query()->create(
-            collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id'])->all()
-        );
+        $employee = DB::transaction(function () use ($request, $data, $withLogin) {
+            $employee = Employee::query()->create(
+                collect($data)->except(['password', 'job_title', 'branch_id', 'department_id', 'team_id'])->all()
+            );
 
-        $this->assignments->open($employee, $data);
+            $this->assignments->open($employee, $data);
+
+            if ($withLogin) {
+                $this->linkNewLogin($request, $employee, $data['email'], $data['password']);
+            }
+
+            return $employee;
+        });
 
         return response()->json($employee->fresh(['branch', 'department', 'team']), 201);
+    }
+
+    /**
+     * Gives an employee who was added without a login one after the fact —
+     * without it they can never sign in, so check-in has nothing to link to.
+     */
+    public function createLogin(Request $request, Employee $employee)
+    {
+        if ($employee->user_id !== null) {
+            throw ValidationException::withMessages([
+                'employee' => ['This employee already has a login.'],
+            ]);
+        }
+
+        $data = $request->validate([
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'password' => ['required', 'string', 'min:8'],
+        ]);
+
+        DB::transaction(function () use ($request, $employee, $data) {
+            $this->linkNewLogin($request, $employee, $data['email'], $data['password']);
+
+            $employee->update(['email' => $data['email']]);
+        });
+
+        return $employee->fresh(['branch', 'department', 'team']);
+    }
+
+    private function linkNewLogin(Request $request, Employee $employee, string $email, string $password): void
+    {
+        $user = app(CompanyUserService::class)->create(
+            $request->user()->company_id,
+            $employee->name,
+            $email,
+            $password,
+            'employee',
+        );
+
+        $employee->update(['user_id' => $user->id]);
     }
 
     public function show(Employee $employee)
