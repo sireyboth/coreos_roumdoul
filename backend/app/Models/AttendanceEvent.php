@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Concerns\Auditable;
+use App\Models\Concerns\BelongsToCompany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class AttendanceEvent extends Model
+{
+    use Auditable, BelongsToCompany, HasFactory;
+
+    protected $fillable = [
+        'company_id',
+        'employee_id',
+        'work_location_id',
+        'event_type',
+        'event_time',
+        'latitude',
+        'longitude',
+        'device_id',
+        'recorded_by',
+        'notes',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'event_time' => 'datetime',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+        ];
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function workLocation(): BelongsTo
+    {
+        return $this->belongsTo(WorkLocation::class);
+    }
+
+    public function recordedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
+}
