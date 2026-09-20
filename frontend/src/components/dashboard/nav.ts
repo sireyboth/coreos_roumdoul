@@ -31,7 +31,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Overview",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "from-indigo-500 to-violet-500" },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "from-indigo-500 to-violet-500", permission: "dashboard.view" },
     ],
   },
   {
@@ -67,6 +67,21 @@ const HIDDEN_ITEMS: NavItem[] = [
 ];
 
 const ALL_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), ...HIDDEN_ITEMS];
+
+type Access = { permissions: string[]; modules: Record<string, boolean> };
+
+export function canSee(item: NavItem, me: Access): boolean {
+  return (!item.permission || me.permissions.includes(item.permission)) && (!item.module || Boolean(me.modules[item.module]));
+}
+
+/**
+ * Where someone lands after signing in: the dashboard if their role has it,
+ * otherwise the first page they can actually use (an employee's attendance).
+ */
+export function homeFor(me: Access): string {
+  const first = NAV_GROUPS.flatMap((g) => g.items).find((item) => canSee(item, me));
+  return first?.href ?? "/dashboard/profile";
+}
 
 // Longest matching href wins, so /attendance/corrections beats /attendance.
 export function findNavItem(pathname: string): NavItem | undefined {

@@ -17,7 +17,7 @@ import {
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
-import { NAV_GROUPS } from "@/components/dashboard/nav";
+import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { cn } from "@/lib/utils";
 
@@ -38,11 +38,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) =>
-        (!item.permission || me?.permissions.includes(item.permission)) &&
-        (!item.module || me?.modules[item.module]),
-    ),
+    items: group.items.filter((item) => me && canSee(item, me)),
   })).filter((group) => group.items.length > 0);
 
   return (
@@ -120,7 +116,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col gap-5 p-4 text-sidebar-foreground">
-      <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 px-1">
+      <Link href={me ? homeFor(me) : "/dashboard"} onClick={onNavigate} className="flex items-center gap-2.5 px-1">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/30">
           <Boxes className="size-4.5" />
         </div>

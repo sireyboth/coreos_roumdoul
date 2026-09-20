@@ -16,13 +16,20 @@ class CompanyPermissions
     ];
 
     /**
+     * Permissions that don't follow the <resource>.view / .manage pattern.
+     * "dashboard.view" gates the overview page: staff who only clock in and
+     * check their own schedule don't need it.
+     */
+    public const STANDALONE = ['company.manage', 'dashboard.view'];
+
+    /**
      * All permission strings that exist, e.g. "branches.view", "branches.manage".
      *
      * @return array<int, string>
      */
     public static function all(): array
     {
-        $permissions = ['company.manage'];
+        $permissions = self::STANDALONE;
 
         foreach (self::RESOURCES as $resource) {
             $permissions[] = "{$resource}.view";
@@ -40,7 +47,10 @@ class CompanyPermissions
      */
     public static function grouped(): array
     {
-        $groups = [['resource' => 'company', 'permissions' => ['company.manage']]];
+        $groups = [
+            ['resource' => 'dashboard', 'permissions' => ['dashboard.view']],
+            ['resource' => 'company', 'permissions' => ['company.manage']],
+        ];
 
         foreach (self::RESOURCES as $resource) {
             $groups[] = [
@@ -62,6 +72,7 @@ class CompanyPermissions
         return match ($role) {
             'company-admin' => self::all(),
             'manager' => [
+                'dashboard.view',
                 'branches.view',
                 'departments.view',
                 'teams.view',

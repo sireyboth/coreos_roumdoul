@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   Building2,
@@ -16,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { NAV_GROUPS } from "@/components/dashboard/nav";
+import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { api, AttendanceSession } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
@@ -219,18 +220,26 @@ function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) 
 
 export default function DashboardPage() {
   const { me } = useMe();
+  const router = useRouter();
   const [sessions, setSessions] = useState<AttendanceSession[] | null>(null);
   const [employeeCount, setEmployeeCount] = useState<number | null>(null);
   const [branchCount, setBranchCount] = useState<number | null>(null);
   const [pendingCorrections, setPendingCorrections] = useState<number | null>(null);
 
   const can = (permission: string) => me?.permissions.includes(permission) ?? false;
+  const canDashboard = can("dashboard.view");
   const canAttendance = can("attendance.view") && Boolean(me?.modules.attendance);
   const canEmployees = can("employees.view");
   const canBranches = can("branches.view");
 
+  // Roles without dashboard.view (e.g. employees) never see this page — send
+  // them to the first page they can use.
   useEffect(() => {
-    if (!me) return;
+    if (me && !canDashboard) router.replace(homeFor(me));
+  }, [me, canDashboard, router]);
+
+  useEffect(() => {
+    if (!me || !canDashboard) return;
 
     const from = new Date();
     from.setDate(from.getDate() - 6);
@@ -247,7 +256,7 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.user.id]);
 
-  if (!me) return null;
+  if (!me || !canDashboard) return null;
 
   const today = isoDate(new Date());
   const enabledModules = Object.values(me.modules).filter(Boolean).length;
@@ -304,12 +313,7 @@ export default function DashboardPage() {
     soft: "bg-fuchsia-500/12",
   });
 
-  const quickLinks = NAV_GROUPS.flatMap((g) => g.items).filter(
-    (item) =>
-      item.href !== "/dashboard" &&
-      (!item.permission || me.permissions.includes(item.permission)) &&
-      (!item.module || me.modules[item.module]),
-  );
+  const quickLinks = NAV_GROUPS.flatMap((g) => g.items).filter((item) => item.href !== "/dashboard" && canSee(item, me));
 
   return (
     <div className="flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8">
