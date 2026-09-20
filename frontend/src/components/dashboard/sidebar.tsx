@@ -66,7 +66,13 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 href={item.href}
                 onClick={onNavigate}
                 onMouseEnter={() => setHovered(item.href)}
-                className="relative rounded-lg px-2.5 py-1.5 text-sm font-medium"
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
+                  // Plain CSS, not an animated element: it has to show the
+                  // instant the route changes, with no hover needed.
+                  active && "bg-sidebar-primary/12 ring-1 ring-sidebar-primary/30 dark:bg-sidebar-primary/20 dark:ring-sidebar-primary/40",
+                )}
               >
                 {hovered === item.href && !active && (
                   <motion.div
@@ -75,17 +81,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                     transition={{ type: "spring", stiffness: 500, damping: 35 }}
                   />
                 )}
-                {active && (
-                  <motion.div
-                    layoutId="sidebar-active-pill"
-                    className="absolute inset-0 rounded-lg bg-sidebar-primary/20 ring-1 ring-sidebar-primary/40"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                  />
-                )}
                 <span
                   className={cn(
                     "relative z-10 flex items-center gap-3 transition-colors",
-                    active ? "text-white" : "text-sidebar-foreground/75",
+                    active ? "font-semibold text-sidebar-primary dark:text-white" : "text-sidebar-foreground/75",
                   )}
                 >
                   <span
@@ -189,7 +188,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           onClick={logout}
           aria-label="Sign out"
           title="Sign out"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-red-500/15 hover:text-red-300"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:hover:bg-red-500/15 dark:hover:text-red-300"
         >
           <LogOut className="size-4" />
         </button>
