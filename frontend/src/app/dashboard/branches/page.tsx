@@ -33,6 +33,7 @@ type BranchFormState = {
   latitude: string;
   longitude: string;
   is_active: boolean;
+  require_location: boolean;
 };
 
 const EMPTY_FORM: BranchFormState = {
@@ -42,6 +43,7 @@ const EMPTY_FORM: BranchFormState = {
   latitude: "",
   longitude: "",
   is_active: true,
+  require_location: false,
 };
 
 function BranchFormFields({
@@ -145,6 +147,21 @@ function BranchFormFields({
         </p>
         {locationError && <p className="text-xs text-destructive">{locationError}</p>}
       </div>
+      <label className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={form.require_location}
+          onChange={(e) => onChange({ ...form, require_location: e.target.checked })}
+          className="mt-0.5 size-4 rounded border-input"
+        />
+        <span>
+          <span className="font-medium">Require location when scanning the QR code</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            Employees must be at the branch (within its radius) for a scan to count, so a photo of the poster can&apos;t
+            be used from home. Leave it off for indoor branches where phones can&apos;t get a GPS signal.
+          </span>
+        </span>
+      </label>
     </>
   );
 }
@@ -182,6 +199,7 @@ export default function BranchesPage() {
       latitude: form.latitude === "" ? null : Number(form.latitude),
       longitude: form.longitude === "" ? null : Number(form.longitude),
       is_active: form.is_active,
+      require_location: form.require_location,
     };
   }
 
@@ -233,6 +251,7 @@ export default function BranchesPage() {
       latitude: branch.latitude != null ? String(branch.latitude) : "",
       longitude: branch.longitude != null ? String(branch.longitude) : "",
       is_active: branch.is_active,
+      require_location: Boolean(branch.require_location),
     });
     setEditError(null);
   }
@@ -286,6 +305,17 @@ export default function BranchesPage() {
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
+    },
+    {
+      id: "verify",
+      header: "QR check-in",
+      cell: (branch) =>
+        branch.require_location ? (
+          <Badge variant="success">Location required</Badge>
+        ) : (
+          <Badge variant="warning">QR only</Badge>
+        ),
+      sortValue: (branch) => (branch.require_location ? 1 : 0),
     },
     {
       id: "status",

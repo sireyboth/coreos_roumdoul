@@ -26,9 +26,11 @@ class Branch extends Model
         'is_active',
     ];
 
+    // qr_token is deliberately NOT appended: a branch is nested inside employees,
+    // departments and more, and anyone who can read the token can "scan" it from
+    // home. BranchController adds it only for people who manage branches.
     protected $appends = [
         'code',
-        'qr_token',
     ];
 
     protected function casts(): array
@@ -73,6 +75,7 @@ class Branch extends Model
     /**
      * The code employees scan at this branch to check in — exposed here so
      * the frontend doesn't need to know a WorkLocation exists underneath.
+     * Only serialized when a controller calls ->append('qr_token').
      */
     public function getQrTokenAttribute(): ?string
     {

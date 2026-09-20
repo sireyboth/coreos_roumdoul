@@ -20,7 +20,7 @@ import {
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
-import { api, ApiError, Branch, Employee } from "@/lib/api";
+import { api, ApiError, Branch, Department, Employee, Team } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
@@ -116,11 +116,15 @@ function CreateLoginDialog({
 function EditEmployeeDialog({
   employee,
   branches,
+  departments,
+  teams,
   onOpenChange,
   onSaved,
 }: {
   employee: Employee | null;
   branches: Branch[];
+  departments: Department[];
+  teams: Team[];
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
@@ -135,7 +139,7 @@ function EditEmployeeDialog({
     setSaving(true);
 
     try {
-      const payload = toPayload(form);
+      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0 });
       // With a login the email is their sign-in — it's changed from Users, not here.
       if (employee.has_login) delete payload.email;
 
@@ -166,6 +170,8 @@ function EditEmployeeDialog({
             form={form}
             onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
             branches={branches}
+            departments={departments}
+            teams={teams}
             emailDisabled={employee?.has_login}
             emailHint={employee?.has_login ? "This is their sign-in email — change it from Users." : undefined}
           />
@@ -187,6 +193,9 @@ export default function EmployeesPage() {
   const confirm = useConfirm();
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
+  // Empty when the role can't see them (the pickers then don't show at all).
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<EmployeeForm>(() => emptyEmployeeForm());
   const [loginPassword, setLoginPassword] = useState("");
@@ -197,6 +206,8 @@ export default function EmployeesPage() {
 
   function load() {
     api.employees.list().then((res) => setEmployees(res.data)).catch(() => setEmployees([]));
+    api.departments.list(200).then((res) => setDepartments(res.data)).catch(() => setDepartments([]));
+    api.teams.list(200).then((res) => setTeams(res.data)).catch(() => setTeams([]));
     api.branches.list().then((res) => {
       setBranches(res.data);
       setForm((f) => (f.branch_id ? f : { ...f, branch_id: String(res.data[0]?.id ?? "") }));
@@ -214,7 +225,7 @@ export default function EmployeesPage() {
 
     try {
       await api.employees.create({
-        ...toPayload(form),
+        ...toPayload(form, { org: departments.length > 0 || teams.length > 0 }),
         name: form.name.trim(),
         branch_id: Number(form.branch_id),
         // The email above doubles as their sign-in when a password is set.
@@ -280,6 +291,21 @@ export default function EmployeesPage() {
       cell: (employee) => <span className="text-muted-foreground">{employee.branch?.name ?? "—"}</span>,
       sortValue: (employee) => employee.branch?.name,
       searchValue: (employee) => employee.branch?.name,
+    },
+    {
+      id: "department",
+      header: "Department",
+      cell: (employee) =>
+        employee.department || employee.team ? (
+          <div className="flex flex-col leading-tight">
+            <span className="text-muted-foreground">{employee.department?.name ?? "—"}</span>
+            {employee.team && <span className="text-xs text-muted-foreground/70">{employee.team.name}</span>}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+      sortValue: (employee) => employee.department?.name,
+      searchValue: (employee) => [employee.department?.name, employee.team?.name].filter(Boolean).join(" "),
     },
     {
       id: "job_title",
@@ -382,6 +408,28 @@ export default function EmployeesPage() {
       options: branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
       getValue: (employee) => (employee.branch ? String(employee.branch.id) : null),
     },
+    ...(departments.length > 0
+      ? [
+          {
+            type: "select" as const,
+            id: "department",
+            label: "Department",
+            options: departments.map((d) => ({ value: String(d.id), label: d.name })),
+            getValue: (employee: Employee) => (employee.department ? String(employee.department.id) : null),
+          },
+        ]
+      : []),
+    ...(teams.length > 0
+      ? [
+          {
+            type: "select" as const,
+            id: "team",
+            label: "Team",
+            options: teams.map((t) => ({ value: String(t.id), label: t.name })),
+            getValue: (employee: Employee) => (employee.team ? String(employee.team.id) : null),
+          },
+        ]
+      : []),
     {
       type: "select",
       id: "login",
@@ -424,6 +472,8 @@ export default function EmployeesPage() {
                       form={form}
                       onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
                       branches={branches}
+                      departments={departments}
+                      teams={teams}
                       emailRequired={loginPassword !== ""}
                     />
                     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
@@ -508,6 +558,8 @@ export default function EmployeesPage() {
         key={`edit-${editingEmployee?.id ?? "none"}`}
         employee={editingEmployee}
         branches={branches}
+        departments={departments}
+        teams={teams}
         onOpenChange={(isOpen) => {
           if (!isOpen) setEditingEmployee(null);
         }}

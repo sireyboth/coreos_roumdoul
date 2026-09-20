@@ -280,4 +280,96 @@ class EmployeeCreationTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['gender', 'employment_type', 'date_of_birth']);
     }
+
+    private function branchIdsOf(int $companyId, string $email): ?array
+    {
+        $this->app['auth']->forgetGuards();
+        $admin = \App\Models\Company::query()->findOrFail($companyId)->users()->first();
+
+        $row = collect($this->actingAs($admin)->getJson('/api/users')->assertOk()->json())->firstWhere('email', $email);
+
+        return $row['branch_ids'];
+    }
+
+    public function test_a_new_employee_login_only_sees_the_branch_the_employee_was_given(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Scope Co', 'Boss', 'boss@scopeco.test', 'password123');
+        $admin = $company->users()->first();
+        $hq = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+        $other = Branch::query()->create(['company_id' => $company->id, 'name' => 'Other']);
+
+        $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Sokha', 'email' => 'sokha@scopeco.test', 'password' => 'password123', 'branch_id' => $hq->id,
+        ])->assertCreated();
+        $this->actingAs($admin)->postJson('/api/employees', ['name' => 'Elsewhere', 'branch_id' => $other->id])->assertCreated();
+
+        // Not "All branches" any more.
+        $this->assertSame([$hq->id], $this->branchIdsOf($company->id, 'sokha@scopeco.test'));
+
+        // And it really is enforced: Sokha can't see the other branch's employee.
+        $sokha = \App\Models\User::query()->where('email', 'sokha@scopeco.test')->firstOrFail();
+        $this->app['auth']->forgetGuards();
+        $names = collect($this->actingAs($sokha)->getJson('/api/employees')->assertOk()->json('data'))->pluck('name')->all();
+        $this->assertSame(['Sokha'], $names);
+    }
+
+    public function test_a_login_added_later_is_scoped_to_the_employees_branch_too(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Later Co', 'Boss', 'boss@laterco.test', 'password123');
+        $admin = $company->users()->first();
+        $hq = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+
+        $id = $this->actingAs($admin)->postJson('/api/employees', ['name' => 'Late', 'branch_id' => $hq->id])->json('id');
+        $this->actingAs($admin)->postJson("/api/employees/{$id}/login", ['email' => 'late@laterco.test', 'password' => 'password123'])->assertOk();
+
+        $this->assertSame([$hq->id], $this->branchIdsOf($company->id, 'late@laterco.test'));
+    }
+
+    public function test_moving_an_employee_moves_their_logins_branch_and_they_still_see_themselves(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Move Co', 'Boss', 'boss@moveco.test', 'password123');
+        $admin = $company->users()->first();
+        $hq = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+        $two = Branch::query()->create(['company_id' => $company->id, 'name' => 'Two']);
+
+        $id = $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Mover', 'email' => 'mover@moveco.test', 'password' => 'password123', 'branch_id' => $hq->id,
+        ])->json('id');
+
+        $this->actingAs($admin)->putJson("/api/employees/{$id}", ['branch_id' => $two->id])->assertOk();
+
+        $this->assertSame([$two->id], $this->branchIdsOf($company->id, 'mover@moveco.test'));
+
+        // Without the follow-along they would be locked out of their own record.
+        $mover = \App\Models\User::query()->where('email', 'mover@moveco.test')->firstOrFail();
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($mover)->getJson('/api/me')->assertOk()->assertJsonPath('employee.name', 'Mover');
+    }
+
+    public function test_a_login_an_admin_customised_or_left_unrestricted_is_not_changed_by_a_move(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Keep Co', 'Boss', 'boss@keepco.test', 'password123');
+        $admin = $company->users()->first();
+        $a = Branch::query()->create(['company_id' => $company->id, 'name' => 'A']);
+        $b = Branch::query()->create(['company_id' => $company->id, 'name' => 'B']);
+        $c = Branch::query()->create(['company_id' => $company->id, 'name' => 'C']);
+
+        $wide = $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Wide', 'email' => 'wide@keepco.test', 'password' => 'password123', 'branch_id' => $a->id,
+        ])->json('id');
+        $free = $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Free', 'email' => 'free@keepco.test', 'password' => 'password123', 'branch_id' => $a->id,
+        ])->json('id');
+
+        $wideUser = \App\Models\User::query()->where('email', 'wide@keepco.test')->firstOrFail();
+        $freeUser = \App\Models\User::query()->where('email', 'free@keepco.test')->firstOrFail();
+        $this->actingAs($admin)->putJson("/api/users/{$wideUser->id}/branch-access", ['branch_ids' => [$a->id, $b->id]])->assertOk();
+        $this->actingAs($admin)->putJson("/api/users/{$freeUser->id}/branch-access", ['branch_ids' => []])->assertOk();
+
+        $this->actingAs($admin)->putJson("/api/employees/{$wide}", ['branch_id' => $c->id])->assertOk();
+        $this->actingAs($admin)->putJson("/api/employees/{$free}", ['branch_id' => $c->id])->assertOk();
+
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], $this->branchIdsOf($company->id, 'wide@keepco.test'));
+        $this->assertNull($this->branchIdsOf($company->id, 'free@keepco.test'));
+    }
 }

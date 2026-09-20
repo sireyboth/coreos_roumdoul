@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Schedule;
+use App\Models\Team;
 use App\Services\AuditLogger;
 use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
@@ -27,7 +28,48 @@ class EmployeeController extends Controller
     {
         $branchIds = $request->user()->membership?->accessibleBranchIds();
 
-        return $branchIds === null ? ['exists:branches,id'] : [Rule::in($branchIds)];
+        return $branchIds === null
+            ? [Rule::exists('branches', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at')]
+            : [Rule::in($branchIds)];
+    }
+
+    /** Departments and teams must belong to the caller's own company (and not be deleted). */
+    private function ownDepartment(Request $request): \Illuminate\Validation\Rules\Exists
+    {
+        return Rule::exists('departments', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
+    }
+
+    private function ownTeam(Request $request): \Illuminate\Validation\Rules\Exists
+    {
+        return Rule::exists('teams', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
+    }
+
+    /**
+     * A team that belongs to a department can only be used together with that
+     * department. Only checked when the request touches either field, so
+     * editing a phone number never trips over older, inconsistent data.
+     */
+    private function assertTeamFitsDepartment(array $data, ?Employee $employee): void
+    {
+        if (! array_key_exists('team_id', $data) && ! array_key_exists('department_id', $data)) {
+            return;
+        }
+
+        $current = $employee?->currentAssignment;
+        $departmentId = array_key_exists('department_id', $data) ? $data['department_id'] : $current?->department_id;
+        $teamId = array_key_exists('team_id', $data) ? $data['team_id'] : $current?->team_id;
+
+        if ($teamId === null) {
+            return;
+        }
+
+        $teamDepartment = Team::query()->whereKey($teamId)->value('department_id');
+
+        if ($teamDepartment !== null && (int) $teamDepartment !== (int) $departmentId) {
+            throw ValidationException::withMessages([
+                'team_id' => ['That team belongs to a different department. Pick a team from the employee\'s department.'],
+            ]);
+        }
     }
 
     /** Rules for the profile fields shared by create and update. */
@@ -63,9 +105,22 @@ class EmployeeController extends Controller
             : $employee;
     }
 
+    /**
+     * Optional filters: department_id / team_id (a member list — people who
+     * have left are left out, matching the headcounts) and per_page (max 200,
+     * so pickers can load everyone instead of the first 25).
+     */
     public function index(Request $request)
     {
-        $employees = Employee::query()->with(['branch', 'department', 'team'])->latest()->paginate(25);
+        $employees = Employee::query()->with(['branch', 'department', 'team'])
+            ->when($request->filled('department_id'), fn ($q) => $q
+                ->where('employment_status', '!=', 'terminated')
+                ->whereHas('currentAssignment', fn ($a) => $a->where('department_id', $request->integer('department_id'))))
+            ->when($request->filled('team_id'), fn ($q) => $q
+                ->where('employment_status', '!=', 'terminated')
+                ->whereHas('currentAssignment', fn ($a) => $a->where('team_id', $request->integer('team_id'))))
+            ->orderBy('display_name')->orderBy('id')
+            ->paginate(min(max($request->integer('per_page', 25), 1), 200));
         $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e));
 
         return $employees;
@@ -93,9 +148,11 @@ class EmployeeController extends Controller
             'job_title' => ['nullable', 'string', 'max:255'],
             'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
             'branch_id' => ['required', ...$this->branchRule($request)],
-            'department_id' => ['nullable', 'exists:departments,id'],
-            'team_id' => ['nullable', 'exists:teams,id'],
+            'department_id' => ['nullable', $this->ownDepartment($request)],
+            'team_id' => ['nullable', $this->ownTeam($request)],
         ]);
+
+        $this->assertTeamFitsDepartment($data, null);
 
         $employee = DB::transaction(function () use ($request, $data, $withLogin) {
             $employee = Employee::query()->create(
@@ -151,6 +208,12 @@ class EmployeeController extends Controller
         );
 
         $employee->update(['user_id' => $user->id]);
+
+        // A new login only sees its own branch (an admin can widen it on the
+        // Users page). Without this it would default to *every* branch.
+        if ($branchId = $employee->currentAssignment()->value('branch_id')) {
+            app(CompanyUserService::class)->restrictToBranch($user, $branchId);
+        }
     }
 
     public function show(Request $request, Employee $employee)
@@ -168,15 +231,27 @@ class EmployeeController extends Controller
             'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
             'termination_date' => ['nullable', 'date'],
             'branch_id' => ['nullable', ...$this->branchRule($request)],
-            'department_id' => ['nullable', 'exists:departments,id'],
-            'team_id' => ['nullable', 'exists:teams,id'],
+            'department_id' => ['nullable', $this->ownDepartment($request)],
+            'team_id' => ['nullable', $this->ownTeam($request)],
         ]);
+
+        $this->assertTeamFitsDepartment($data, $employee);
 
         $employee->update(
             collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id'])->all()
         );
 
+        $branchBefore = $employee->currentAssignment()->value('branch_id');
+
         $this->assignments->reassign($employee, $data);
+
+        if ($employee->user) {
+            app(CompanyUserService::class)->followEmployeeBranch(
+                $employee->user,
+                $branchBefore,
+                $employee->currentAssignment()->value('branch_id'),
+            );
+        }
 
         return $this->reveal($request, $employee->fresh(['branch', 'department', 'team']));
     }

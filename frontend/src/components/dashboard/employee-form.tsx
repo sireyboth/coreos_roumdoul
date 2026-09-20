@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Branch, Employee, EmployeeInput } from "@/lib/api";
+import type { Branch, Department, Employee, EmployeeInput, Team } from "@/lib/api";
 
 export const EMPLOYMENT_STATUSES = [
   { value: "active", label: "Active" },
@@ -35,6 +35,8 @@ export type EmployeeForm = {
   email: string;
   phone: string;
   branch_id: string;
+  department_id: string;
+  team_id: string;
   job_title: string;
   employment_type: string;
   employment_status: string;
@@ -53,6 +55,8 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
     email: "",
     phone: "",
     branch_id: branchId,
+    department_id: "",
+    team_id: "",
     job_title: "",
     employment_type: "",
     employment_status: "active",
@@ -71,7 +75,10 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
     employee_code: employee.employee_code ?? "",
     email: employee.email ?? "",
     phone: employee.phone ?? "",
-    branch_id: employee.branch_id != null ? String(employee.branch_id) : "",
+    // The API sends the branch as a nested object, not a branch_id field.
+    branch_id: employee.branch?.id != null ? String(employee.branch.id) : "",
+    department_id: employee.department?.id != null ? String(employee.department.id) : "",
+    team_id: employee.team?.id != null ? String(employee.team.id) : "",
     job_title: employee.job_title ?? "",
     employment_type: employee.employment_type ?? "",
     employment_status: employee.employment_status,
@@ -84,7 +91,12 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
   };
 }
 
-export function toPayload(form: EmployeeForm): EmployeeInput {
+/**
+ * `org` says whether the department/team pickers were available. Only then
+ * are they sent — otherwise a person who can't see departments would wipe an
+ * employee's department just by editing their phone number.
+ */
+export function toPayload(form: EmployeeForm, options: { org: boolean }): EmployeeInput {
   const orNull = (value: string) => value.trim() || null;
 
   return {
@@ -93,6 +105,12 @@ export function toPayload(form: EmployeeForm): EmployeeInput {
     email: orNull(form.email),
     phone: orNull(form.phone),
     ...(form.branch_id ? { branch_id: Number(form.branch_id) } : {}),
+    ...(options.org
+      ? {
+          department_id: form.department_id ? Number(form.department_id) : null,
+          team_id: form.team_id ? Number(form.team_id) : null,
+        }
+      : {}),
     job_title: orNull(form.job_title),
     employment_type: orNull(form.employment_type),
     employment_status: form.employment_status,
@@ -144,6 +162,8 @@ export function EmployeeFormFields({
   form,
   onChange,
   branches,
+  departments = [],
+  teams = [],
   emailHint,
   emailDisabled,
   emailRequired,
@@ -152,11 +172,35 @@ export function EmployeeFormFields({
   form: EmployeeForm;
   onChange: (patch: Partial<EmployeeForm>) => void;
   branches: Branch[];
+  departments?: Department[];
+  teams?: Team[];
   emailHint?: string;
   emailDisabled?: boolean;
   emailRequired?: boolean;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
+
+  // Inactive ones can't be newly chosen, but stay visible if the employee is already in one.
+  const departmentOptions = departments.filter((d) => d.status === "active" || String(d.id) === form.department_id);
+  // With a department picked, offer only its teams (plus teams not tied to any department).
+  const teamOptions = teams.filter(
+    (t) =>
+      (t.status === "active" || String(t.id) === form.team_id) &&
+      (!form.department_id || t.department_id === null || String(t.department_id) === form.department_id),
+  );
+
+  function changeTeam(teamId: string) {
+    const team = teams.find((t) => String(t.id) === teamId);
+    // A team sits inside one department, so choosing it also fills that in.
+    onChange({ team_id: teamId, ...(team?.department_id != null ? { department_id: String(team.department_id) } : {}) });
+  }
+
+  function changeDepartment(departmentId: string) {
+    const team = teams.find((t) => String(t.id) === form.team_id);
+    // A team belongs to one department — drop it if it no longer fits.
+    const keepTeam = !team || !departmentId || team.department_id === null || String(team.department_id) === departmentId;
+    onChange({ department_id: departmentId, ...(keepTeam ? {} : { team_id: "" }) });
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -208,6 +252,40 @@ export function EmployeeFormFields({
             ))}
           </select>
         </Field>
+        {departments.length > 0 && (
+          <Field label="Department (optional)" htmlFor={id("department")}>
+            <select
+              id={id("department")}
+              value={form.department_id}
+              onChange={(e) => changeDepartment(e.target.value)}
+              className={SELECT_CLASS}
+            >
+              <option value="">None</option>
+              {departmentOptions.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {teams.length > 0 && (
+          <Field label="Team (optional)" htmlFor={id("team")}>
+            <select
+              id={id("team")}
+              value={form.team_id}
+              onChange={(e) => changeTeam(e.target.value)}
+              className={SELECT_CLASS}
+            >
+              <option value="">None</option>
+              {teamOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label="Job title (optional)" htmlFor={id("job")}>
           <Input id={id("job")} value={form.job_title} onChange={(e) => onChange({ job_title: e.target.value })} />
         </Field>

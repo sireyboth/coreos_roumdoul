@@ -7,11 +7,13 @@ import {
   KeyRound,
   LayoutDashboard,
   MapPin,
+  Network,
   PartyPopper,
   ShieldCheck,
   Timer,
   User,
   Users,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -48,6 +50,8 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Organization",
     items: [
       { href: "/dashboard/employees", label: "Employees", icon: Users, tone: "from-violet-500 to-fuchsia-500", permission: "employees.view" },
+      { href: "/dashboard/departments", label: "Departments", icon: Network, tone: "from-blue-500 to-indigo-500", permission: "departments.view" },
+      { href: "/dashboard/teams", label: "Teams", icon: UsersRound, tone: "from-teal-500 to-emerald-500", permission: "teams.view" },
       { href: "/dashboard/branches", label: "Branches", icon: Building2, tone: "from-cyan-500 to-sky-500", permission: "branches.view" },
       { href: "/dashboard/work-locations", label: "Work Locations", icon: MapPin, tone: "from-lime-500 to-emerald-500", permission: "work_locations.view" },
     ],

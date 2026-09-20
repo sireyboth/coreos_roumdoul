@@ -18,6 +18,7 @@ import { AttendancePreviewDialog } from "@/components/dashboard/attendance-previ
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
+import { withLocationRetry } from "@/lib/location";
 import { dateOnly, isToday } from "@/lib/date";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -25,6 +26,19 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// A QR scan that came with no GPS reading — the branch's radius couldn't be checked.
+function isUnverified(event: { method: string | null; latitude: number | null } | null | undefined): boolean {
+  return event?.method === "qr" && event.latitude == null;
+}
+
+function NoLocationTag() {
+  return (
+    <Badge variant="warning" title="The scan came without the phone's location, so it couldn't be checked against the branch.">
+      No location
+    </Badge>
+  );
 }
 
 function formatMinutes(minutes: number | null): string {
@@ -86,10 +100,10 @@ export default function AttendancePage() {
     setWorking(true);
     try {
       if (isCheckingOut) {
-        await api.attendance.checkOut(data);
+        await withLocationRetry(api.attendance.checkOut, data ?? {});
         notifySuccess("Checked out", "Have a good rest of your day.");
       } else {
-        await api.attendance.checkIn(data);
+        await withLocationRetry(api.attendance.checkIn, data ?? {});
         notifySuccess("Checked in", "Your attendance has been recorded.");
       }
       load();
@@ -166,7 +180,10 @@ export default function AttendancePage() {
       id: "check_in",
       header: "Check in",
       cell: (session) => (
-        <span className="text-muted-foreground">{formatTime(session.check_in_event?.event_time)}</span>
+        <span className="inline-flex items-center gap-2">
+          <span className="text-muted-foreground">{formatTime(session.check_in_event?.event_time)}</span>
+          {isUnverified(session.check_in_event) && <NoLocationTag />}
+        </span>
       ),
       sortValue: (session) => session.check_in_event?.event_time,
     },
@@ -174,7 +191,10 @@ export default function AttendancePage() {
       id: "check_out",
       header: "Check out",
       cell: (session) => (
-        <span className="text-muted-foreground">{formatTime(session.check_out_event?.event_time)}</span>
+        <span className="inline-flex items-center gap-2">
+          <span className="text-muted-foreground">{formatTime(session.check_out_event?.event_time)}</span>
+          {isUnverified(session.check_out_event) && <NoLocationTag />}
+        </span>
       ),
       sortValue: (session) => session.check_out_event?.event_time,
     },

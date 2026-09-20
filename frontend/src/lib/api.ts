@@ -80,7 +80,34 @@ export type Branch = {
   latitude: number | null;
   longitude: number | null;
   is_active: boolean;
-  qr_token: string | null;
+  // When on, a QR scan only counts if the phone also reports a position inside the radius.
+  require_location?: boolean;
+  // Only sent to people who manage branches — everyone else must never see it.
+  qr_token?: string | null;
+};
+
+export type Department = {
+  id: number;
+  name: string;
+  code: string | null;
+  status: "active" | "inactive";
+  branch_id: number | null;
+  branch: Branch | null;
+  parent_department_id: number | null;
+  parent: { id: number; name: string } | null;
+  // Current, non-terminated employees.
+  members_count?: number;
+  teams_count?: number;
+};
+
+export type Team = {
+  id: number;
+  name: string;
+  code: string | null;
+  status: "active" | "inactive";
+  department_id: number | null;
+  department: { id: number; name: string } | null;
+  members_count?: number;
 };
 
 // What the employee form sends — every optional field is null when cleared.
@@ -91,6 +118,9 @@ export type EmployeeInput = {
   phone?: string | null;
   job_title?: string | null;
   branch_id?: number;
+  // null clears it; leave them out to keep what the employee has.
+  department_id?: number | null;
+  team_id?: number | null;
   employment_status?: string;
   employment_type?: string | null;
   hire_date?: string | null;
@@ -119,14 +149,16 @@ export type Employee = {
   date_of_birth?: string | null;
   address?: string | null;
   notes?: string | null;
-  branch_id: number | null;
+  // Where they work now. There is no branch_id field — read branch?.id.
   branch: Branch | null;
+  department?: { id: number; name: string } | null;
+  team?: { id: number; name: string } | null;
   // Whether this employee has a login linked to them — without one they
   // can never sign in or check in.
   has_login: boolean;
 };
 
-type Paginated<T> = { data: T[] };
+type Paginated<T> = { data: T[]; total: number };
 
 export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "none";
 export type CalendarAttendance = "present" | "late" | "absent" | "missing_checkout";
@@ -212,6 +244,7 @@ export type WorkLocation = {
   latitude: number | string | null;
   longitude: number | string | null;
   radius_meters: number;
+  require_location?: boolean;
   is_active: boolean;
   qr_token?: string | null;
   // Set when this is a branch's own check-in point (managed through the branch).
@@ -321,7 +354,14 @@ export const api = {
   },
 
   employees: {
-    list: () => request<Paginated<Employee>>("/api/employees"),
+    // Loads up to 200 by default — the API's own default is only 25, which
+    // silently hid everyone after the 25th. `total` is the real headcount.
+    list: (params: { perPage?: number; departmentId?: number; teamId?: number } = {}) => {
+      const query = new URLSearchParams({ per_page: String(params.perPage ?? 200) });
+      if (params.departmentId) query.set("department_id", String(params.departmentId));
+      if (params.teamId) query.set("team_id", String(params.teamId));
+      return request<Paginated<Employee>>(`/api/employees?${query}`);
+    },
     create: (data: EmployeeInput & { name: string; branch_id: number; password?: string }) =>
       request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: EmployeeInput) =>
@@ -369,6 +409,39 @@ export const api = {
     regenerateQr: (id: number) =>
       request<WorkLocation>(`/api/work_locations/${id}/regenerate-qr`, { method: "POST" }),
     remove: (id: number) => request<void>(`/api/work_locations/${id}`, { method: "DELETE" }),
+  },
+
+  // Pass a large perPage to fill a dropdown (the API caps it at 200).
+  departments: {
+    list: (perPage = 25) => request<Paginated<Department>>(`/api/departments?per_page=${perPage}`),
+    create: (data: Partial<Omit<Department, "id">>) =>
+      request<Department>("/api/departments", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Omit<Department, "id">>) =>
+      request<Department>(`/api/departments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/departments/${id}`, { method: "DELETE" }),
+    addMembers: (id: number, employeeIds: number[]) =>
+      request<{ added: number }>(`/api/departments/${id}/members`, {
+        method: "POST",
+        body: JSON.stringify({ employee_ids: employeeIds }),
+      }),
+    removeMember: (id: number, employeeId: number) =>
+      request<void>(`/api/departments/${id}/members/${employeeId}`, { method: "DELETE" }),
+  },
+
+  teams: {
+    list: (perPage = 25) => request<Paginated<Team>>(`/api/teams?per_page=${perPage}`),
+    create: (data: Partial<Omit<Team, "id">>) =>
+      request<Team>("/api/teams", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: number, data: Partial<Omit<Team, "id">>) =>
+      request<Team>(`/api/teams/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/teams/${id}`, { method: "DELETE" }),
+    addMembers: (id: number, employeeIds: number[]) =>
+      request<{ added: number }>(`/api/teams/${id}/members`, {
+        method: "POST",
+        body: JSON.stringify({ employee_ids: employeeIds }),
+      }),
+    removeMember: (id: number, employeeId: number) =>
+      request<void>(`/api/teams/${id}/members/${employeeId}`, { method: "DELETE" }),
   },
 
   shifts: {

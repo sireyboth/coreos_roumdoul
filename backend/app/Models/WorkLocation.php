@@ -21,6 +21,10 @@ class WorkLocation extends Model
         });
     }
 
+    // Hidden everywhere (schedules, attendance events, ...) — the token proves
+    // someone is at the branch, so it only goes to people who manage locations.
+    protected $hidden = ['qr_token'];
+
     protected $fillable = [
         'company_id',
         'branch_id',
@@ -29,6 +33,7 @@ class WorkLocation extends Model
         'latitude',
         'longitude',
         'radius_meters',
+        'require_location',
         'qr_token',
         'is_active',
     ];
@@ -39,6 +44,7 @@ class WorkLocation extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'is_active' => 'boolean',
+            'require_location' => 'boolean',
         ];
     }
 

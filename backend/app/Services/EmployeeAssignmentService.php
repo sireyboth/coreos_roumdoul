@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
+use App\Models\Team;
 
 /**
  * The only place that should ever write to employee_assignments: opens the
@@ -69,5 +71,37 @@ class EmployeeAssignmentService
         $current?->update(['effective_to' => now()->toDateString()]);
 
         return $this->open($employee, $next);
+    }
+
+    /**
+     * Puts an employee in a department. A team from a different department
+     * no longer fits, so it is cleared; a team with no department is kept.
+     */
+    public function joinDepartment(Employee $employee, Department $department): void
+    {
+        $team = $employee->currentAssignment?->team;
+        $keepTeam = ! $team || $team->department_id === null || $team->department_id === $department->id;
+
+        $this->reassign($employee, ['department_id' => $department->id] + ($keepTeam ? [] : ['team_id' => null]));
+    }
+
+    /** Takes an employee out of a department (and out of that department's team). */
+    public function leaveDepartment(Employee $employee, Department $department): void
+    {
+        $team = $employee->currentAssignment?->team;
+        $dropTeam = $team && $team->department_id === $department->id;
+
+        $this->reassign($employee, ['department_id' => null] + ($dropTeam ? ['team_id' => null] : []));
+    }
+
+    /** Puts an employee in a team — and in the team's department, since a team sits inside one. */
+    public function joinTeam(Employee $employee, Team $team): void
+    {
+        $this->reassign($employee, ['team_id' => $team->id] + ($team->department_id !== null ? ['department_id' => $team->department_id] : []));
+    }
+
+    public function leaveTeam(Employee $employee): void
+    {
+        $this->reassign($employee, ['team_id' => null]);
     }
 }

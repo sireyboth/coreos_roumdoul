@@ -6,12 +6,35 @@ use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\WorkLocation;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class WorkLocationController extends Controller
 {
-    public function index()
+    /** "Require location" is meaningless for a place with no coordinates to check against. */
+    private function assertCanRequireLocation(bool $require, mixed $latitude, mixed $longitude): void
     {
-        return WorkLocation::query()->with('branch')->latest()->paginate(25);
+        if ($require && ($latitude === null || $longitude === null)) {
+            throw ValidationException::withMessages([
+                'require_location' => ['Set this location\'s latitude and longitude first — there is nothing to check the scan against without them.'],
+            ]);
+        }
+    }
+
+    /** The token is hidden on the model; only people who manage locations get it back. */
+    private function reveal(Request $request, WorkLocation $location): WorkLocation
+    {
+        return $request->user()->hasCompanyPermission('work_locations.manage') ? $location->makeVisible('qr_token') : $location;
+    }
+
+    public function index(Request $request)
+    {
+        $locations = WorkLocation::query()->with('branch')->latest()->paginate(25);
+
+        if ($request->user()->hasCompanyPermission('work_locations.manage')) {
+            $locations->getCollection()->each->makeVisible('qr_token');
+        }
+
+        return $locations;
     }
 
     public function store(Request $request)
@@ -23,23 +46,26 @@ class WorkLocationController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'radius_meters' => ['sometimes', 'integer', 'min:10', 'max:5000'],
+            'require_location' => ['boolean'],
             'is_active' => ['boolean'],
         ]);
 
-        return response()->json(WorkLocation::query()->create($data), 201);
+        $this->assertCanRequireLocation($data['require_location'] ?? false, $data['latitude'] ?? null, $data['longitude'] ?? null);
+
+        return response()->json($this->reveal($request, WorkLocation::query()->create($data)->fresh()), 201);
     }
 
     /** Invalidates this location's printed code and issues a new one. */
-    public function regenerateQrCode(WorkLocation $workLocation)
+    public function regenerateQrCode(Request $request, WorkLocation $workLocation)
     {
         $workLocation->regenerateQrToken();
 
-        return $workLocation->fresh('branch');
+        return $this->reveal($request, $workLocation->fresh('branch'));
     }
 
-    public function show(WorkLocation $workLocation)
+    public function show(Request $request, WorkLocation $workLocation)
     {
-        return $workLocation->load('branch');
+        return $this->reveal($request, $workLocation->load('branch'));
     }
 
     public function update(Request $request, WorkLocation $workLocation)
@@ -51,12 +77,19 @@ class WorkLocationController extends Controller
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'radius_meters' => ['sometimes', 'integer', 'min:10', 'max:5000'],
+            'require_location' => ['boolean'],
             'is_active' => ['boolean'],
         ]);
 
+        $this->assertCanRequireLocation(
+            $data['require_location'] ?? $workLocation->require_location,
+            array_key_exists('latitude', $data) ? $data['latitude'] : $workLocation->latitude,
+            array_key_exists('longitude', $data) ? $data['longitude'] : $workLocation->longitude,
+        );
+
         $workLocation->update($data);
 
-        return $workLocation;
+        return $this->reveal($request, $workLocation);
     }
 
     public function destroy(WorkLocation $workLocation)

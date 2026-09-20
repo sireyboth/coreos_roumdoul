@@ -45,6 +45,7 @@ function WorkLocationFormDialog({
   const [longitude, setLongitude] = useState(location?.longitude != null ? String(location.longitude) : "");
   const [radius, setRadius] = useState(String(location?.radius_meters ?? 100));
   const [active, setActive] = useState(location?.is_active ?? true);
+  const [requireLocation, setRequireLocation] = useState(location?.require_location ?? false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -87,6 +88,7 @@ function WorkLocationFormDialog({
               latitude: latitude === "" ? null : Number(latitude),
               longitude: longitude === "" ? null : Number(longitude),
               radius_meters: Number(radius),
+              require_location: requireLocation,
               is_active: active,
             };
         await api.workLocations.update(location.id, payload);
@@ -98,6 +100,7 @@ function WorkLocationFormDialog({
           latitude: latitude === "" ? null : Number(latitude),
           longitude: longitude === "" ? null : Number(longitude),
           radius_meters: Number(radius),
+          require_location: requireLocation,
         });
         notifySuccess("Work location added");
       }
@@ -190,9 +193,34 @@ function WorkLocationFormDialog({
               onChange={(e) => setRadius(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              How close someone must be for a GPS check-in to count. QR check-ins ignore this.
+              How close someone must be for a check-in to count. QR scans are checked against it too whenever the
+              phone shares its location{managedByBranch ? "" : " — and always, if location is required below"}.
             </p>
           </div>
+          {!managedByBranch && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={requireLocation}
+                disabled={latitude === "" || longitude === ""}
+                onChange={(e) => setRequireLocation(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-input"
+              />
+              <span>
+                <span className="font-medium">Require location when scanning the QR code</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {latitude === "" || longitude === ""
+                    ? "Set the latitude and longitude above first."
+                    : "A scan only counts if the phone is inside the radius, so a photo of the poster can't be used from elsewhere."}
+                </span>
+              </span>
+            </label>
+          )}
+          {managedByBranch && (
+            <p className="text-xs text-muted-foreground">
+              Whether a scan must include the employee&apos;s location is set on the branch itself.
+            </p>
+          )}
           {location && (
             <label className="flex items-center gap-2 text-sm">
               <input

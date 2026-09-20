@@ -341,11 +341,17 @@ export default function UsersPage() {
                     </TableCell>
                     {branches.length > 0 && (
                       <TableCell>
-                        <Badge variant="outline">
-                          {user.branch_ids && user.branch_ids.length > 0
-                            ? `${user.branch_ids.length} branch${user.branch_ids.length > 1 ? "es" : ""}`
-                            : "All branches"}
-                        </Badge>
+                        {user.branch_ids && user.branch_ids.length > 0 ? (
+                          <span className="flex flex-wrap gap-1">
+                            {user.branch_ids.map((id) => (
+                              <Badge key={id} variant="info">
+                                {branches.find((b) => b.id === id)?.name ?? `#${id}`}
+                              </Badge>
+                            ))}
+                          </span>
+                        ) : (
+                          <Badge variant="outline">All branches</Badge>
+                        )}
                       </TableCell>
                     )}
                     {canManage && (

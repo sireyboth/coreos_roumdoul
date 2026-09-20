@@ -7,13 +7,37 @@ use App\Models\Branch;
 use App\Models\EmployeeAssignment;
 use App\Models\WorkLocation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class BranchController extends Controller
 {
-    public function index()
+    /**
+     * What a branch response carries beyond its own columns: whether a scan
+     * must come with the phone's location (a setting of its check-in point),
+     * and — for people who manage branches and so print the poster — the QR
+     * token. Nobody else ever receives the token.
+     */
+    private function present(Branch $branch, bool $canSeeQr): Branch
     {
-        return Branch::query()->with('workLocation')->latest()->paginate(25);
+        $branch->setAttribute('require_location', (bool) $branch->workLocation?->require_location);
+
+        return $canSeeQr ? $branch->append('qr_token') : $branch;
+    }
+
+    private function canSeeQr(Request $request): bool
+    {
+        return $request->user()->hasCompanyPermission('branches.manage');
+    }
+
+    public function index(Request $request)
+    {
+        $branches = Branch::query()->with('workLocation')->latest()->paginate(25);
+        $canSeeQr = $this->canSeeQr($request);
+
+        $branches->getCollection()->each(fn (Branch $branch) => $this->present($branch, $canSeeQr));
+
+        return $branches;
     }
 
     public function store(Request $request)
@@ -36,18 +60,19 @@ class BranchController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'timezone' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'require_location' => ['boolean'],
         ]);
 
-        $branch = Branch::query()->create($data);
+        $branch = Branch::query()->create(Arr::except($data, 'require_location'));
 
-        $this->syncWorkLocation($branch);
+        $this->syncWorkLocation($branch, $data['require_location'] ?? null);
 
-        return response()->json($branch, 201);
+        return response()->json($this->present($branch->refresh(), $this->canSeeQr($request)), 201);
     }
 
-    public function show(Branch $branch)
+    public function show(Request $request, Branch $branch)
     {
-        return $branch;
+        return $this->present($branch->load('workLocation'), $this->canSeeQr($request));
     }
 
     public function update(Request $request, Branch $branch)
@@ -62,13 +87,14 @@ class BranchController extends Controller
             'longitude' => ['sometimes', 'required', 'numeric', 'between:-180,180'],
             'timezone' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'require_location' => ['boolean'],
         ]);
 
-        $branch->update($data);
+        $branch->update(Arr::except($data, 'require_location'));
 
-        $this->syncWorkLocation($branch);
+        $this->syncWorkLocation($branch, $data['require_location'] ?? null);
 
-        return $branch;
+        return $this->present($branch->refresh(), $this->canSeeQr($request));
     }
 
     public function destroy(Branch $branch)
@@ -101,13 +127,13 @@ class BranchController extends Controller
      * Invalidates the branch's current QR code and issues a new one — for
      * when a printed poster is lost, damaged, or its photo has leaked.
      */
-    public function regenerateQrCode(Branch $branch)
+    public function regenerateQrCode(Request $request, Branch $branch)
     {
         $this->syncWorkLocation($branch);
 
         $branch->refresh()->workLocation->regenerateQrToken();
 
-        return $branch->fresh();
+        return $this->present($branch->fresh('workLocation'), $this->canSeeQr($request));
     }
 
     /**
@@ -118,7 +144,7 @@ class BranchController extends Controller
      * first creation — never silently overridden if an admin has since
      * tuned it by hand.
      */
-    private function syncWorkLocation(Branch $branch): void
+    private function syncWorkLocation(Branch $branch, ?bool $requireLocation = null): void
     {
         $workLocation = WorkLocation::query()->firstOrNew(['branch_id' => $branch->id]);
 
@@ -133,6 +159,12 @@ class BranchController extends Controller
 
         if (! $workLocation->exists) {
             $workLocation->radius_meters = 100;
+        }
+
+        // Only changed when the request says so — an edit that doesn't mention
+        // it must never quietly switch the setting off.
+        if ($requireLocation !== null) {
+            $workLocation->require_location = $requireLocation;
         }
 
         $workLocation->save();

@@ -39,4 +39,34 @@ class CompanyUserService
 
         return $user->fresh();
     }
+
+    /**
+     * Limits a login to exactly one branch, replacing any earlier restriction.
+     * Used for employees, whose login should only see their own branch.
+     */
+    public function restrictToBranch(User $user, int $branchId): void
+    {
+        $membership = $user->membership;
+
+        $membership->branchAccess()->delete();
+        $membership->branchAccess()->create(['branch_id' => $branchId, 'created_at' => now()]);
+
+        AuditLogger::record('user.branch_access_changed', $user, ['branch_ids' => [$branchId], 'reason' => 'employee branch']);
+    }
+
+    /**
+     * When an employee moves branch their login follows — but only if it was
+     * tied to the old branch alone. Someone left unrestricted, or given a
+     * custom set of branches by an admin, is never changed behind their back.
+     */
+    public function followEmployeeBranch(User $user, ?int $from, ?int $to): void
+    {
+        if ($from === null || $to === null || $from === $to) {
+            return;
+        }
+
+        if (array_map('intval', $user->membership?->accessibleBranchIds() ?? []) === [$from]) {
+            $this->restrictToBranch($user, $to);
+        }
+    }
 }

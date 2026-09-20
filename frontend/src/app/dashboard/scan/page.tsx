@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useMe } from "@/contexts/me-context";
 import { useQrScanner } from "@/hooks/use-qr-scanner";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
+import { withLocationRetry } from "@/lib/location";
 
 type Status =
   | { kind: "scanning" }
@@ -78,7 +79,7 @@ export default function ScanPage() {
       const action = isCheckingOut ? "check_out" : "check_in";
 
       try {
-        const event = await (isCheckingOut ? api.attendance.checkOut : api.attendance.checkIn)({
+        const event = await withLocationRetry(isCheckingOut ? api.attendance.checkOut : api.attendance.checkIn, {
           qr_token: token,
           ...gpsRef.current,
         });

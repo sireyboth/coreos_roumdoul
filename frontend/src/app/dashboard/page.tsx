@@ -251,7 +251,7 @@ export default function DashboardPage() {
         .then((r) => setPendingCorrections(r.data.filter((c) => c.status === "pending").length))
         .catch(() => setPendingCorrections(0));
     }
-    if (canEmployees) api.employees.list().then((r) => setEmployeeCount(r.data.length)).catch(() => setEmployeeCount(0));
+    if (canEmployees) api.employees.list({ perPage: 1 }).then((r) => setEmployeeCount(r.total)).catch(() => setEmployeeCount(0));
     if (canBranches) api.branches.list().then((r) => setBranchCount(r.data.length)).catch(() => setBranchCount(0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.user.id]);

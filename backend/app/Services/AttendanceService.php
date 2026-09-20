@@ -12,6 +12,7 @@ use App\Models\Shift;
 use App\Models\WorkLocation;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -247,6 +248,19 @@ class AttendanceService
             throw ValidationException::withMessages([
                 'qr_token' => ["{$workLocation->name} is no longer active, so you can't check in there."],
             ]);
+        }
+
+        // A site that requires location won't accept a scan the phone couldn't
+        // back with a position — that's what stops a photo of the poster
+        // being used from home. The code lets the app fetch the position and retry.
+        if ($workLocation->require_location && ! $hasGps) {
+            $message = "{$workLocation->name} needs your location to {$verb}. Turn on location for this site and try again.";
+
+            throw new HttpResponseException(response()->json([
+                'message' => $message,
+                'code' => 'location_required',
+                'errors' => ['latitude' => [$message]],
+            ], 422));
         }
 
         if ($hasGps && $workLocation->latitude !== null && $workLocation->longitude !== null) {

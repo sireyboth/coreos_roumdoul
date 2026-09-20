@@ -65,6 +65,16 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
             ->middlewareFor(['store', 'update', 'destroy'], "company_permission:{$uri}.manage");
     }
 
+    Route::middleware('company_permission:departments.manage')->group(function () {
+        Route::post('/departments/{department}/members', [DepartmentController::class, 'addMembers']);
+        Route::delete('/departments/{department}/members/{employee}', [DepartmentController::class, 'removeMember']);
+    });
+
+    Route::middleware('company_permission:teams.manage')->group(function () {
+        Route::post('/teams/{team}/members', [TeamController::class, 'addMembers']);
+        Route::delete('/teams/{team}/members/{employee}', [TeamController::class, 'removeMember']);
+    });
+
     Route::post('/holidays/import', [HolidayController::class, 'import'])->middleware('company_permission:holidays.manage');
 
     Route::middleware('company_permission:work_locations.manage')->group(function () {

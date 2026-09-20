@@ -115,7 +115,14 @@ function EventDetails({ title, event }: { title: string; event: AttendanceEvent 
     <section className="flex flex-col gap-3 rounded-md border border-border p-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{title}</h3>
-        {event.method && <Badge variant="outline">{METHOD_LABELS[event.method]}</Badge>}
+        <div className="flex items-center gap-2">
+          {event.method === "qr" && !hasGps && (
+            <Badge variant="warning" title="The scan came without the phone's location, so it couldn't be checked against the branch.">
+              No location
+            </Badge>
+          )}
+          {event.method && <Badge variant="outline">{METHOD_LABELS[event.method]}</Badge>}
+        </div>
       </div>
       <dl className="grid grid-cols-2 gap-3">
         <Field label="Time">{formatDateTime(event.event_time)}</Field>
