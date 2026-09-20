@@ -89,7 +89,12 @@ class AuthController extends Controller
             'roles' => $membership?->roles()->pluck('name') ?? [],
             'permissions' => $membership?->permissionCodes() ?? [],
             'employee' => $user->employee?->only('id', 'name'),
-            'company' => $company?->only('id', 'name', 'slug', 'status'),
+            'company' => $company?->only('id', 'name', 'slug', 'status', 'trial_ends_at'),
+            'plan' => $company?->subscription?->plan?->only('name', 'max_employees', 'max_branches'),
+            'usage' => $company ? [
+                'employees' => $company->employeeCount(),
+                'branches' => $company->branchCount(),
+            ] : null,
             'modules' => $company
                 ? \App\Models\Module::query()
                     ->where('status', 'active')

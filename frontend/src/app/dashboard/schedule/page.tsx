@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee, Schedule, Shift } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function SchedulePage() {
   const { me } = useMe();
@@ -51,10 +53,12 @@ export default function SchedulePage() {
 
     try {
       await api.schedules.create({ employee_id: Number(employeeId), shift_id: Number(shiftId), date });
+      notifySuccess("Shift scheduled");
       setDate("");
       setOpen(false);
       loadSchedules();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -63,7 +67,13 @@ export default function SchedulePage() {
 
   async function handleRemove(schedule: Schedule) {
     if (!confirm(`Remove this schedule entry?`)) return;
-    await api.schedules.remove(schedule.id);
+    try {
+      await api.schedules.remove(schedule.id);
+      notifySuccess("Schedule entry removed");
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     loadSchedules();
   }
 
@@ -140,7 +150,7 @@ export default function SchedulePage() {
                         onChange={(e) => setDate(e.target.value)}
                       />
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

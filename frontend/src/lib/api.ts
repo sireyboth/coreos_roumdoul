@@ -18,13 +18,20 @@ export function clearToken() {
 export class ApiError extends Error {
   status: number;
   errors?: Record<string, string[]>;
+  /** Machine-readable reason, e.g. plan_limit_reached, trial_expired. */
+  code?: string;
 
-  constructor(status: number, message: string, errors?: Record<string, string[]>) {
+  constructor(status: number, message: string, errors?: Record<string, string[]>, code?: string) {
     super(message);
     this.status = status;
     this.errors = errors;
+    this.code = code;
   }
 }
+
+// The whole account is locked (not just this one request).
+const ACCOUNT_BLOCKED_CODES = ["trial_expired", "company_suspended", "company_cancelled"];
+export const ACCOUNT_BLOCKED_EVENT = "app:account-blocked";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -41,7 +48,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body.message ?? `Request failed (${res.status})`, body.errors);
+    if (typeof window !== "undefined" && ACCOUNT_BLOCKED_CODES.includes(body.code)) {
+      window.dispatchEvent(new CustomEvent(ACCOUNT_BLOCKED_EVENT, { detail: { code: body.code, message: body.message } }));
+    }
+
+    throw new ApiError(res.status, body.message ?? `Request failed (${res.status})`, body.errors, body.code);
   }
 
   if (res.status === 204) return undefined as T;
@@ -54,7 +65,10 @@ export type MeResponse = {
   roles: string[];
   permissions: string[];
   employee: { id: number; name: string } | null;
-  company: { id: number; name: string; slug: string; status: string } | null;
+  company: { id: number; name: string; slug: string; status: string; trial_ends_at: string | null } | null;
+  // null limits mean unlimited.
+  plan: { name: string; max_employees: number | null; max_branches: number | null } | null;
+  usage: { employees: number; branches: number } | null;
   modules: Record<string, boolean>;
 };
 

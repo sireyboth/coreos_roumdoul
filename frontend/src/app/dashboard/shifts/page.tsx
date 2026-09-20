@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Shift } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function ShiftsPage() {
   const { me } = useMe();
@@ -53,10 +55,12 @@ export default function ShiftsPage() {
         end_time: endTime,
         break_minutes: Number(breakMinutes),
       });
+      notifySuccess("Shift created");
       setName("");
       setOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -125,7 +129,7 @@ export default function ShiftsPage() {
                         onChange={(e) => setBreakMinutes(e.target.value)}
                       />
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

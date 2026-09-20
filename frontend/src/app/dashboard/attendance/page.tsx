@@ -19,6 +19,8 @@ import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
 import { dateOnly, isToday } from "@/lib/date";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
@@ -81,12 +83,15 @@ export default function AttendancePage() {
     try {
       if (isCheckingOut) {
         await api.attendance.checkOut(data);
+        notifySuccess("Checked out", "Have a good rest of your day.");
       } else {
         await api.attendance.checkIn(data);
+        notifySuccess("Checked in", "Your attendance has been recorded.");
       }
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      notifyError(err);
     } finally {
       setWorking(false);
     }
@@ -268,7 +273,7 @@ export default function AttendancePage() {
                 {todaySession && todaySession.late_minutes > 0 && (
                   <Badge variant="warning">{todaySession.late_minutes}m late</Badge>
                 )}
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {error && <Alert variant="destructive">{error}</Alert>}
               </div>
               <Link href="/dashboard/scan" className="text-sm text-muted-foreground underline">
                 Open instant-scan mode →

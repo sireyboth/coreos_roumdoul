@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api, ApiError, setToken } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,7 +71,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <Alert variant="destructive">{error}</Alert>}
             <Button type="submit" disabled={loading} className="mt-1">
               {loading ? "Signing in…" : "Sign in"}
             </Button>

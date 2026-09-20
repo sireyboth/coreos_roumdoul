@@ -21,7 +21,7 @@ class Employee extends Model
     protected static function booted(): void
     {
         $recordCount = function (self $employee) {
-            UsageRecorder::record($employee->company, 'employees_count', $employee->company->employees()->count());
+            UsageRecorder::record($employee->company, 'employees_count', $employee->company->employeeCount());
         };
 
         static::created($recordCount);

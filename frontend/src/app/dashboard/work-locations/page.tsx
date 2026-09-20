@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, WorkLocation } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function WorkLocationsPage() {
   const { me } = useMe();
@@ -47,12 +49,14 @@ export default function WorkLocationsPage() {
 
     try {
       await api.workLocations.create({ name, address: address || null, radius_meters: Number(radius) });
+      notifySuccess("Work location added");
       setName("");
       setAddress("");
       setRadius("100");
       setOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -103,7 +107,7 @@ export default function WorkLocationsPage() {
                         onChange={(e) => setRadius(e.target.value)}
                       />
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

@@ -22,6 +22,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, CompanyUser, Role } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 function BranchAccessDialog({
   user,
@@ -50,8 +52,12 @@ function BranchAccessDialog({
     setSaving(true);
     try {
       await api.users.setBranchAccess(user.id, selected);
+      notifySuccess("Branch access updated", `${user.name} can now see ${selected.length ? "only the selected branches" : "every branch"}.`);
       onOpenChange(false);
       onSaved();
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
     } finally {
       setSaving(false);
     }
@@ -152,12 +158,14 @@ export default function UsersPage() {
 
     try {
       await api.users.invite({ name, email, password, role });
+      notifySuccess("Teammate invited", `${email} can now sign in.`);
       setName("");
       setEmail("");
       setPassword("");
       setOpen(false);
       loadUsers();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -165,18 +173,36 @@ export default function UsersPage() {
   }
 
   async function handleRoleChange(user: CompanyUser, newRole: string) {
-    await api.users.updateRole(user.id, newRole);
+    try {
+      await api.users.updateRole(user.id, newRole);
+      notifySuccess(`${user.name} is now ${newRole}`);
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     loadUsers();
   }
 
   async function handleToggleActive(user: CompanyUser) {
-    await api.users.setActive(user.id, !user.is_active);
+    try {
+      await api.users.setActive(user.id, !user.is_active);
+      notifySuccess(`${user.name} ${user.is_active ? "deactivated" : "reactivated"}`);
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     loadUsers();
   }
 
   async function handleRemove(user: CompanyUser) {
     if (!confirm(`Remove ${user.name}? This cannot be undone.`)) return;
-    await api.users.remove(user.id);
+    try {
+      await api.users.remove(user.id);
+      notifySuccess(`${user.name} removed`);
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     loadUsers();
   }
 
@@ -241,7 +267,7 @@ export default function UsersPage() {
                       <Label htmlFor="role">Role</Label>
                       <RoleSelect roles={roles} value={role} onChange={setRole} />
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

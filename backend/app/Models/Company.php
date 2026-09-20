@@ -204,13 +204,28 @@ class Company extends Model
     {
         $limit = $this->subscription?->plan?->max_branches;
 
-        return $limit !== null && $this->branches()->count() >= $limit;
+        return $limit !== null && $this->branchCount() >= $limit;
     }
 
     public function hasReachedEmployeeLimit(): bool
     {
         $limit = $this->subscription?->plan?->max_employees;
 
-        return $limit !== null && $this->employees()->count() >= $limit;
+        return $limit !== null && $this->employeeCount() >= $limit;
+    }
+
+    public function branchCount(): int
+    {
+        return $this->branches()->count();
+    }
+
+    /**
+     * The company's real headcount. Skips the branch-access filter: a
+     * manager restricted to one branch must not see (and be limited by) a
+     * smaller number than the plan is actually billed on.
+     */
+    public function employeeCount(): int
+    {
+        return $this->employees()->withoutGlobalScope('branch_access')->count();
     }
 }

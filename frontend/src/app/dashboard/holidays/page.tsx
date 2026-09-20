@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Holiday } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function HolidaysPage() {
   const { me } = useMe();
@@ -47,12 +49,14 @@ export default function HolidaysPage() {
 
     try {
       await api.holidays.create({ name, date, is_recurring_yearly: recurring });
+      notifySuccess("Holiday added");
       setName("");
       setDate("");
       setRecurring(false);
       setOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -61,7 +65,13 @@ export default function HolidaysPage() {
 
   async function handleRemove(holiday: Holiday) {
     if (!confirm(`Remove "${holiday.name}"?`)) return;
-    await api.holidays.remove(holiday.id);
+    try {
+      await api.holidays.remove(holiday.id);
+      notifySuccess(`"${holiday.name}" removed`);
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     load();
   }
 
@@ -113,7 +123,7 @@ export default function HolidaysPage() {
                       />
                       Repeats every year
                     </label>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

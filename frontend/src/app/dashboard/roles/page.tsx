@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, PermissionGroup, Role } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 function permissionLabel(permission: string): string {
   const action = permission.split(".")[1];
@@ -106,11 +108,13 @@ export default function RolesPage() {
 
     try {
       await api.roles.create({ name: newRoleName, permissions: newRolePermissions });
+      notifySuccess("Role created");
       setNewRoleName("");
       setNewRolePermissions([]);
       setCreateOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setCreateError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setCreating(false);
@@ -131,9 +135,11 @@ export default function RolesPage() {
 
     try {
       await api.roles.update(editingRole.id, { permissions: editPermissions });
+      notifySuccess("Role permissions updated");
       setEditingRole(null);
       load();
     } catch (err) {
+      notifyError(err);
       setEditError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSavingEdit(false);
@@ -144,9 +150,10 @@ export default function RolesPage() {
     if (!confirm(`Delete the "${role.name}" role?`)) return;
     try {
       await api.roles.remove(role.id);
+      notifySuccess(`"${role.name}" role deleted`);
       load();
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Something went wrong.");
+    notifyError(err);
     }
   }
 
@@ -192,7 +199,7 @@ export default function RolesPage() {
                         onChange={setNewRolePermissions}
                       />
                     </div>
-                    {createError && <p className="text-sm text-destructive">{createError}</p>}
+                    {createError && <Alert variant="destructive">{createError}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={creating}>
@@ -267,7 +274,7 @@ export default function RolesPage() {
             </DialogHeader>
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
               <PermissionCheckboxes groups={groups} selected={editPermissions} onChange={setEditPermissions} />
-              {editError && <p className="text-sm text-destructive">{editError}</p>}
+              {editError && <Alert variant="destructive">{editError}</Alert>}
               <DialogFooter>
                 <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                 <Button type="submit" disabled={savingEdit}>

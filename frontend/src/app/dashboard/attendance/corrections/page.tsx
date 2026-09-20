@@ -21,6 +21,8 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
@@ -58,6 +60,7 @@ export default function AttendanceCorrectionsPage() {
         requested_check_in: checkIn || undefined,
         requested_check_out: checkOut || undefined,
       });
+      notifySuccess("Correction requested", "Your manager will review it.");
       setDate("");
       setReason("");
       setCheckIn("");
@@ -65,6 +68,7 @@ export default function AttendanceCorrectionsPage() {
       setOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -72,12 +76,24 @@ export default function AttendanceCorrectionsPage() {
   }
 
   async function handleApprove(correction: AttendanceCorrection) {
-    await api.attendanceCorrections.approve(correction.id);
+    try {
+      await api.attendanceCorrections.approve(correction.id);
+      notifySuccess("Correction approved", "The attendance record was updated.");
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     load();
   }
 
   async function handleReject(correction: AttendanceCorrection) {
-    await api.attendanceCorrections.reject(correction.id);
+    try {
+      await api.attendanceCorrections.reject(correction.id);
+      notifySuccess("Correction rejected");
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
+    }
     load();
   }
 
@@ -134,7 +150,7 @@ export default function AttendanceCorrectionsPage() {
                       <Label htmlFor="reason">Reason</Label>
                       <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>

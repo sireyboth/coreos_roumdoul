@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AccountBanner } from "@/components/dashboard/account-banner";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
 import { findNavItem } from "@/components/dashboard/nav";
@@ -151,7 +152,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 "radial-gradient(60% 100% at 15% 0%, color-mix(in oklch, var(--primary), transparent 90%), transparent 70%), radial-gradient(45% 80% at 90% 0%, color-mix(in oklch, oklch(0.7 0.15 200), transparent 92%), transparent 70%)",
             }}
           />
-          <div className="relative">{children}</div>
+          <div className="relative">
+            <div className="px-4 pt-4 empty:hidden sm:px-6 lg:px-8">
+              <AccountBanner />
+            </div>
+            {children}
+          </div>
         </main>
       </div>
     </div>

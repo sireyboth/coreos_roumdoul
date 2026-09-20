@@ -19,7 +19,12 @@ class EnsureModuleEnabled
     {
         $company = $request->user()?->company;
 
-        abort_unless($company?->hasModule($moduleKey), 403, "Your plan doesn't include the \"{$moduleKey}\" module.");
+        if (! $company?->hasModule($moduleKey)) {
+            return response()->json([
+                'message' => "Your plan doesn't include the \"{$moduleKey}\" module.",
+                'code' => 'module_not_enabled',
+            ], 403);
+        }
 
         return $next($request);
     }

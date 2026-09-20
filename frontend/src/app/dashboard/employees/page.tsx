@@ -21,6 +21,9 @@ import { DataTable, type DataTableColumn, type DataTableFilter } from "@/compone
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Employee } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
+import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 
 function CreateLoginDialog({
   employee,
@@ -44,9 +47,11 @@ function CreateLoginDialog({
 
     try {
       await api.employees.createLogin(employee.id, { email, password });
+      notifySuccess("Login created", `${employee.name} can now sign in and check in.`);
       onOpenChange(false);
       onSaved();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -84,7 +89,7 @@ function CreateLoginDialog({
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
             <Button type="submit" disabled={saving}>
@@ -98,7 +103,7 @@ function CreateLoginDialog({
 }
 
 export default function EmployeesPage() {
-  const { me } = useMe();
+  const { me, refresh } = useMe();
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [open, setOpen] = useState(false);
@@ -135,6 +140,8 @@ export default function EmployeesPage() {
         branch_id: Number(branchId),
         ...(loginPassword ? { email: loginEmail, password: loginPassword } : {}),
       });
+      notifySuccess("Employee added", loginPassword ? `${loginEmail} can now sign in.` : undefined);
+      refresh();
       setName("");
       setJobTitle("");
       setLoginEmail("");
@@ -142,6 +149,7 @@ export default function EmployeesPage() {
       setOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSaving(false);
@@ -149,6 +157,7 @@ export default function EmployeesPage() {
   }
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
+  const atEmployeeLimit = me?.plan?.max_employees != null && (me.usage?.employees ?? 0) >= me.plan.max_employees;
 
   const columns: DataTableColumn<Employee>[] = [
     {
@@ -246,7 +255,7 @@ export default function EmployeesPage() {
               <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger
                   render={
-                    <Button>
+                    <Button disabled={atEmployeeLimit}>
                       <Plus className="size-4" />
                       Add employee
                     </Button>
@@ -308,7 +317,7 @@ export default function EmployeesPage() {
                         />
                       </div>
                     </div>
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && <Alert variant="destructive">{error}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={saving}>
@@ -334,6 +343,8 @@ export default function EmployeesPage() {
             )}
           </p>
         )}
+
+        <PlanLimitAlert resource="employees" />
 
         <DataTable
           data={employees}

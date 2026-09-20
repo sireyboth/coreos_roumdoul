@@ -19,6 +19,7 @@ class BranchController extends Controller
         if ($request->user()->company->hasReachedBranchLimit()) {
             return response()->json([
                 'message' => 'Your plan\'s branch limit has been reached. Upgrade your plan to add more.',
+                'code' => 'plan_limit_reached',
             ], 422);
         }
 

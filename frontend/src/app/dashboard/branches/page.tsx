@@ -22,6 +22,9 @@ import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
+import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 
 function BranchQrDialog({
   branch,
@@ -60,6 +63,10 @@ function BranchQrDialog({
     try {
       const updated = await api.branches.regenerateQr(branch.id);
       onRegenerated(updated);
+      notifySuccess("New QR code generated", "The old poster no longer works.");
+    } catch (err) {
+      notifyError(err);
+      notifyError(err);
     } finally {
       setRegenerating(false);
     }
@@ -218,7 +225,7 @@ function BranchFormFields({
 }
 
 export default function BranchesPage() {
-  const { me } = useMe();
+  const { me, refresh } = useMe();
   const [branches, setBranches] = useState<Branch[] | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -259,10 +266,13 @@ export default function BranchesPage() {
 
     try {
       await api.branches.create(toPayload(createForm));
+      notifySuccess("Branch added");
+      refresh();
       setCreateForm(EMPTY_FORM);
       setCreateOpen(false);
       load();
     } catch (err) {
+      notifyError(err);
       setCreateError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setCreating(false);
@@ -290,9 +300,11 @@ export default function BranchesPage() {
 
     try {
       await api.branches.update(editingBranch.id, toPayload(editForm));
+      notifySuccess("Branch updated");
       setEditingBranch(null);
       load();
     } catch (err) {
+      notifyError(err);
       setEditError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSavingEdit(false);
@@ -300,6 +312,7 @@ export default function BranchesPage() {
   }
 
   const canManage = me?.permissions.includes("branches.manage") ?? false;
+  const atBranchLimit = me?.plan?.max_branches != null && (me.usage?.branches ?? 0) >= me.plan.max_branches;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -312,7 +325,7 @@ export default function BranchesPage() {
               <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogTrigger
                   render={
-                    <Button>
+                    <Button disabled={atBranchLimit}>
                       <Plus className="size-4" />
                       Add branch
                     </Button>
@@ -327,7 +340,7 @@ export default function BranchesPage() {
                   </DialogHeader>
                   <form onSubmit={handleCreate} className="flex flex-col gap-4">
                     <BranchFormFields form={createForm} onChange={setCreateForm} />
-                    {createError && <p className="text-sm text-destructive">{createError}</p>}
+                    {createError && <Alert variant="destructive">{createError}</Alert>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                       <Button type="submit" disabled={creating}>
@@ -340,6 +353,8 @@ export default function BranchesPage() {
             )
           }
         />
+
+        <PlanLimitAlert resource="branches" />
 
         {branches === null && <p className="text-sm text-muted-foreground">Loading…</p>}
 
@@ -418,7 +433,7 @@ export default function BranchesPage() {
                 />
                 Active
               </label>
-              {editError && <p className="text-sm text-destructive">{editError}</p>}
+              {editError && <Alert variant="destructive">{editError}</Alert>}
               <DialogFooter>
                 <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
                 <Button type="submit" disabled={savingEdit}>

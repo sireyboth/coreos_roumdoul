@@ -15,6 +15,8 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function ProfilePage() {
   const { me, refresh } = useMe();
@@ -42,9 +44,11 @@ export default function ProfilePage() {
 
     try {
       await api.profile.update({ name, email });
+      notifySuccess("Profile updated");
       setProfileSaved(true);
       refresh();
     } catch (err) {
+      notifyError(err);
       setProfileError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSavingProfile(false);
@@ -63,11 +67,13 @@ export default function ProfilePage() {
         password: newPassword,
         password_confirmation: confirmPassword,
       });
+      notifySuccess("Password changed");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setPasswordSaved(true);
     } catch (err) {
+      notifyError(err);
       setPasswordError(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setSavingPassword(false);
@@ -104,7 +110,7 @@ export default function ProfilePage() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              {profileError && <p className="text-sm text-destructive">{profileError}</p>}
+              {profileError && <Alert variant="destructive">{profileError}</Alert>}
               {profileSaved && <Badge variant="success">Saved</Badge>}
               <Button type="submit" disabled={savingProfile} className="self-start">
                 {savingProfile ? "Saving…" : "Save changes"}
@@ -153,7 +159,7 @@ export default function ProfilePage() {
                   autoComplete="new-password"
                 />
               </div>
-              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              {passwordError && <Alert variant="destructive">{passwordError}</Alert>}
               {passwordSaved && <Badge variant="success">Password updated</Badge>}
               <Button type="submit" disabled={savingPassword} className="self-start">
                 {savingPassword ? "Updating…" : "Update password"}

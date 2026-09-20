@@ -19,17 +19,19 @@ class EnsureCompanyIsActive
     {
         $company = $request->user()?->company;
 
-        abort_if(
-            in_array($company?->status, self::BLOCKED_STATUSES, true),
-            403,
-            "This company's account has been {$company?->status}. Contact support.",
-        );
+        if (in_array($company?->status, self::BLOCKED_STATUSES, true)) {
+            return response()->json([
+                'message' => "This company's account has been {$company->status}. Contact support.",
+                'code' => "company_{$company->status}",
+            ], 403);
+        }
 
-        abort_if(
-            $company?->isTrialExpired(),
-            403,
-            'Your trial has ended. Please upgrade your plan to continue.',
-        );
+        if ($company?->isTrialExpired()) {
+            return response()->json([
+                'message' => 'Your trial has ended. Please upgrade your plan to continue.',
+                'code' => 'trial_expired',
+            ], 403);
+        }
 
         return $next($request);
     }
