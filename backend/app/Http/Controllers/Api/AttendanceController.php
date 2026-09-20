@@ -12,7 +12,14 @@ class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AttendanceSession::query()->with(['employee', 'checkInEvent', 'checkOutEvent']);
+        $query = AttendanceSession::query()->with([
+            'employee.branch',
+            'schedule.shift',
+            'checkInEvent.workLocation',
+            'checkInEvent.recordedBy:id,name',
+            'checkOutEvent.workLocation',
+            'checkOutEvent.recordedBy:id,name',
+        ]);
 
         if (! $request->user()->hasCompanyPermission('attendance.manage')) {
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));

@@ -186,4 +186,56 @@ class AttendanceQrCheckInTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('latitude');
     }
+
+    /**
+     * The attendance list carries everything a reviewer needs to preview a
+     * record: who, where, how it was verified and how far they were.
+     */
+    public function test_attendance_records_expose_location_method_and_distance_details(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Theta', 'Boss', 'boss@theta.test', 'password123');
+        $this->subscribeToGrowth($company->id);
+        $admin = $company->users()->first();
+
+        $branchId = $this->createBranch($admin, [
+            'name' => 'Riverside',
+            'address' => '12 Sisowath Quay',
+            'latitude' => 11.5564,
+            'longitude' => 104.9282,
+        ]);
+        $workLocation = WorkLocation::query()->where('branch_id', $branchId)->firstOrFail();
+
+        $user = $this->createUserWithRole($company, 'employee');
+        $employee = Employee::query()->create(['company_id' => $company->id, 'name' => 'Reviewed', 'user_id' => $user->id]);
+        $this->actingAs($admin)->putJson("/api/employees/{$employee->id}", ['branch_id' => $branchId])->assertOk();
+
+        $this->actingAs($user)->postJson('/api/attendance/check-in', [
+            'qr_token' => $workLocation->qr_token,
+            'latitude' => 11.5564,
+            'longitude' => 104.9283,
+        ])->assertCreated();
+
+        $record = $this->actingAs($admin)->getJson('/api/attendance')->assertOk()->json('data.0');
+
+        $this->assertSame('Reviewed', $record['employee']['name']);
+        $this->assertSame('Riverside', $record['employee']['branch']['name']);
+        $this->assertSame('qr', $record['check_in_event']['method']);
+        $this->assertSame('Riverside', $record['check_in_event']['work_location']['name']);
+        $this->assertSame('12 Sisowath Quay', $record['check_in_event']['work_location']['address']);
+        $this->assertLessThan(100, $record['check_in_event']['distance_meters']);
+        $this->assertNull($record['check_out_event']);
+    }
+
+    public function test_a_check_in_with_no_qr_and_no_gps_is_recorded_as_unverified(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Lambda', 'Boss', 'boss@lambda.test', 'password123');
+        $this->subscribeToGrowth($company->id);
+
+        $user = $this->createUserWithRole($company, 'employee');
+        Employee::query()->create(['company_id' => $company->id, 'name' => 'Bare', 'user_id' => $user->id]);
+
+        $this->actingAs($user)->postJson('/api/attendance/check-in')
+            ->assertCreated()
+            ->assertJsonPath('method', 'none');
+    }
 }

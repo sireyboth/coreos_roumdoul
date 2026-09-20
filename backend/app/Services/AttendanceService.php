@@ -41,6 +41,7 @@ class AttendanceService
             'employee_id' => $employee->id,
             'work_location_id' => $workLocation?->id ?? $data['work_location_id'] ?? null,
             'event_type' => 'check_in',
+            'method' => $this->methodFor($data),
             'event_time' => now(),
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
@@ -105,6 +106,7 @@ class AttendanceService
             'employee_id' => $employee->id,
             'work_location_id' => $workLocation?->id ?? $data['work_location_id'] ?? null,
             'event_type' => 'check_out',
+            'method' => $this->methodFor($data),
             'event_time' => now(),
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
@@ -123,6 +125,15 @@ class AttendanceService
         ]);
 
         return $event;
+    }
+
+    private function methodFor(array $data): string
+    {
+        if (! empty($data['qr_token'])) {
+            return 'qr';
+        }
+
+        return isset($data['latitude'], $data['longitude']) ? 'gps' : 'none';
     }
 
     /**
@@ -184,6 +195,7 @@ class AttendanceService
                 'company_id' => $correction->company_id,
                 'employee_id' => $correction->employee_id,
                 'event_type' => 'check_in',
+                'method' => 'correction',
                 'event_time' => $correction->requested_check_in,
                 'recorded_by' => $reviewerId,
                 'notes' => "Correction #{$correction->id}: {$correction->reason}",
@@ -196,6 +208,7 @@ class AttendanceService
                 'company_id' => $correction->company_id,
                 'employee_id' => $correction->employee_id,
                 'event_type' => 'check_out',
+                'method' => 'correction',
                 'event_time' => $correction->requested_check_out,
                 'recorded_by' => $reviewerId,
                 'notes' => "Correction #{$correction->id}: {$correction->reason}",

@@ -17,6 +17,7 @@ class AttendanceEvent extends Model
         'employee_id',
         'work_location_id',
         'event_type',
+        'method',
         'event_time',
         'latitude',
         'longitude',
@@ -24,6 +25,25 @@ class AttendanceEvent extends Model
         'recorded_by',
         'notes',
     ];
+
+    protected $appends = ['distance_meters'];
+
+    /**
+     * How far the device was from the work location when it checked in/out.
+     * Only computed when both sides have coordinates and the location was
+     * eager-loaded (so it never triggers a query per row).
+     */
+    public function getDistanceMetersAttribute(): ?int
+    {
+        $location = $this->relationLoaded('workLocation') ? $this->workLocation : null;
+
+        if (! $location || $location->latitude === null || $location->longitude === null
+            || $this->latitude === null || $this->longitude === null) {
+            return null;
+        }
+
+        return (int) round($location->distanceInMetersTo((float) $this->latitude, (float) $this->longitude));
+    }
 
     protected function casts(): array
     {
