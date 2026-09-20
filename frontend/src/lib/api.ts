@@ -78,6 +78,9 @@ export type Employee = {
   employment_status: string;
   branch_id: number | null;
   branch: Branch | null;
+  // Whether this employee has a login linked to them — without one they
+  // can never sign in or check in.
+  has_login: boolean;
 };
 
 type Paginated<T> = { data: T[] };
@@ -204,8 +207,15 @@ export const api = {
 
   employees: {
     list: () => request<Paginated<Employee>>("/api/employees"),
-    create: (data: Partial<Employee>) =>
-      request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
+    create: (data: {
+      name: string;
+      branch_id: number;
+      job_title?: string | null;
+      email?: string;
+      password?: string;
+    }) => request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
+    createLogin: (id: number, data: { email: string; password: string }) =>
+      request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
   },
 
   users: {

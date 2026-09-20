@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Users } from "lucide-react";
+import { KeyRound, Plus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,81 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Employee } from "@/lib/api";
 
+function CreateLoginDialog({
+  employee,
+  onOpenChange,
+  onSaved,
+}: {
+  employee: Employee | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [email, setEmail] = useState(employee?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!employee) return;
+    setError(null);
+    setSaving(true);
+
+    try {
+      await api.employees.createLogin(employee.id, { email, password });
+      onOpenChange(false);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={employee !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create a login for {employee?.name}</DialogTitle>
+          <DialogDescription>
+            They&apos;ll use this email and temporary password to sign in and check in.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="login-email">Email</Label>
+            <Input
+              id="login-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="login-password">Temporary password</Label>
+            <Input
+              id="login-password"
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Creating…" : "Create login"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function EmployeesPage() {
   const { me } = useMe();
   const [employees, setEmployees] = useState<Employee[] | null>(null);
@@ -31,6 +106,9 @@ export default function EmployeesPage() {
   const [name, setName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [branchId, setBranchId] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginFor, setLoginFor] = useState<Employee | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -52,9 +130,16 @@ export default function EmployeesPage() {
     setSaving(true);
 
     try {
-      await api.employees.create({ name, job_title: jobTitle || null, branch_id: Number(branchId) });
+      await api.employees.create({
+        name,
+        job_title: jobTitle || null,
+        branch_id: Number(branchId),
+        ...(loginPassword ? { email: loginEmail, password: loginPassword } : {}),
+      });
       setName("");
       setJobTitle("");
+      setLoginEmail("");
+      setLoginPassword("");
       setOpen(false);
       load();
     } catch (err) {
@@ -115,6 +200,32 @@ export default function EmployeesPage() {
                       <Label htmlFor="job_title">Job title (optional)</Label>
                       <Input id="job_title" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
                     </div>
+                    <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+                      <p className="text-sm font-medium">Login (optional)</p>
+                      <p className="text-xs text-muted-foreground">
+                        Fill both in so this employee can sign in and check in. You can also add it later.
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="login_email">Email</Label>
+                        <Input
+                          id="login_email"
+                          type="email"
+                          required={loginPassword !== ""}
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="login_password">Temporary password</Label>
+                        <Input
+                          id="login_password"
+                          type="password"
+                          minLength={8}
+                          value={loginPassword}
+                          onChange={(e) => setLoginPassword(e.target.value)}
+                        />
+                      </div>
+                    </div>
                     {error && <p className="text-sm text-destructive">{error}</p>}
                     <DialogFooter>
                       <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -160,6 +271,7 @@ export default function EmployeesPage() {
                 <TableHead>Branch</TableHead>
                 <TableHead>Job title</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Login</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -173,12 +285,33 @@ export default function EmployeesPage() {
                       {employee.employment_status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {employee.has_login ? (
+                      <Badge variant="outline">Has login</Badge>
+                    ) : canManage ? (
+                      <Button variant="outline" size="sm" onClick={() => setLoginFor(employee)}>
+                        <KeyRound className="size-3.5" />
+                        Create login
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground">No login</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
       </div>
+
+      <CreateLoginDialog
+        key={loginFor?.id ?? "none"}
+        employee={loginFor}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setLoginFor(null);
+        }}
+        onSaved={load}
+      />
     </div>
   );
 }
