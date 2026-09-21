@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ACCOUNT_BLOCKED_EVENT, api, clearToken, getToken, MeResponse } from "@/lib/api";
+import { ACCOUNT_BLOCKED_EVENT, api, clearToken, getMeSnapshot, getToken, MeResponse, saveMeSnapshot } from "@/lib/api";
 
 type BlockedInfo = { code: string; message: string };
 
@@ -24,17 +24,33 @@ export function MeProvider({ children }: { children: React.ReactNode }) {
   const [blocked, setBlocked] = useState<BlockedInfo | null>(null);
 
   function load() {
-    if (!getToken()) {
+    const token = getToken();
+
+    if (!token) {
       router.push("/login");
       return;
     }
 
     // Only show the full-screen loader the first time — a later refresh
     // (e.g. updating usage after adding an employee) must not blank the page.
-    if (!me) setLoading(true);
+    if (!me) {
+      // If we know who this is from last time, show the app straight away and
+      // let the fresh answer below correct anything that changed.
+      const known = getMeSnapshot(token);
+      if (known) {
+        setMe(known);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+    }
+
     api
       .me()
-      .then(setMe)
+      .then((fresh) => {
+        saveMeSnapshot(token, fresh);
+        setMe(fresh);
+      })
       .catch(() => {
         clearToken();
         router.push("/login");

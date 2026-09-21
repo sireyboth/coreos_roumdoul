@@ -14,6 +14,7 @@ class AttendanceController extends Controller
     {
         $query = AttendanceSession::query()->with([
             'employee.branch',
+            'employee.currentAssignment',
             'schedule.shift',
             'checkInEvent.workLocation',
             'checkInEvent.recordedBy:id,name',

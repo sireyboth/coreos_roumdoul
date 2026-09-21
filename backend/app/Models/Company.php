@@ -168,6 +168,32 @@ class Company extends Model
             ->exists() ?? false;
     }
 
+    /**
+     * Whether each active module is on for this company, in a fixed number of
+     * queries no matter how many modules exist. Same rules as hasModule():
+     * a currently-active override wins, otherwise the plan decides. Used by
+     * /me, which every page waits on.
+     *
+     * @return array<string, bool> module code => enabled
+     */
+    public function moduleAccess(): array
+    {
+        $modules = Module::query()->where('status', 'active')->get();
+
+        $overrides = $this->moduleEntitlements()->orderBy('id')->get()->groupBy('module_id')->map->first();
+        $planModuleIds = $this->subscription?->plan?->modules()->pluck('modules.id')->flip() ?? collect();
+
+        return $modules->mapWithKeys(function (Module $module) use ($overrides, $planModuleIds) {
+            $override = $overrides->get($module->id);
+
+            $enabled = $override && $this->entitlementIsActive($override)
+                ? (bool) $override->is_enabled
+                : $planModuleIds->has($module->id);
+
+            return [$module->code => $enabled];
+        })->all();
+    }
+
     private function entitlementIsActive(CompanyModuleEntitlement $entitlement): bool
     {
         $now = now();

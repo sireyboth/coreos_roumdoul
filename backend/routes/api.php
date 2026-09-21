@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeePhotoController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
@@ -27,6 +28,13 @@ Route::get('/health', function () {
         'time' => now()->toIso8601String(),
     ]);
 });
+
+// Photos load through <img> tags, which can't send a login header — so this one
+// route is reached with a short-lived signed link instead (relative, so it
+// keeps working behind proxies that change the host or scheme).
+Route::get('/employees/{employee}/photo', [EmployeePhotoController::class, 'show'])
+    ->middleware('signed:relative')
+    ->name('employees.photo');
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -75,6 +83,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
         Route::delete('/teams/{team}/members/{employee}', [TeamController::class, 'removeMember']);
     });
 
+    Route::post('/schedules/bulk', [ScheduleController::class, 'bulk'])->middleware('company_permission:schedules.manage');
+
     Route::post('/holidays/import', [HolidayController::class, 'import'])->middleware('company_permission:holidays.manage');
 
     Route::middleware('company_permission:work_locations.manage')->group(function () {
@@ -92,6 +102,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
     });
 
     Route::middleware('company_permission:employees.manage')->group(function () {
+        Route::post('/employees/{employee}/photo', [EmployeePhotoController::class, 'store']);
+        Route::delete('/employees/{employee}/photo', [EmployeePhotoController::class, 'destroy']);
         Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);
     });
 

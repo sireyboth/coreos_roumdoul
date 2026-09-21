@@ -95,12 +95,7 @@ class AuthController extends Controller
                 'employees' => $company->employeeCount(),
                 'branches' => $company->branchCount(),
             ] : null,
-            'modules' => $company
-                ? \App\Models\Module::query()
-                    ->where('status', 'active')
-                    ->get()
-                    ->mapWithKeys(fn ($module) => [$module->code => $company->hasModule($module->code)])
-                : [],
+            'modules' => $company ? $company->moduleAccess() : [],
         ]);
     }
 

@@ -98,11 +98,12 @@ class EmployeeController extends Controller
      * Personal details (gender, date of birth, address, notes) are only for
      * people who can manage employees; everyone else gets the work profile.
      */
-    private function reveal(Request $request, Employee $employee): Employee
+    private function reveal(Request $request, Employee $employee, ?bool $canManage = null): Employee
     {
-        return $request->user()->hasCompanyPermission('employees.manage')
-            ? $employee->makeVisible(Employee::PERSONAL_FIELDS)
-            : $employee;
+        // A list passes the answer in, so it's worked out once — not once per row.
+        $canManage ??= $request->user()->hasCompanyPermission('employees.manage');
+
+        return $canManage ? $employee->makeVisible(Employee::PERSONAL_FIELDS) : $employee;
     }
 
     /**
@@ -112,7 +113,9 @@ class EmployeeController extends Controller
      */
     public function index(Request $request)
     {
-        $employees = Employee::query()->with(['branch', 'department', 'team'])
+        // currentAssignment is loaded up front: the job_title field reads it, and
+        // without this every row would run its own query.
+        $employees = Employee::query()->with(['branch', 'department', 'team', 'currentAssignment'])
             ->when($request->filled('department_id'), fn ($q) => $q
                 ->where('employment_status', '!=', 'terminated')
                 ->whereHas('currentAssignment', fn ($a) => $a->where('department_id', $request->integer('department_id'))))
@@ -121,7 +124,8 @@ class EmployeeController extends Controller
                 ->whereHas('currentAssignment', fn ($a) => $a->where('team_id', $request->integer('team_id'))))
             ->orderBy('display_name')->orderBy('id')
             ->paginate(min(max($request->integer('per_page', 25), 1), 200));
-        $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e));
+        $canManage = $request->user()->hasCompanyPermission('employees.manage');
+        $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e, $canManage));
 
         return $employees;
     }

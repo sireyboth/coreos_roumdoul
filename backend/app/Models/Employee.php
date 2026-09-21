@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\URL;
 
 class Employee extends Model
 {
@@ -56,12 +57,14 @@ class Employee extends Model
      */
     public const PERSONAL_FIELDS = ['gender', 'date_of_birth', 'address', 'notes'];
 
-    protected $hidden = self::PERSONAL_FIELDS;
+    // photo_path is an internal storage path; clients get photo_url instead.
+    protected $hidden = [...self::PERSONAL_FIELDS, 'photo_path'];
 
     protected $appends = [
         'name',
         'job_title',
         'has_login',
+        'photo_url',
     ];
 
     protected function casts(): array
@@ -100,6 +103,26 @@ class Employee extends Model
     public function setNameAttribute(string $value): void
     {
         $this->attributes['display_name'] = $value;
+    }
+
+    /**
+     * A signed, relative link to this employee's photo (or null). It is only
+     * ever produced for people who are already allowed to see the employee,
+     * and it expires. The expiry is rounded to the hour so the URL stays the
+     * same for a while and browsers can cache the image.
+     */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        if (! $this->photo_path) {
+            return null;
+        }
+
+        return URL::temporarySignedRoute(
+            'employees.photo',
+            now()->startOfHour()->addHours(12),
+            ['employee' => $this->getKey(), 'v' => basename($this->photo_path, '.jpg')],
+            absolute: false,
+        );
     }
 
     public function getHasLoginAttribute(): bool

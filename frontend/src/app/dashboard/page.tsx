@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { api, AttendanceSession } from "@/lib/api";
@@ -48,15 +49,6 @@ function greeting(): string {
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 type Kpi = {
@@ -198,9 +190,7 @@ function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) 
         )}
         {recent.map((s) => (
           <div key={s.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white">
-              {initialsOf(s.employee.name)}
-            </div>
+            <EmployeeAvatar name={s.employee.name} photoUrl={s.employee.photo_url} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{s.employee.name}</p>
               <p className="truncate text-xs text-muted-foreground">

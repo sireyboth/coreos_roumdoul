@@ -2,247 +2,66 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { CalendarRange, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { useMe } from "@/contexts/me-context";
-import { api, ApiError, Branch, Department, Employee, Team } from "@/lib/api";
-import { Alert } from "@/components/ui/alert";
-import { notifyError, notifySuccess } from "@/lib/notify";
-import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import {
-  EMPLOYMENT_STATUSES,
-  EMPLOYMENT_TYPES,
-  EmployeeFormFields,
-  emptyEmployeeForm,
-  formFromEmployee,
-  labelFor,
-  toPayload,
-  type EmployeeForm,
-} from "@/components/dashboard/employee-form";
+import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
+import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
+import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelFor } from "@/components/dashboard/employee-form";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { RosterView } from "@/components/dashboard/roster-view";
+import { useMe } from "@/contexts/me-context";
+import { api, Branch, Department, Employee, Team } from "@/lib/api";
+import { notifyError, notifySuccess } from "@/lib/notify";
+import { cn } from "@/lib/utils";
 
-function CreateLoginDialog({
-  employee,
-  onOpenChange,
-  onSaved,
-}: {
-  employee: Employee | null;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  const [email, setEmail] = useState(employee?.email ?? "");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!employee) return;
-    setError(null);
-    setSaving(true);
-
-    try {
-      await api.employees.createLogin(employee.id, { email, password });
-      notifySuccess("Login created", `${employee.name} can now sign in and check in.`);
-      onOpenChange(false);
-      onSaved();
-    } catch (err) {
-      notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={employee !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create a login for {employee?.name}</DialogTitle>
-          <DialogDescription>
-            They&apos;ll use this email and temporary password to sign in and check in.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="login-email">Email</Label>
-            <Input
-              id="login-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="login-password">Temporary password</Label>
-            <Input
-              id="login-password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && <Alert variant="destructive">{error}</Alert>}
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Creating…" : "Create login"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function EditEmployeeDialog({
-  employee,
-  branches,
-  departments,
-  teams,
-  onOpenChange,
-  onSaved,
-}: {
-  employee: Employee | null;
-  branches: Branch[];
-  departments: Department[];
-  teams: Team[];
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState<EmployeeForm>(() => (employee ? formFromEmployee(employee) : emptyEmployeeForm()));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!employee) return;
-    setError(null);
-    setSaving(true);
-
-    try {
-      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0 });
-      // With a login the email is their sign-in — it's changed from Users, not here.
-      if (employee.has_login) delete payload.email;
-
-      await api.employees.update(employee.id, payload);
-      notifySuccess("Employee updated");
-      onOpenChange(false);
-      onSaved();
-    } catch (err) {
-      notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={employee !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Edit {employee?.name}</DialogTitle>
-          <DialogDescription>
-            Moving someone to another branch also moves where they&apos;re allowed to check in.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          <EmployeeFormFields
-            idPrefix="edit"
-            form={form}
-            onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-            branches={branches}
-            departments={departments}
-            teams={teams}
-            emailDisabled={employee?.has_login}
-            emailHint={employee?.has_login ? "This is their sign-in email — change it from Users." : undefined}
-          />
-          {error && <Alert variant="destructive">{error}</Alert>}
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+type Tab = "people" | "roster";
 
 export default function EmployeesPage() {
   const { me, refresh } = useMe();
   const confirm = useConfirm();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const canPeople = me?.permissions.includes("employees.view") ?? false;
+  const canRoster = me?.permissions.includes("schedules.view") ?? false;
+  const canManage = me?.permissions.includes("employees.manage") ?? false;
+  const canManageRoster = me?.permissions.includes("schedules.manage") ?? false;
+  const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
+
+  // ?tab=roster deep-links to the roster (the old Schedule page redirects here).
+  const [tab, setTab] = useState<Tab>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "roster" ? "roster" : "people",
+  );
+  // Someone who can only see one of the two never gets an empty tab.
+  const activeTab: Tab = tab === "roster" ? (canRoster ? "roster" : "people") : canPeople ? "people" : "roster";
+
   const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
-  // Empty when the role can't see them (the pickers then don't show at all).
+  // Empty when the role can't see them (the filters then don't show at all).
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<EmployeeForm>(() => emptyEmployeeForm());
-  const [loginPassword, setLoginPassword] = useState("");
   const [loginFor, setLoginFor] = useState<Employee | null>(null);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   function load() {
     api.employees.list().then((res) => setEmployees(res.data)).catch(() => setEmployees([]));
-    api.departments.list(200).then((res) => setDepartments(res.data)).catch(() => setDepartments([]));
-    api.teams.list(200).then((res) => setTeams(res.data)).catch(() => setTeams([]));
-    api.branches.list().then((res) => {
-      setBranches(res.data);
-      setForm((f) => (f.branch_id ? f : { ...f, branch_id: String(res.data[0]?.id ?? "") }));
-    });
   }
 
   useEffect(() => {
+    if (!canPeople) return;
     load();
-  }, []);
+    api.departments.list(200).then((res) => setDepartments(res.data)).catch(() => setDepartments([]));
+    api.teams.list(200).then((res) => setTeams(res.data)).catch(() => setTeams([]));
+    api.branches.list().then((res) => setBranches(res.data)).catch(() => setBranches([]));
+  }, [canPeople]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setSaving(true);
-
-    try {
-      await api.employees.create({
-        ...toPayload(form, { org: departments.length > 0 || teams.length > 0 }),
-        name: form.name.trim(),
-        branch_id: Number(form.branch_id),
-        // The email above doubles as their sign-in when a password is set.
-        ...(loginPassword ? { password: loginPassword } : {}),
-      });
-      notifySuccess("Employee added", loginPassword ? `${form.email} can now sign in.` : undefined);
-      refresh();
-      setForm(emptyEmployeeForm(form.branch_id));
-      setLoginPassword("");
-      setOpen(false);
-      load();
-    } catch (err) {
-      notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setSaving(false);
-    }
+  function switchTab(next: Tab) {
+    setTab(next);
+    window.history.replaceState(null, "", next === "roster" ? `${pathname}?tab=roster` : pathname);
   }
 
   async function handleDelete(employee: Employee) {
@@ -264,8 +83,8 @@ export default function EmployeesPage() {
     load();
   }
 
-  const canManage = me?.permissions.includes("employees.manage") ?? false;
   const atEmployeeLimit = me?.plan?.max_employees != null && (me.usage?.employees ?? 0) >= me.plan.max_employees;
+  const open = (employee: Employee) => router.push(`/dashboard/employees/${employee.id}`);
 
   const columns: DataTableColumn<Employee>[] = [
     {
@@ -273,13 +92,16 @@ export default function EmployeesPage() {
       header: "Name",
       primary: true,
       cell: (employee) => (
-        <div className="flex flex-col leading-tight">
-          <span className="font-medium">{employee.name}</span>
-          {(employee.employee_code || employee.email) && (
-            <span className="text-xs text-muted-foreground">
-              {[employee.employee_code, employee.email].filter(Boolean).join(" · ")}
-            </span>
-          )}
+        <div className="flex items-center gap-3">
+          <EmployeeAvatar name={employee.name} photoUrl={employee.photo_url} />
+          <div className="flex flex-col leading-tight">
+            <span className="font-medium">{employee.name}</span>
+            {(employee.employee_code || employee.email) && (
+              <span className="text-xs text-muted-foreground">
+                {[employee.employee_code, employee.email].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </div>
         </div>
       ),
       sortValue: (employee) => employee.name,
@@ -387,20 +209,8 @@ export default function EmployeesPage() {
   ];
 
   const filters: DataTableFilter<Employee>[] = [
-    {
-      type: "select",
-      id: "status",
-      label: "Status",
-      options: EMPLOYMENT_STATUSES,
-      getValue: (employee) => employee.employment_status,
-    },
-    {
-      type: "select",
-      id: "type",
-      label: "Type",
-      options: EMPLOYMENT_TYPES,
-      getValue: (employee) => employee.employment_type,
-    },
+    { type: "select", id: "status", label: "Status", options: EMPLOYMENT_STATUSES, getValue: (e) => e.employment_status },
+    { type: "select", id: "type", label: "Type", options: EMPLOYMENT_TYPES, getValue: (e) => e.employment_type },
     {
       type: "select",
       id: "branch",
@@ -441,130 +251,113 @@ export default function EmployeesPage() {
       getValue: (employee) => (employee.has_login ? "yes" : "no"),
     },
   ];
-  const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
+
+  const tabs = [
+    { id: "people" as const, label: "People", icon: Users, visible: canPeople },
+    { id: "roster" as const, label: "Roster", icon: CalendarRange, visible: canRoster },
+  ].filter((t) => t.visible);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Employees"
-          description="The canonical record every module builds on."
+          description={
+            activeTab === "roster"
+              ? canManageRoster
+                ? "Who works which shift, and when."
+                : "Your shifts."
+              : "Your team's records, photos and details."
+          }
           action={
+            activeTab === "people" &&
             canManage &&
-            (branches.length > 0 ? (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger
-                  render={
-                    <Button disabled={atEmployeeLimit}>
-                      <Plus className="size-4" />
-                      Add employee
-                    </Button>
-                  }
-                />
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Add an employee</DialogTitle>
-                    <DialogDescription>Every employee belongs to a branch. Only the name is required.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreate} className="flex flex-col gap-5">
-                    <EmployeeFormFields
-                      idPrefix="new"
-                      form={form}
-                      onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-                      branches={branches}
-                      departments={departments}
-                      teams={teams}
-                      emailRequired={loginPassword !== ""}
-                    />
-                    <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-3">
-                      <p className="text-sm font-medium">Sign-in (optional)</p>
-                      <p className="text-xs text-muted-foreground">
-                        Set a temporary password so this employee can sign in and check in with the email above. You
-                        can also do this later.
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="login_password">Temporary password</Label>
-                        <Input
-                          id="login_password"
-                          type="password"
-                          minLength={8}
-                          autoComplete="new-password"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    {error && <Alert variant="destructive">{error}</Alert>}
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                      <Button type="submit" disabled={saving}>
-                        {saving ? "Adding…" : "Add employee"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            ) : undefined)
+            branches.length > 0 &&
+            (atEmployeeLimit ? (
+              <Button disabled>
+                <Plus className="size-4" />
+                Add employee
+              </Button>
+            ) : (
+              <Button render={<Link href="/dashboard/employees/new" />} nativeButton={false}>
+                <Plus className="size-4" />
+                Add employee
+              </Button>
+            ))
           }
         />
 
-        {canManage && branches.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            You need a branch before adding employees.{" "}
-            {canManageBranches ? (
-              <Link href="/dashboard/branches" className="font-medium text-primary hover:underline">
-                Create one first →
-              </Link>
-            ) : (
-              "Ask a company admin to create one."
-            )}
-          </p>
+        {tabs.length > 1 && (
+          <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                onClick={() => switchTab(t.id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <t.icon className="size-4" />
+                {t.label}
+              </button>
+            ))}
+          </div>
         )}
 
-        <PlanLimitAlert resource="employees" />
+        {activeTab === "people" && (
+          <>
+            {canManage && branches.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                You need a branch before adding employees.{" "}
+                {canManageBranches ? (
+                  <Link href="/dashboard/branches" className="font-medium text-primary hover:underline">
+                    Create one first →
+                  </Link>
+                ) : (
+                  "Ask a company admin to create one."
+                )}
+              </p>
+            )}
 
-        <DataTable
-          data={employees}
-          getRowId={(employee) => employee.id}
-          columns={columns}
-          filters={filters}
-          searchPlaceholder="Search by name, code, email, phone, branch or job title…"
-          initialSort={{ columnId: "name", direction: "asc" }}
-          emptyState={{
-            icon: Users,
-            title: "No employees yet",
-            description: "Add your first employee to start building your team directory.",
-          }}
-          rowActions={
-            canManage
-              ? (employee) => (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => setEditingEmployee(employee)}>
-                      <Pencil className="size-3.5" />
-                      Edit
-                    </Button>
+            <PlanLimitAlert resource="employees" />
+
+            <DataTable
+              data={employees}
+              getRowId={(employee) => employee.id}
+              columns={columns}
+              filters={filters}
+              searchPlaceholder="Search by name, code, email, phone, branch or job title…"
+              initialSort={{ columnId: "name", direction: "asc" }}
+              onRowClick={open}
+              emptyState={{
+                icon: Users,
+                title: "No employees yet",
+                description: "Add your first employee to start building your team directory.",
+              }}
+              rowActions={(employee) => (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => open(employee)}>
+                    <Pencil className="size-3.5" />
+                    {canManage ? "Edit" : "View"}
+                  </Button>
+                  {canManage && (
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(employee)}>
                       <Trash2 className="size-3.5" />
                       Delete
                     </Button>
-                  </>
-                )
-              : undefined
-          }
-        />
-      </div>
+                  )}
+                </>
+              )}
+            />
+          </>
+        )}
 
-      <EditEmployeeDialog
-        key={`edit-${editingEmployee?.id ?? "none"}`}
-        employee={editingEmployee}
-        branches={branches}
-        departments={departments}
-        teams={teams}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setEditingEmployee(null);
-        }}
-        onSaved={load}
-      />
+        {activeTab === "roster" && <RosterView />}
+      </div>
 
       <CreateLoginDialog
         key={loginFor?.id ?? "none"}

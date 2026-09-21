@@ -1,7 +1,6 @@
 import {
   Building2,
   CalendarDays,
-  CalendarRange,
   Clock,
   FileClock,
   KeyRound,
@@ -24,6 +23,8 @@ export type NavItem = {
   // Full class strings so Tailwind can see them — gradient for the icon tile.
   tone: string;
   permission?: string;
+  // Visible with any one of these (used when a page merges two areas, e.g. Employees + Roster).
+  anyPermission?: string[];
   module?: string;
   // Reachable from other pages but not listed in the sidebar.
   hidden?: boolean;
@@ -41,7 +42,6 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/attendance", label: "Attendance", icon: Clock, tone: "from-emerald-500 to-teal-500", permission: "attendance.view", module: "attendance" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, tone: "from-teal-500 to-cyan-500", permission: "schedules.view" },
-      { href: "/dashboard/schedule", label: "Schedule", icon: CalendarRange, tone: "from-sky-500 to-blue-500", permission: "schedules.view" },
       { href: "/dashboard/shifts", label: "Shifts", icon: Timer, tone: "from-amber-500 to-orange-500", permission: "shifts.view" },
       { href: "/dashboard/holidays", label: "Holidays", icon: PartyPopper, tone: "from-pink-500 to-rose-500", permission: "holidays.view" },
     ],
@@ -49,7 +49,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Organization",
     items: [
-      { href: "/dashboard/employees", label: "Employees", icon: Users, tone: "from-violet-500 to-fuchsia-500", permission: "employees.view" },
+      { href: "/dashboard/employees", label: "Employees", icon: Users, tone: "from-violet-500 to-fuchsia-500", anyPermission: ["employees.view", "schedules.view"] },
       { href: "/dashboard/departments", label: "Departments", icon: Network, tone: "from-blue-500 to-indigo-500", permission: "departments.view" },
       { href: "/dashboard/teams", label: "Teams", icon: UsersRound, tone: "from-teal-500 to-emerald-500", permission: "teams.view" },
       { href: "/dashboard/branches", label: "Branches", icon: Building2, tone: "from-cyan-500 to-sky-500", permission: "branches.view" },
@@ -75,7 +75,11 @@ const ALL_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), ...HIDDEN_ITEMS];
 type Access = { permissions: string[]; modules: Record<string, boolean> };
 
 export function canSee(item: NavItem, me: Access): boolean {
-  return (!item.permission || me.permissions.includes(item.permission)) && (!item.module || Boolean(me.modules[item.module]));
+  return (
+    (!item.permission || me.permissions.includes(item.permission)) &&
+    (!item.anyPermission || item.anyPermission.some((p) => me.permissions.includes(p))) &&
+    (!item.module || Boolean(me.modules[item.module]))
+  );
 }
 
 /**

@@ -1,6 +1,14 @@
+import { createHttpCache } from "@/lib/http-cache";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TOKEN_KEY = "business_os_token";
+const ME_SNAPSHOT_KEY = "business_os_me";
+
+// Reference-data lists that many pages ask for again and again. Live data
+// (attendance, schedules, the calendar) is deliberately not cached.
+const CACHEABLE_GET = /^\/api\/(branches|departments|teams|shifts|work_locations|holidays|employees|roles|permissions|users)(\?|$)/;
+const httpCache = createHttpCache(30_000);
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -9,10 +17,39 @@ export function getToken(): string | null {
 
 export function setToken(token: string) {
   window.localStorage.setItem(TOKEN_KEY, token);
+  // A fresh sign-in starts clean, even if the previous session wasn't signed out properly.
+  httpCache.clear();
 }
 
 export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(ME_SNAPSHOT_KEY);
+  // Nothing from one person's session may be served to the next.
+  httpCache.clear();
+}
+
+/**
+ * The last /me answer, kept so the app can show itself straight away instead of
+ * waiting a network round trip. It only ever decides what the UI shows — the
+ * server still checks every request — and is refreshed right after. Tied to
+ * the token so it can't outlive a sign-out or belong to another account.
+ */
+export function getMeSnapshot(token: string): MeResponse | null {
+  try {
+    const raw = window.localStorage.getItem(ME_SNAPSHOT_KEY);
+    const saved = raw ? (JSON.parse(raw) as { token: string; me: MeResponse }) : null;
+    return saved && saved.token === token ? saved.me : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveMeSnapshot(token: string, me: MeResponse) {
+  try {
+    window.localStorage.setItem(ME_SNAPSHOT_KEY, JSON.stringify({ token, me }));
+  } catch {
+    // storage full or blocked — the snapshot is only an optimisation
+  }
 }
 
 export class ApiError extends Error {
@@ -33,13 +70,48 @@ export class ApiError extends Error {
 const ACCOUNT_BLOCKED_CODES = ["trial_expired", "company_suspended", "company_cancelled"];
 export const ACCOUNT_BLOCKED_EVENT = "app:account-blocked";
 
+/** Photo links from the API are relative and signed; this makes one loadable in an <img>. */
+export function photoSrc(url?: string | null): string | null {
+  return url ? `${API_URL}${url}` : null;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+
+  if (method === "GET") {
+    const send = () => sendWithRetry<T>(path, options);
+    return CACHEABLE_GET.test(path) ? httpCache.get<T>(path, send) : send();
+  }
+
+  try {
+    return await sendOnce<T>(path, options);
+  } finally {
+    // Any change (even a failed one) may have altered what the lists show.
+    httpCache.clear();
+  }
+}
+
+/** A dropped connection on a read is worth one more try; a write is never repeated automatically. */
+async function sendWithRetry<T>(path: string, options: RequestInit): Promise<T> {
+  try {
+    return await sendOnce<T>(path, options);
+  } catch (err) {
+    if (!(err instanceof TypeError)) throw err;
+    await sleep(800);
+    return sendOnce<T>(path, options);
+  }
+}
+
+async function sendOnce<T>(path: string, options: RequestInit): Promise<T> {
   const token = getToken();
 
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      // A FormData body sets its own multipart boundary — forcing JSON would break uploads.
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       Accept: "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
@@ -153,6 +225,8 @@ export type Employee = {
   branch: Branch | null;
   department?: { id: number; name: string } | null;
   team?: { id: number; name: string } | null;
+  // A short-lived signed link — use photoSrc() to turn it into an image URL.
+  photo_url?: string | null;
   // Whether this employee has a login linked to them — without one they
   // can never sign in or check in.
   has_login: boolean;
@@ -270,6 +344,24 @@ export type Holiday = {
   is_recurring_yearly: boolean;
 };
 
+export type ScheduleBulkInput = {
+  employee_ids: number[];
+  shift_id: number;
+  work_location_id?: number | null;
+  from: string;
+  to: string;
+  // 0 = Sunday .. 6 = Saturday.
+  weekdays: number[];
+  skip_holidays?: boolean;
+  dry_run?: boolean;
+};
+
+export type ScheduleBulkResult = {
+  dry_run: boolean;
+  created: number;
+  skipped: { holiday: number; day_off: number; already_scheduled: number; employee_left: number };
+};
+
 export type Schedule = {
   id: number;
   date: string;
@@ -362,6 +454,14 @@ export const api = {
       if (params.teamId) query.set("team_id", String(params.teamId));
       return request<Paginated<Employee>>(`/api/employees?${query}`);
     },
+    get: (id: number) => request<Employee>(`/api/employees/${id}`),
+    // Sends the (already resized) image; the server re-encodes it again.
+    uploadPhoto: (id: number, photo: Blob) => {
+      const body = new FormData();
+      body.append("photo", photo, "photo.jpg");
+      return request<{ photo_url: string | null }>(`/api/employees/${id}/photo`, { method: "POST", body });
+    },
+    removePhoto: (id: number) => request<void>(`/api/employees/${id}/photo`, { method: "DELETE" }),
     create: (data: EmployeeInput & { name: string; branch_id: number; password?: string }) =>
       request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: EmployeeInput) =>
@@ -487,7 +587,17 @@ export const api = {
   },
 
   schedules: {
-    list: () => request<Paginated<Schedule>>("/api/schedules"),
+    // Ask for a date range: the API pages 50 at a time unless perPage is raised (max 500).
+    list: (params: { from?: string; to?: string; employeeId?: number; perPage?: number } = {}) => {
+      const query = new URLSearchParams({ per_page: String(params.perPage ?? 500) });
+      if (params.employeeId) query.set("employee_id", String(params.employeeId));
+      if (params.from) query.set("from", params.from);
+      if (params.to) query.set("to", params.to);
+      return request<Paginated<Schedule>>(`/api/schedules?${query}`);
+    },
+    // Rosters many people over a date range in one go. dry_run only reports what it would do.
+    bulk: (data: ScheduleBulkInput) =>
+      request<ScheduleBulkResult>("/api/schedules/bulk", { method: "POST", body: JSON.stringify(data) }),
     create: (data: { employee_id: number; shift_id: number; work_location_id?: number | null; date: string; notes?: string }) =>
       request<Schedule>("/api/schedules", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: { employee_id?: number; shift_id?: number; work_location_id?: number | null; date?: string; notes?: string | null }) =>

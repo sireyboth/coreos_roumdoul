@@ -198,8 +198,8 @@ export function DayDialog({
             {canManage && (day.type === "work" || day.type === "none") && (
               <p className="text-muted-foreground">
                 To {day.type === "work" ? "change or remove the shift" : "give them a shift"}, use the{" "}
-                <Link href="/dashboard/schedule" className="font-medium text-primary hover:underline">
-                  Schedule page
+                <Link href="/dashboard/employees?tab=roster" className="font-medium text-primary hover:underline">
+                  Roster
                 </Link>
                 .
               </p>
