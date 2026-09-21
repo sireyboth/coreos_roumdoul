@@ -206,7 +206,15 @@ export default function EmployeesPage() {
         employee.has_login ? (
           <Badge variant="outline">Has login</Badge>
         ) : canManage ? (
-          <Button variant="outline" size="sm" onClick={() => setLoginFor(employee)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              // The row is clickable (opens the edit page); don't let this click reach it.
+              e.stopPropagation();
+              setLoginFor(employee);
+            }}
+          >
             <KeyRound className="size-3.5" />
             Create login
           </Button>

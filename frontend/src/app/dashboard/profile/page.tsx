@@ -115,7 +115,7 @@ export default function ProfilePage() {
                 />
                 {signsInById && (
                   <p className="text-xs text-muted-foreground">
-                    You sign in with company code <strong>{me?.company?.slug}</strong> and employee ID{" "}
+                    You sign in with employee ID{" "}
                     <strong>{me?.user.login_id}</strong>. An email here is optional and doesn&apos;t change that.
                   </p>
                 )}

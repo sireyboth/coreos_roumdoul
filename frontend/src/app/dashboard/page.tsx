@@ -370,7 +370,7 @@ export default function DashboardPage() {
                 key={key}
                 className={cn(
                   "flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm",
-                  enabled ? "border-success/25 bg-success/[0.06]" : "border-border bg-muted/50 opacity-60",
+                  enabled ? "border-success/25 bg-success/6" : "border-border bg-muted/50 opacity-60",
                 )}
               >
                 <span className="font-medium">{MODULE_LABELS[key] ?? key}</span>

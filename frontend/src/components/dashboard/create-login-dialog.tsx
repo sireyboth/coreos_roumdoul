@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoginLink } from "@/components/dashboard/login-link";
 import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
-import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -28,7 +28,6 @@ export function CreateLoginDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const { me } = useMe();
   // Start on whatever they already have on file: an email, else an ID, else email.
   const [method, setMethod] = useState<SignInMethod>(employee?.email ? "email" : employee?.employee_code ? "employee_id" : "email");
   const [email, setEmail] = useState(employee?.email ?? "");
@@ -57,7 +56,7 @@ export function CreateLoginDialog({
         "Login created",
         method === "email"
           ? `${employee.name} can now sign in with ${email}.`
-          : `${employee.name} signs in with company code ${me?.company?.slug} and employee ID ${code}.`,
+          : `${employee.name} signs in with employee ID ${code}. Share your company sign-in link with them.`,
       );
       onOpenChange(false);
       onSaved();
@@ -101,8 +100,9 @@ export function CreateLoginDialog({
                   : "They don't have an employee ID yet — this one will be saved on their profile."}
               </p>
               <p className="text-xs text-muted-foreground">
-                They&apos;ll also need the company code <strong>{me?.company?.slug}</strong> to sign in.
+                Share this link with them — it opens the sign-in page with your company already filled in.
               </p>
+              <LoginLink />
             </div>
           )}
 

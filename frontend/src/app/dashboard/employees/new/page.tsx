@@ -19,6 +19,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PhotoPicker } from "@/components/dashboard/photo-picker";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { LoginLink } from "@/components/dashboard/login-link";
 import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Team } from "@/lib/api";
@@ -100,7 +101,7 @@ export default function NewEmployeePage() {
           ? undefined
           : method === "email"
             ? `${form.email} can now sign in.`
-            : `They sign in with company code ${me?.company?.slug} and employee ID ${form.employee_code}.`,
+            : `They sign in with employee ID ${form.employee_code}. Share your company sign-in link with them.`,
       );
       if (photoFailed) toast.warning("The photo couldn't be uploaded", { description: "You can add it again from their page." });
       router.push(`/dashboard/employees/${created.id}`);
@@ -200,9 +201,12 @@ export default function NewEmployeePage() {
                       <>They&apos;ll sign in with the <strong>email</strong> above and this password.</>
                     ) : (
                       <>
-                        They&apos;ll sign in with company code <strong>{me?.company?.slug}</strong>, employee ID{" "}
+                        They&apos;ll sign in with employee ID{" "}
                         <strong>{form.employee_code || "(fill in the Employee ID above)"}</strong> and this password. No email
-                        needed.
+                        needed. Share this link so the company is filled in for them:
+                        <div className="mt-2">
+                          <LoginLink />
+                        </div>
                       </>
                     )}
                   </Alert>

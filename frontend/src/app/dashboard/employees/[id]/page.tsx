@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { LoginLink } from "@/components/dashboard/login-link";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -278,9 +279,14 @@ export default function EmployeePage() {
                     {employee.login && (
                       <dl className="divide-y divide-border text-sm">
                         <Fact label="Signs in with">{employee.login.method === "email" ? "Email" : "Employee ID"}</Fact>
-                        {employee.login.method === "employee_id" && <Fact label="Company code">{employee.login.company_code}</Fact>}
-                        <Fact label={employee.login.method === "email" ? "Email" : "Employee ID"}>{employee.login.identifier ?? "—"}</Fact>
+                                                <Fact label={employee.login.method === "email" ? "Email" : "Employee ID"}>{employee.login.identifier ?? "—"}</Fact>
                       </dl>
+                    )}
+                    {employee.login?.method === "employee_id" && (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-muted-foreground">Share this link so they don&apos;t have to type the company code:</p>
+                        <LoginLink />
+                      </div>
                     )}
                   </div>
                 ) : canManage ? (

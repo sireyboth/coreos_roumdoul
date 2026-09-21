@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthLayout } from "@/components/auth-layout";
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,25 @@ import {
 import { api, ApiError, setToken } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 
+// useSearchParams needs a Suspense boundary above it, so the page is a thin
+// wrapper and the real form lives in LoginForm.
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
-  // Either an email, or a company code + employee ID.
-  const [method, setMethod] = useState<"email" | "employee_id">("email");
+  // An admin can share /login?company=acme-x9k2 so staff never type the code.
+  const linkedCompany = useSearchParams().get("company")?.trim().toLowerCase() || null;
+  // Either an email, or a company code + employee ID. A company link means the latter.
+  const [method, setMethod] = useState<"email" | "employee_id">(linkedCompany ? "employee_id" : "email");
   const [email, setEmail] = useState("");
-  const [company, setCompany] = useState("");
+  const [typedCompany, setTypedCompany] = useState("");
+  const company = linkedCompany ?? typedCompany;
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -94,20 +107,29 @@ export default function LoginPage() {
               </div>
             ) : (
               <>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="company">Company code</Label>
-                  <Input
-                    id="company"
-                    required
-                    placeholder="e.g. acme-x9k2"
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                  <p className="text-xs text-muted-foreground">Your manager can tell you this.</p>
-                </div>
+                {linkedCompany ? (
+                  <p className="text-sm text-muted-foreground">
+                    Signing in to <strong className="text-foreground">{linkedCompany}</strong>.{" "}
+                    <Link href="/login" className="font-medium text-primary hover:underline">
+                      Not your company?
+                    </Link>
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="company">Company code</Label>
+                    <Input
+                      id="company"
+                      required
+                      placeholder="e.g. acme-x9k2"
+                      value={company}
+                      onChange={(e) => setTypedCompany(e.target.value)}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                    <p className="text-xs text-muted-foreground">Your manager can tell you this.</p>
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="employee_id">Employee ID</Label>
                   <Input
