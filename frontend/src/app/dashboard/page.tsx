@@ -20,8 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
-import { api, AttendanceSession } from "@/lib/api";
-import { dateOnly } from "@/lib/date";
+import { api, DashboardSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const MODULE_LABELS: Record<string, string> = {
@@ -44,11 +43,6 @@ function greeting(): string {
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
-}
-
-function formatTime(iso: string | undefined): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 type Kpi = {
@@ -91,22 +85,17 @@ function KpiCard({ kpi }: { kpi: Kpi }) {
   );
 }
 
-function WeekChart({ sessions }: { sessions: AttendanceSession[] | null }) {
-  const days = useMemo(() => {
-    const out: { key: string; label: string; count: number; today: boolean }[] = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const key = isoDate(d);
-      out.push({
-        key,
-        label: d.toLocaleDateString([], { weekday: "short" }),
-        count: sessions?.filter((s) => dateOnly(s.date) === key).length ?? 0,
-        today: i === 0,
-      });
-    }
-    return out;
-  }, [sessions]);
+function WeekChart({ week }: { week: { date: string; count: number }[] | null }) {
+  const days = useMemo(
+    () =>
+      (week ?? []).map((d, i, all) => ({
+        key: d.date,
+        label: new Date(d.date + "T00:00:00").toLocaleDateString([], { weekday: "short" }),
+        count: d.count,
+        today: i === all.length - 1,
+      })),
+    [week],
+  );
 
   const max = Math.max(1, ...days.map((d) => d.count));
   const total = days.reduce((sum, d) => sum + d.count, 0);
@@ -119,12 +108,12 @@ function WeekChart({ sessions }: { sessions: AttendanceSession[] | null }) {
           <CardDescription>Check-in sessions recorded over the last 7 days</CardDescription>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-semibold tabular-nums">{sessions === null ? "—" : total}</p>
+          <p className="text-2xl font-semibold tabular-nums">{week === null ? "—" : total}</p>
           <p className="text-xs text-muted-foreground">total sessions</p>
         </div>
       </CardHeader>
       <CardContent>
-        {sessions === null ? (
+        {week === null ? (
           <Skeleton className="h-48 w-full" />
         ) : (
           <div className="flex h-48 items-end gap-2 sm:gap-4">
@@ -154,12 +143,7 @@ function WeekChart({ sessions }: { sessions: AttendanceSession[] | null }) {
   );
 }
 
-function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) {
-  const recent = useMemo(
-    () => [...(sessions ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id).slice(0, 6),
-    [sessions],
-  );
-
+function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["attendance"]>["recent"] | null }) {
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="grid-cols-[1fr_auto]">
@@ -175,7 +159,7 @@ function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) 
         </Link>
       </CardHeader>
       <CardContent className="flex flex-col divide-y divide-border">
-        {sessions === null &&
+        {recent === null &&
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 py-3">
               <Skeleton className="size-9 rounded-full" />
@@ -185,16 +169,16 @@ function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) 
               </div>
             </div>
           ))}
-        {sessions?.length === 0 && (
+        {recent?.length === 0 && (
           <p className="py-8 text-center text-sm text-muted-foreground">No attendance recorded yet.</p>
         )}
-        {recent.map((s) => (
+        {(recent ?? []).map((s) => (
           <div key={s.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
             <EmployeeAvatar name={s.employee.name} photoUrl={s.employee.photo_url} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{s.employee.name}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {s.date} · {formatTime(s.check_in_event?.event_time)} → {formatTime(s.check_out_event?.event_time)}
+                {s.date} · {s.check_in ?? "—"} → {s.check_out ?? "—"}
               </p>
             </div>
             {s.late_minutes > 0 && <Badge variant="warning">{s.late_minutes}m late</Badge>}
@@ -211,10 +195,8 @@ function RecentActivity({ sessions }: { sessions: AttendanceSession[] | null }) 
 export default function DashboardPage() {
   const { me } = useMe();
   const router = useRouter();
-  const [sessions, setSessions] = useState<AttendanceSession[] | null>(null);
-  const [employeeCount, setEmployeeCount] = useState<number | null>(null);
-  const [branchCount, setBranchCount] = useState<number | null>(null);
-  const [pendingCorrections, setPendingCorrections] = useState<number | null>(null);
+  // Everything on this page comes from one small request that the server counts for us.
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
 
   const can = (permission: string) => me?.permissions.includes(permission) ?? false;
   const canDashboard = can("dashboard.view");
@@ -230,34 +212,30 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!me || !canDashboard) return;
+    let cancelled = false;
 
-    const from = new Date();
-    from.setDate(from.getDate() - 6);
+    api.dashboard
+      .summary()
+      .then((data) => !cancelled && setSummary(data))
+      // A failed load shows dashes, not zeros — a zero would look like real data.
+      .catch(() => !cancelled && setSummary({ today: isoDate(new Date()), employees: null, branches: null, attendance: null }));
 
-    if (canAttendance) {
-      api.attendance.list({ from: isoDate(from) }).then((r) => setSessions(r.data)).catch(() => setSessions([]));
-      api.attendanceCorrections
-        .list()
-        .then((r) => setPendingCorrections(r.data.filter((c) => c.status === "pending").length))
-        .catch(() => setPendingCorrections(0));
-    }
-    if (canEmployees) api.employees.list({ perPage: 1 }).then((r) => setEmployeeCount(r.total)).catch(() => setEmployeeCount(0));
-    if (canBranches) api.branches.list().then((r) => setBranchCount(r.data.length)).catch(() => setBranchCount(0));
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.user.id]);
 
   if (!me || !canDashboard) return null;
 
-  const today = isoDate(new Date());
   const enabledModules = Object.values(me.modules).filter(Boolean).length;
   const totalModules = Object.keys(me.modules).length;
-  const presentToday = sessions?.filter((s) => dateOnly(s.date) === today).length ?? null;
 
   const kpis: Kpi[] = [];
   if (canAttendance)
     kpis.push({
       label: "Checked in today",
-      value: presentToday,
+      value: summary ? (summary.attendance?.checked_in_today ?? null) : null,
       hint: "Sessions started today",
       icon: CalendarCheck2,
       href: "/dashboard/attendance",
@@ -267,7 +245,7 @@ export default function DashboardPage() {
   if (canEmployees)
     kpis.push({
       label: "Employees",
-      value: employeeCount,
+      value: summary?.employees ?? null,
       hint: "On your team",
       icon: Users,
       href: "/dashboard/employees",
@@ -277,7 +255,7 @@ export default function DashboardPage() {
   if (canBranches)
     kpis.push({
       label: "Branches",
-      value: branchCount,
+      value: summary?.branches ?? null,
       hint: "Active locations",
       icon: Building2,
       href: "/dashboard/branches",
@@ -287,7 +265,7 @@ export default function DashboardPage() {
   if (canAttendance)
     kpis.push({
       label: "Pending corrections",
-      value: pendingCorrections,
+      value: summary ? (summary.attendance?.pending_corrections ?? null) : null,
       hint: "Waiting for review",
       icon: FileClock,
       href: "/dashboard/attendance/corrections",
@@ -366,7 +344,7 @@ export default function DashboardPage() {
       {/* Chart + modules */}
       <section className="grid gap-6 lg:grid-cols-3">
         {canAttendance ? (
-          <WeekChart sessions={sessions} />
+          <WeekChart week={summary ? (summary.attendance?.week ?? []) : null} />
         ) : (
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -405,7 +383,7 @@ export default function DashboardPage() {
 
       {/* Activity + quick actions */}
       <section className="grid gap-6 lg:grid-cols-3">
-        {canAttendance && <RecentActivity sessions={sessions} />}
+        {canAttendance && <RecentActivity recent={summary ? (summary.attendance?.recent ?? []) : null} />}
 
         {(canAttendance || quickLinks.length > 0) && (
           <Card className={cn(!canAttendance && "lg:col-span-3")}>

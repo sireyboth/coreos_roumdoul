@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Clock, Eye, LogIn, LogOut, QrCode } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Eye, LogIn, LogOut, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
+import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AttendancePreviewDialog } from "@/components/dashboard/attendance-preview-dialog";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
@@ -50,29 +51,68 @@ function formatMinutes(minutes: number | null): string {
 
 export default function AttendancePage() {
   const { me } = useMe();
-  const [sessions, setSessions] = useState<AttendanceSession[] | null>(null);
+  // The table shows one month at a time. The API sends only 50 rows unless asked for
+  // more, and a busy company writes far more than 50 a day.
+  const [month, setMonth] = useState(currentMonth);
+  const [reloads, setReloads] = useState(0);
+  const [tableResult, setTableResult] = useState<{ key: string; data: AttendanceSession[]; total: number } | null>(null);
+  // The signed-in person's own recent sessions: the Today card is about *them*, not
+  // whoever happens to be newest in a manager's company-wide list.
+  const [mine, setMine] = useState<AttendanceSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [previewSession, setPreviewSession] = useState<AttendanceSession | null>(null);
   const scanGpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
+  const tableKey = `${month}|${reloads}`;
+  const sessions = tableResult?.key === tableKey ? tableResult.data : null;
+  const truncated = tableResult?.key === tableKey && tableResult.total > tableResult.data.length;
+  const employeeId = me?.employee?.id;
+
   function load() {
-    api.attendance.list().then((res) => setSessions(res.data)).catch(() => setSessions([]));
+    setReloads((n) => n + 1);
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    let cancelled = false;
+    const first = parseDate(`${month}-01`);
+    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
 
-  const todaySession = sessions?.find((s) => isToday(s.date));
+    api.attendance
+      .list({ from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}`, per_page: 1000 })
+      .then((res) => !cancelled && setTableResult({ key: tableKey, data: res.data, total: res.total }))
+      .catch(() => !cancelled && setTableResult({ key: tableKey, data: [], total: 0 }));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [month, tableKey]);
+
+  useEffect(() => {
+    if (!employeeId) return;
+    let cancelled = false;
+
+    const from = new Date();
+    from.setDate(from.getDate() - 45);
+    const iso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+
+    api.attendance
+      .list({ employee_id: employeeId, from: iso, per_page: 100 })
+      .then((res) => !cancelled && setMine(res.data))
+      .catch(() => !cancelled && setMine([]));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [employeeId, reloads]);
+
+  const todaySession = mine?.find((s) => isToday(s.date));
   // The shift the server still has open — not just today's, so an overnight
   // shift can still be checked out of after midnight. Shifts forgotten for
   // too long become "missing_checkout" and stop counting as open.
-  const openSession = sessions?.find((s) => s.status === "open");
-  const myForgottenShifts = (sessions ?? []).filter(
-    (s) => s.status === "missing_checkout" && s.employee.id === me?.employee?.id,
-  );
+  const openSession = mine?.find((s) => s.status === "open");
+  const myForgottenShifts = (mine ?? []).filter((s) => s.status === "missing_checkout");
   const isCheckingOut = Boolean(openSession);
 
   useEffect(() => {
@@ -341,6 +381,28 @@ export default function AttendancePage() {
           <p className="text-sm text-muted-foreground">
             Your account isn&apos;t linked to an employee record, so you can&apos;t check in yourself.
           </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+            <ChevronLeft className="size-4" />
+          </Button>
+          <h2 className="min-w-40 text-center text-base font-semibold">
+            {parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+          </h2>
+          <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+            <ChevronRight className="size-4" />
+          </Button>
+          <Button variant="outline" onClick={() => setMonth(currentMonth())}>
+            Today
+          </Button>
+        </div>
+
+        {truncated && tableResult && (
+          <Alert variant="warning">
+            This month has {tableResult.total.toLocaleString()} records; showing the newest {tableResult.data.length.toLocaleString()}.
+            Use the search and filters, or open a single employee, to see the rest.
+          </Alert>
         )}
 
         <DataTable

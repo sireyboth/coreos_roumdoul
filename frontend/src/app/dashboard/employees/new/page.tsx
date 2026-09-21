@@ -19,6 +19,7 @@ import {
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PhotoPicker } from "@/components/dashboard/photo-picker";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Team } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -35,6 +36,8 @@ export default function NewEmployeePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [form, setForm] = useState<EmployeeForm>(() => emptyEmployeeForm());
   const [loginPassword, setLoginPassword] = useState("");
+  // One way to sign in, never both.
+  const [method, setMethod] = useState<SignInMethod>("email");
   // Kept here until Save — the employee doesn't exist yet to upload it to.
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +79,8 @@ export default function NewEmployeePage() {
         ...toPayload(form, { org: departments.length > 0 || teams.length > 0 }),
         name: form.name.trim(),
         branch_id: Number(form.branch_id),
-        // The email above doubles as their sign-in when a password is set.
-        ...(loginPassword ? { password: loginPassword } : {}),
+        // Whichever way was chosen (their email, or their employee ID) is their sign-in.
+        ...(loginPassword ? { password: loginPassword, login_method: method } : {}),
       });
 
       // The employee exists now; a failed photo must not lose them.
@@ -91,7 +94,14 @@ export default function NewEmployeePage() {
       }
 
       refresh();
-      notifySuccess("Employee added", loginPassword ? `${form.email} can now sign in.` : undefined);
+      notifySuccess(
+        "Employee added",
+        !loginPassword
+          ? undefined
+          : method === "email"
+            ? `${form.email} can now sign in.`
+            : `They sign in with company code ${me?.company?.slug} and employee ID ${form.employee_code}.`,
+      );
       if (photoFailed) toast.warning("The photo couldn't be uploaded", { description: "You can add it again from their page." });
       router.push(`/dashboard/employees/${created.id}`);
     } catch (err) {
@@ -153,7 +163,9 @@ export default function NewEmployeePage() {
                   branches={branches ?? []}
                   departments={departments}
                   teams={teams}
-                  emailRequired={loginPassword !== ""}
+                  emailRequired={loginPassword !== "" && method === "email"}
+                  codeRequired={loginPassword !== "" && method === "employee_id"}
+                  codeHint={loginPassword !== "" && method === "employee_id" ? "This is what they'll sign in with." : undefined}
                 />
               </CardContent>
             </Card>
@@ -162,11 +174,13 @@ export default function NewEmployeePage() {
               <CardHeader>
                 <CardTitle>Sign-in</CardTitle>
                 <CardDescription>
-                  Optional. Set a temporary password so this employee can sign in and check in with the email above. You
-                  can also do this later.
+                  Optional. Give this employee a login so they can sign in and check in. Choose <strong>one</strong> way for them
+                  to sign in. You can also do this later.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col gap-4">
+                <SignInMethodPicker value={method} onChange={setMethod} />
+
                 <div className="flex max-w-sm flex-col gap-2">
                   <Label htmlFor="login_password">Temporary password</Label>
                   <Input
@@ -177,7 +191,22 @@ export default function NewEmployeePage() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Leave empty to add the employee without a login.</p>
                 </div>
+
+                {loginPassword !== "" && (
+                  <Alert variant="info">
+                    {method === "email" ? (
+                      <>They&apos;ll sign in with the <strong>email</strong> above and this password.</>
+                    ) : (
+                      <>
+                        They&apos;ll sign in with company code <strong>{me?.company?.slug}</strong>, employee ID{" "}
+                        <strong>{form.employee_code || "(fill in the Employee ID above)"}</strong> and this password. No email
+                        needed.
+                      </>
+                    )}
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 

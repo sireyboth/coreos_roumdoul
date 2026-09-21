@@ -110,8 +110,11 @@ export default function EmployeePage() {
 
     try {
       const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0 });
-      // With a login the email is their sign-in — it's changed from Users, not here.
-      if (employee.has_login) delete payload.email;
+      // With an email login the email is their sign-in — it's changed from Users, not here.
+      // (For an employee-ID login the email is only a contact detail, so it stays editable.)
+      if (emailIsSignIn) delete payload.email;
+      // Same for the ID they sign in with.
+      if (idIsSignIn) delete payload.employee_code;
 
       const updated = await api.employees.update(employee.id, payload);
       setEmployee(updated);
@@ -204,6 +207,10 @@ export default function EmployeePage() {
     );
   }
 
+  const idIsSignIn = employee.login?.method === "employee_id";
+  // has_login without details means an older response — assume the safe case (email).
+  const emailIsSignIn = employee.has_login && !idIsSignIn;
+
   const statusVariant =
     employee.employment_status === "active"
       ? "success"
@@ -264,7 +271,18 @@ export default function EmployeePage() {
               </CardHeader>
               <CardContent>
                 {employee.has_login ? (
-                  <Badge variant="success">Has login</Badge>
+                  <div className="flex flex-col gap-3">
+                    <Badge variant="success" className="self-start">
+                      Has login
+                    </Badge>
+                    {employee.login && (
+                      <dl className="divide-y divide-border text-sm">
+                        <Fact label="Signs in with">{employee.login.method === "email" ? "Email" : "Employee ID"}</Fact>
+                        {employee.login.method === "employee_id" && <Fact label="Company code">{employee.login.company_code}</Fact>}
+                        <Fact label={employee.login.method === "email" ? "Email" : "Employee ID"}>{employee.login.identifier ?? "—"}</Fact>
+                      </dl>
+                    )}
+                  </div>
                 ) : canManage ? (
                   <Button variant="outline" onClick={() => setLoginOpen(true)}>
                     <KeyRound className="size-4" />
@@ -318,8 +336,10 @@ export default function EmployeePage() {
                       branches={branches}
                       departments={departments}
                       teams={teams}
-                      emailDisabled={employee.has_login}
-                      emailHint={employee.has_login ? "This is their sign-in email — change it from Users." : undefined}
+                      emailDisabled={emailIsSignIn}
+                      emailHint={emailIsSignIn ? "This is their sign-in email — change it from Users." : undefined}
+                      codeDisabled={idIsSignIn}
+                      codeHint={idIsSignIn ? "This is their sign-in ID, so it can't be changed here." : undefined}
                     />
                   </CardContent>
                 </Card>

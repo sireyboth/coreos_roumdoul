@@ -21,9 +21,10 @@ class WorkLocation extends Model
         });
     }
 
-    // Hidden everywhere (schedules, attendance events, ...) — the token proves
+    // qr_token is hidden everywhere (schedules, attendance events, ...) — it proves
     // someone is at the branch, so it only goes to people who manage locations.
-    protected $hidden = ['qr_token'];
+    // The rest are internal columns no screen reads.
+    protected $hidden = ['qr_token', 'company_id', 'created_at', 'updated_at', 'deleted_at'];
 
     protected $fillable = [
         'company_id',

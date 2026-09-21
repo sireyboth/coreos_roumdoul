@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarRange, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
@@ -41,6 +42,7 @@ export default function EmployeesPage() {
   const activeTab: Tab = tab === "roster" ? (canRoster ? "roster" : "people") : canPeople ? "people" : "roster";
 
   const [employees, setEmployees] = useState<Employee[] | null>(null);
+  const [employeeTotal, setEmployeeTotal] = useState(0);
   const [branches, setBranches] = useState<Branch[]>([]);
   // Empty when the role can't see them (the filters then don't show at all).
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -48,7 +50,13 @@ export default function EmployeesPage() {
   const [loginFor, setLoginFor] = useState<Employee | null>(null);
 
   function load() {
-    api.employees.list().then((res) => setEmployees(res.data)).catch(() => setEmployees([]));
+    api.employees
+      .list()
+      .then((res) => {
+        setEmployees(res.data);
+        setEmployeeTotal(res.total);
+      })
+      .catch(() => setEmployees([]));
   }
 
   useEffect(() => {
@@ -324,6 +332,13 @@ export default function EmployeesPage() {
             )}
 
             <PlanLimitAlert resource="employees" />
+
+            {employees && employeeTotal > employees.length && (
+              <Alert variant="warning">
+                You have {employeeTotal.toLocaleString()} employees; showing the first {employees.length.toLocaleString()}. Filter by branch or
+                department to narrow the list.
+              </Alert>
+            )}
 
             <DataTable
               data={employees}

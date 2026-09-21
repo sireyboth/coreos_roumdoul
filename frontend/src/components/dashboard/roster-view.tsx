@@ -144,7 +144,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const confirm = useConfirm();
   const [month, setMonth] = useState(currentMonth);
   const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: Schedule[] } | null>(null);
+  const [result, setResult] = useState<{ key: string; data: Schedule[]; total: number } | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [locations, setLocations] = useState<WorkLocation[]>([]);
@@ -160,6 +160,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const requestKey = `${employeeId ?? "all"}|${month}|${reloads}`;
   // A month at a time: the API only returns the first 50 entries otherwise, which a roster outgrows in a day.
   const schedules = result?.key === requestKey ? result.data : null;
+  const truncated = result?.key === requestKey && result.total > result.data.length;
   const loadSchedules = () => setReloads((n) => n + 1);
   const canManage = me?.permissions.includes("schedules.manage") ?? false;
 
@@ -170,8 +171,8 @@ export function RosterView({ employee }: { employee?: Employee }) {
 
     api.schedules
       .list({ from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}`, employeeId })
-      .then((res) => !cancelled && setResult({ key: requestKey, data: res.data }))
-      .catch(() => !cancelled && setResult({ key: requestKey, data: [] }));
+      .then((res) => !cancelled && setResult({ key: requestKey, data: res.data, total: res.total }))
+      .catch(() => !cancelled && setResult({ key: requestKey, data: [], total: 0 }));
 
     return () => {
       cancelled = true;
@@ -289,6 +290,13 @@ export function RosterView({ employee }: { employee?: Employee }) {
           </Button>
         )}
       </div>
+
+      {truncated && result && (
+        <Alert variant="warning">
+          This month has {result.total.toLocaleString()} shifts; showing the first {result.data.length.toLocaleString()}. Open a single
+          employee to see all of theirs.
+        </Alert>
+      )}
 
       <DataTable
         data={schedules}

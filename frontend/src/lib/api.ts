@@ -133,7 +133,8 @@ async function sendOnce<T>(path: string, options: RequestInit): Promise<T> {
 }
 
 export type MeResponse = {
-  user: { id: number; name: string; email: string; company_id: number | null; is_platform_admin: boolean };
+  // email is null for someone who signs in with an employee ID; login_id is that ID.
+  user: { id: number; name: string; email: string | null; login_id?: string | null; company_id: number | null; is_platform_admin: boolean };
   roles: string[];
   permissions: string[];
   employee: { id: number; name: string } | null;
@@ -203,6 +204,11 @@ export type EmployeeInput = {
   notes?: string | null;
 };
 
+// How a new employee login is set up: the admin picks ONE way to sign in.
+export type LoginSetup =
+  | { login_method: "email"; email: string; password: string }
+  | { login_method: "employee_id"; employee_code: string; password: string };
+
 export type Employee = {
   id: number;
   name: string;
@@ -227,6 +233,8 @@ export type Employee = {
   team?: { id: number; name: string } | null;
   // A short-lived signed link — use photoSrc() to turn it into an image URL.
   photo_url?: string | null;
+  // How this person signs in — only sent (to managers) when they have a login.
+  login?: { method: "email" | "employee_id"; identifier: string | null; company_code: string };
   // Whether this employee has a login linked to them — without one they
   // can never sign in or check in.
   has_login: boolean;
@@ -282,6 +290,30 @@ export type TeamCalendar = {
   employees: TeamCalendarEmployee[];
 };
 
+// One small answer for the whole dashboard, counted by the server. Sections the
+// caller can't see are null.
+export type DashboardSummary = {
+  today: string;
+  employees: number | null;
+  branches: number | null;
+  attendance: {
+    checked_in_today: number;
+    late_today: number;
+    pending_corrections: number;
+    // The last 7 days, oldest first — days with none are included as 0.
+    week: { date: string; count: number }[];
+    recent: {
+      id: number;
+      date: string;
+      status: "open" | "completed" | "missing_checkout";
+      late_minutes: number;
+      check_in: string | null;
+      check_out: string | null;
+      employee: { id: number; name: string; photo_url: string | null };
+    }[];
+  } | null;
+};
+
 export type Notification = {
   id: number;
   data: { title: string; body?: string; [key: string]: unknown };
@@ -292,7 +324,9 @@ export type Notification = {
 export type CompanyUser = {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
+  // Set instead of an email for accounts that sign in with an employee ID.
+  login_id?: string | null;
   is_active: boolean;
   role: string | null;
   // null = unrestricted (every branch); otherwise the exact branches they can see.
@@ -419,10 +453,11 @@ export type AttendanceCorrection = {
 };
 
 export const api = {
-  login: (email: string, password: string) =>
+  // Either an email, or a company code + employee ID — never both.
+  login: (credentials: { email: string; password: string } | { company: string; employee_id: string; password: string }) =>
     request<{ token: string }>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(credentials),
     }),
 
   register: (companyName: string, name: string, email: string, password: string) =>
@@ -446,10 +481,10 @@ export const api = {
   },
 
   employees: {
-    // Loads up to 200 by default — the API's own default is only 25, which
+    // Loads up to 500 by default — the API's own default is only 25, which
     // silently hid everyone after the 25th. `total` is the real headcount.
     list: (params: { perPage?: number; departmentId?: number; teamId?: number } = {}) => {
-      const query = new URLSearchParams({ per_page: String(params.perPage ?? 200) });
+      const query = new URLSearchParams({ per_page: String(params.perPage ?? 500) });
       if (params.departmentId) query.set("department_id", String(params.departmentId));
       if (params.teamId) query.set("team_id", String(params.teamId));
       return request<Paginated<Employee>>(`/api/employees?${query}`);
@@ -462,12 +497,12 @@ export const api = {
       return request<{ photo_url: string | null }>(`/api/employees/${id}/photo`, { method: "POST", body });
     },
     removePhoto: (id: number) => request<void>(`/api/employees/${id}/photo`, { method: "DELETE" }),
-    create: (data: EmployeeInput & { name: string; branch_id: number; password?: string }) =>
+    create: (data: EmployeeInput & { name: string; branch_id: number; password?: string; login_method?: "email" | "employee_id" }) =>
       request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: EmployeeInput) =>
       request<Employee>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/employees/${id}`, { method: "DELETE" }),
-    createLogin: (id: number, data: { email: string; password: string }) =>
+    createLogin: (id: number, data: LoginSetup) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
   },
 
@@ -587,9 +622,9 @@ export const api = {
   },
 
   schedules: {
-    // Ask for a date range: the API pages 50 at a time unless perPage is raised (max 500).
+    // Ask for a date range: the API pages 50 at a time unless perPage is raised (max 2000).
     list: (params: { from?: string; to?: string; employeeId?: number; perPage?: number } = {}) => {
-      const query = new URLSearchParams({ per_page: String(params.perPage ?? 500) });
+      const query = new URLSearchParams({ per_page: String(params.perPage ?? 2000) });
       if (params.employeeId) query.set("employee_id", String(params.employeeId));
       if (params.from) query.set("from", params.from);
       if (params.to) query.set("to", params.to);
@@ -605,8 +640,14 @@ export const api = {
     remove: (id: number) => request<void>(`/api/schedules/${id}`, { method: "DELETE" }),
   },
 
+  dashboard: {
+    summary: () => request<DashboardSummary>("/api/dashboard/summary"),
+  },
+
   attendance: {
-    list: (params?: { employee_id?: number; from?: string; to?: string }) => {
+    // The API sends 50 rows unless asked for more (max 1000) — say so, or a busy
+    // company's list silently stops after the newest 50.
+    list: (params?: { employee_id?: number; from?: string; to?: string; per_page?: number }) => {
       const query = new URLSearchParams(
         Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][],
       ).toString();
@@ -645,8 +686,8 @@ export const api = {
   },
 
   profile: {
-    update: (data: { name: string; email: string }) =>
-      request<{ id: number; name: string; email: string }>("/api/profile", {
+    update: (data: { name: string; email: string | null }) =>
+      request<{ id: number; name: string; email: string | null }>("/api/profile", {
         method: "PUT",
         body: JSON.stringify(data),
       }),

@@ -20,7 +20,7 @@ class AttendanceCorrectionController extends Controller
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
         }
 
-        return $query->orderByDesc('created_at')->paginate(50);
+        return $query->orderByDesc('created_at')->paginate(min(max($request->integer('per_page', 50), 1), 500));
     }
 
     public function store(Request $request)

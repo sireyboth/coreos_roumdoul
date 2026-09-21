@@ -14,6 +14,9 @@ class Branch extends Model
 {
     use Auditable, BelongsToCompany, HasFactory, SoftDeletes;
 
+    // Internal columns no screen reads; hidden so they aren't repeated in every nested copy.
+    protected $hidden = ['company_id', 'created_at', 'updated_at', 'deleted_at', 'laravel_through_key'];
+
     protected $fillable = [
         'company_id',
         'name',

@@ -159,7 +159,7 @@ class EmployeePhotoTest extends TestCase
         $this->assertNull(Employee::query()->withoutGlobalScopes()->findOrFail($this->employeeId)->photo_path);
     }
 
-    public function test_the_photo_link_shows_up_wherever_the_employee_is_nested_too(): void
+    public function test_the_photo_link_is_only_sent_where_avatars_are_shown(): void
     {
         $this->upload()->assertOk();
         $employee = Employee::query()->findOrFail($this->employeeId);
@@ -168,8 +168,13 @@ class EmployeePhotoTest extends TestCase
         ]);
         Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $shift->id, 'date' => '2026-09-22']);
 
+        // The employee list shows avatars, so it carries the link.
+        $listed = collect($this->as($this->admin)->getJson('/api/employees')->assertOk()->json('data'))->firstWhere('id', $this->employeeId);
+        $this->assertNotNull($listed['photo_url']);
+
+        // A roster row nests the employee but shows no avatar — the long signed link would only be dead weight.
         $row = $this->as($this->admin)->getJson('/api/schedules?from=2026-09-01&to=2026-09-30')->assertOk()->json('data.0');
-        $this->assertNotNull($row['employee']['photo_url']);
+        $this->assertArrayNotHasKey('photo_url', $row['employee']);
         $this->assertArrayNotHasKey('photo_path', $row['employee']);
     }
 

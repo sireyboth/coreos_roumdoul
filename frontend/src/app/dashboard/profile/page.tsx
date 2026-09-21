@@ -23,6 +23,7 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(me?.user.name ?? "");
   const [email, setEmail] = useState(me?.user.email ?? "");
+  const signsInById = Boolean(me?.user.login_id);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -43,7 +44,7 @@ export default function ProfilePage() {
     setSavingProfile(true);
 
     try {
-      await api.profile.update({ name, email });
+      await api.profile.update({ name, email: email.trim() === "" ? null : email });
       notifySuccess("Profile updated");
       setProfileSaved(true);
       refresh();
@@ -92,7 +93,9 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle>Account details</CardTitle>
-            <CardDescription>Your name and email address</CardDescription>
+            <CardDescription>
+              {signsInById ? "Your name and, if you like, an email address" : "Your name and email address"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
@@ -101,14 +104,21 @@ export default function ProfilePage() {
                 <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{signsInById ? "Email (optional)" : "Email"}</Label>
                 <Input
                   id="email"
                   type="email"
-                  required
+                  // Someone who signs in with an employee ID has no email to lose.
+                  required={!signsInById}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
+                {signsInById && (
+                  <p className="text-xs text-muted-foreground">
+                    You sign in with company code <strong>{me?.company?.slug}</strong> and employee ID{" "}
+                    <strong>{me?.user.login_id}</strong>. An email here is optional and doesn&apos;t change that.
+                  </p>
+                )}
               </div>
               {profileError && <Alert variant="destructive">{profileError}</Alert>}
               {profileSaved && <Badge variant="success">Saved</Badge>}

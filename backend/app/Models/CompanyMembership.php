@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyMembership extends Model
 {
-    protected $fillable = ['company_id', 'user_id', 'status', 'joined_at'];
+    protected $fillable = ['company_id', 'user_id', 'login_id', 'status', 'joined_at'];
 
     protected function casts(): array
     {

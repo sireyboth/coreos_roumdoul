@@ -222,7 +222,9 @@ class CalendarTest extends TestCase
         $this->assertSame('holiday', collect($worker['days'])->firstWhere('date', '2026-09-24')['type']);
 
         // The roster and the personal calendar are built by the same code.
-        $this->assertEquals($this->month($this->admin, "&employee_id={$this->employee->id}")['days'], $worker['days']);
+        // (The roster leaves out empty fields to keep the payload small; the app reads a missing one as "none".)
+        $personal = array_map(fn ($day) => array_filter($day, fn ($value) => $value !== null), $this->month($this->admin, "&employee_id={$this->employee->id}")['days']);
+        $this->assertEquals($personal, $worker['days']);
         $this->assertSame('none', collect(collect($team['employees'])->firstWhere('id', $other->id)['days'])->firstWhere('date', '2026-09-10')['type']);
     }
 

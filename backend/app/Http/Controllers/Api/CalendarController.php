@@ -140,7 +140,9 @@ class CalendarController extends Controller
                 'employee_code' => $employee->employee_code,
                 'branch' => $employee->branch?->name,
                 'summary' => $summary,
-                'days' => $days,
+                // A month has ~30 days per person and most are plain: leaving out the
+                // empty fields (the app reads a missing one as "none") cuts the size ~3x.
+                'days' => array_map(fn (array $day) => array_filter($day, fn ($value) => $value !== null), $days),
             ];
         })->values();
 

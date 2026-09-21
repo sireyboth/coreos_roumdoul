@@ -179,4 +179,40 @@ class QueryEfficiencyTest extends TestCase
             $this->assertSame($bare->hasModule($code), $enabled);
         }
     }
+
+    public function test_responses_leave_out_internal_columns_nothing_on_screen_reads(): void
+    {
+        $this->addEmployees(2);
+
+        $internal = ['company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days', 'created_at', 'updated_at', 'deleted_at',
+            'current_assignment', 'laravel_through_key', 'photo_path'];
+
+        $this->app['auth']->forgetGuards();
+        $this->actingAs($this->admin);
+
+        $employee = $this->getJson('/api/employees?per_page=200')->assertOk()->json('data.0');
+        $roster = $this->getJson('/api/schedules?from=2026-09-01&to=2026-09-30')->assertOk()->json('data.0');
+        $correction = $this->getJson('/api/attendance/corrections')->assertOk()->json('data.0');
+
+        foreach ([
+            'employee' => $employee,
+            'employee.branch' => $employee['branch'],
+            'employee.department' => $employee['department'],
+            'roster employee' => $roster['employee'],
+            'roster shift' => $roster['shift'],
+            'correction employee' => $correction['employee'],
+        ] as $where => $payload) {
+            foreach ($internal as $key) {
+                $this->assertArrayNotHasKey($key, $payload, "{$where} still carries {$key}");
+            }
+        }
+
+        // What the screens do read is still there.
+        foreach (['id', 'name', 'employee_code', 'email', 'phone', 'job_title', 'employment_status', 'has_login', 'photo_url', 'branch', 'department', 'team'] as $key) {
+            $this->assertArrayHasKey($key, $employee, "employee lost {$key}");
+        }
+        $this->assertSame('Clerk', $employee['job_title']);
+        $this->assertArrayHasKey('name', $roster['shift']);
+        $this->assertArrayHasKey('start_time', $roster['shift']);
+    }
 }

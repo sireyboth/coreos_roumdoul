@@ -144,6 +144,8 @@ class UserController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            // Set for someone who signs in with an employee ID instead of an email.
+            'login_id' => $user->membership?->login_id,
             'is_active' => $user->is_active,
             'role' => $user->membership?->roles?->first()?->name,
             // null = unrestricted (every branch); otherwise the exact set they can see.

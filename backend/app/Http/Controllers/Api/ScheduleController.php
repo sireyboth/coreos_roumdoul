@@ -39,8 +39,9 @@ class ScheduleController extends Controller
             $query->whereDate('date', '<=', $request->date('to'));
         }
 
-        // per_page (max 500) lets a month view load a whole roster at once.
-        return $query->orderBy('date')->orderBy('id')->paginate(min(max($request->integer('per_page', 50), 1), 500));
+        // per_page (max 2000) lets a month view load a whole company's roster at once —
+        // 80 people on weekdays is ~1,800 entries, far past the old 500 cap.
+        return $query->orderBy('date')->orderBy('id')->paginate(min(max($request->integer('per_page', 50), 1), 2000));
     }
 
     public function store(Request $request)

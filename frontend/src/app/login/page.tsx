@@ -19,7 +19,11 @@ import { Alert } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const router = useRouter();
+  // Either an email, or a company code + employee ID.
+  const [method, setMethod] = useState<"email" | "employee_id">("email");
   const [email, setEmail] = useState("");
+  const [company, setCompany] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,7 +34,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const { token } = await api.login(email, password);
+      const { token } = await api.login(
+        method === "email" ? { email, password } : { company, employee_id: employeeId, password },
+      );
       setToken(token);
       router.push("/dashboard");
     } catch (err) {
@@ -45,21 +51,79 @@ export default function LoginPage() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-xl">Sign in</CardTitle>
-          <CardDescription>Welcome back — enter your company account details.</CardDescription>
+          <CardDescription>Welcome back — sign in with your email or your employee ID.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-              />
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm font-medium" role="tablist">
+              {(
+                [
+                  { id: "email", label: "Email" },
+                  { id: "employee_id", label: "Employee ID" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={method === tab.id}
+                  onClick={() => {
+                    setMethod(tab.id);
+                    setError(null);
+                  }}
+                  className={`rounded-md px-3 py-1.5 transition-colors ${
+                    method === tab.id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
+
+            {method === "email" ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="company">Company code</Label>
+                  <Input
+                    id="company"
+                    required
+                    placeholder="e.g. acme-x9k2"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <p className="text-xs text-muted-foreground">Your manager can tell you this.</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="employee_id">Employee ID</Label>
+                  <Input
+                    id="employee_id"
+                    required
+                    placeholder="e.g. E-001"
+                    value={employeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="password">Password</Label>
               <Input

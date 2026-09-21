@@ -13,7 +13,11 @@ use App\Models\User;
  */
 class CompanyUserService
 {
-    public function create(int $companyId, string $name, string $email, string $password, string $roleName): User
+    /**
+     * @param  string|null  $email  null for someone who signs in with an employee ID instead
+     * @param  string|null  $loginId  the employee ID they sign in with (with the company code)
+     */
+    public function create(int $companyId, string $name, ?string $email, string $password, string $roleName, ?string $loginId = null): User
     {
         $role = CompanyRole::query()
             ->where('company_id', $companyId)
@@ -29,15 +33,24 @@ class CompanyUserService
 
         $membership = $user->membership()->create([
             'company_id' => $companyId,
+            // Lower-case so "E-001" and "e-001" are the same person.
+            'login_id' => $loginId !== null ? self::normaliseLoginId($loginId) : null,
             'status' => 'active',
             'joined_at' => now(),
         ]);
 
         $membership->roles()->attach($role->id, ['created_at' => now()]);
 
-        AuditLogger::record('user.invited', $user, ['name' => $user->name, 'email' => $user->email, 'role' => $roleName]);
+        AuditLogger::record('user.invited', $user, [
+            'name' => $user->name, 'email' => $user->email, 'login_id' => $membership->login_id, 'role' => $roleName,
+        ]);
 
         return $user->fresh();
+    }
+
+    public static function normaliseLoginId(string $loginId): string
+    {
+        return mb_strtolower(trim($loginId));
     }
 
     /**

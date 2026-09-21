@@ -167,6 +167,9 @@ export function EmployeeFormFields({
   emailHint,
   emailDisabled,
   emailRequired,
+  codeRequired,
+  codeDisabled,
+  codeHint,
 }: {
   idPrefix: string;
   form: EmployeeForm;
@@ -177,6 +180,11 @@ export function EmployeeFormFields({
   emailHint?: string;
   emailDisabled?: boolean;
   emailRequired?: boolean;
+  // The employee code is their sign-in when they use an employee ID login.
+  codeRequired?: boolean;
+  // Locked when this ID is what they sign in with.
+  codeDisabled?: boolean;
+  codeHint?: string;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
 
@@ -208,9 +216,15 @@ export function EmployeeFormFields({
         <Field label="Full name" htmlFor={id("name")} wide>
           <Input id={id("name")} required value={form.name} onChange={(e) => onChange({ name: e.target.value })} />
         </Field>
-        <Field label="Employee code (optional)" htmlFor={id("code")}>
+        <Field
+          label={codeRequired ? "Employee ID" : "Employee code (optional)"}
+          htmlFor={id("code")}
+          hint={codeHint}
+        >
           <Input
             id={id("code")}
+            required={codeRequired}
+            disabled={codeDisabled}
             placeholder="E-001"
             value={form.employee_code}
             onChange={(e) => onChange({ employee_code: e.target.value })}

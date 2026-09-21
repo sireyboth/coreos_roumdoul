@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AttendanceCorrectionController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeController;
@@ -37,7 +38,7 @@ Route::get('/employees/{employee}/photo', [EmployeePhotoController::class, 'show
     ->name('employees.photo');
 
 Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware(['auth:sanctum'])->group(function () {
     // Always reachable even for a paused company, so a user can still see
@@ -82,6 +83,8 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
         Route::post('/teams/{team}/members', [TeamController::class, 'addMembers']);
         Route::delete('/teams/{team}/members/{employee}', [TeamController::class, 'removeMember']);
     });
+
+    Route::get('/dashboard/summary', [DashboardController::class, 'summary'])->middleware('company_permission:dashboard.view');
 
     Route::post('/schedules/bulk', [ScheduleController::class, 'bulk'])->middleware('company_permission:schedules.manage');
 

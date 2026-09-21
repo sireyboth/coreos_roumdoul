@@ -16,12 +16,13 @@ class ProfileController extends Controller
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            // Someone who signs in with an employee ID has no email to lose, so it's optional for them.
+            'email' => [$user->membership?->login_id !== null ? 'nullable' : 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
         ]);
 
         $user->update($data);
 
-        return $user->only('id', 'name', 'email');
+        return $user->only('id', 'name', 'email') + ['login_id' => $user->membership?->login_id];
     }
 
     public function updatePassword(Request $request)

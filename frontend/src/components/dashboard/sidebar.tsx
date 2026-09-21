@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "motion/react";
 import {
   Boxes,
   Calculator,
@@ -34,7 +33,10 @@ const MODULES: Record<string, { label: string; icon: LucideIcon }> = {
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { me } = useMe();
-  const [hovered, setHovered] = useState<string | null>(null);
+  // One highlight that glides to whichever item is hovered. Plain CSS (a moving,
+  // transitioned element) instead of an animation library, which would add ~75 KB
+  // to every page just for this effect.
+  const [pill, setPill] = useState<{ top: number; height: number; visible: boolean } | null>(null);
 
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -42,7 +44,15 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <nav className="flex flex-col gap-5" onMouseLeave={() => setHovered(null)}>
+    <nav className="relative flex flex-col gap-5" onMouseLeave={() => setPill((p) => p && { ...p, visible: false })}>
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 rounded-lg bg-sidebar-accent transition-[transform,height,opacity] duration-200 ease-out",
+          pill?.visible ? "opacity-100" : "opacity-0",
+        )}
+        style={{ height: pill?.height ?? 0, transform: `translateY(${pill?.top ?? 0}px)` }}
+      />
       {groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-0.5">
           <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
@@ -61,7 +71,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
-                onMouseEnter={() => setHovered(item.href)}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  // The current page already has its own highlight — don't put a second one under it.
+                  setPill({ top: el.offsetTop, height: el.offsetHeight, visible: !active });
+                }}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors",
@@ -70,13 +84,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   active && "bg-sidebar-primary/12 ring-1 ring-sidebar-primary/30 dark:bg-sidebar-primary/20 dark:ring-sidebar-primary/40",
                 )}
               >
-                {hovered === item.href && !active && (
-                  <motion.div
-                    layoutId="sidebar-hover-pill"
-                    className="absolute inset-0 rounded-lg bg-sidebar-accent"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                  />
-                )}
                 <span
                   className={cn(
                     "relative z-10 flex items-center gap-3 transition-colors",

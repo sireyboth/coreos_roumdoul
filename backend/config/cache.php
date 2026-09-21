@@ -112,6 +112,19 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Rate limiter store
+    |--------------------------------------------------------------------------
+    |
+    | Where sign-in attempt counters live. Sign-in must never depend on Redis being
+    | up, so this is the database (which sign-in needs anyway) rather than the
+    | default cache store. Set CACHE_LIMITER_STORE to use another store.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER_STORE', 'database'),
+
     'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
 
 ];

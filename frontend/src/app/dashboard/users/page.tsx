@@ -304,7 +304,7 @@ export default function UsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Email / ID</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
                 {branches.length > 0 && <TableHead>Branch access</TableHead>}
@@ -320,7 +320,9 @@ export default function UsersPage() {
                     <TableCell className="font-medium">
                       {user.name} {isSelf && <span className="text-muted-foreground">(you)</span>}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.email ?? (user.login_id ? <span title="Signs in with their employee ID">ID: {user.login_id}</span> : "—")}
+                    </TableCell>
                     <TableCell>
                       {canManage && !isSelf ? (
                         <RoleSelect

@@ -57,14 +57,23 @@ class Employee extends Model
      */
     public const PERSONAL_FIELDS = ['gender', 'date_of_birth', 'address', 'notes'];
 
-    // photo_path is an internal storage path; clients get photo_url instead.
-    protected $hidden = [...self::PERSONAL_FIELDS, 'photo_path'];
+    // Kept out of every API response: internal columns nothing on screen reads.
+    // An employee is nested inside roster and attendance rows, so each unused
+    // field is repeated hundreds of times. (photo_path is a storage path;
+    // clients get photo_url instead. currentAssignment is only loaded so that
+    // job_title doesn't run a query per row — its raw row isn't needed too.)
+    protected $hidden = [
+        ...self::PERSONAL_FIELDS,
+        'photo_path',
+        'company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days',
+        'created_at', 'updated_at', 'deleted_at',
+        'currentAssignment',
+    ];
 
     protected $appends = [
         'name',
         'job_title',
         'has_login',
-        'photo_url',
     ];
 
     protected function casts(): array
@@ -106,6 +115,10 @@ class Employee extends Model
     }
 
     /**
+     * A signed, relative link to this employee's photo (or null). Not part of
+     * $appends: it is a long string and needs signing, so only the responses
+     * that actually show avatars ask for it with ->append('photo_url').
+     *
      * A signed, relative link to this employee's photo (or null). It is only
      * ever produced for people who are already allowed to see the employee,
      * and it expires. The expiry is rounded to the hour so the URL stays the

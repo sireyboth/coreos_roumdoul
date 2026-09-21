@@ -38,7 +38,13 @@ class AttendanceController extends Controller
             $query->whereDate('date', '<=', $request->date('to'));
         }
 
-        return $query->orderByDesc('date')->paginate(50);
+        // per_page (max 1000): a month of attendance for a whole company is far more than 50 rows.
+        $sessions = $query->orderByDesc('date')->orderByDesc('id')->paginate(min(max($request->integer('per_page', 50), 1), 1000));
+
+        // The dashboard's recent check-ins show each person's avatar.
+        $sessions->getCollection()->each(fn ($session) => $session->employee?->append('photo_url'));
+
+        return $sessions;
     }
 
     public function checkIn(Request $request, AttendanceService $attendance)
