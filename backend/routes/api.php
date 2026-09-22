@@ -140,6 +140,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
     Route::middleware('module:attendance')->group(function () {
         Route::middleware('company_permission:attendance.view')->group(function () {
             Route::get('/attendance', [AttendanceController::class, 'index']);
+            Route::get('/attendance/export', [AttendanceController::class, 'export']);
             Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
             Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
             Route::get('/attendance/corrections', [AttendanceCorrectionController::class, 'index']);

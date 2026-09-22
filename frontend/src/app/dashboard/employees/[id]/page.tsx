@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarRange, KeyRound, Trash2, User, UserX } from "lucide-react";
+import { ArrowLeft, CalendarRange, Download, KeyRound, Trash2, User, UserX } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { LoginLink } from "@/components/dashboard/login-link";
+import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -54,6 +55,7 @@ export default function EmployeePage() {
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canRoster = me?.permissions.includes("schedules.view") ?? false;
+  const canExportAttendance = (me?.permissions.includes("attendance.manage") ?? false) && Boolean(me?.modules.attendance);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [missing, setMissing] = useState(false);
@@ -69,6 +71,7 @@ export default function EmployeePage() {
   const [error, setError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +303,21 @@ export default function EmployeePage() {
               </CardContent>
             </Card>
 
+            {canExportAttendance && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attendance report</CardTitle>
+                  <CardDescription>Download {employee.name}&apos;s check-ins and check-outs as a CSV file.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="outline" onClick={() => setExportOpen(true)}>
+                    <Download className="size-4" />
+                    Export attendance
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {canManage && (
               <Button variant="destructive" onClick={handleDelete}>
                 <Trash2 className="size-4" />
@@ -384,6 +402,11 @@ export default function EmployeePage() {
         </div>
       </div>
 
+      <AttendanceExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        employee={{ id: employee.id, name: employee.name }}
+      />
       <CreateLoginDialog
         key={loginOpen ? "open" : "closed"}
         employee={loginOpen ? employee : null}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Clock, Eye, LogIn, LogOut, QrCode } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Download, Eye, LogIn, LogOut, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
 import { AttendancePreviewDialog } from "@/components/dashboard/attendance-preview-dialog";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
@@ -63,6 +64,7 @@ export default function AttendancePage() {
   const [working, setWorking] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [previewSession, setPreviewSession] = useState<AttendanceSession | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const scanGpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
 
   const tableKey = `${month}|${reloads}`;
@@ -306,6 +308,12 @@ export default function AttendancePage() {
               Correction requests →
             </Link>
           }
+          action={
+            <Button variant="outline" onClick={() => setExportOpen(true)}>
+              <Download className="size-4" />
+              Export report
+            </Button>
+          }
         />
 
         {myForgottenShifts.length > 0 && (
@@ -426,6 +434,7 @@ export default function AttendancePage() {
         />
       </div>
 
+      <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
       <QrScanDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScan} />
       <AttendancePreviewDialog
         session={previewSession}

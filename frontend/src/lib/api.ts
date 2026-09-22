@@ -98,7 +98,7 @@ async function sendWithRetry<T>(path: string, options: RequestInit): Promise<T> 
   try {
     return await sendOnce<T>(path, options);
   } catch (err) {
-    if (!(err instanceof TypeError)) throw err;
+    if (!(err instanceof ApiError) || err.code !== "network_error") throw err;
     await sleep(800);
     return sendOnce<T>(path, options);
   }
@@ -107,16 +107,33 @@ async function sendWithRetry<T>(path: string, options: RequestInit): Promise<T> 
 async function sendOnce<T>(path: string, options: RequestInit): Promise<T> {
   const token = getToken();
 
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      // A FormData body sets its own multipart boundary — forcing JSON would break uploads.
-      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-      Accept: "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        // A FormData body sets its own multipart boundary — forcing JSON would break uploads.
+        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (err) {
+    // fetch() rejects with a plain TypeError for anything before a response comes back —
+    // the server is down, the URL is wrong, or the network dropped. Left as-is, every
+    // caller's catch block shows the generic "Something went wrong.", which is true but
+    // useless here: this is the one case where we can name the actual problem.
+    if (err instanceof TypeError) {
+      throw new ApiError(
+        0,
+        `Can't reach the server at ${API_URL}. It may be offline, or check your internet connection.`,
+        undefined,
+        "network_error",
+      );
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -652,6 +669,25 @@ export const api = {
         Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][],
       ).toString();
       return request<Paginated<AttendanceSession>>(`/api/attendance${query ? `?${query}` : ""}`);
+    },
+    // The report is a file, not JSON, so it can't go through request(). It still
+    // needs the login header, which is why a plain <a href> can't be used either.
+    export: async (params: { from: string; to: string; employee_id?: number }): Promise<{ blob: Blob; filename: string }> => {
+      const query = new URLSearchParams({ from: params.from, to: params.to });
+      if (params.employee_id) query.set("employee_id", String(params.employee_id));
+
+      const token = getToken();
+      const res = await fetch(`${API_URL}/api/attendance/export?${query}`, {
+        headers: { Accept: "text/csv, application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, body.message ?? `Export failed (${res.status})`, body.errors, body.code);
+      }
+
+      const named = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
+      return { blob: await res.blob(), filename: named?.[1] ?? `attendance-${params.from}-to-${params.to}.csv` };
     },
     checkIn: (data?: { qr_token?: string; latitude?: number; longitude?: number }) =>
       request<AttendanceEvent>("/api/attendance/check-in", { method: "POST", body: JSON.stringify(data ?? {}) }),
