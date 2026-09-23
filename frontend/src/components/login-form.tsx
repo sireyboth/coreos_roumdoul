@@ -20,10 +20,11 @@ import { Alert } from "@/components/ui/alert";
 /**
  * The sign-in form, shared by /login (generic, company typed by hand or via
  * ?company=) and /c/[company]/login (an admin's shareable link, company baked
- * into the path). A path segment survives "Add to Home Screen" the way a
- * query string doesn't — installed PWAs launch at the manifest's fixed
- * start_url and drop whatever query string the page had, so a company baked
- * into the path is the only version safe to shortcut.
+ * into the path so it survives "Add to Home Screen" the way a query string
+ * doesn't). The path alone isn't the whole fix, though: installed PWAs
+ * relaunch at their manifest's start_url regardless of the URL installed
+ * from, which is why /c/[company]/ has its own manifest with its own
+ * start_url (see that route's layout.tsx) instead of the app's global one.
  */
 export function LoginForm({ linkedCompany = null }: { linkedCompany?: string | null }) {
   const router = useRouter();
