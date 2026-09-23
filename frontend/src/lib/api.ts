@@ -521,6 +521,21 @@ export const api = {
     remove: (id: number) => request<void>(`/api/employees/${id}`, { method: "DELETE" }),
     createLogin: (id: number, data: LoginSetup) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
+    // A PDF, not JSON, so it can't go through request() — same reasoning as
+    // attendance.export below.
+    card: async (id: number): Promise<Blob> => {
+      const token = getToken();
+      const res = await fetch(`${API_URL}/api/employees/${id}/card`, {
+        headers: { Accept: "application/pdf", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, body.message ?? `Couldn't generate the card (${res.status})`, body.errors, body.code);
+      }
+
+      return res.blob();
+    },
   },
 
   users: {

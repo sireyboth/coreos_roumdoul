@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
+use App\Http\Controllers\Api\EmployeeCardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeePhotoController;
 use App\Http\Controllers\Api\HolidayController;
@@ -112,6 +113,10 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
 
     Route::middleware('company_permission:branches.manage')->group(function () {
         Route::post('/branches/{branch}/regenerate-qr', [BranchController::class, 'regenerateQrCode']);
+    });
+
+    Route::middleware(['module:id_cards', 'company_permission:employees.view'])->group(function () {
+        Route::get('/employees/{employee}/card', [EmployeeCardController::class, 'show']);
     });
 
     Route::middleware('company_permission:users.view')->group(function () {

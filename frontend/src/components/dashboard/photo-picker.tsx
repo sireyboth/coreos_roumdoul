@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { toSquareJpeg } from "@/lib/image";
+import { PhotoCropDialog } from "@/components/dashboard/photo-crop-dialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,6 +30,9 @@ export function PhotoPicker({
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The freshly-picked file, as an object URL, while the crop dialog is
+  // open — cleared (and revoked) once the dialog closes either way.
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
 
   const initials = name
     .split(" ")
@@ -38,15 +41,31 @@ export function PhotoPicker({
     .join("")
     .toUpperCase();
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Reset so choosing the same file again still fires.
     e.target.value = "";
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+
     setError(null);
+    setPickedUrl(URL.createObjectURL(file));
+  }
+
+  function closeCropDialog(open: boolean) {
+    if (!open && pickedUrl) {
+      URL.revokeObjectURL(pickedUrl);
+      setPickedUrl(null);
+    }
+  }
+
+  async function handleCropped(photo: Blob) {
     try {
-      await onPick(await toSquareJpeg(file));
+      await onPick(photo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't use that image.");
     }
@@ -83,10 +102,12 @@ export function PhotoPicker({
               </Button>
             )}
           </div>
-          <p className="text-center text-xs text-muted-foreground">JPG, PNG or WebP. It&apos;s cropped to a square.</p>
+          <p className="text-center text-xs text-muted-foreground">JPG, PNG or WebP. You can drag and zoom to crop it.</p>
         </>
       )}
       {error && <p className="text-center text-xs text-destructive">{error}</p>}
+
+      <PhotoCropDialog imageUrl={pickedUrl} open={pickedUrl !== null} onOpenChange={closeCropDialog} onCropped={handleCropped} />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarRange, Download, KeyRound, Trash2, User, UserX } from "lucide-react";
+import { ArrowLeft, CalendarRange, Download, Eye, IdCard, KeyRound, Trash2, User, UserX } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { LoginLink } from "@/components/dashboard/login-link";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
+import { CardPreviewDialog } from "@/components/dashboard/card-preview-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
@@ -27,6 +28,7 @@ import { PhotoPicker } from "@/components/dashboard/photo-picker";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
+import { saveBlob } from "@/lib/download";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +58,7 @@ export default function EmployeePage() {
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canRoster = me?.permissions.includes("schedules.view") ?? false;
   const canExportAttendance = (me?.permissions.includes("attendance.manage") ?? false) && Boolean(me?.modules.attendance);
+  const canPrintCard = (me?.permissions.includes("employees.view") ?? false) && Boolean(me?.modules.id_cards);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [missing, setMissing] = useState(false);
@@ -72,6 +75,30 @@ export default function EmployeePage() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  // "view" opens an in-page preview modal; "download" saves it straight
+  // away. Tracked separately so only the button actually clicked shows
+  // "Preparing…".
+  const [cardAction, setCardAction] = useState<"view" | "download" | null>(null);
+  const [cardBlob, setCardBlob] = useState<Blob | null>(null);
+  const [cardPreviewOpen, setCardPreviewOpen] = useState(false);
+
+  async function handleCard(action: "view" | "download") {
+    if (!employee) return;
+    setCardAction(action);
+    try {
+      const blob = await api.employees.card(employee.id);
+      if (action === "view") {
+        setCardBlob(blob);
+        setCardPreviewOpen(true);
+      } else {
+        saveBlob(blob, `employee-card-${employee.employee_code ?? employee.id}.pdf`);
+      }
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setCardAction(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -318,6 +345,25 @@ export default function EmployeePage() {
               </Card>
             )}
 
+            {canPrintCard && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>ID card</CardTitle>
+                  <CardDescription>A printable badge with {employee.name}&apos;s photo, ID, and a scannable QR code.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex gap-2">
+                  <Button variant="outline" onClick={() => handleCard("view")} disabled={cardAction !== null}>
+                    <Eye className="size-4" />
+                    {cardAction === "view" ? "Preparing…" : "View"}
+                  </Button>
+                  <Button variant="outline" onClick={() => handleCard("download")} disabled={cardAction !== null}>
+                    <IdCard className="size-4" />
+                    {cardAction === "download" ? "Preparing…" : "Download"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {canManage && (
               <Button variant="destructive" onClick={handleDelete}>
                 <Trash2 className="size-4" />
@@ -412,6 +458,12 @@ export default function EmployeePage() {
         employee={loginOpen ? employee : null}
         onOpenChange={setLoginOpen}
         onSaved={reload}
+      />
+      <CardPreviewDialog
+        blob={cardBlob}
+        filename={`employee-card-${employee.employee_code ?? employee.id}.pdf`}
+        open={cardPreviewOpen}
+        onOpenChange={setCardPreviewOpen}
       />
     </div>
   );

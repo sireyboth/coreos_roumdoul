@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Clock,
   FileClock,
+  IdCard,
   KeyRound,
   LayoutDashboard,
   MapPin,
@@ -54,6 +55,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/dashboard/teams", label: "Teams", icon: UsersRound, tone: "from-teal-500 to-emerald-500", permission: "teams.view" },
       { href: "/dashboard/branches", label: "Branches", icon: Building2, tone: "from-cyan-500 to-sky-500", permission: "branches.view" },
       { href: "/dashboard/work-locations", label: "Work Locations", icon: MapPin, tone: "from-lime-500 to-emerald-500", permission: "work_locations.view" },
+      { href: "/dashboard/id-cards", label: "ID Cards", icon: IdCard, tone: "from-rose-500 to-orange-500", permission: "employees.view", module: "id_cards" },
     ],
   },
   {
