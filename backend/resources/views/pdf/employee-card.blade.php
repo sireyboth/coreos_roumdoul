@@ -29,7 +29,16 @@
     $tagline2 = 'Bigger Tomorrow';
     $motto    = 'WORK  ·  GROW  ·  TOGETHER';
 
-    $showPattern = true;   // faint logo pattern in the background
+    $showPattern   = true;   // faint logo pattern in the background
+    $showRings     = true;   // concentric guilloche-style rings
+    $showDots      = true;   // dot-matrix blocks beside the photo
+    $showMicrotext = true;   // security-style microtext line
+
+    // Rings: [centerX mm, centerY mm, first radius, last radius, step]
+    $frontRings = [[54, 0, 6, 46, 3.2], [0, 62, 4, 22, 3]];
+    $backRings  = [[0, 0, 6, 40, 3.2]];
+
+    $microtext = str_repeat(strtoupper($company->name) . ' • ', 12);
 
     // Contact rows on the back (employee first, then company fallback)
     $contacts = array_filter([
@@ -76,6 +85,33 @@
             width: 6mm;
             height: 6mm;
         }
+
+        /* ---------- professional pattern ---------- */
+        .ring {
+            position: absolute;
+            border-style: solid;
+            border-width: 0.18mm;
+        }
+
+        .dot {
+            position: absolute;
+            width: 0.55mm;
+            height: 0.55mm;
+            border-radius: 0.3mm;
+        }
+
+        .microtext {
+            position: absolute;
+            left: 0;
+            width: 54mm;
+            height: 1.6mm;
+            overflow: hidden;
+            white-space: nowrap;
+            font-size: 2.4pt;
+            line-height: 1.6mm;
+            letter-spacing: 0.3pt;
+        }
+
 
         /* ================= FRONT ================= */
         .header {
@@ -324,6 +360,30 @@
         @endfor
     @endif
 
+    {{-- concentric rings --}}
+    @if ($showRings)
+        @foreach ($frontRings as [$cx, $cy, $r0, $r1, $step])
+            @for ($r = $r0; $r <= $r1; $r += $step)
+                <div class="ring" style="left: {{ $cx - $r }}mm; top: {{ $cy - $r }}mm; width: {{ $r * 2 }}mm; height: {{ $r * 2 }}mm; border-radius: {{ $r }}mm; border-color: #e1e7f0;"></div>
+            @endfor
+        @endforeach
+    @endif
+
+    {{-- dot matrix beside the photo --}}
+    @if ($showDots)
+        @for ($row = 0; $row < 9; $row++)
+            @for ($col = 0; $col < 3; $col++)
+                <div class="dot" style="left: {{ 4.5 + $col * 2 }}mm; top: {{ 17 + $row * 2 }}mm; background: #cdd6e4;"></div>
+                <div class="dot" style="left: {{ 45 + $col * 2 }}mm; top: {{ 27 + $row * 2 }}mm; background: #cdd6e4;"></div>
+            @endfor
+        @endfor
+    @endif
+
+    {{-- security microtext --}}
+    @if ($showMicrotext)
+        <div class="microtext" style="top: 44.8mm; color: #c9d2e0;">{{ $microtext }}</div>
+    @endif
+
     {{-- header --}}
     <table class="header" cellpadding="0" cellspacing="0">
         <tr>
@@ -388,6 +448,18 @@
                      style="opacity: 0.04; top: {{ $row * 10 }}mm; left: {{ $col * 11 + ($row % 2 ? 5.5 : 0) - 2 }}mm;">
             @endfor
         @endfor
+    @endif
+
+    @if ($showRings)
+        @foreach ($backRings as [$cx, $cy, $r0, $r1, $step])
+            @for ($r = $r0; $r <= $r1; $r += $step)
+                <div class="ring" style="left: {{ $cx - $r }}mm; top: {{ $cy - $r }}mm; width: {{ $r * 2 }}mm; height: {{ $r * 2 }}mm; border-radius: {{ $r }}mm; border-color: #1f3a6b;"></div>
+            @endfor
+        @endforeach
+    @endif
+
+    @if ($showMicrotext)
+        <div class="microtext" style="top: 21.2mm; color: #2c4a80;">{{ $microtext }}</div>
     @endif
 
     {{-- soft diagonal in bottom-right --}}
