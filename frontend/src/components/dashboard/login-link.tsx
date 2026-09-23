@@ -29,7 +29,7 @@ export function LoginLink() {
   return (
     <div className="flex gap-2">
       {/* Shown as a path-less preview during SSR; the real link needs `window`. */}
-      <Input readOnly value={`/login?company=${slug}`} aria-label="Sign-in link" onFocus={(e) => e.currentTarget.select()} />
+      <Input readOnly value={`/c/${slug}/login`} aria-label="Sign-in link" onFocus={(e) => e.currentTarget.select()} />
       <Button type="button" variant="outline" onClick={copy}>
         {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
         {copied ? "Copied" : "Copy link"}
