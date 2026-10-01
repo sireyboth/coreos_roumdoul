@@ -19,6 +19,8 @@ import {
   EMPLOYMENT_TYPES,
   EmployeeFormFields,
   formFromEmployee,
+  type SalaryAccess,
+  formatSalary,
   labelFor,
   toPayload,
   type EmployeeForm,
@@ -55,6 +57,11 @@ export default function EmployeePage() {
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canRoster = me?.permissions.includes("schedules.view") ?? false;
+  const salaryAccess: SalaryAccess = me?.permissions.includes("salary.manage")
+    ? "edit"
+    : me?.permissions.includes("salary.view")
+      ? "view"
+      : "none";
   const canExportAttendance = (me?.permissions.includes("attendance.manage") ?? false) && Boolean(me?.modules.attendance);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -113,7 +120,7 @@ export default function EmployeePage() {
     setSaving(true);
 
     try {
-      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0 });
+      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0, salary: salaryAccess === "edit" });
       // With an email login the email is their sign-in — it's changed from Users, not here.
       // (For an employee-ID login the email is only a contact detail, so it stays editable.)
       if (emailIsSignIn) delete payload.email;
@@ -250,6 +257,11 @@ export default function EmployeePage() {
                 />
                 <div className="flex flex-col items-center gap-1.5 text-center">
                   <h1 className="text-xl font-semibold tracking-tight">{employee.name}</h1>
+                  {employee.name_km && (
+                    <p lang="km" className="-mt-1 text-sm text-muted-foreground">
+                      {employee.name_km}
+                    </p>
+                  )}
                   {employee.job_title && <p className="text-sm text-muted-foreground">{employee.job_title}</p>}
                   <Badge variant={statusVariant}>{labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}</Badge>
                 </div>
@@ -364,6 +376,7 @@ export default function EmployeePage() {
                       emailHint={emailIsSignIn ? "This is their sign-in email — change it from Users." : undefined}
                       codeDisabled={idIsSignIn}
                       codeHint={idIsSignIn ? "This is their sign-in ID, so it can't be changed here." : undefined}
+                      salary={salaryAccess}
                     />
                   </CardContent>
                 </Card>
@@ -392,6 +405,10 @@ export default function EmployeePage() {
                     <Fact label="Employment type">{employee.employment_type ? labelFor(EMPLOYMENT_TYPES, employee.employment_type) : "—"}</Fact>
                     <Fact label="Job title">{employee.job_title ?? "—"}</Fact>
                     <Fact label="Hired">{dateLabel(employee.hire_date)}</Fact>
+                    {/* Only present when the API sent it, i.e. the viewer has salary.view. */}
+                    {employee.base_salary !== undefined && (
+                      <Fact label="Base salary">{formatSalary(employee.base_salary, employee.salary_currency)}</Fact>
+                    )}
                   </dl>
                 </CardContent>
               </Card>

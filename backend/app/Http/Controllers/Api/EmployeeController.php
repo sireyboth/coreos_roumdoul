@@ -91,22 +91,81 @@ class EmployeeController extends Controller
             'employment_type' => ['nullable', 'in:full_time,part_time,contract,temporary'],
             'hire_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+
+            'first_name' => ['nullable', 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
+            'name_km' => ['nullable', 'string', 'max:255'],
+            'nationality' => ['nullable', 'string', 'max:100'],
+            'national_id_number' => ['nullable', 'string', 'max:50'],
+            'passport_number' => ['nullable', 'string', 'max:50'],
+
+            'nssf_number' => ['nullable', 'string', 'max:50'],
+            'tax_id' => ['nullable', 'string', 'max:50'],
+            'bank_name' => ['nullable', 'string', 'max:100'],
+            'bank_account_number' => ['nullable', 'string', 'max:50'],
+            'base_salary' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            // A salary without a currency means nothing, so one comes with the other.
+            'salary_currency' => ['nullable', 'required_with:base_salary', 'in:USD,KHR'],
         ];
     }
 
     /**
-     * Personal details (gender, date of birth, address, notes) are only for
-     * people who can manage employees; everyone else gets the work profile.
+     * Only people with salary.manage may set pay. Checked before saving, so a
+     * manager without it gets a clear form error rather than a silent skip.
      */
-    private function reveal(Request $request, Employee $employee, ?bool $canManage = null): Employee
+    private function assertMayChangeSalary(Request $request, array $data): void
+    {
+        $touchesSalary = array_intersect(array_keys($data), Employee::SALARY_FIELDS) !== [];
+
+        if ($touchesSalary && ! $request->user()->hasCompanyPermission('salary.manage')) {
+            throw ValidationException::withMessages([
+                'base_salary' => ['You don\'t have permission to change salaries.'],
+            ]);
+        }
+    }
+
+    /**
+     * The name is required, but someone filling in first and last name
+     * separately shouldn't have to type it a third time.
+     */
+    private function withName(array $data, ?Employee $employee = null): array
+    {
+        if (filled($data['name'] ?? null) || (! array_key_exists('first_name', $data) && ! array_key_exists('last_name', $data))) {
+            return $data;
+        }
+
+        $first = array_key_exists('first_name', $data) ? $data['first_name'] : $employee?->first_name;
+        $last = array_key_exists('last_name', $data) ? $data['last_name'] : $employee?->last_name;
+        $full = trim("{$first} {$last}");
+
+        return $full === '' ? $data : [...$data, 'name' => $full];
+    }
+
+    /**
+     * Which hidden fields this caller may see: identity details for everyone
+     * who can see the employee, personal details (documents, bank, notes…)
+     * for employees.manage, and pay for salary.view.
+     */
+    private function visibleFields(Request $request): array
+    {
+        $user = $request->user();
+
+        return [
+            ...Employee::PROFILE_FIELDS,
+            ...($user->hasCompanyPermission('employees.manage') ? Employee::PERSONAL_FIELDS : []),
+            ...($user->hasCompanyPermission('salary.view') ? Employee::SALARY_FIELDS : []),
+        ];
+    }
+
+    private function reveal(Request $request, Employee $employee, ?array $fields = null): Employee
     {
         // A list passes the answer in, so it's worked out once — not once per row.
-        $canManage ??= $request->user()->hasCompanyPermission('employees.manage');
+        $fields ??= $this->visibleFields($request);
 
         // Every response built here is one that shows the person, so it carries the avatar link.
         $employee->append('photo_url');
 
-        return $canManage ? $employee->makeVisible(Employee::PERSONAL_FIELDS) : $employee;
+        return $employee->makeVisible($fields);
     }
 
     /**
@@ -127,8 +186,8 @@ class EmployeeController extends Controller
                 ->whereHas('currentAssignment', fn ($a) => $a->where('team_id', $request->integer('team_id'))))
             ->orderBy('display_name')->orderBy('id')
             ->paginate(min(max($request->integer('per_page', 25), 1), 500));
-        $canManage = $request->user()->hasCompanyPermission('employees.manage');
-        $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e, $canManage));
+        $fields = $this->visibleFields($request);
+        $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e, $fields));
 
         return $employees;
     }
@@ -147,7 +206,7 @@ class EmployeeController extends Controller
         $method = $withLogin ? $this->loginMethod($request) : null;
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required_without:first_name', 'nullable', 'string', 'max:255'],
             ...$this->profileRules($request),
             'login_method' => ['nullable', 'in:email,employee_id'],
             // With an email login the email is the sign-in; otherwise it is just a contact detail.
@@ -165,6 +224,8 @@ class EmployeeController extends Controller
         ]);
 
         $this->assertTeamFitsDepartment($data, null);
+        $this->assertMayChangeSalary($request, array_filter($data, fn ($value) => $value !== null));
+        $data = $this->withName($data);
 
         $employee = DB::transaction(function () use ($request, $data, $withLogin, $method) {
             $employee = Employee::query()->create(
@@ -339,6 +400,16 @@ class EmployeeController extends Controller
 
         $this->assertTeamFitsDepartment($data, $employee);
         $this->assertSignInIdUnchanged($employee, $data);
+        $this->assertMayChangeSalary($request, array_filter(
+            $data,
+            fn ($value, $key) => match ($key) {
+                'base_salary' => ($value === null) !== ($employee->base_salary === null) || (float) $value !== (float) $employee->base_salary,
+                'salary_currency' => $value !== $employee->salary_currency,
+                default => false,
+            },
+            ARRAY_FILTER_USE_BOTH,
+        ));
+        $data = $this->withName($data, $employee);
 
         $employee->update(
             collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id'])->all()

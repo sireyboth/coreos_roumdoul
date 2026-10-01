@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { FileDown } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { api, ApiError, Employee } from "@/lib/api";
-import { saveBlob } from "@/lib/download";
+import { attendanceReportToExcel } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -36,7 +36,7 @@ function daysBetween(from: string, to: string): number {
 }
 
 /**
- * Downloads the attendance report as a CSV file. Managers can pick one employee
+ * Downloads the attendance report as an Excel workbook. Managers can pick one employee
  * or everyone; with `employee` set, the report is locked to that person; with
  * neither, it's the signed-in person's own records (the server enforces that).
  */
@@ -130,8 +130,8 @@ function ExportForm({
         to,
         employee_id: employee?.id ?? (employeeId ? Number(employeeId) : undefined),
       });
-      saveBlob(blob, filename);
-      notifySuccess("Report downloaded", filename);
+      const saved = await attendanceReportToExcel(blob, filename);
+      notifySuccess("Excel file downloaded", saved);
       onDone();
     } catch (err) {
       notifyError(err);
@@ -145,7 +145,7 @@ function ExportForm({
     <>
       <DialogHeader>
         <DialogTitle>{employee ? `Export attendance — ${employee.name}` : "Export attendance report"}</DialogTitle>
-        <DialogDescription>Download a CSV file you can open in Excel or Google Sheets.</DialogDescription>
+        <DialogDescription>Download an Excel workbook (.xlsx) — it also opens in Google Sheets and Numbers.</DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleDownload} className="flex flex-col gap-4">
@@ -190,8 +190,8 @@ function ExportForm({
         <DialogFooter>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
           <Button type="submit" disabled={downloading || rangeProblem !== null}>
-            <Download className="size-4" />
-            {downloading ? "Preparing…" : "Download CSV"}
+            <FileDown className="size-4" />
+            {downloading ? "Preparing…" : "Download Excel"}
           </Button>
         </DialogFooter>
       </form>

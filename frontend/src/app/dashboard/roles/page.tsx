@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, PermissionGroup, Role } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
+import { exportRoles, roleImport } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -173,50 +175,53 @@ export default function RolesPage() {
           title="Roles & Permissions"
           description="Define what each position at your company can see and do."
           action={
-            canManage && (
-              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogTrigger
-                  render={
-                    <Button>
-                      <Plus className="size-4" />
-                      Create role
-                    </Button>
-                  }
-                />
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Create a role</DialogTitle>
-                    <DialogDescription>E.g. &quot;HR Officer&quot; or &quot;Supervisor&quot;.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="role_name">Role name</Label>
-                      <Input
-                        id="role_name"
-                        required
-                        value={newRoleName}
-                        onChange={(e) => setNewRoleName(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label>Permissions</Label>
-                      <PermissionCheckboxes
-                        groups={groups}
-                        selected={newRolePermissions}
-                        onChange={setNewRolePermissions}
-                      />
-                    </div>
-                    {createError && <Alert variant="destructive">{createError}</Alert>}
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                      <Button type="submit" disabled={creating}>
-                        {creating ? "Creating…" : "Create role"}
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportRoles} importSpec={canManage ? roleImport : undefined} onImported={load} />
+              {canManage && (
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger
+                    render={
+                      <Button>
+                        <Plus className="size-4" />
+                        Create role
                       </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )
+                    }
+                  />
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Create a role</DialogTitle>
+                      <DialogDescription>E.g. &quot;HR Officer&quot; or &quot;Supervisor&quot;.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="role_name">Role name</Label>
+                        <Input
+                          id="role_name"
+                          required
+                          value={newRoleName}
+                          onChange={(e) => setNewRoleName(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label>Permissions</Label>
+                        <PermissionCheckboxes
+                          groups={groups}
+                          selected={newRolePermissions}
+                          onChange={setNewRolePermissions}
+                        />
+                      </div>
+                      {createError && <Alert variant="destructive">{createError}</Alert>}
+                      <DialogFooter>
+                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <Button type="submit" disabled={creating}>
+                          {creating ? "Creating…" : "Create role"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           }
         />
 

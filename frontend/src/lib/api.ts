@@ -67,7 +67,7 @@ export class ApiError extends Error {
 }
 
 // The whole account is locked (not just this one request).
-const ACCOUNT_BLOCKED_CODES = ["trial_expired", "company_suspended", "company_cancelled"];
+export const ACCOUNT_BLOCKED_CODES = ["trial_expired", "company_suspended", "company_cancelled", "company_deleted"];
 export const ACCOUNT_BLOCKED_EVENT = "app:account-blocked";
 
 /** Photo links from the API are relative and signed; this makes one loadable in an <img>. */
@@ -149,6 +149,22 @@ async function sendOnce<T>(path: string, options: RequestInit): Promise<T> {
   return res.json();
 }
 
+/**
+ * Every row of a paginated list, page by page — for exports, which must never
+ * stop at the first 25. Asks for the largest page each endpoint allows.
+ */
+async function requestAll<T>(path: string): Promise<T[]> {
+  const join = path.includes("?") ? "&" : "?";
+  const first = await request<Paginated<T>>(`${path}${join}page=1`);
+  const rows = [...first.data];
+
+  for (let page = 2; page <= (first.last_page ?? 1); page++) {
+    rows.push(...(await request<Paginated<T>>(`${path}${join}page=${page}`)).data);
+  }
+
+  return rows;
+}
+
 export type MeResponse = {
   // email is null for someone who signs in with an employee ID; login_id is that ID.
   user: { id: number; name: string; email: string | null; login_id?: string | null; company_id: number | null; is_platform_admin: boolean };
@@ -219,7 +235,22 @@ export type EmployeeInput = {
   date_of_birth?: string | null;
   address?: string | null;
   notes?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  name_km?: string | null;
+  nationality?: string | null;
+  national_id_number?: string | null;
+  passport_number?: string | null;
+  nssf_number?: string | null;
+  tax_id?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  // Only accepted from people with salary.manage — leave both out otherwise.
+  base_salary?: number | null;
+  salary_currency?: SalaryCurrency | null;
 };
+
+export type SalaryCurrency = "USD" | "KHR";
 
 // How a new employee login is set up: the admin picks ONE way to sign in.
 export type LoginSetup =
@@ -244,6 +275,21 @@ export type Employee = {
   date_of_birth?: string | null;
   address?: string | null;
   notes?: string | null;
+  nationality?: string | null;
+  national_id_number?: string | null;
+  passport_number?: string | null;
+  nssf_number?: string | null;
+  tax_id?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  // Pay: only sent to people with salary.view. A decimal string, e.g. "650.00".
+  base_salary?: string | null;
+  salary_currency?: SalaryCurrency | null;
+  // Identity details: sent wherever the employee pages load one person or the
+  // list, but not when an employee is nested in roster or attendance rows.
+  first_name?: string | null;
+  last_name?: string | null;
+  name_km?: string | null;
   // Where they work now. There is no branch_id field — read branch?.id.
   branch: Branch | null;
   department?: { id: number; name: string } | null;
@@ -257,7 +303,7 @@ export type Employee = {
   has_login: boolean;
 };
 
-type Paginated<T> = { data: T[]; total: number };
+type Paginated<T> = { data: T[]; total: number; last_page?: number };
 
 export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "none";
 export type CalendarAttendance = "present" | "late" | "absent" | "missing_checkout";
@@ -489,6 +535,7 @@ export const api = {
 
   branches: {
     list: () => request<Paginated<Branch>>("/api/branches"),
+    all: () => requestAll<Branch>("/api/branches"),
     create: (data: Partial<Branch>) =>
       request<Branch>("/api/branches", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Branch>) =>
@@ -506,6 +553,7 @@ export const api = {
       if (params.teamId) query.set("team_id", String(params.teamId));
       return request<Paginated<Employee>>(`/api/employees?${query}`);
     },
+    all: () => requestAll<Employee>("/api/employees?per_page=500"),
     get: (id: number) => request<Employee>(`/api/employees/${id}`),
     // Sends the (already resized) image; the server re-encodes it again.
     uploadPhoto: (id: number, photo: Blob) => {
@@ -554,6 +602,7 @@ export const api = {
 
   workLocations: {
     list: () => request<Paginated<WorkLocation>>("/api/work_locations"),
+    all: () => requestAll<WorkLocation>("/api/work_locations"),
     create: (data: Partial<WorkLocation>) =>
       request<WorkLocation>("/api/work_locations", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<WorkLocation>) =>
@@ -566,6 +615,7 @@ export const api = {
   // Pass a large perPage to fill a dropdown (the API caps it at 200).
   departments: {
     list: (perPage = 25) => request<Paginated<Department>>(`/api/departments?per_page=${perPage}`),
+    all: () => requestAll<Department>("/api/departments?per_page=200"),
     create: (data: Partial<Omit<Department, "id">>) =>
       request<Department>("/api/departments", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Omit<Department, "id">>) =>
@@ -582,6 +632,7 @@ export const api = {
 
   teams: {
     list: (perPage = 25) => request<Paginated<Team>>(`/api/teams?per_page=${perPage}`),
+    all: () => requestAll<Team>("/api/teams?per_page=200"),
     create: (data: Partial<Omit<Team, "id">>) =>
       request<Team>("/api/teams", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Omit<Team, "id">>) =>
@@ -598,6 +649,7 @@ export const api = {
 
   shifts: {
     list: () => request<Paginated<Shift>>("/api/shifts"),
+    all: () => requestAll<Shift>("/api/shifts"),
     create: (data: Partial<Shift>) =>
       request<Shift>("/api/shifts", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Shift>) =>
@@ -607,6 +659,7 @@ export const api = {
 
   holidays: {
     list: () => request<Paginated<Holiday>>("/api/holidays"),
+    all: () => requestAll<Holiday>("/api/holidays"),
     create: (data: Partial<Holiday>) =>
       request<Holiday>("/api/holidays", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: Partial<Holiday>) =>
@@ -646,6 +699,11 @@ export const api = {
       if (params.from) query.set("from", params.from);
       if (params.to) query.set("to", params.to);
       return request<Paginated<Schedule>>(`/api/schedules?${query}`);
+    },
+    all: (params: { from: string; to: string; employeeId?: number }) => {
+      const query = new URLSearchParams({ per_page: "2000", from: params.from, to: params.to });
+      if (params.employeeId) query.set("employee_id", String(params.employeeId));
+      return requestAll<Schedule>(`/api/schedules?${query}`);
     },
     // Rosters many people over a date range in one go. dry_run only reports what it would do.
     bulk: (data: ScheduleBulkInput) =>
@@ -697,6 +755,7 @@ export const api = {
 
   attendanceCorrections: {
     list: () => request<Paginated<AttendanceCorrection>>("/api/attendance/corrections"),
+    all: () => requestAll<AttendanceCorrection>("/api/attendance/corrections?per_page=500"),
     create: (data: {
       employee_id?: number;
       date: string;

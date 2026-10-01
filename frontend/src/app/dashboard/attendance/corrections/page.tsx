@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
+import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function formatDateTime(iso: string | null): string {
@@ -106,61 +108,69 @@ export default function AttendanceCorrectionsPage() {
           title="Correction requests"
           description="Fix a missed check-in or check-out."
           action={
-            me?.employee && (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger
-                  render={
-                    <Button>
-                      <Plus className="size-4" />
-                      Request correction
-                    </Button>
-                  }
-                />
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Request a correction</DialogTitle>
-                    <DialogDescription>Your manager will need to approve this.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="date">Date</Label>
-                      <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="check_in">Check-in time</Label>
-                        <Input
-                          id="check_in"
-                          type="datetime-local"
-                          value={checkIn}
-                          onChange={(e) => setCheckIn(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="check_out">Check-out time</Label>
-                        <Input
-                          id="check_out"
-                          type="datetime-local"
-                          value={checkOut}
-                          onChange={(e) => setCheckOut(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="reason">Reason</Label>
-                      <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
-                    </div>
-                    {error && <Alert variant="destructive">{error}</Alert>}
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                      <Button type="submit" disabled={saving}>
-                        {saving ? "Submitting…" : "Submit request"}
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions
+                onExport={exportCorrections}
+                // Importing files rows for other people, which only attendance managers may do.
+                importSpec={me?.permissions.includes("attendance.manage") ? attendanceImport : undefined}
+                onImported={load}
+              />
+              {me?.employee && (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger
+                    render={
+                      <Button>
+                        <Plus className="size-4" />
+                        Request correction
                       </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )
+                    }
+                  />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Request a correction</DialogTitle>
+                      <DialogDescription>Your manager will need to approve this.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="check_in">Check-in time</Label>
+                          <Input
+                            id="check_in"
+                            type="datetime-local"
+                            value={checkIn}
+                            onChange={(e) => setCheckIn(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="check_out">Check-out time</Label>
+                          <Input
+                            id="check_out"
+                            type="datetime-local"
+                            value={checkOut}
+                            onChange={(e) => setCheckOut(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="reason">Reason</Label>
+                        <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
+                      </div>
+                      {error && <Alert variant="destructive">{error}</Alert>}
+                      <DialogFooter>
+                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <Button type="submit" disabled={saving}>
+                          {saving ? "Submitting…" : "Submit request"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           }
         />
 

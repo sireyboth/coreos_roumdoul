@@ -30,6 +30,8 @@ export default function NewEmployeePage() {
   const router = useRouter();
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
+  // A new employee's pay can only be set by someone allowed to change pay.
+  const canEditSalary = me?.permissions.includes("salary.manage") ?? false;
 
   const [branches, setBranches] = useState<Branch[] | null>(null);
   // Empty when the role can't see them (the pickers then don't show at all).
@@ -77,7 +79,7 @@ export default function NewEmployeePage() {
 
     try {
       const created = await api.employees.create({
-        ...toPayload(form, { org: departments.length > 0 || teams.length > 0 }),
+        ...toPayload(form, { org: departments.length > 0 || teams.length > 0, salary: canEditSalary }),
         name: form.name.trim(),
         branch_id: Number(form.branch_id),
         // Whichever way was chosen (their email, or their employee ID) is their sign-in.
@@ -167,6 +169,7 @@ export default function NewEmployeePage() {
                   emailRequired={loginPassword !== "" && method === "email"}
                   codeRequired={loginPassword !== "" && method === "employee_id"}
                   codeHint={loginPassword !== "" && method === "employee_id" ? "This is what they'll sign in with." : undefined}
+                  salary={canEditSalary ? "edit" : "none"}
                 />
               </CardContent>
             </Card>

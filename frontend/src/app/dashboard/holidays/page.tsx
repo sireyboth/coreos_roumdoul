@@ -18,11 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { KhmerHolidayImportDialog } from "@/components/dashboard/khmer-holiday-import-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Holiday } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
+import { exportHolidays, holidayImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function HolidayFormDialog({
@@ -178,18 +180,21 @@ export default function HolidaysPage() {
           title="Holidays"
           description="Company-wide non-working days."
           action={
-            canManage && (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => setImportOpen(true)}>
-                  <Flag className="size-4" />
-                  Import Cambodian holidays
-                </Button>
-                <Button onClick={() => openForm(null)}>
-                  <Plus className="size-4" />
-                  Add holiday
-                </Button>
-              </div>
-            )
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportHolidays} importSpec={canManage ? holidayImport : undefined} onImported={load} />
+              {canManage && (
+                <>
+                  <Button variant="outline" onClick={() => setImportOpen(true)}>
+                    <Flag className="size-4" />
+                    Import Cambodian holidays
+                  </Button>
+                  <Button onClick={() => openForm(null)}>
+                    <Plus className="size-4" />
+                    Add holiday
+                  </Button>
+                </>
+              )}
+            </div>
           }
         />
 

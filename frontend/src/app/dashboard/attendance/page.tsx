@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Clock, Download, Eye, LogIn, LogOut, QrCode } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Eye, FileDown, LogIn, LogOut, QrCode } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,12 +16,14 @@ import { DataTable, type DataTableColumn, type DataTableFilter } from "@/compone
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { AttendancePreviewDialog } from "@/components/dashboard/attendance-preview-dialog";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceSession } from "@/lib/api";
 import { withLocationRetry } from "@/lib/location";
 import { dateOnly, isToday } from "@/lib/date";
+import { attendanceImport } from "@/lib/excel-specs/time";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -309,10 +311,14 @@ export default function AttendancePage() {
             </Link>
           }
           action={
-            <Button variant="outline" onClick={() => setExportOpen(true)}>
-              <Download className="size-4" />
-              Export report
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {/* Export has its own dialog (date range, employee), so only Import comes from here. */}
+              <ExcelActions importSpec={canManage ? attendanceImport : undefined} onImported={load} />
+              <Button variant="outline" onClick={() => setExportOpen(true)}>
+                <FileDown className="size-4" />
+                Export
+              </Button>
+            </div>
           }
         />
 

@@ -20,9 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BulkScheduleDialog } from "@/components/dashboard/bulk-schedule-dialog";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee, Schedule, Shift, WorkLocation } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
+import { exportRoster, rosterImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 /** Edits one existing roster entry. New entries go through the bulk dialog. */
@@ -283,12 +285,20 @@ export function RosterView({ employee }: { employee?: Employee }) {
           Today
         </Button>
 
-        {canManage && (
-          <Button onClick={openBulk} className="ml-auto">
-            <Plus className="size-4" />
-            {employee ? `Schedule ${employee.name.split(" ")[0]}` : "Add to roster"}
-          </Button>
-        )}
+        <div className="ml-auto flex flex-wrap gap-2">
+          <ExcelActions
+            onExport={() => exportRoster(month, employee)}
+            // One person's schedule tab exports just them; the file import belongs to the whole roster.
+            importSpec={canManage && !employee ? rosterImport : undefined}
+            onImported={loadSchedules}
+          />
+          {canManage && (
+            <Button onClick={openBulk}>
+              <Plus className="size-4" />
+              {employee ? `Schedule ${employee.name.split(" ")[0]}` : "Add to roster"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {truncated && result && (

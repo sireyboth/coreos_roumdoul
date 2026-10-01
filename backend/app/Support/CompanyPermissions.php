@@ -13,6 +13,9 @@ class CompanyPermissions
     public const RESOURCES = [
         'branches', 'departments', 'teams', 'employees', 'users', 'roles',
         'work_locations', 'shifts', 'holidays', 'schedules', 'attendance',
+        // An employee's pay. Separate from employees.* on purpose: someone can
+        // run the staff list without seeing what anyone earns.
+        'salary',
     ];
 
     /**

@@ -19,6 +19,17 @@ class EnsureCompanyIsActive
     {
         $company = $request->user()?->company;
 
+        // A membership whose company is gone: it was deleted (soft-deleted, e.g.
+        // from the admin panel) while its people were still signed in. A user
+        // with no membership at all isn't affected — only their own profile is
+        // reachable, and nothing there needs a company.
+        if ($request->user()?->company_id !== null && ! $company) {
+            return response()->json([
+                'message' => "This company's account no longer exists. Contact support.",
+                'code' => 'company_deleted',
+            ], 403);
+        }
+
         if (in_array($company?->status, self::BLOCKED_STATUSES, true)) {
             return response()->json([
                 'message' => "This company's account has been {$company->status}. Contact support.",

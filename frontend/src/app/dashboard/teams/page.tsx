@@ -19,9 +19,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MembersDialog } from "@/components/dashboard/members-dialog";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Department, Team } from "@/lib/api";
+import { exportTeams, teamImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -266,12 +268,15 @@ export default function TeamsPage() {
           title="Teams"
           description="Smaller groups inside your departments. Employees are assigned to a team from the Employees page."
           action={
-            canManage && (
-              <Button onClick={() => openForm(null)}>
-                <Plus className="size-4" />
-                Add team
-              </Button>
-            )
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportTeams} importSpec={canManage ? teamImport : undefined} onImported={load} />
+              {canManage && (
+                <Button onClick={() => openForm(null)}>
+                  <Plus className="size-4" />
+                  Add team
+                </Button>
+              )}
+            </div>
           }
         />
 

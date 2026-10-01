@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarRange, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelFor } from "@/components/dashboard/employee-form";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -17,6 +18,7 @@ import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, Branch, Department, Employee, Team } from "@/lib/api";
+import { employeeImport, exportEmployees } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,10 @@ export default function EmployeesPage() {
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canManageRoster = me?.permissions.includes("schedules.manage") ?? false;
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
+  // Pay columns appear in the Excel files only for people allowed to see / change pay.
+  const canSeeSalary = me?.permissions.includes("salary.view") ?? false;
+  const canEditSalary = me?.permissions.includes("salary.manage") ?? false;
+  const importSpec = useMemo(() => employeeImport({ salary: canEditSalary }), [canEditSalary]);
 
   // ?tab=roster deep-links to the roster (the old Schedule page redirects here).
   const [tab, setTab] = useState<Tab>(() =>
@@ -103,7 +109,14 @@ export default function EmployeesPage() {
         <div className="flex items-center gap-3">
           <EmployeeAvatar name={employee.name} photoUrl={employee.photo_url} />
           <div className="flex flex-col leading-tight">
-            <span className="font-medium">{employee.name}</span>
+            <span className="font-medium">
+              {employee.name}
+              {employee.name_km && (
+                <span lang="km" className="ml-1.5 font-normal text-muted-foreground">
+                  {employee.name_km}
+                </span>
+              )}
+            </span>
             {(employee.employee_code || employee.email) && (
               <span className="text-xs text-muted-foreground">
                 {[employee.employee_code, employee.email].filter(Boolean).join(" · ")}
@@ -113,7 +126,7 @@ export default function EmployeesPage() {
         </div>
       ),
       sortValue: (employee) => employee.name,
-      searchValue: (employee) => [employee.name, employee.employee_code, employee.email].filter(Boolean).join(" "),
+      searchValue: (employee) => [employee.name, employee.name_km, employee.employee_code, employee.email].filter(Boolean).join(" "),
     },
     {
       id: "branch",
@@ -286,20 +299,32 @@ export default function EmployeesPage() {
               : "Your team's records, photos and details."
           }
           action={
-            activeTab === "people" &&
-            canManage &&
-            branches.length > 0 &&
-            (atEmployeeLimit ? (
-              <Button disabled>
-                <Plus className="size-4" />
-                Add employee
-              </Button>
-            ) : (
-              <Button render={<Link href="/dashboard/employees/new" />} nativeButton={false}>
-                <Plus className="size-4" />
-                Add employee
-              </Button>
-            ))
+            activeTab === "people" && (
+              <div className="flex flex-wrap gap-2">
+                <ExcelActions
+                  onExport={() => exportEmployees({ salary: canSeeSalary })}
+                  importSpec={canManage ? importSpec : undefined}
+                  onImported={() => {
+                    load();
+                    // The plan's headcount changed — keeps the limit banner honest.
+                    refresh();
+                  }}
+                />
+                {canManage &&
+                  branches.length > 0 &&
+                  (atEmployeeLimit ? (
+                    <Button disabled>
+                      <Plus className="size-4" />
+                      Add employee
+                    </Button>
+                  ) : (
+                    <Button render={<Link href="/dashboard/employees/new" />} nativeButton={false}>
+                      <Plus className="size-4" />
+                      Add employee
+                    </Button>
+                  ))}
+              </div>
+            )
           }
         />
 

@@ -24,10 +24,12 @@ import {
   TYPE_STYLES,
   WEEKDAYS,
 } from "@/components/dashboard/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TeamCalendar } from "@/components/dashboard/team-calendar";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
+import { dayOffImport, exportMonthCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
@@ -239,21 +241,28 @@ export default function CalendarPage() {
                 Today
               </Button>
 
-              {canManage && (
-                <select
-                  value={effectiveEmployeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  aria-label="Employee"
-                  className="ml-auto h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
-                >
-                  {hasOwnCalendar && <option value="">My calendar</option>}
-                  {employees.map((employee) => (
-                    <option key={employee.id} value={employee.id}>
-                      {employee.name}
-                    </option>
-                  ))}
-                </select>
-              )}
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                {canManage && (
+                  <select
+                    value={effectiveEmployeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                    aria-label="Employee"
+                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
+                  >
+                    {hasOwnCalendar && <option value="">My calendar</option>}
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <ExcelActions
+                  onExport={data ? () => exportMonthCalendar(month, effectiveEmployeeId ? Number(effectiveEmployeeId) : undefined) : undefined}
+                  importSpec={canManage ? dayOffImport : undefined}
+                  onImported={reload}
+                />
+              </div>
             </div>
 
             {needsPick && employees.length === 0 && (

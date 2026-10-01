@@ -17,10 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
+import { exportBranches, branchImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -335,36 +337,39 @@ export default function BranchesPage() {
           title="Branches"
           description="Physical or virtual locations your employees belong to."
           action={
-            canManage && (
-              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogTrigger
-                  render={
-                    <Button disabled={atBranchLimit}>
-                      <Plus className="size-4" />
-                      Add branch
-                    </Button>
-                  }
-                />
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Add a branch</DialogTitle>
-                    <DialogDescription>
-                      Adding a location makes it a real check-in point for Attendance.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                    <BranchFormFields form={createForm} onChange={setCreateForm} />
-                    {createError && <Alert variant="destructive">{createError}</Alert>}
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                      <Button type="submit" disabled={creating}>
-                        {creating ? "Adding…" : "Add branch"}
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportBranches} importSpec={canManage ? branchImport : undefined} onImported={load} />
+              {canManage && (
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger
+                    render={
+                      <Button disabled={atBranchLimit}>
+                        <Plus className="size-4" />
+                        Add branch
                       </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )
+                    }
+                  />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add a branch</DialogTitle>
+                      <DialogDescription>
+                        Adding a location makes it a real check-in point for Attendance.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                      <BranchFormFields form={createForm} onChange={setCreateForm} />
+                      {createError && <Alert variant="destructive">{createError}</Alert>}
+                      <DialogFooter>
+                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <Button type="submit" disabled={creating}>
+                          {creating ? "Adding…" : "Add branch"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           }
         />
 

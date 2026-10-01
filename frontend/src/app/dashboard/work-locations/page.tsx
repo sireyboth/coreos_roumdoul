@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { QrCodeDialog } from "@/components/dashboard/qr-code-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, WorkLocation } from "@/lib/api";
+import { exportWorkLocations, workLocationImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function WorkLocationFormDialog({
@@ -340,12 +342,15 @@ export default function WorkLocationsPage() {
           title="Work Locations"
           description="Physical check-in points. Each branch has one automatically; add extra ones for client sites or company-wide offices."
           action={
-            canManage && (
-              <Button onClick={() => openForm(null)}>
-                <Plus className="size-4" />
-                Add location
-              </Button>
-            )
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportWorkLocations} importSpec={canManage ? workLocationImport : undefined} onImported={load} />
+              {canManage && (
+                <Button onClick={() => openForm(null)}>
+                  <Plus className="size-4" />
+                  Add location
+                </Button>
+              )}
+            </div>
           }
         />
 

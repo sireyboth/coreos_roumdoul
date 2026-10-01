@@ -43,6 +43,23 @@ class CompanyStatusEnforcementTest extends TestCase
         $this->postJson('/api/auth/logout', [], $headers)->assertOk();
     }
 
+    public function test_a_deleted_companys_signed_in_user_is_blocked_instead_of_crashing(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Omega', 'Boss', 'boss@omega.test', 'password123');
+        $admin = $company->users()->first();
+        $token = $admin->createToken('api')->plainTextToken;
+
+        $company->delete();
+
+        $headers = ['Authorization' => "Bearer {$token}"];
+
+        // The team calendar read the company's timezone and failed with a 500.
+        $this->getJson('/api/calendar/team?month=2026-10', $headers)
+            ->assertForbidden()
+            ->assertJsonPath('code', 'company_deleted');
+        $this->postJson('/api/auth/logout', [], $headers)->assertOk();
+    }
+
     public function test_active_and_trial_companies_are_unaffected(): void
     {
         $company = app(CompanyProvisioner::class)->provision('Gamma', 'Boss', 'boss@gamma.test', 'password123');

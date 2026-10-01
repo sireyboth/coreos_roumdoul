@@ -18,9 +18,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Shift } from "@/lib/api";
+import { exportShifts, shiftImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function ShiftFormDialog({
@@ -256,12 +258,15 @@ export default function ShiftsPage() {
           title="Shifts"
           description="Reusable start/end times and break rules employees get scheduled onto."
           action={
-            canManage && (
-              <Button onClick={() => openForm(null)}>
-                <Plus className="size-4" />
-                Add shift
-              </Button>
-            )
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportShifts} importSpec={canManage ? shiftImport : undefined} onImported={load} />
+              {canManage && (
+                <Button onClick={() => openForm(null)}>
+                  <Plus className="size-4" />
+                  Add shift
+                </Button>
+              )}
+            </div>
           }
         />
 

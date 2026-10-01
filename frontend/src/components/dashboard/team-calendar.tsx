@@ -15,7 +15,9 @@ import {
   TYPE_STYLES,
   WEEKDAYS,
 } from "@/components/dashboard/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { api, ApiError, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
+import { dayOffImport, exportTeamCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +139,12 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
               ))}
             </select>
           )}
+          <ExcelActions
+            onExport={() => exportTeamCalendar(month, branchId ? Number(branchId) : undefined)}
+            // Days off are what the calendar adds by hand; shifts are imported from the Roster.
+            importSpec={canManage ? dayOffImport : undefined}
+            onImported={() => setReloads((n) => n + 1)}
+          />
         </div>
       </div>
 

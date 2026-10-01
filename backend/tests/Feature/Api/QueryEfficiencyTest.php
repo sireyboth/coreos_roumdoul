@@ -202,7 +202,14 @@ class QueryEfficiencyTest extends TestCase
             'roster shift' => $roster['shift'],
             'correction employee' => $correction['employee'],
         ] as $where => $payload) {
-            foreach ($internal as $key) {
+            // The employee pages show first/last name (and the Khmer name), so
+            // the employee list carries them — but nothing that only nests an
+            // employee does.
+            $checked = $where === 'employee'
+                ? array_diff($internal, Employee::PROFILE_FIELDS)
+                : [...$internal, ...Employee::PROFILE_FIELDS, ...Employee::SALARY_FIELDS];
+
+            foreach ($checked as $key) {
                 $this->assertArrayNotHasKey($key, $payload, "{$where} still carries {$key}");
             }
         }

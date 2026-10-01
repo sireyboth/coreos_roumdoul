@@ -19,10 +19,12 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, CompanyUser, Role } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
+import { exportUsers, userImport } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -230,62 +232,65 @@ export default function UsersPage() {
             ) : undefined
           }
           action={
-            canManage && (
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger
-                  render={
-                    <Button>
-                      <Plus className="size-4" />
-                      Invite user
-                    </Button>
-                  }
-                />
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Invite a teammate</DialogTitle>
-                    <DialogDescription>Creates their login and assigns a role.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleInvite} className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="name">Name</Label>
-                      <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="password">Temporary password</Label>
-                      <Input
-                        id="password"
-                        type="password"
-                        required
-                        minLength={8}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="role">Role</Label>
-                      <RoleSelect roles={roles} value={role} onChange={setRole} />
-                    </div>
-                    {error && <Alert variant="destructive">{error}</Alert>}
-                    <DialogFooter>
-                      <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                      <Button type="submit" disabled={saving}>
-                        {saving ? "Inviting…" : "Invite"}
+            <div className="flex flex-wrap gap-2">
+              <ExcelActions onExport={exportUsers} importSpec={canManage ? userImport : undefined} onImported={loadUsers} />
+              {canManage && (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger
+                    render={
+                      <Button>
+                        <Plus className="size-4" />
+                        Invite user
                       </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            )
+                    }
+                  />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite a teammate</DialogTitle>
+                      <DialogDescription>Creates their login and assigns a role.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleInvite} className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="name">Name</Label>
+                        <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="password">Temporary password</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          required
+                          minLength={8}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="role">Role</Label>
+                        <RoleSelect roles={roles} value={role} onChange={setRole} />
+                      </div>
+                      {error && <Alert variant="destructive">{error}</Alert>}
+                      <DialogFooter>
+                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <Button type="submit" disabled={saving}>
+                          {saving ? "Inviting…" : "Invite"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           }
         />
 

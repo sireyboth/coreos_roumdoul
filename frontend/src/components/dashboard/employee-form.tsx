@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Branch, Department, Employee, EmployeeInput, Team } from "@/lib/api";
+import type { Branch, Department, Employee, EmployeeInput, SalaryCurrency, Team } from "@/lib/api";
 
 export const EMPLOYMENT_STATUSES = [
   { value: "active", label: "Active" },
@@ -18,14 +18,41 @@ export const EMPLOYMENT_TYPES = [
   { value: "temporary", label: "Temporary" },
 ];
 
-const GENDERS = [
+export const GENDERS = [
   { value: "female", label: "Female" },
   { value: "male", label: "Male" },
   { value: "other", label: "Other" },
 ];
 
+export const SALARY_CURRENCIES = [
+  { value: "USD", label: "USD ($)" },
+  { value: "KHR", label: "KHR (៛)" },
+];
+
+// Suggestions only — any bank can be typed in.
+const CAMBODIAN_BANKS = [
+  "ABA Bank", "ACLEDA Bank", "Canadia Bank", "Wing Bank", "Prince Bank", "Sathapana Bank",
+  "Hattha Bank", "AMK Bank", "Chip Mong Commercial Bank", "Bank of China (Phnom Penh)",
+  "Cambodia Post Bank", "Foreign Trade Bank of Cambodia", "J Trust Royal Bank", "Maybank Cambodia",
+  "Phillip Bank", "Vattanac Bank", "Woori Bank Cambodia",
+];
+
 export const labelFor = (options: { value: string; label: string }[], value: string | null | undefined) =>
   options.find((o) => o.value === value)?.label ?? value ?? "—";
+
+/** "650.00" + "USD" → "$650.00"; riel has no decimals and its own symbol. */
+export function formatSalary(amount: string | number | null | undefined, currency: string | null | undefined): string {
+  if (amount === null || amount === undefined || amount === "") return "—";
+  const value = Number(amount);
+  if (currency === "KHR") return `${value.toLocaleString("en-US", { maximumFractionDigits: 0 })} ៛`;
+  if (currency === "USD") return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+  return value.toLocaleString("en-US");
+}
+
+/** Who can see and change pay on this form. */
+export type SalaryAccess = "none" | "view" | "edit";
+
+const joinName = (first: string, last: string) => [first.trim(), last.trim()].filter(Boolean).join(" ");
 
 // Everything is a string here so inputs stay controlled; toPayload() turns
 // empty strings into nulls for the API.
@@ -46,10 +73,34 @@ export type EmployeeForm = {
   date_of_birth: string;
   address: string;
   notes: string;
+  first_name: string;
+  last_name: string;
+  name_km: string;
+  nationality: string;
+  national_id_number: string;
+  passport_number: string;
+  nssf_number: string;
+  tax_id: string;
+  bank_name: string;
+  bank_account_number: string;
+  base_salary: string;
+  salary_currency: string;
 };
 
 export function emptyEmployeeForm(branchId = ""): EmployeeForm {
   return {
+    first_name: "",
+    last_name: "",
+    name_km: "",
+    nationality: "",
+    national_id_number: "",
+    passport_number: "",
+    nssf_number: "",
+    tax_id: "",
+    bank_name: "",
+    bank_account_number: "",
+    base_salary: "",
+    salary_currency: "USD",
     name: "",
     employee_code: "",
     email: "",
@@ -71,6 +122,18 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
 
 export function formFromEmployee(employee: Employee): EmployeeForm {
   return {
+    first_name: employee.first_name ?? "",
+    last_name: employee.last_name ?? "",
+    name_km: employee.name_km ?? "",
+    nationality: employee.nationality ?? "",
+    national_id_number: employee.national_id_number ?? "",
+    passport_number: employee.passport_number ?? "",
+    nssf_number: employee.nssf_number ?? "",
+    tax_id: employee.tax_id ?? "",
+    bank_name: employee.bank_name ?? "",
+    bank_account_number: employee.bank_account_number ?? "",
+    base_salary: employee.base_salary ?? "",
+    salary_currency: employee.salary_currency ?? "USD",
     name: employee.name,
     employee_code: employee.employee_code ?? "",
     email: employee.email ?? "",
@@ -94,13 +157,28 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
 /**
  * `org` says whether the department/team pickers were available. Only then
  * are they sent — otherwise a person who can't see departments would wipe an
- * employee's department just by editing their phone number.
+ * employee's department just by editing their phone number. `salary` works
+ * the same way: pay is only sent by someone allowed to change it.
  */
-export function toPayload(form: EmployeeForm, options: { org: boolean }): EmployeeInput {
+export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: boolean }): EmployeeInput {
   const orNull = (value: string) => value.trim() || null;
+  const salary = form.base_salary.trim() === "" ? null : Number(form.base_salary);
 
   return {
-    name: form.name.trim(),
+    name: form.name.trim() || joinName(form.first_name, form.last_name),
+    first_name: orNull(form.first_name),
+    last_name: orNull(form.last_name),
+    name_km: orNull(form.name_km),
+    nationality: orNull(form.nationality),
+    national_id_number: orNull(form.national_id_number),
+    passport_number: orNull(form.passport_number),
+    nssf_number: orNull(form.nssf_number),
+    tax_id: orNull(form.tax_id),
+    bank_name: orNull(form.bank_name),
+    bank_account_number: orNull(form.bank_account_number),
+    ...(options.salary
+      ? { base_salary: salary, salary_currency: salary === null ? null : (form.salary_currency as SalaryCurrency) }
+      : {}),
     employee_code: orNull(form.employee_code),
     email: orNull(form.email),
     phone: orNull(form.phone),
@@ -170,6 +248,7 @@ export function EmployeeFormFields({
   codeRequired,
   codeDisabled,
   codeHint,
+  salary = "none",
 }: {
   idPrefix: string;
   form: EmployeeForm;
@@ -185,8 +264,21 @@ export function EmployeeFormFields({
   // Locked when this ID is what they sign in with.
   codeDisabled?: boolean;
   codeHint?: string;
+  salary?: SalaryAccess;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
+
+  /**
+   * Typing a first or last name keeps the full name in step — until someone
+   * edits the full name by hand (e.g. "Dara Sok" written "Sok Dara"), after
+   * which it's left alone.
+   */
+  function changeNamePart(patch: { first_name?: string; last_name?: string }) {
+    const before = joinName(form.first_name, form.last_name);
+    const after = joinName(patch.first_name ?? form.first_name, patch.last_name ?? form.last_name);
+    const following = form.name.trim() === "" || form.name.trim() === before;
+    onChange({ ...patch, ...(following ? { name: after } : {}) });
+  }
 
   // Inactive ones can't be newly chosen, but stay visible if the employee is already in one.
   const departmentOptions = departments.filter((d) => d.status === "active" || String(d.id) === form.department_id);
@@ -213,8 +305,33 @@ export function EmployeeFormFields({
   return (
     <div className="flex flex-col gap-5">
       <Section title="Basic info">
-        <Field label="Full name" htmlFor={id("name")} wide>
+        <Field label="First name" htmlFor={id("first")}>
+          <Input
+            id={id("first")}
+            autoComplete="given-name"
+            value={form.first_name}
+            onChange={(e) => changeNamePart({ first_name: e.target.value })}
+          />
+        </Field>
+        <Field label="Last name" htmlFor={id("last")}>
+          <Input
+            id={id("last")}
+            autoComplete="family-name"
+            value={form.last_name}
+            onChange={(e) => changeNamePart({ last_name: e.target.value })}
+          />
+        </Field>
+        <Field label="Full name" htmlFor={id("name")} hint="Filled in from the first and last name. Edit it if they go by something else.">
           <Input id={id("name")} required value={form.name} onChange={(e) => onChange({ name: e.target.value })} />
+        </Field>
+        <Field label="Name in Khmer (optional)" htmlFor={id("name-km")}>
+          <Input
+            id={id("name-km")}
+            lang="km"
+            placeholder="ឈ្មោះជាភាសាខ្មែរ"
+            value={form.name_km}
+            onChange={(e) => onChange({ name_km: e.target.value })}
+          />
         </Field>
         <Field
           label={codeRequired ? "Employee ID" : "Employee code (optional)"}
@@ -405,6 +522,93 @@ export function EmployeeFormFields({
           />
         </Field>
       </Section>
+
+      <Section title="Identity documents">
+        <Field label="Nationality" htmlFor={id("nationality")} wide>
+          <Input
+            id={id("nationality")}
+            placeholder="Cambodian"
+            value={form.nationality}
+            onChange={(e) => onChange({ nationality: e.target.value })}
+          />
+        </Field>
+        <Field label="National ID card number" htmlFor={id("national-id")}>
+          <Input
+            id={id("national-id")}
+            value={form.national_id_number}
+            onChange={(e) => onChange({ national_id_number: e.target.value })}
+          />
+        </Field>
+        <Field label="Passport number" htmlFor={id("passport")} hint="For foreign staff, or anyone without a national ID.">
+          <Input id={id("passport")} value={form.passport_number} onChange={(e) => onChange({ passport_number: e.target.value })} />
+        </Field>
+      </Section>
+
+      <Section title="Payroll & compliance">
+        <Field label="NSSF number" htmlFor={id("nssf")} hint="National Social Security Fund.">
+          <Input id={id("nssf")} value={form.nssf_number} onChange={(e) => onChange({ nssf_number: e.target.value })} />
+        </Field>
+        <Field label="Tax ID" htmlFor={id("tax")}>
+          <Input id={id("tax")} value={form.tax_id} onChange={(e) => onChange({ tax_id: e.target.value })} />
+        </Field>
+        <Field label="Bank" htmlFor={id("bank")}>
+          <Input
+            id={id("bank")}
+            list={id("bank-list")}
+            placeholder="ABA Bank"
+            value={form.bank_name}
+            onChange={(e) => onChange({ bank_name: e.target.value })}
+          />
+          <datalist id={id("bank-list")}>
+            {CAMBODIAN_BANKS.map((bank) => (
+              <option key={bank} value={bank} />
+            ))}
+          </datalist>
+        </Field>
+        <Field label="Bank account number" htmlFor={id("account")}>
+          <Input
+            id={id("account")}
+            inputMode="numeric"
+            value={form.bank_account_number}
+            onChange={(e) => onChange({ bank_account_number: e.target.value })}
+          />
+        </Field>
+      </Section>
+
+      {salary !== "none" && (
+        <Section title="Salary">
+          <Field
+            label="Base salary (per month)"
+            htmlFor={id("salary")}
+            hint={salary === "view" ? "You can see pay, but not change it." : "Only people with the salary permission can see this."}
+          >
+            <Input
+              id={id("salary")}
+              type="number"
+              min={0}
+              step={form.salary_currency === "KHR" ? 1000 : 0.01}
+              disabled={salary === "view"}
+              value={form.base_salary}
+              onChange={(e) => onChange({ base_salary: e.target.value })}
+            />
+          </Field>
+          <Field label="Currency" htmlFor={id("currency")}>
+            <select
+              id={id("currency")}
+              disabled={salary === "view"}
+              value={form.salary_currency}
+              onChange={(e) => onChange({ salary_currency: e.target.value })}
+              className={SELECT_CLASS}
+            >
+              {SALARY_CURRENCIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </Section>
+      )}
     </div>
   );
 }

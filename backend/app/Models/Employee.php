@@ -37,10 +37,14 @@ class Employee extends Model
         'last_name',
         'display_name',
         'name',
+        'name_km',
         'email',
         'phone',
         'gender',
         'date_of_birth',
+        'nationality',
+        'national_id_number',
+        'passport_number',
         'address',
         'employment_status',
         'employment_type',
@@ -48,6 +52,12 @@ class Employee extends Model
         'termination_date',
         'notes',
         'rest_days',
+        'nssf_number',
+        'tax_id',
+        'bank_name',
+        'bank_account_number',
+        'base_salary',
+        'salary_currency',
     ];
 
     /**
@@ -55,7 +65,20 @@ class Employee extends Model
      * many places an employee is nested (attendance, calendar, ...). Only
      * EmployeeController reveals them, and only to employees.manage.
      */
-    public const PERSONAL_FIELDS = ['gender', 'date_of_birth', 'address', 'notes'];
+    public const PERSONAL_FIELDS = [
+        'gender', 'date_of_birth', 'address', 'notes',
+        'nationality', 'national_id_number', 'passport_number',
+        'nssf_number', 'tax_id', 'bank_name', 'bank_account_number',
+    ];
+
+    /** Pay: revealed only with salary.view, on top of the personal fields. */
+    public const SALARY_FIELDS = ['base_salary', 'salary_currency'];
+
+    /**
+     * Identity details only the employee pages show. Not secret, but kept out
+     * of nested rows (roster, attendance) for the size reason below.
+     */
+    public const PROFILE_FIELDS = ['first_name', 'last_name', 'name_km'];
 
     // Kept out of every API response: internal columns nothing on screen reads.
     // An employee is nested inside roster and attendance rows, so each unused
@@ -64,6 +87,8 @@ class Employee extends Model
     // job_title doesn't run a query per row — its raw row isn't needed too.)
     protected $hidden = [
         ...self::PERSONAL_FIELDS,
+        ...self::SALARY_FIELDS,
+        'name_km',
         'photo_path',
         'company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days',
         'created_at', 'updated_at', 'deleted_at',
@@ -83,6 +108,7 @@ class Employee extends Model
             'termination_date' => 'date',
             'date_of_birth' => 'date',
             'rest_days' => 'array',
+            'base_salary' => 'decimal:2',
         ];
     }
 
