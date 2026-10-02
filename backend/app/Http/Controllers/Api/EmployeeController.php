@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompanyMembership;
 use App\Models\Employee;
 use App\Models\Schedule;
 use App\Models\Team;
 use App\Services\AuditLogger;
 use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
 
 class EmployeeController extends Controller
@@ -34,12 +37,12 @@ class EmployeeController extends Controller
     }
 
     /** Departments and teams must belong to the caller's own company (and not be deleted). */
-    private function ownDepartment(Request $request): \Illuminate\Validation\Rules\Exists
+    private function ownDepartment(Request $request): Exists
     {
         return Rule::exists('departments', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
     }
 
-    private function ownTeam(Request $request): \Illuminate\Validation\Rules\Exists
+    private function ownTeam(Request $request): Exists
     {
         return Rule::exists('teams', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
     }
@@ -323,7 +326,7 @@ class EmployeeController extends Controller
             'required', 'string', 'max:50',
             Rule::unique('employees', 'employee_code')->where('company_id', $request->user()->company_id)->ignore($employee?->id),
             function (string $attribute, mixed $value, \Closure $fail) use ($request) {
-                $taken = \App\Models\CompanyMembership::query()
+                $taken = CompanyMembership::query()
                     ->where('company_id', $request->user()->company_id)
                     ->where('login_id', CompanyUserService::normaliseLoginId((string) $value))
                     ->exists();
@@ -437,6 +440,8 @@ class EmployeeController extends Controller
         DB::transaction(function () use ($employee, $today) {
             // A removed employee must not keep a working login or a future rota.
             Schedule::query()->where('employee_id', $employee->id)->whereDate('date', '>=', $today)->delete();
+            // Nor a schedule to be judged against: absences would keep piling up.
+            app(ScheduleAssignmentService::class)->endAll($employee, $today);
 
             if ($user = $employee->user) {
                 $user->update(['is_active' => false]);

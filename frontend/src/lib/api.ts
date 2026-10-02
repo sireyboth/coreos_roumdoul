@@ -306,21 +306,45 @@ export type Employee = {
 type Paginated<T> = { data: T[]; total: number; last_page?: number };
 
 export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "none";
-export type CalendarAttendance = "present" | "late" | "absent" | "missing_checkout";
+// "worked" = scans on a day with nothing planned (a day off, or no schedule).
+export type CalendarAttendance = "present" | "late" | "absent" | "incomplete" | "worked";
+
+// A slot as the calendar and schedules show it: "08:00 IN", "06:00 OUT (next day)".
+export type ScheduleSlot = { type: "in" | "out"; time: string; next_day: boolean };
 
 export type CalendarDay = {
   date: string;
   type: CalendarDayType;
   label: string | null;
+  // A holiday's name — also set on a holiday someone was rostered to work.
+  holiday?: string | null;
   day_off_id: number | null;
-  shift: { name: string; start_time: string; end_time: string } | null;
+  // What was planned: the schedule's slots for this weekday, and where it came from.
+  schedule: { id: number; name: string; source: "assignment" | "override"; slots: ScheduleSlot[] } | null;
+  // The roster entry behind an override (to edit or remove it).
   schedule_id: number | null;
   work_location: string | null;
   // What actually happened; null for future days and days with nothing planned.
   attendance: CalendarAttendance | null;
   late_minutes: number | null;
-  check_in: string | null;
-  check_out: string | null;
+  early_leave_minutes?: number | null;
+  worked_minutes?: number | null;
+  overtime_minutes?: number | null;
+  // Every scan of the day as HH:MM, in order.
+  scans?: string[];
+  exceptions?: AttendanceException[];
+};
+
+export type CalendarSummary = {
+  work_days: number;
+  holidays: number;
+  days_off: number;
+  present: number;
+  late: number;
+  absent: number;
+  incomplete: number;
+  worked_minutes: number;
+  overtime_minutes: number;
 };
 
 export type CalendarMonth = {
@@ -328,9 +352,7 @@ export type CalendarMonth = {
   month: string;
   today: string;
   timezone: string;
-  // 0 = Sunday .. 6 = Saturday
-  weekly_off_days: number[];
-  summary: { work_days: number; holidays: number; days_off: number; present: number; late: number; absent: number };
+  summary: CalendarSummary;
   days: CalendarDay[];
 };
 
@@ -339,7 +361,7 @@ export type TeamCalendarEmployee = {
   name: string;
   employee_code: string | null;
   branch: string | null;
-  summary: CalendarMonth["summary"];
+  summary: CalendarSummary;
   days: CalendarDay[];
 };
 
@@ -363,15 +385,19 @@ export type DashboardSummary = {
     checked_in_today: number;
     late_today: number;
     pending_corrections: number;
+    // Only for people who manage attendance.
+    pending_overtime: number | null;
     // The last 7 days, oldest first — days with none are included as 0.
     week: { date: string; count: number }[];
     recent: {
       id: number;
       date: string;
-      status: "open" | "completed" | "missing_checkout";
+      status: AttendanceDayStatus;
       late_minutes: number;
+      // The day's first and (when there's more than one) last scan, HH:MM.
       check_in: string | null;
       check_out: string | null;
+      exceptions: AttendanceException[];
       employee: { id: number; name: string; photo_url: string | null };
     }[];
   } | null;
@@ -423,15 +449,60 @@ export type WorkLocation = {
   branch?: { id: number; name: string } | null;
 };
 
-export type Shift = {
+export type OvertimeMode = "off" | "after_last_out" | "above_scheduled";
+
+// What everyone on a schedule is expected to do: per weekday, any number of
+// IN/OUT slots, plus the rules every slot is judged by.
+export type WorkSchedule = {
   id: number;
   name: string;
-  start_time: string;
-  end_time: string;
+  description: string | null;
+  is_active: boolean;
+  late_grace_minutes: number;
+  early_leave_grace_minutes: number;
+  // Deducted only on a day with one IN/OUT pair (people who don't scan out for lunch).
   break_minutes: number;
   is_break_paid: boolean;
-  grace_minutes: number;
-  is_active: boolean;
+  overtime_mode: OvertimeMode;
+  // Overtime shorter than this is ignored.
+  overtime_min_minutes: number;
+  overtime_count_early: boolean;
+  // Overtime is rounded down to this step (0 = not rounded).
+  overtime_round_minutes: number;
+  overtime_requires_approval: boolean;
+  // Suggested weekly days off for new assignments (0 = Sunday .. 6 = Saturday).
+  default_days_off: number[];
+  // Weekdays with no entry have no slots.
+  days: { weekday: number; slots: (ScheduleSlot & { sequence: number })[] }[];
+  weekly_minutes: number;
+  // People following it today (only in the list).
+  assigned_count?: number;
+};
+
+export type WorkScheduleInput = Partial<Omit<WorkSchedule, "id" | "days" | "weekly_minutes" | "assigned_count">> & {
+  days?: { weekday: number; slots: ScheduleSlot[] }[];
+};
+
+// "From this date (until that date) this person follows that schedule, with these days off."
+export type ScheduleAssignment = {
+  id: number;
+  employee_id: number;
+  employee: { id: number; name: string; employee_code: string | null } | null;
+  work_schedule: { id: number; name: string; is_active: boolean } | null;
+  effective_from: string;
+  effective_to: string | null;
+  days_off: number[];
+  notes: string | null;
+  state?: "current" | "upcoming" | "ended";
+};
+
+export type ScheduleAssignmentInput = {
+  work_schedule_id: number;
+  effective_from: string;
+  effective_to?: string | null;
+  // Left out: the schedule's suggested days off are used.
+  days_off?: number[] | null;
+  notes?: string | null;
 };
 
 export type Holiday = {
@@ -443,7 +514,7 @@ export type Holiday = {
 
 export type ScheduleBulkInput = {
   employee_ids: number[];
-  shift_id: number;
+  work_schedule_id: number;
   work_location_id?: number | null;
   from: string;
   to: string;
@@ -456,21 +527,24 @@ export type ScheduleBulkInput = {
 export type ScheduleBulkResult = {
   dry_run: boolean;
   created: number;
-  skipped: { holiday: number; day_off: number; already_scheduled: number; employee_left: number };
+  // no_hours: a weekday the schedule has no slots on.
+  skipped: { holiday: number; day_off: number; already_scheduled: number; employee_left: number; no_hours: number };
 };
 
+// A roster entry: a one-day override of the person's assigned schedule.
 export type Schedule = {
   id: number;
   date: string;
   notes: string | null;
   employee: Employee;
-  shift: Shift;
+  work_schedule: WorkSchedule;
   work_location: WorkLocation | null;
 };
 
 export type AttendanceEvent = {
   id: number;
-  event_type: "check_in" | "check_out";
+  // Only on scans recorded before work schedules; the schedule decides now.
+  event_type: "check_in" | "check_out" | null;
   event_time: string;
   // qr / gps / correction / none — how presence was verified.
   method: "qr" | "gps" | "correction" | "none" | null;
@@ -490,24 +564,165 @@ export type AttendanceEvent = {
   recorded_by: { id: number; name: string } | null;
 };
 
-export type AttendanceSession = {
+export type AttendanceDayStatus =
+  | "upcoming" // nothing scanned yet, the day is still going
+  | "in_progress"
+  | "complete" // every slot answered
+  | "incomplete" // closed with slots unanswered
+  | "absent"
+  | "off" // a day off nobody worked
+  | "worked_off" // scans on a day off or holiday
+  | "unscheduled";
+
+export type AttendanceException =
+  | "late"
+  | "early_leave"
+  | "missing_in"
+  | "missing_out"
+  | "absent"
+  | "extra_scan"
+  | "worked_day_off"
+  | "worked_holiday"
+  | "unscheduled_work"
+  | "overtime_pending";
+
+// One recorded scan, with where and how it was made.
+export type ScanDetail = {
+  id: number;
+  at: string;
+  method: AttendanceEvent["method"];
+  work_location: { id: number; name: string; address: string | null; latitude: number | string | null; longitude: number | string | null } | null;
+  distance_meters: number | null;
+  // Where the phone said it was (null for a QR scan without GPS, or a correction).
+  latitude: number | string | null;
+  longitude: number | string | null;
+  device_id: string | null;
+  recorded_by: { id: number; name: string } | null;
+  notes: string | null;
+};
+
+// An expected slot next to the scan that answered it (if any).
+export type DaySlot = {
+  sequence: number;
+  type: "in" | "out";
+  expected_at: string;
+  scan_id: number | null;
+  actual_at: string | null;
+  method: string | null;
+  late_minutes: number;
+  early_minutes: number;
+  status: "ok" | "late" | "early" | "missing" | "pending";
+  scan: ScanDetail | null;
+};
+
+// One employee's day: expected (schedule) next to actual (scans), and what follows from the two.
+export type AttendanceDay = {
   id: number;
   date: string;
-  status: "open" | "completed" | "missing_checkout";
-  worked_minutes: number | null;
+  kind: "work" | "holiday" | "day_off" | "weekly_off" | "unscheduled";
+  label: string | null;
+  holiday: string | null;
+  schedule: string | null;
+  status: AttendanceDayStatus;
+  is_closed: boolean;
+  slots: DaySlot[];
+  // Every scan in order, with the part it played.
+  scans: { scan_id: number; at: string; method: string | null; role: "in" | "out" | "extra"; scan: ScanDetail | null }[];
+  extra_scans: { scan_id: number; at: string; method: string | null; scan: ScanDetail | null }[];
+  scan_count: number;
+  scheduled_minutes: number;
+  worked_minutes: number;
   late_minutes: number;
-  employee: Employee;
-  schedule: { shift: { name: string; start_time: string; end_time: string } | null } | null;
-  check_in_event: AttendanceEvent | null;
-  check_out_event: AttendanceEvent | null;
+  early_leave_minutes: number;
+  night_minutes: number;
+  overtime_minutes: number;
+  overtime_type: "workday" | "day_off" | "holiday" | null;
+  overtime_status: "pending" | "approved" | "rejected" | null;
+  exceptions: AttendanceException[];
+  employee: {
+    id: number;
+    name: string;
+    employee_code: string | null;
+    branch: { id: number; name: string } | null;
+    job_title: string | null;
+    photo_url: string | null;
+  } | null;
 };
+
+// The signed-in person's day, for the scan screen.
+export type AttendanceToday = {
+  date: string;
+  kind: AttendanceDay["kind"];
+  label: string | null;
+  schedule: string | null;
+  slots: Omit<DaySlot, "scan" | "method">[];
+  // The next slot still to scan, if any.
+  next: Omit<DaySlot, "scan" | "method"> | null;
+  day: AttendanceDay | null;
+};
+
+export type ScanResult = {
+  event: AttendanceEvent;
+  // The expected slot this scan answered (null if it matched none).
+  slot: Omit<DaySlot, "scan"> | null;
+  day: AttendanceDay | null;
+  // e.g. "IN recorded at 08:07 (expected 08:00) — 2 min late."
+  message: string;
+};
+
+export type OvertimeEntry = {
+  id: number;
+  date: string;
+  employee: { id: number; name: string; employee_code: string | null };
+  schedule: string | null;
+  worked_minutes: number;
+  scheduled_minutes: number;
+  overtime_minutes: number;
+  overtime_type: "workday" | "day_off" | "holiday";
+  overtime_status: "pending" | "approved" | "rejected";
+  reviewed_by: { id: number; name: string } | null;
+  reviewed_at: string | null;
+  last_scan_at: string | null;
+};
+
+// One employee's month — what payroll reads. Overtime counts once approved.
+export type AttendanceSummaryRow = {
+  employee: { id: number; name: string; employee_code: string | null; branch: string | null };
+  scheduled_days: number;
+  weekly_days_off: number;
+  days_off: number;
+  holidays: number;
+  present_days: number;
+  absent_days: number;
+  incomplete_days: number;
+  late_days: number;
+  late_minutes: number;
+  early_leave_minutes: number;
+  scheduled_minutes: number;
+  worked_minutes: number;
+  night_minutes: number;
+  worked_days_off: number;
+  worked_holidays: number;
+  overtime_workday_minutes: number;
+  overtime_day_off_minutes: number;
+  overtime_holiday_minutes: number;
+  overtime_pending_minutes: number;
+  is_partial: boolean;
+};
+
+export type AttendanceSummary = { month: string; locked: boolean; rows: AttendanceSummaryRow[] };
+
+export type AttendancePeriod = { month: string; locked_at: string; locked_by: { id: number; name: string } | null };
 
 export type AttendanceCorrection = {
   id: number;
   date: string;
   reason: string;
+  // Older requests only; newer ones list every time in requested_times.
   requested_check_in: string | null;
   requested_check_out: string | null;
+  // Every scan the request asks to add, oldest first (ISO).
+  requested_times: string[];
   status: "pending" | "approved" | "rejected";
   review_notes: string | null;
   employee: Employee;
@@ -662,14 +877,37 @@ export const api = {
       request<void>(`/api/teams/${id}/members/${employeeId}`, { method: "DELETE" }),
   },
 
-  shifts: {
-    list: () => request<Paginated<Shift>>("/api/shifts"),
-    all: () => requestAll<Shift>("/api/shifts"),
-    create: (data: Partial<Shift>) =>
-      request<Shift>("/api/shifts", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: Partial<Shift>) =>
-      request<Shift>(`/api/shifts/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-    remove: (id: number) => request<void>(`/api/shifts/${id}`, { method: "DELETE" }),
+  workSchedules: {
+    // Not paginated: a company has a handful of schedules.
+    list: () => request<WorkSchedule[]>("/api/work_schedules"),
+    get: (id: number) => request<WorkSchedule>(`/api/work_schedules/${id}`),
+    create: (data: WorkScheduleInput) =>
+      request<WorkSchedule>("/api/work_schedules", { method: "POST", body: JSON.stringify(data) }),
+    // Sending `days` replaces every day's slots; leave it out to keep them.
+    update: (id: number, data: WorkScheduleInput) =>
+      request<WorkSchedule>(`/api/work_schedules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/work_schedules/${id}`, { method: "DELETE" }),
+  },
+
+  scheduleAssignments: {
+    list: (params: { employeeId?: number; workScheduleId?: number; currentOnly?: boolean } = {}) => {
+      const query = new URLSearchParams();
+      if (params.employeeId) query.set("employee_id", String(params.employeeId));
+      if (params.workScheduleId) query.set("work_schedule_id", String(params.workScheduleId));
+      if (params.currentOnly) query.set("current_only", "1");
+      return request<ScheduleAssignment[]>(`/api/schedule-assignments${query.size ? `?${query}` : ""}`);
+    },
+    create: (data: ScheduleAssignmentInput & { employee_id: number }) =>
+      request<ScheduleAssignment>("/api/schedule-assignments", { method: "POST", body: JSON.stringify(data) }),
+    // Each person is handled on their own; anyone who can't take it is listed in `skipped`.
+    bulk: (data: ScheduleAssignmentInput & { employee_ids: number[] }) =>
+      request<{ assigned: number; skipped: { employee_id: number; name: string; reason: string }[] }>(
+        "/api/schedule-assignments/bulk",
+        { method: "POST", body: JSON.stringify(data) },
+      ),
+    update: (id: number, data: Partial<ScheduleAssignmentInput>) =>
+      request<ScheduleAssignment>(`/api/schedule-assignments/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    remove: (id: number) => request<void>(`/api/schedule-assignments/${id}`, { method: "DELETE" }),
   },
 
   holidays: {
@@ -692,12 +930,6 @@ export const api = {
       request<TeamCalendar>(`/api/calendar/team?month=${month}${branchId ? `&branch_id=${branchId}` : ""}`),
     month: (month: string, employeeId?: number) =>
       request<CalendarMonth>(`/api/calendar?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
-    weeklyOffDays: () => request<{ weekly_off_days: number[] }>("/api/calendar/weekly-off-days"),
-    setWeeklyOffDays: (days: number[]) =>
-      request<{ weekly_off_days: number[] }>("/api/calendar/weekly-off-days", {
-        method: "PUT",
-        body: JSON.stringify({ days }),
-      }),
   },
 
   daysOff: {
@@ -723,9 +955,9 @@ export const api = {
     // Rosters many people over a date range in one go. dry_run only reports what it would do.
     bulk: (data: ScheduleBulkInput) =>
       request<ScheduleBulkResult>("/api/schedules/bulk", { method: "POST", body: JSON.stringify(data) }),
-    create: (data: { employee_id: number; shift_id: number; work_location_id?: number | null; date: string; notes?: string }) =>
+    create: (data: { employee_id: number; work_schedule_id: number; work_location_id?: number | null; date: string; notes?: string }) =>
       request<Schedule>("/api/schedules", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: { employee_id?: number; shift_id?: number; work_location_id?: number | null; date?: string; notes?: string | null }) =>
+    update: (id: number, data: { employee_id?: number; work_schedule_id?: number; work_location_id?: number | null; date?: string; notes?: string | null }) =>
       request<Schedule>(`/api/schedules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/schedules/${id}`, { method: "DELETE" }),
   },
@@ -737,12 +969,41 @@ export const api = {
   attendance: {
     // The API sends 50 rows unless asked for more (max 1000) — say so, or a busy
     // company's list silently stops after the newest 50.
-    list: (params?: { employee_id?: number; from?: string; to?: string; per_page?: number }) => {
+    list: (params?: {
+      employee_id?: number;
+      from?: string;
+      to?: string;
+      per_page?: number;
+      status?: AttendanceDayStatus;
+      exception?: AttendanceException;
+    }) => {
       const query = new URLSearchParams(
-        Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][],
+        Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]),
       ).toString();
-      return request<Paginated<AttendanceSession>>(`/api/attendance${query ? `?${query}` : ""}`);
+      return request<Paginated<AttendanceDay>>(`/api/attendance${query ? `?${query}` : ""}`);
     },
+    // One scan: the person's schedule decides whether it's an IN or an OUT.
+    scan: (data?: { qr_token?: string; latitude?: number; longitude?: number }) =>
+      request<ScanResult>("/api/attendance/scan", { method: "POST", body: JSON.stringify(data ?? {}) }),
+    today: () => request<AttendanceToday>("/api/attendance/today"),
+    overtime: (params: { status?: "pending" | "approved" | "rejected"; from?: string; to?: string } = {}) => {
+      const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);
+      return request<OvertimeEntry[]>(`/api/attendance/overtime${query.size ? `?${query}` : ""}`);
+    },
+    approveOvertime: (dayId: number) =>
+      request<{ id: number; overtime_status: string }>(`/api/attendance/days/${dayId}/overtime/approve`, { method: "POST", body: "{}" }),
+    rejectOvertime: (dayId: number) =>
+      request<{ id: number; overtime_status: string }>(`/api/attendance/days/${dayId}/overtime/reject`, { method: "POST", body: "{}" }),
+    summary: (month: string, employeeId?: number) =>
+      request<AttendanceSummary>(`/api/attendance/summary?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+    periods: () => request<AttendancePeriod[]>("/api/attendance/periods"),
+    // ignorePendingOvertime: lock even though some overtime was never reviewed (it won't be paid).
+    lockMonth: (month: string, ignorePendingOvertime = false) =>
+      request<{ month: string; locked_at: string }>("/api/attendance/periods", {
+        method: "POST",
+        body: JSON.stringify({ month, ignore_pending_overtime: ignorePendingOvertime }),
+      }),
+    unlockMonth: (month: string) => request<void>(`/api/attendance/periods/${month}`, { method: "DELETE" }),
     // The report is a file, not JSON, so it can't go through request(). It still
     // needs the login header, which is why a plain <a href> can't be used either.
     export: async (params: { from: string; to: string; employee_id?: number }): Promise<{ blob: Blob; filename: string }> => {
@@ -762,10 +1023,6 @@ export const api = {
       const named = /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "");
       return { blob: await res.blob(), filename: named?.[1] ?? `attendance-${params.from}-to-${params.to}.csv` };
     },
-    checkIn: (data?: { qr_token?: string; latitude?: number; longitude?: number }) =>
-      request<AttendanceEvent>("/api/attendance/check-in", { method: "POST", body: JSON.stringify(data ?? {}) }),
-    checkOut: (data?: { qr_token?: string; latitude?: number; longitude?: number }) =>
-      request<AttendanceEvent>("/api/attendance/check-out", { method: "POST", body: JSON.stringify(data ?? {}) }),
   },
 
   attendanceCorrections: {
@@ -775,8 +1032,8 @@ export const api = {
       employee_id?: number;
       date: string;
       reason: string;
-      requested_check_in?: string;
-      requested_check_out?: string;
+      // Scans to add, on the company's clock: "2026-10-05T12:00".
+      scans: string[];
     }) =>
       request<AttendanceCorrection>("/api/attendance/corrections", {
         method: "POST",

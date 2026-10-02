@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceCorrection;
-use App\Models\AttendanceSession;
+use App\Models\AttendanceDay;
 use App\Models\Branch;
 use App\Models\Employee;
 use Carbon\CarbonImmutable;
@@ -46,45 +46,50 @@ class DashboardController extends Controller
 
         // Managers see everyone they're allowed to see; anyone else, only themselves.
         // whereHas('employee') also applies a branch-limited manager's branch restriction.
-        $sessions = fn () => AttendanceSession::query()->whereHas('employee', function ($q) use ($user, $manages) {
+        $days = fn () => AttendanceDay::query()->whereHas('employee', function ($q) use ($user, $manages) {
             if (! $manages) {
                 $q->where('user_id', $user->id);
             }
         });
 
-        $days = collect(range(6, 0))->map(fn (int $ago) => CarbonImmutable::parse($today)->subDays($ago)->toDateString());
+        $week = collect(range(6, 0))->map(fn (int $ago) => CarbonImmutable::parse($today)->subDays($ago)->toDateString());
 
-        $perDay = $sessions()
-            ->whereDate('date', '>=', $days->first())->whereDate('date', '<=', $today)
-            ->whereNotNull('check_in_event_id')
-            ->selectRaw('date as day, count(*) as total')->groupBy('date')
+        $perDay = $days()
+            ->whereDate('date', '>=', $week->first())->whereDate('date', '<=', $today)
+            ->where('scan_count', '>', 0)
+            // Late people counted in the same pass, so it costs no extra query.
+            ->selectRaw('date as day, count(*) as total, sum(case when late_minutes > 0 then 1 else 0 end) as late')->groupBy('date')
             ->get()
-            ->mapWithKeys(fn ($row) => [substr((string) $row->day, 0, 10) => (int) $row->total]);
+            ->keyBy(fn ($row) => substr((string) $row->day, 0, 10));
 
-        $recent = $sessions()->with(['employee', 'checkInEvent', 'checkOutEvent'])
-            ->orderByDesc('date')->orderByDesc('id')->limit(6)->get()
-            ->map(fn (AttendanceSession $s) => [
-                'id' => $s->id,
-                'date' => $s->date->toDateString(),
-                'status' => $s->status,
-                'late_minutes' => $s->late_minutes,
-                'check_in' => $s->checkInEvent?->event_time?->setTimezone($timezone)->format('H:i'),
-                'check_out' => $s->checkOutEvent?->event_time?->setTimezone($timezone)->format('H:i'),
+        $recent = $days()->with('employee')
+            ->where('scan_count', '>', 0)
+            ->orderByDesc('date')->orderByDesc('last_scan_at')->limit(6)->get()
+            ->map(fn (AttendanceDay $d) => [
+                'id' => $d->id,
+                'date' => $d->date->toDateString(),
+                'status' => $d->status,
+                'late_minutes' => $d->late_minutes,
+                'check_in' => $d->first_scan_at?->setTimezone($timezone)->format('H:i'),
+                // Only a real "last" scan once there's more than one.
+                'check_out' => $d->scan_count > 1 ? $d->last_scan_at?->setTimezone($timezone)->format('H:i') : null,
+                'exceptions' => $d->exceptions ?? [],
                 'employee' => [
-                    'id' => $s->employee->id,
-                    'name' => $s->employee->name,
-                    'photo_url' => $s->employee->append('photo_url')->photo_url,
+                    'id' => $d->employee->id,
+                    'name' => $d->employee->name,
+                    'photo_url' => $d->employee->append('photo_url')->photo_url,
                 ],
             ]);
 
         $summary['attendance'] = [
-            'checked_in_today' => (int) ($perDay[$today] ?? 0),
-            'late_today' => $sessions()->whereDate('date', $today)->whereNotNull('check_in_event_id')->where('late_minutes', '>', 0)->count(),
+            'checked_in_today' => (int) ($perDay[$today]->total ?? 0),
+            'late_today' => (int) ($perDay[$today]->late ?? 0),
             'pending_corrections' => AttendanceCorrection::query()->where('status', 'pending')
                 ->when(! $manages, fn ($q) => $q->whereHas('employee', fn ($e) => $e->where('user_id', $user->id)))
                 ->count(),
+            'pending_overtime' => $manages ? $days()->where('overtime_status', 'pending')->count() : null,
             // Last 7 days, oldest first, including days with none.
-            'week' => $days->map(fn (string $day) => ['date' => $day, 'count' => (int) ($perDay[$day] ?? 0)])->values(),
+            'week' => $week->map(fn (string $day) => ['date' => $day, 'count' => (int) ($perDay[$day]->total ?? 0)])->values(),
             'recent' => $recent,
         ];
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceCorrectionController;
+use App\Http\Controllers\Api\AttendanceReviewController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CalendarController;
@@ -15,11 +16,13 @@ use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\ScheduleAssignmentController;
 use App\Http\Controllers\Api\ScheduleController;
-use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkLocationController;
+use App\Http\Controllers\Api\WorkScheduleController;
+use App\Http\Middleware\EnsureCompanyIsActive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -52,7 +55,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
 
-Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::class])->group(function () {
+Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 
@@ -66,7 +69,7 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
         'teams' => TeamController::class,
         'employees' => EmployeeController::class,
         'work_locations' => WorkLocationController::class,
-        'shifts' => ShiftController::class,
+        'work_schedules' => WorkScheduleController::class,
         'holidays' => HolidayController::class,
         'schedules' => ScheduleController::class,
     ] as $uri => $controller) {
@@ -97,10 +100,17 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
 
     Route::get('/calendar', [CalendarController::class, 'index'])->middleware('company_permission:schedules.view');
 
+    // Who follows which work schedule, and from when. Part of the roster, so the same permissions.
+    Route::get('/schedule-assignments', [ScheduleAssignmentController::class, 'index'])->middleware('company_permission:schedules.view');
+    Route::middleware('company_permission:schedules.manage')->group(function () {
+        Route::post('/schedule-assignments', [ScheduleAssignmentController::class, 'store']);
+        Route::post('/schedule-assignments/bulk', [ScheduleAssignmentController::class, 'bulk']);
+        Route::put('/schedule-assignments/{schedule_assignment}', [ScheduleAssignmentController::class, 'update']);
+        Route::delete('/schedule-assignments/{schedule_assignment}', [ScheduleAssignmentController::class, 'destroy']);
+    });
+
     Route::middleware('company_permission:schedules.manage')->group(function () {
         Route::get('/calendar/team', [CalendarController::class, 'team']);
-        Route::get('/calendar/weekly-off-days', [CalendarController::class, 'weeklyOffDays']);
-        Route::put('/calendar/weekly-off-days', [CalendarController::class, 'setWeeklyOffDays']);
         Route::post('/days-off', [DayOffController::class, 'store']);
         Route::delete('/days-off/{day_off}', [DayOffController::class, 'destroy']);
     });
@@ -146,15 +156,26 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsureCompanyIsActive::c
         Route::middleware('company_permission:attendance.view')->group(function () {
             Route::get('/attendance', [AttendanceController::class, 'index']);
             Route::get('/attendance/export', [AttendanceController::class, 'export']);
+            Route::get('/attendance/today', [AttendanceController::class, 'today']);
+            Route::post('/attendance/scan', [AttendanceController::class, 'scan']);
+            // Older app versions: both are now a plain scan.
             Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
             Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
             Route::get('/attendance/corrections', [AttendanceCorrectionController::class, 'index']);
             Route::post('/attendance/corrections', [AttendanceCorrectionController::class, 'store']);
+            // Everyone gets their own row; managers get everyone's.
+            Route::get('/attendance/summary', [AttendanceReviewController::class, 'summary']);
+            Route::get('/attendance/periods', [AttendanceReviewController::class, 'periods']);
         });
 
         Route::middleware('company_permission:attendance.manage')->group(function () {
             Route::post('/attendance/corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve']);
             Route::post('/attendance/corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject']);
+            Route::get('/attendance/overtime', [AttendanceReviewController::class, 'overtime']);
+            Route::post('/attendance/days/{day}/overtime/approve', [AttendanceReviewController::class, 'approveOvertime']);
+            Route::post('/attendance/days/{day}/overtime/reject', [AttendanceReviewController::class, 'rejectOvertime']);
+            Route::post('/attendance/periods', [AttendanceReviewController::class, 'lock']);
+            Route::delete('/attendance/periods/{month}', [AttendanceReviewController::class, 'unlock'])->where('month', '\d{4}-\d{2}');
         });
     });
 });

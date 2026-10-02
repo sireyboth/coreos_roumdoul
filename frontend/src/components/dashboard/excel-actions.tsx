@@ -18,10 +18,13 @@ export function ExcelActions<Ctx>({
   onExport,
   importSpec,
   onImported,
+  subject,
 }: {
   onExport?: () => Promise<string>;
   importSpec?: ImportSpec<Ctx>;
   onImported?: () => void;
+  /** Names what the buttons are for when a page has more than one set, e.g. "assignments". */
+  subject?: string;
 }) {
   const [exporting, setExporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -44,13 +47,13 @@ export function ExcelActions<Ctx>({
       {importSpec && (
         <Button variant="outline" onClick={() => setImportOpen(true)}>
           <FileUp className="size-4" />
-          Import
+          {subject ? `Import ${subject}` : "Import"}
         </Button>
       )}
       {onExport && (
         <Button variant="outline" onClick={handleExport} disabled={exporting}>
           <FileDown className="size-4" />
-          {exporting ? "Exporting…" : "Export"}
+          {exporting ? "Exporting…" : subject ? `Export ${subject}` : "Export"}
         </Button>
       )}
       {importSpec && (

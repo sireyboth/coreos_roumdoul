@@ -27,6 +27,7 @@ import {
   type EmployeeForm,
 } from "@/components/dashboard/employee-form";
 import { PhotoPicker } from "@/components/dashboard/photo-picker";
+import { EmployeeScheduleAssignments } from "@/components/dashboard/employee-schedule-assignments";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
@@ -460,7 +461,16 @@ export default function EmployeePage() {
               </Card>
             )}
 
-            {activeTab === "schedule" && <RosterView employee={employee} />}
+            {activeTab === "schedule" && (
+              <div className="flex flex-col gap-6">
+                {/* Their regular hours over time; the roster below is for one-off days. */}
+                <EmployeeScheduleAssignments employee={employee} canManage={me?.permissions.includes("schedules.manage") ?? false} />
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-base font-semibold">One-off changes</h2>
+                  <RosterView employee={employee} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

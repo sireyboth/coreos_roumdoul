@@ -22,7 +22,8 @@ import { BulkScheduleDialog } from "@/components/dashboard/bulk-schedule-dialog"
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useMe } from "@/contexts/me-context";
-import { api, ApiError, Employee, Schedule, Shift, WorkLocation } from "@/lib/api";
+import { api, ApiError, Employee, Schedule, WorkLocation, WorkSchedule } from "@/lib/api";
+import { slotsOn, slotsSummary, weekSummary } from "@/lib/schedule";
 import { dateOnly } from "@/lib/date";
 import { exportRoster, rosterImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -31,38 +32,38 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 function ScheduleFormDialog({
   schedule,
   employees,
-  shifts,
+  schedules,
   open,
   onOpenChange,
   onSaved,
 }: {
   schedule: Schedule | null;
   employees: Employee[];
-  shifts: Shift[];
+  schedules: WorkSchedule[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
   const [employeeId, setEmployeeId] = useState(schedule ? String(schedule.employee.id) : "");
-  const [shiftId, setShiftId] = useState(schedule ? String(schedule.shift.id) : "");
+  const [scheduleId, setScheduleId] = useState(schedule ? String(schedule.work_schedule.id) : "");
   const [date, setDate] = useState(schedule ? dateOnly(schedule.date) : "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Inactive shifts can't be newly assigned, but keep the current one visible while editing.
-  const selectableShifts = shifts.filter((shift) => shift.is_active || shift.id === schedule?.shift.id);
+  // Inactive schedules can't be newly picked, but keep the current one visible while editing.
+  const selectableSchedules = schedules.filter((s) => s.is_active || s.id === schedule?.work_schedule.id);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSaving(true);
 
-    const payload = { employee_id: Number(employeeId), shift_id: Number(shiftId), date };
+    const payload = { employee_id: Number(employeeId), work_schedule_id: Number(scheduleId), date };
 
     try {
       if (schedule) {
         await api.schedules.update(schedule.id, payload);
-        notifySuccess("Schedule updated");
+        notifySuccess("Roster entry updated");
       }
       onOpenChange(false);
       onSaved();
@@ -79,7 +80,7 @@ function ScheduleFormDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit roster entry</DialogTitle>
-          <DialogDescription>Change this one employee, shift or date.</DialogDescription>
+          <DialogDescription>On this date the person follows this schedule instead of their usual one.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -102,20 +103,20 @@ function ScheduleFormDialog({
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="shift">Shift</Label>
+            <Label htmlFor="shift">Work schedule</Label>
             <select
               id="shift"
               required
-              value={shiftId}
-              onChange={(e) => setShiftId(e.target.value)}
+              value={scheduleId}
+              onChange={(e) => setScheduleId(e.target.value)}
               className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
             >
               <option value="" disabled>
                 Select…
               </option>
-              {selectableShifts.map((shift) => (
-                <option key={shift.id} value={shift.id}>
-                  {shift.name} ({shift.start_time.slice(0, 5)}–{shift.end_time.slice(0, 5)})
+              {selectableSchedules.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} — {weekSummary(s)}
                 </option>
               ))}
             </select>
@@ -148,7 +149,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const [reloads, setReloads] = useState(0);
   const [result, setResult] = useState<{ key: string; data: Schedule[]; total: number } | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
   const [locations, setLocations] = useState<WorkLocation[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Schedule | null>(null);
@@ -156,7 +157,6 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const [formKey, setFormKey] = useState(0);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkKey, setBulkKey] = useState(0);
-  const [weeklyOffDays, setWeeklyOffDays] = useState<number[]>([]);
 
   const employeeId = employee?.id;
   const requestKey = `${employeeId ?? "all"}|${month}|${reloads}`;
@@ -185,7 +185,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
     // One person's tab already knows who it is; the full roster needs the whole list.
     if (!employee && canManage) api.employees.list().then((res) => setEmployees(res.data)).catch(() => {});
     if (canManage) {
-      api.shifts.list().then((res) => setShifts(res.data)).catch(() => {});
+      api.workSchedules.list().then(setWorkSchedules).catch(() => {});
       api.workLocations.list().then((res) => setLocations(res.data)).catch(() => {});
     }
   }, [employee, canManage]);
@@ -196,13 +196,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
     setFormOpen(true);
   }
 
-  async function openBulk() {
-    // The company's weekly days off start un-ticked; read fresh so they're current.
-    try {
-      setWeeklyOffDays((await api.calendar.weeklyOffDays()).weekly_off_days);
-    } catch {
-      setWeeklyOffDays([]);
-    }
+  function openBulk() {
     setBulkKey((key) => key + 1);
     setBulkOpen(true);
   }
@@ -251,14 +245,17 @@ export function RosterView({ employee }: { employee?: Employee }) {
     },
     {
       id: "shift",
-      header: "Shift",
+      header: "Schedule that day",
       cell: (schedule) => (
-        <span className="text-muted-foreground">
-          {schedule.shift.name} ({schedule.shift.start_time.slice(0, 5)}–{schedule.shift.end_time.slice(0, 5)})
-        </span>
+        <div className="flex flex-col">
+          <span className="font-medium">{schedule.work_schedule.name}</span>
+          <span className="text-xs text-muted-foreground">
+            {slotsSummary(slotsOn(schedule.work_schedule, parseDate(dateOnly(schedule.date)).getDay()))}
+          </span>
+        </div>
       ),
-      sortValue: (schedule) => schedule.shift.name,
-      searchValue: (schedule) => schedule.shift.name,
+      sortValue: (schedule) => schedule.work_schedule.name,
+      searchValue: (schedule) => schedule.work_schedule.name,
     },
     {
       id: "location",
@@ -303,7 +300,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
 
       {truncated && result && (
         <Alert variant="warning">
-          This month has {result.total.toLocaleString()} shifts; showing the first {result.data.length.toLocaleString()}. Open a single
+          This month has {result.total.toLocaleString()} roster entries; showing the first {result.data.length.toLocaleString()}. Open a single
           employee to see all of theirs.
         </Alert>
       )}
@@ -316,11 +313,11 @@ export function RosterView({ employee }: { employee?: Employee }) {
         initialSort={{ columnId: "date", direction: "asc" }}
         emptyState={{
           icon: CalendarRange,
-          title: "Nothing scheduled this month",
+          title: "No one-off changes this month",
           description: canManage
             ? employee
-              ? `Use “Schedule ${employee.name.split(" ")[0]}” to give them shifts — or pick another month.`
-              : "Use “Add to roster” to schedule people for this month — or pick another month."
+              ? `${employee.name.split(" ")[0]} follows their assigned work schedule. Use “Schedule ${employee.name.split(" ")[0]}” for one-off changes on specific days.`
+              : "Everyone follows their assigned work schedule. Use “Add to roster” for one-off changes on specific days."
             : "Check back once you're scheduled.",
         }}
         rowActions={
@@ -345,9 +342,8 @@ export function RosterView({ employee }: { employee?: Employee }) {
         key={`bulk-${bulkKey}`}
         employees={employee ? [employee] : employees}
         fixedEmployee={employee}
-        shifts={shifts}
+        schedules={workSchedules}
         locations={locations}
-        weeklyOffDays={weeklyOffDays}
         open={bulkOpen}
         onOpenChange={setBulkOpen}
         onSaved={loadSchedules}
@@ -357,7 +353,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
         key={formKey}
         schedule={editing}
         employees={employee ? [employee] : employees}
-        shifts={shifts}
+        schedules={workSchedules}
         open={formOpen}
         onOpenChange={setFormOpen}
         onSaved={loadSchedules}

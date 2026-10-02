@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarCheck2,
   FileClock,
+  Hourglass,
   Layers,
   QrCode,
   Users,
@@ -21,6 +22,7 @@ import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { api, DashboardSummary } from "@/lib/api";
+import { DAY_STATUS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 const MODULE_LABELS: Record<string, string> = {
@@ -178,13 +180,11 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{s.employee.name}</p>
               <p className="truncate text-xs text-muted-foreground">
-                {s.date} · {s.check_in ?? "—"} → {s.check_out ?? "—"}
+                {s.date} · {s.check_in ?? "—"}{s.check_out ? ` → ${s.check_out}` : ""}
               </p>
             </div>
             {s.late_minutes > 0 && <Badge variant="warning">{s.late_minutes}m late</Badge>}
-            <Badge variant={s.status === "completed" ? "success" : s.status === "missing_checkout" ? "destructive" : "info"}>
-              {s.status.replace("_", " ")}
-            </Badge>
+            <Badge variant={DAY_STATUS[s.status].tone}>{DAY_STATUS[s.status].label}</Badge>
           </div>
         ))}
       </CardContent>
@@ -236,7 +236,7 @@ export default function DashboardPage() {
     kpis.push({
       label: "Checked in today",
       value: summary ? (summary.attendance?.checked_in_today ?? null) : null,
-      hint: "Sessions started today",
+      hint: "People who scanned today",
       icon: CalendarCheck2,
       href: "/dashboard/attendance",
       tone: "text-emerald-600 dark:text-emerald-400",
@@ -271,6 +271,17 @@ export default function DashboardPage() {
       href: "/dashboard/attendance/corrections",
       tone: "text-amber-600 dark:text-amber-400",
       soft: "bg-amber-500/14",
+    });
+  // Only people who manage attendance get this number (null otherwise).
+  if (canAttendance && summary?.attendance?.pending_overtime != null)
+    kpis.push({
+      label: "Overtime to review",
+      value: summary.attendance.pending_overtime,
+      hint: "Waiting for approval",
+      icon: Hourglass,
+      href: "/dashboard/attendance",
+      tone: "text-sky-600 dark:text-sky-400",
+      soft: "bg-sky-500/12",
     });
   kpis.push({
     label: "Active modules",

@@ -125,9 +125,9 @@ class Company extends Model
         return $this->hasMany(WorkLocation::class);
     }
 
-    public function shifts(): HasMany
+    public function workSchedules(): HasMany
     {
-        return $this->hasMany(Shift::class);
+        return $this->hasMany(WorkSchedule::class);
     }
 
     public function holidays(): HasMany

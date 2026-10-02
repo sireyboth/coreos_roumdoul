@@ -16,7 +16,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WEEKDAYS } from "@/components/dashboard/calendar-shared";
-import { api, ApiError, Employee, ScheduleBulkInput, ScheduleBulkResult, Shift, WorkLocation } from "@/lib/api";
+import { api, ApiError, Employee, ScheduleBulkInput, ScheduleBulkResult, WorkLocation, WorkSchedule } from "@/lib/api";
+import { weekSummary } from "@/lib/schedule";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -63,22 +64,23 @@ function skippedText(skipped: ScheduleBulkResult["skipped"]): string {
     skipped.day_off > 0 && `${skipped.day_off} on days off`,
     skipped.already_scheduled > 0 && `${skipped.already_scheduled} already scheduled`,
     skipped.employee_left > 0 && `${skipped.employee_left} for people who have left`,
+    skipped.no_hours > 0 && `${skipped.no_hours} on weekdays the schedule has no hours`,
   ]
     .filter(Boolean)
     .join(", ");
 }
 
 /**
- * Roster many people over a date range in one step: pick employees, a shift,
+ * Roster many people over a date range in one step: pick employees, a work schedule,
  * a range and the weekdays. A live preview asks the server what would really
  * be created, so holidays, days off and existing entries are accounted for.
  */
 export function BulkScheduleDialog({
   employees,
   fixedEmployee,
-  shifts,
+  schedules,
   locations,
-  weeklyOffDays,
+  weeklyOffDays = [],
   open,
   onOpenChange,
   onSaved,
@@ -86,20 +88,21 @@ export function BulkScheduleDialog({
   employees: Employee[];
   // Set when scheduling one specific person (from their own page): no picker is shown.
   fixedEmployee?: Employee;
-  shifts: Shift[];
+  schedules: WorkSchedule[];
   locations: WorkLocation[];
   // The company's regular days off — left un-ticked by default.
-  weeklyOffDays: number[];
+  // Weekdays to start un-ticked.
+  weeklyOffDays?: number[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
   const roster = useMemo(() => employees.filter((e) => e.employment_status !== "terminated"), [employees]);
-  const activeShifts = useMemo(() => shifts.filter((s) => s.is_active), [shifts]);
+  const activeSchedules = useMemo(() => schedules.filter((s) => s.is_active), [schedules]);
 
   const [picked, setPicked] = useState<Set<number>>(() => new Set(fixedEmployee ? [fixedEmployee.id] : []));
   const [search, setSearch] = useState("");
-  const [shiftId, setShiftId] = useState("");
+  const [scheduleId, setScheduleId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [dates, setDates] = useState(() => range("this-week"));
   const [weekdays, setWeekdays] = useState<number[]>(() => [0, 1, 2, 3, 4, 5, 6].filter((d) => !weeklyOffDays.includes(d)));
@@ -125,10 +128,10 @@ export function BulkScheduleDialog({
             : null;
 
   const payload: ScheduleBulkInput | null =
-    picked.size > 0 && shiftId && !rangeProblem
+    picked.size > 0 && scheduleId && !rangeProblem
       ? {
           employee_ids: [...picked],
-          shift_id: Number(shiftId),
+          work_schedule_id: Number(scheduleId),
           work_location_id: locationId ? Number(locationId) : null,
           from: dates.from,
           to: dates.to,
@@ -195,7 +198,7 @@ export function BulkScheduleDialog({
       const res = await api.schedules.bulk(payload);
       const skipped = skippedText(res.skipped);
       notifySuccess(
-        `${res.created} ${res.created === 1 ? "shift" : "shifts"} scheduled`,
+        `${res.created} roster ${res.created === 1 ? "day" : "days"} added`,
         skipped ? `Skipped: ${skipped}.` : undefined,
       );
       onOpenChange(false);
@@ -215,8 +218,8 @@ export function BulkScheduleDialog({
           <DialogTitle>Add to roster</DialogTitle>
           <DialogDescription>
             {fixedEmployee
-              ? `Pick a shift and a date range. ${fixedEmployee.name} gets the shift on each chosen weekday in the range. A single day works too — set both dates the same.`
-              : "Pick people, a shift and a date range. Every chosen person gets the shift on each chosen weekday in the range. A single day works too — just set both dates the same."}
+              ? `Pick a work schedule and a date range. On each chosen weekday in the range, ${fixedEmployee.name} follows that schedule instead of their usual one. A single day works too — set both dates the same.`
+              : "Pick people, a work schedule and a date range. On each chosen weekday in the range, they follow that schedule instead of their usual one. A single day works too — just set both dates the same."}
           </DialogDescription>
         </DialogHeader>
 
@@ -272,14 +275,14 @@ export function BulkScheduleDialog({
             {/* What and when */}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="bulk-shift">Shift</Label>
-                <select id="bulk-shift" required value={shiftId} onChange={(e) => setShiftId(e.target.value)} className={SELECT_CLASS}>
+                <Label htmlFor="bulk-shift">Work schedule</Label>
+                <select id="bulk-shift" required value={scheduleId} onChange={(e) => setScheduleId(e.target.value)} className={SELECT_CLASS}>
                   <option value="" disabled>
                     Select…
                   </option>
-                  {activeShifts.map((shift) => (
-                    <option key={shift.id} value={shift.id}>
-                      {shift.name} ({shift.start_time.slice(0, 5)}–{shift.end_time.slice(0, 5)})
+                  {activeSchedules.map((schedule) => (
+                    <option key={schedule.id} value={schedule.id}>
+                      {schedule.name} — {weekSummary(schedule)}
                     </option>
                   ))}
                 </select>
@@ -359,17 +362,17 @@ export function BulkScheduleDialog({
 
           {/* Live preview */}
           <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
-            {rangeProblem && picked.size > 0 && shiftId ? (
+            {rangeProblem && picked.size > 0 && scheduleId ? (
               <span className="text-destructive">{rangeProblem}</span>
             ) : !payload ? (
-              <span className="text-muted-foreground">Pick at least one employee and a shift to see what will be created.</span>
+              <span className="text-muted-foreground">Pick at least one employee and a work schedule to see what will be created.</span>
             ) : !previewReady ? (
               <span className="text-muted-foreground">Checking…</span>
             ) : preview?.error ? (
               <span className="text-destructive">{preview.error}</span>
             ) : result ? (
               <span>
-                <strong>{result.created}</strong> {result.created === 1 ? "shift" : "shifts"} will be created
+                <strong>{result.created}</strong> roster {result.created === 1 ? "day" : "days"} will be added
                 {skippedText(result.skipped) && <span className="text-muted-foreground"> · skipping {skippedText(result.skipped)}</span>}
               </span>
             ) : null}
@@ -379,7 +382,7 @@ export function BulkScheduleDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
             <Button type="submit" disabled={saving || !previewReady || !result || result.created === 0}>
-              {saving ? "Scheduling…" : result ? `Schedule ${result.created} ${result.created === 1 ? "shift" : "shifts"}` : "Schedule"}
+              {saving ? "Adding…" : result ? `Add ${result.created} roster ${result.created === 1 ? "day" : "days"}` : "Add to roster"}
             </Button>
           </DialogFooter>
         </form>

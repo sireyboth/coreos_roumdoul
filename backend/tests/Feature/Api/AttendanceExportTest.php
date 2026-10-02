@@ -3,27 +3,32 @@
 namespace Tests\Feature\Api;
 
 use App\Models\AttendanceEvent;
-use App\Models\AttendanceSession;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\WorkSchedule;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\CompanyProvisioner;
+use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 class AttendanceExportTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private Company $company;
 
     private User $admin;
+
+    private WorkSchedule $schedule;
 
     protected function setUp(): void
     {
@@ -39,32 +44,31 @@ class AttendanceExportTest extends TestCase
             'status' => 'active',
         ]);
         $this->admin = $this->company->users()->first();
+        $this->schedule = $this->makeWorkSchedule($this->company, attributes: ['name' => 'Office']);
+        $this->travelTo(Carbon::parse('2026-10-05 05:00:00', 'UTC'));
     }
 
-    /** A finished 08:00–17:00 (Phnom Penh) shift for the employee. */
-    private function shiftFor(Employee $employee, string $date = '2026-09-10'): AttendanceSession
+    /** A finished day for the employee: scans at 08:05 and 17:30 Phnom Penh time against 08:00–17:00. */
+    private function shiftFor(Employee $employee, string $date = '2026-09-10'): void
     {
-        $in = AttendanceEvent::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $employee->id,
-            'event_type' => 'check_in', 'event_time' => "{$date} 01:00:00",
-        ]);
-        $out = AttendanceEvent::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $employee->id,
-            'event_type' => 'check_out', 'event_time' => "{$date} 10:30:00",
-        ]);
+        foreach (['01:05:00', '10:30:00'] as $utc) {
+            AttendanceEvent::query()->create([
+                'company_id' => $this->company->id, 'employee_id' => $employee->id,
+                'method' => 'qr', 'event_time' => "{$date} {$utc}",
+            ]);
+        }
 
-        return AttendanceSession::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $employee->id, 'date' => $date,
-            'check_in_event_id' => $in->id, 'check_out_event_id' => $out->id,
-            'worked_minutes' => 570, 'late_minutes' => 5, 'status' => 'completed',
-        ]);
+        app(AttendanceRecorder::class)->recalculate($employee, $date);
     }
 
     private function employee(string $name, ?User $user = null, ?string $code = null): Employee
     {
-        return Employee::query()->create([
+        $employee = Employee::query()->create([
             'company_id' => $this->company->id, 'name' => $name, 'employee_code' => $code, 'user_id' => $user?->id,
         ]);
+        $this->assignSchedule($employee, $this->schedule);
+
+        return $employee;
     }
 
     /** The response body as rows, without the byte-order mark. */
@@ -84,13 +88,21 @@ class AttendanceExportTest extends TestCase
 
         $response->assertOk()->assertDownload('attendance-2026-09-01-to-2026-09-30.csv');
         $rows = $this->rows($response);
+        $columns = array_flip($rows[0]);
 
         $this->assertSame('Employee ID', $rows[0][0]);
         $this->assertCount(3, $rows); // header + two people
-        // 01:00 UTC is 08:00 in Phnom Penh; 570 minutes is 9.50 hours.
-        $this->assertSame(['E-001', 'Sok Dara'], array_slice($rows[1], 0, 2));
-        $this->assertSame(['2026-09-10', '', '08:00', '17:30'], array_slice($rows[1], 5, 4));
-        $this->assertSame(['5', '9.50', 'Completed'], array_slice($rows[1], 11, 3));
+        $row = $rows[1];
+        $this->assertSame(['E-001', 'Sok Dara'], array_slice($row, 0, 2));
+        $this->assertSame('2026-09-10', $row[$columns['Date']]);
+        $this->assertSame('Office', $row[$columns['Schedule']]);
+        // 01:05 UTC is 08:05 in Phnom Penh.
+        $this->assertSame('IN 08:00, OUT 17:00', $row[$columns['Expected']]);
+        $this->assertSame('IN 08:05, OUT 17:30', $row[$columns['Scans']]);
+        $this->assertSame('5', $row[$columns['Late (min)']]);
+        $this->assertSame('9.42', $row[$columns['Worked (hours)']]); // 08:05–17:30
+        $this->assertSame('Complete', $row[$columns['Status']]);
+        $this->assertSame('Late', $row[$columns['Exceptions']]);
     }
 
     public function test_one_employee_can_be_exported_on_their_own(): void
@@ -114,7 +126,7 @@ class AttendanceExportTest extends TestCase
         $rows = $this->rows($this->actingAs($this->admin)->get('/api/attendance/export?from=2026-09-01&to=2026-09-30'));
 
         $this->assertCount(2, $rows);
-        $this->assertSame('2026-09-15', $rows[1][5]);
+        $this->assertSame('2026-09-15', $rows[1][array_flip($rows[0])['Date']]);
     }
 
     public function test_an_ordinary_employee_only_gets_their_own_rows(): void

@@ -1,19 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight, Moon, Settings2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ATTENDANCE,
@@ -31,83 +23,8 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
 import { dayOffImport, exportMonthCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
-import { notifyError, notifySuccess } from "@/lib/notify";
+import { formatMinutes, slotsSummary } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-
-function WeeklyOffDialog({
-  open,
-  onOpenChange,
-  initial,
-  onSaved,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initial: number[];
-  onSaved: () => void;
-}) {
-  const [days, setDays] = useState<number[]>(initial);
-  const [saving, setSaving] = useState(false);
-
-  function toggle(day: number) {
-    setDays((current) => (current.includes(day) ? current.filter((d) => d !== day) : [...current, day]));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-
-    try {
-      await api.calendar.setWeeklyOffDays(days);
-      notifySuccess("Weekly days off updated");
-      onOpenChange(false);
-      onSaved();
-    } catch (err) {
-      notifyError(err);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Weekly days off</DialogTitle>
-          <DialogDescription>
-            Days your company doesn&apos;t normally work. A shift can still be scheduled on one if needed.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-4 gap-2">
-            {WEEKDAYS.map((name, index) => (
-              <label
-                key={name}
-                className={cn(
-                  "flex cursor-pointer items-center justify-center gap-2 rounded-md border px-2 py-2 text-sm",
-                  days.includes(index) ? "border-primary bg-primary/10 font-medium" : "border-input",
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={days.includes(index)}
-                  onChange={() => toggle(index)}
-                  className="sr-only"
-                />
-                {name}
-              </label>
-            ))}
-          </div>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function CalendarPage() {
   const { me } = useMe();
@@ -122,23 +39,6 @@ export default function CalendarPage() {
   const [reloads, setReloads] = useState(0);
   const [result, setResult] = useState<{ key: string; data: CalendarMonth | null; error: string | null } | null>(null);
   const [selected, setSelected] = useState<CalendarDay | null>(null);
-  const [weeklyOpen, setWeeklyOpen] = useState(false);
-  const [weeklyKey, setWeeklyKey] = useState(0);
-  // Read fresh from the server when the dialog opens — the month on screen
-  // (or the team roster) isn't a reliable source, and saving from a stale
-  // or empty list would overwrite the company's real weekly days off.
-  const [weeklyInitial, setWeeklyInitial] = useState<number[]>([]);
-
-  async function openWeekly() {
-    try {
-      const res = await api.calendar.weeklyOffDays();
-      setWeeklyInitial(res.weekly_off_days);
-      setWeeklyKey((k) => k + 1);
-      setWeeklyOpen(true);
-    } catch (err) {
-      notifyError(err);
-    }
-  }
 
   // An admin who isn't an employee has no "my calendar" — they pick someone
   // (defaulting to the first person) instead of hitting a "no employee" error.
@@ -187,7 +87,7 @@ export default function CalendarPage() {
           title="Calendar"
           description={
             showTeam
-              ? "Everyone's month at a glance — shifts, days off and attendance."
+              ? "Everyone's month at a glance — schedules, days off and attendance."
               : "Work days, holidays and days off — and how each day actually went."
           }
           action={
@@ -216,9 +116,10 @@ export default function CalendarPage() {
                     </button>
                   ))}
                 </div>
-                <Button variant="outline" onClick={openWeekly}>
+                {/* Hours and each person's weekly days off are set on their work schedule. */}
+                <Button variant="outline" render={<Link href="/dashboard/work-schedules" />} nativeButton={false}>
                   <Settings2 className="size-4" />
-                  Weekly days off
+                  Work schedules
                 </Button>
               </div>
             )
@@ -279,6 +180,9 @@ export default function CalendarPage() {
                 <Badge variant="success">{data.summary.present} present</Badge>
                 <Badge variant="warning">{data.summary.late} late</Badge>
                 <Badge variant="destructive">{data.summary.absent} absent</Badge>
+                {data.summary.incomplete > 0 && <Badge variant="warning">{data.summary.incomplete} missing a scan</Badge>}
+                <Badge variant="outline">{formatMinutes(data.summary.worked_minutes)} worked</Badge>
+                {data.summary.overtime_minutes > 0 && <Badge variant="info">{formatMinutes(data.summary.overtime_minutes)} overtime</Badge>}
               </div>
             )}
 
@@ -337,9 +241,9 @@ export default function CalendarPage() {
                             {khmerHoliday.nameEn}
                           </span>
                         )}
-                        {day.shift && (
-                          <span className="hidden text-muted-foreground sm:block">
-                            {day.shift.start_time}–{day.shift.end_time}
+                        {day.schedule && (
+                          <span className="hidden truncate text-muted-foreground sm:block" title={day.schedule.name}>
+                            {slotsSummary(day.schedule.slots)}
                           </span>
                         )}
                         {day.attendance && (
@@ -385,13 +289,6 @@ export default function CalendarPage() {
         onChanged={reload}
       />
 
-      <WeeklyOffDialog
-        key={weeklyKey}
-        open={weeklyOpen}
-        onOpenChange={setWeeklyOpen}
-        initial={weeklyInitial}
-        onSaved={reload}
-      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { api, ApiError, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
 import { dayOffImport, exportTeamCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
+import { slotsSummary } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -88,7 +89,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
       found = true;
       if (day.type === "work") counts.working++;
       if (day.type === "day_off" || day.type === "weekly_off" || day.type === "holiday") counts.off++;
-      if (day.attendance === "present" || day.attendance === "missing_checkout") counts.present++;
+      if (day.attendance === "present" || day.attendance === "incomplete" || day.attendance === "worked") counts.present++;
       if (day.attendance === "late") counts.late++;
       if (day.attendance === "absent") counts.absent++;
     }
@@ -141,7 +142,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
           )}
           <ExcelActions
             onExport={() => exportTeamCalendar(month, branchId ? Number(branchId) : undefined)}
-            // Days off are what the calendar adds by hand; shifts are imported from the Roster.
+            // Days off are what the calendar adds by hand; one-off schedule changes go through the Roster.
             importSpec={canManage ? dayOffImport : undefined}
             onImported={() => setReloads((n) => n + 1)}
           />
@@ -231,7 +232,8 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                     const tip = [
                       `${employee.name} · ${day.date}`,
                       day.label ?? style.label,
-                      day.shift ? `${day.shift.start_time}–${day.shift.end_time}` : null,
+                      day.schedule ? `${day.schedule.name} ${slotsSummary(day.schedule.slots)}` : null,
+                      day.scans?.length ? `Scans ${day.scans.join(", ")}` : null,
                       attendance ? ATTENDANCE[attendance].label : null,
                     ]
                       .filter(Boolean)

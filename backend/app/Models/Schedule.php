@@ -15,7 +15,7 @@ class Schedule extends Model
     protected $fillable = [
         'company_id',
         'employee_id',
-        'shift_id',
+        'work_schedule_id',
         'work_location_id',
         'date',
         'notes',
@@ -33,9 +33,9 @@ class Schedule extends Model
         return $this->belongsTo(Employee::class)->withTrashed();
     }
 
-    public function shift(): BelongsTo
+    public function workSchedule(): BelongsTo
     {
-        return $this->belongsTo(Shift::class)->withTrashed();
+        return $this->belongsTo(WorkSchedule::class)->withTrashed();
     }
 
     public function workLocation(): BelongsTo

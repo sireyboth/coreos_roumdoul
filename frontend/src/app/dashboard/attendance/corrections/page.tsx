@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileEdit, Plus } from "lucide-react";
+import { FileEdit, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,9 +26,28 @@ import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
-function formatDateTime(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * The typed times as wall-clock datetimes on the chosen date, in order. A time
+ * earlier than the one before it is the next morning (a night shift's OUT).
+ */
+function scansFor(date: string, times: string[]): string[] {
+  let day = date;
+  let previous = "";
+  return times
+    .filter(Boolean)
+    .map((time) => {
+      if (previous && time <= previous) {
+        const next = new Date(`${day}T00:00:00`);
+        next.setDate(next.getDate() + 1);
+        day = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+      }
+      previous = time;
+      return `${day}T${time}`;
+    });
 }
 
 export default function AttendanceCorrectionsPage() {
@@ -37,8 +56,8 @@ export default function AttendanceCorrectionsPage() {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  // The scans to add, as HH:MM on the chosen date (a time earlier than the one before is the next morning).
+  const [times, setTimes] = useState<string[]>([""]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -56,17 +75,11 @@ export default function AttendanceCorrectionsPage() {
     setSaving(true);
 
     try {
-      await api.attendanceCorrections.create({
-        date,
-        reason,
-        requested_check_in: checkIn || undefined,
-        requested_check_out: checkOut || undefined,
-      });
+      await api.attendanceCorrections.create({ date, reason, scans: scansFor(date, times) });
       notifySuccess("Correction requested", "Your manager will review it.");
       setDate("");
       setReason("");
-      setCheckIn("");
-      setCheckOut("");
+      setTimes([""]);
       setOpen(false);
       load();
     } catch (err) {
@@ -80,9 +93,8 @@ export default function AttendanceCorrectionsPage() {
   async function handleApprove(correction: AttendanceCorrection) {
     try {
       await api.attendanceCorrections.approve(correction.id);
-      notifySuccess("Correction approved", "The attendance record was updated.");
+      notifySuccess("Correction approved", "The scans were added and the day recalculated.");
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     }
     load();
@@ -93,7 +105,6 @@ export default function AttendanceCorrectionsPage() {
       await api.attendanceCorrections.reject(correction.id);
       notifySuccess("Correction rejected");
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     }
     load();
@@ -135,25 +146,41 @@ export default function AttendanceCorrectionsPage() {
                         <Label htmlFor="date">Date</Label>
                         <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-2">
-                          <Label htmlFor="check_in">Check-in time</Label>
-                          <Input
-                            id="check_in"
-                            type="datetime-local"
-                            value={checkIn}
-                            onChange={(e) => setCheckIn(e.target.value)}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Label htmlFor="check_out">Check-out time</Label>
-                          <Input
-                            id="check_out"
-                            type="datetime-local"
-                            value={checkOut}
-                            onChange={(e) => setCheckOut(e.target.value)}
-                          />
-                        </div>
+                      <div className="flex flex-col gap-2">
+                        <Label>Scans you missed</Label>
+                        <p className="-mt-1 text-xs text-muted-foreground">
+                          Only the ones you forgot — e.g. just 12:00 if you didn&apos;t scan out for lunch. Your schedule
+                          decides whether each is an IN or an OUT.
+                        </p>
+                        {times.map((time, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Input
+                              type="time"
+                              required
+                              aria-label={`Scan ${i + 1}`}
+                              value={time}
+                              onChange={(e) => setTimes((all) => all.map((t, j) => (j === i ? e.target.value : t)))}
+                              className="w-32"
+                            />
+                            {times.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Remove this time"
+                                onClick={() => setTimes((all) => all.filter((_, j) => j !== i))}
+                              >
+                                <X className="size-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                        {times.length < 8 && (
+                          <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setTimes((all) => [...all, ""])}>
+                            <Plus className="size-3.5" />
+                            Add another time
+                          </Button>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="reason">Reason</Label>
@@ -186,8 +213,7 @@ export default function AttendanceCorrectionsPage() {
               <TableRow>
                 {canManage && <TableHead>Employee</TableHead>}
                 <TableHead>Date</TableHead>
-                <TableHead>Requested check-in</TableHead>
-                <TableHead>Requested check-out</TableHead>
+                <TableHead>Scans to add</TableHead>
                 <TableHead>Reason</TableHead>
                 <TableHead>Status</TableHead>
                 {canManage && <TableHead className="text-right">Actions</TableHead>}
@@ -198,11 +224,8 @@ export default function AttendanceCorrectionsPage() {
                 <TableRow key={correction.id}>
                   {canManage && <TableCell className="font-medium">{correction.employee.name}</TableCell>}
                   <TableCell>{correction.date}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(correction.requested_check_in)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(correction.requested_check_out)}
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {correction.requested_times.map(formatTime).join(" · ") || "—"}
                   </TableCell>
                   <TableCell className="max-w-48 truncate text-muted-foreground">{correction.reason}</TableCell>
                   <TableCell>

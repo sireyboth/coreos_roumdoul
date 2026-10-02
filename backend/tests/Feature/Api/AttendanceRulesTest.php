@@ -3,11 +3,10 @@
 namespace Tests\Feature\Api;
 
 use App\Models\AttendanceCorrection;
-use App\Models\AttendanceSession;
+use App\Models\AttendanceDay;
+use App\Models\AttendanceEvent;
 use App\Models\Employee;
 use App\Models\Plan;
-use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WorkLocation;
@@ -18,16 +17,17 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 /**
- * The attendance rules that used to be gaps: company-timezone shift times,
- * GPS-only check-ins matched to a real branch, forgotten check-outs, who may
- * check in at all, and paid vs unpaid breaks.
+ * The attendance rules around a scan: company-timezone schedule times,
+ * GPS-only scans matched to a real branch, forgotten scans, night shifts,
+ * who may scan at all, and paid vs unpaid breaks.
  */
 class AttendanceRulesTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
@@ -74,88 +74,82 @@ class AttendanceRulesTest extends TestCase
         $this->travelTo(Carbon::parse($utc, 'UTC'));
     }
 
-    private function shift(array $overrides = []): Shift
+    /** 08:00–17:00 with a 10 min grace and a 60 min unpaid break, assigned to the worker. */
+    private function dayShift(array $attributes = [], ?Employee $employee = null): void
     {
-        return Shift::query()->create(array_merge([
-            'company_id' => $this->company->id,
-            'name' => 'Day',
-            'start_time' => '08:00',
-            'end_time' => '17:00',
-            'break_minutes' => 60,
-            'is_break_paid' => false,
-            'grace_minutes' => 10,
-        ], $overrides));
+        $schedule = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], array_merge([
+            'late_grace_minutes' => 10, 'break_minutes' => 60, 'is_break_paid' => false,
+        ], $attributes));
+
+        $this->assignSchedule($employee ?? $this->employee, $schedule);
     }
 
-    private function schedule(Shift $shift, string $localDate, ?Employee $employee = null): void
+    private function scan(?User $user = null, ?array $where = null)
     {
-        Schedule::query()->create([
-            'company_id' => $this->company->id,
-            'employee_id' => ($employee ?? $this->employee)->id,
-            'shift_id' => $shift->id,
-            'date' => $localDate,
-        ]);
+        return $this->actingAs($user ?? $this->user)->postJson('/api/attendance/scan', $where ?? $this->atHq);
     }
 
-    private function sessionOf(?Employee $employee = null): AttendanceSession
+    private function dayOf(?Employee $employee = null): AttendanceDay
     {
-        return AttendanceSession::query()->where('employee_id', ($employee ?? $this->employee)->id)->latest('id')->firstOrFail();
+        return $this->attendanceDay($employee ?? $this->employee) ?? $this->fail('No attendance day was recorded.');
     }
 
-    // ---- 0. Shift required ---------------------------------------------------
+    // ---- 0. Schedule required ------------------------------------------------
 
-    public function test_check_in_needs_a_shift_on_the_roster_when_required(): void
+    public function test_scanning_needs_a_work_schedule_when_required(): void
     {
         config(['attendance.require_schedule' => true]);
         $this->at('2026-09-21 01:00:00'); // 08:00 in Phnom Penh
 
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('schedule');
+        $this->scan()->assertStatus(422)->assertJsonValidationErrors('schedule');
 
-        $this->schedule($this->shift(), '2026-09-21');
+        $this->dayShift();
         $this->app['auth']->forgetGuards();
 
         // Arriving hours early is fine — there's no early-arrival cutoff.
         $this->at('2026-09-20 22:00:00'); // 05:00 local, same local day
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
     }
 
     // ---- 1. Company timezone -------------------------------------------------
 
-    public function test_shift_times_are_read_in_the_companys_timezone_not_utc(): void
+    public function test_schedule_times_are_read_in_the_companys_timezone_not_utc(): void
     {
-        $this->schedule($this->shift(), '2026-09-21');
+        $this->dayShift();
 
         // 01:30 UTC is 08:30 in Cambodia: 30 min after an 08:00 start, 20 past the 10 min grace.
         $this->at('2026-09-21 01:30:00');
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated()
+            ->assertJsonPath('slot.type', 'in')
+            ->assertJsonPath('slot.late_minutes', 20)
+            ->assertJsonPath('message', 'IN recorded at 08:30 (expected 08:00) — 20 min late.');
 
-        $this->assertSame(20, $this->sessionOf()->late_minutes);
+        $this->assertSame(20, $this->dayOf()->late_minutes);
     }
 
     public function test_arriving_within_the_grace_period_is_not_late(): void
     {
-        $this->schedule($this->shift(), '2026-09-21');
+        $this->dayShift();
 
         $this->at('2026-09-21 01:05:00'); // 08:05 in Cambodia
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
 
-        $this->assertSame(0, $this->sessionOf()->late_minutes);
+        $this->assertSame(0, $this->dayOf()->late_minutes);
     }
 
     public function test_the_day_rolls_over_at_local_midnight_not_7am(): void
     {
         // 18:00 UTC on the 20th is 01:00 on the 21st in Cambodia.
         $this->at('2026-09-20 18:00:00');
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
 
-        $this->assertSame('2026-09-21', $this->sessionOf()->date->toDateString());
+        $this->assertSame('2026-09-21', $this->dayOf()->date->toDateString());
     }
 
     public function test_a_corrections_typed_times_are_read_as_company_time(): void
     {
-        $this->schedule($this->shift(), '2026-09-15');
+        $this->dayShift();
+        $this->at('2026-09-16 05:00:00');
 
         $id = $this->actingAs($this->user)->postJson('/api/attendance/corrections', [
             'date' => '2026-09-15',
@@ -165,126 +159,150 @@ class AttendanceRulesTest extends TestCase
         ])->assertCreated()->json('id');
 
         // Typed as 08:30 in Cambodia = 01:30 UTC.
-        $this->assertSame('01:30', AttendanceCorrection::query()->findOrFail($id)->requested_check_in->utc()->format('H:i'));
+        $this->assertSame('01:30', AttendanceCorrection::query()->findOrFail($id)->requestedTimes()[0]->utc()->format('H:i'));
 
         $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$id}/approve")->assertOk();
 
-        $session = $this->sessionOf();
-        $this->assertSame(20, $session->late_minutes);           // 08:30 vs 08:10
-        $this->assertSame(480, $session->worked_minutes);        // 9h minus the 60 min unpaid break
-        $this->assertSame('completed', $session->status);
+        // The 15th specifically — approving also brought today (the 16th) up to date.
+        $day = $this->attendanceDay($this->employee, '2026-09-15');
+        $this->assertSame(20, $day->late_minutes);       // 08:30 vs 08:10
+        $this->assertSame(480, $day->worked_minutes);    // 9h minus the 60 min unpaid break
+        $this->assertSame('complete', $day->status);
     }
 
-    // ---- 2. GPS-only check-in ------------------------------------------------
+    // ---- 2. GPS-only scans ---------------------------------------------------
 
-    public function test_a_gps_only_check_in_inside_a_branch_is_matched_to_it(): void
+    public function test_a_gps_only_scan_inside_a_branch_is_matched_to_it(): void
     {
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-            ->assertCreated()
-            ->assertJsonPath('work_location_id', $this->hq->id)
-            ->assertJsonPath('method', 'gps');
+        $this->scan()->assertCreated()
+            ->assertJsonPath('event.work_location_id', $this->hq->id)
+            ->assertJsonPath('event.method', 'gps');
     }
 
-    public function test_a_gps_only_check_in_far_from_every_branch_is_rejected(): void
+    public function test_a_gps_only_scan_far_from_every_branch_is_rejected(): void
     {
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', ['latitude' => 11.6564, 'longitude' => 104.9282])
+        $this->scan(where: ['latitude' => 11.6564, 'longitude' => 104.9282])
             ->assertStatus(422)
             ->assertJsonValidationErrors('latitude');
 
-        $this->assertSame(0, AttendanceSession::query()->count());
+        $this->assertSame(0, AttendanceEvent::query()->count());
+        $this->assertSame(0, AttendanceDay::query()->count());
     }
 
-    public function test_a_gps_only_check_in_needs_at_least_one_branch_location(): void
+    public function test_a_gps_only_scan_needs_at_least_one_branch_location(): void
     {
         $this->hq->delete();
 
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('latitude');
+        $this->scan()->assertStatus(422)->assertJsonValidationErrors('latitude');
     }
 
-    public function test_a_check_in_with_no_proof_at_all_is_rejected(): void
+    public function test_a_scan_with_no_proof_at_all_is_rejected(): void
     {
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in')
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('verification');
+        $this->scan(where: [])->assertStatus(422)->assertJsonValidationErrors('verification');
     }
 
-    // ---- 3. Forgotten check-outs ---------------------------------------------
-
-    public function test_a_forgotten_check_out_is_flagged_and_stops_blocking_the_next_day(): void
-    {
-        $this->at('2026-09-21 01:00:00'); // 08:00 in Cambodia
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
-        $forgotten = $this->sessionOf();
-
-        // 17 hours on (01:00 the next morning) — past the 16h cutoff.
-        $this->at('2026-09-21 18:00:00');
-
-        $this->actingAs($this->user)->postJson('/api/attendance/check-out', $this->atHq)
-            ->assertStatus(422)
-            ->assertJsonPath('errors.event_type.0', fn ($message) => str_contains($message, 'never closed'));
-
-        $this->assertSame('missing_checkout', $forgotten->fresh()->status);
-
-        // ...and a new day's check-in works again.
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
-    }
-
-    public function test_the_scheduled_command_flags_forgotten_shifts_for_everyone(): void
+    public function test_a_double_tap_is_refused_politely(): void
     {
         $this->at('2026-09-21 01:00:00');
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
-        $session = $this->sessionOf();
+        $this->scan()->assertCreated();
 
-        $this->at('2026-09-21 18:00:00');
-        $this->artisan('attendance:close-stale')->assertSuccessful();
-
-        $this->assertSame('missing_checkout', $session->fresh()->status);
+        $this->at('2026-09-21 01:01:00');
+        $this->scan()->assertStatus(422)
+            ->assertJsonPath('errors.scan.0', 'You already scanned at 08:00. Wait a moment before scanning again.');
     }
 
-    public function test_a_night_shift_still_checks_out_after_midnight_but_cannot_start_a_second_shift(): void
+    // ---- 3. Forgotten scans --------------------------------------------------
+
+    public function test_a_forgotten_out_is_reported_missing_and_the_next_day_starts_fresh(): void
     {
-        $this->at('2026-09-21 14:00:00'); // 21:00 in Cambodia
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->dayShift();
 
-        $this->at('2026-09-21 20:00:00'); // 03:00 the next day, 6h later — still a normal open shift
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-            ->assertStatus(422)
-            ->assertJsonPath('errors.event_type.0', fn ($message) => str_contains($message, 'still checked in'));
+        $this->at('2026-09-21 01:00:00'); // 08:00 in Cambodia
+        $this->scan()->assertCreated();
 
-        $this->actingAs($this->user)->postJson('/api/attendance/check-out', $this->atHq)->assertCreated();
-        $this->assertSame('completed', $this->sessionOf()->status);
+        // The next morning: yesterday is closed with its OUT missing, today's first scan is today's IN.
+        $this->at('2026-09-22 01:02:00');
+        $this->scan()->assertCreated()->assertJsonPath('slot.type', 'in');
+
+        $yesterday = $this->attendanceDay($this->employee, '2026-09-21');
+        $this->assertSame('incomplete', $yesterday->status);
+        $this->assertContains('missing_out', $yesterday->exceptions);
+        $this->assertSame('in_progress', $this->attendanceDay($this->employee, '2026-09-22')->status);
     }
 
-    // ---- 4. Who may check in -------------------------------------------------
+    public function test_the_hourly_command_records_absences_and_missing_scans_for_everyone(): void
+    {
+        $this->dayShift();
 
-    public function test_terminated_and_suspended_employees_cannot_check_in(): void
+        $this->at('2026-09-21 01:00:00');
+        $this->scan()->assertCreated();
+
+        // Nobody scans again; the day closes overnight.
+        $this->at('2026-09-22 03:00:00');
+        $this->artisan('attendance:close-days')->assertSuccessful();
+
+        $this->assertSame('incomplete', $this->attendanceDay($this->employee, '2026-09-21')->status);
+        // Today has started (08:00 local passed at 01:00 UTC) — upcoming until they scan, absent once it closes.
+        $this->assertSame('upcoming', $this->attendanceDay($this->employee, '2026-09-22')->status);
+
+        $this->at('2026-09-23 03:00:00');
+        $this->artisan('attendance:close-days')->assertSuccessful();
+        $this->assertSame('absent', $this->attendanceDay($this->employee, '2026-09-22')->status);
+    }
+
+    public function test_a_night_shift_finishes_the_next_morning_on_the_same_work_day(): void
+    {
+        $night = $this->makeWorkSchedule($this->company, [['in', '22:00'], ['out', '06:00', true]]);
+        $this->assignSchedule($this->employee, $night);
+
+        $this->at('2026-09-21 14:58:00'); // 21:58 in Cambodia
+        $this->scan()->assertCreated()->assertJsonPath('slot.type', 'in');
+
+        $this->at('2026-09-21 23:05:00'); // 06:05 on the 22nd
+        $this->scan()->assertCreated()->assertJsonPath('slot.type', 'out');
+
+        $day = $this->attendanceDay($this->employee, '2026-09-21');
+        $this->assertSame('complete', $day->status);
+        $this->assertSame(487, $day->worked_minutes);
+        $this->assertNull($this->attendanceDay($this->employee, '2026-09-22'));
+    }
+
+    // ---- 4. Who may scan -----------------------------------------------------
+
+    public function test_terminated_and_suspended_employees_cannot_scan(): void
     {
         foreach (['terminated', 'suspended'] as $status) {
             $this->employee->update(['employment_status' => $status]);
             $this->user->unsetRelation('employee'); // a real request loads it fresh
 
-            $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-                ->assertStatus(422)
-                ->assertJsonValidationErrors('employee');
+            $this->scan()->assertStatus(422)->assertJsonValidationErrors('employee');
         }
 
         $this->employee->update(['employment_status' => 'on_leave']);
         $this->user->unsetRelation('employee');
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
     }
 
-    public function test_an_inactive_branch_does_not_accept_check_ins_by_qr_or_gps(): void
+    public function test_an_inactive_branch_does_not_accept_scans_by_qr_or_gps(): void
     {
         $this->hq->update(['is_active' => false]);
 
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', ['qr_token' => $this->hq->qr_token])
-            ->assertStatus(422);
+        $this->scan(where: ['qr_token' => $this->hq->qr_token])->assertStatus(422);
 
         // GPS-only ignores inactive branches entirely, so there's nothing near enough.
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)
-            ->assertStatus(422);
+        $this->scan()->assertStatus(422);
+    }
+
+    public function test_the_old_check_in_and_check_out_addresses_still_scan(): void
+    {
+        $this->dayShift();
+
+        $this->at('2026-09-21 01:00:00');
+        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->at('2026-09-21 10:00:00');
+        $this->actingAs($this->user)->postJson('/api/attendance/check-out', $this->atHq)->assertCreated();
+
+        $this->assertSame('complete', $this->dayOf()->status);
     }
 
     // ---- 5. Paid vs unpaid breaks --------------------------------------------
@@ -294,18 +312,18 @@ class AttendanceRulesTest extends TestCase
         $paidUser = $this->createUserWithRole($this->company, 'employee');
         $paidEmployee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Paid', 'user_id' => $paidUser->id]);
 
-        $this->schedule($this->shift(['name' => 'Unpaid break', 'is_break_paid' => false]), '2026-09-21');
-        $this->schedule($this->shift(['name' => 'Paid break', 'is_break_paid' => true]), '2026-09-21', $paidEmployee);
+        $this->dayShift(['name' => 'Unpaid break', 'is_break_paid' => false]);
+        $this->dayShift(['name' => 'Paid break', 'is_break_paid' => true], $paidEmployee);
 
         $this->at('2026-09-21 01:00:00');
-        $this->actingAs($this->user)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
-        $this->actingAs($paidUser)->postJson('/api/attendance/check-in', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
+        $this->scan($paidUser)->assertCreated();
 
         $this->at('2026-09-21 10:00:00'); // 9 hours later
-        $this->actingAs($this->user)->postJson('/api/attendance/check-out', $this->atHq)->assertCreated();
-        $this->actingAs($paidUser)->postJson('/api/attendance/check-out', $this->atHq)->assertCreated();
+        $this->scan()->assertCreated();
+        $this->scan($paidUser)->assertCreated();
 
-        $this->assertSame(480, $this->sessionOf()->worked_minutes);              // 9h - 60 unpaid
-        $this->assertSame(540, $this->sessionOf($paidEmployee)->worked_minutes); // 9h, break is paid
+        $this->assertSame(480, $this->dayOf()->worked_minutes);              // 9h - 60 unpaid
+        $this->assertSame(540, $this->dayOf($paidEmployee)->worked_minutes); // 9h, break is paid
     }
 }

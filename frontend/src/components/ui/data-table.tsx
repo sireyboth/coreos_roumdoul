@@ -50,6 +50,8 @@ export type DataTableFilter<T> =
       label: string;
       options: Option[];
       getValue: (row: T) => string | null | undefined;
+      /** For rows that can match several options (e.g. a list of tags). Defaults to getValue(row) === selected. */
+      matches?: (row: T, selected: string) => boolean;
     }
   | {
       type: "date-range";
@@ -125,7 +127,9 @@ export function DataTable<T>({
     for (const filter of filters) {
       if (filter.type === "select") {
         const selected = filterValues[filter.id];
-        if (selected) result = result.filter((row) => filter.getValue(row) === selected);
+        if (selected) {
+          result = result.filter((row) => (filter.matches ? filter.matches(row, selected) : filter.getValue(row) === selected));
+        }
       } else {
         const from = filterValues[`${filter.id}.from`];
         const to = filterValues[`${filter.id}.to`];

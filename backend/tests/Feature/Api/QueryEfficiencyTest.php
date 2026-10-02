@@ -10,16 +10,18 @@ use App\Models\Employee;
 use App\Models\Module;
 use App\Models\Plan;
 use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\Subscription;
 use App\Models\Team;
+use App\Models\WorkSchedule;
 use App\Services\CompanyProvisioner;
+use App\Services\EmployeeAssignmentService;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 /**
@@ -30,13 +32,13 @@ use Tests\TestCase;
  */
 class QueryEfficiencyTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
     private $admin;
 
-    private Shift $shift;
+    private WorkSchedule $shift;
 
     private Branch $branch;
 
@@ -55,9 +57,7 @@ class QueryEfficiencyTest extends TestCase
         ]);
         $this->admin = $this->company->users()->first();
         $this->branch = Branch::query()->create(['company_id' => $this->company->id, 'name' => 'HQ', 'latitude' => 1, 'longitude' => 1]);
-        $this->shift = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00', 'break_minutes' => 0, 'grace_minutes' => 0,
-        ]);
+        $this->shift = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], ['name' => 'Day']);
     }
 
     private function addEmployees(int $count): void
@@ -67,10 +67,10 @@ class QueryEfficiencyTest extends TestCase
 
         for ($i = 0; $i < $count; $i++) {
             $employee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'E'.uniqid()]);
-            app(\App\Services\EmployeeAssignmentService::class)->open($employee, [
+            app(EmployeeAssignmentService::class)->open($employee, [
                 'branch_id' => $this->branch->id, 'department_id' => $dept->id, 'team_id' => $team->id, 'job_title' => 'Clerk',
             ]);
-            Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $this->shift->id, 'date' => '2026-09-22']);
+            Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'work_schedule_id' => $this->shift->id, 'date' => '2026-09-22']);
             AttendanceCorrection::query()->create([
                 'company_id' => $this->company->id, 'employee_id' => $employee->id, 'requested_by' => $this->admin->id,
                 'date' => '2026-09-21', 'reason' => 'forgot', 'status' => 'pending',
@@ -199,7 +199,7 @@ class QueryEfficiencyTest extends TestCase
             'employee.branch' => $employee['branch'],
             'employee.department' => $employee['department'],
             'roster employee' => $roster['employee'],
-            'roster shift' => $roster['shift'],
+            'roster schedule' => $roster['work_schedule'],
             'correction employee' => $correction['employee'],
         ] as $where => $payload) {
             // The employee pages show first/last name (and the Khmer name), so
@@ -219,7 +219,7 @@ class QueryEfficiencyTest extends TestCase
             $this->assertArrayHasKey($key, $employee, "employee lost {$key}");
         }
         $this->assertSame('Clerk', $employee['job_title']);
-        $this->assertArrayHasKey('name', $roster['shift']);
-        $this->assertArrayHasKey('start_time', $roster['shift']);
+        $this->assertArrayHasKey('name', $roster['work_schedule']);
+        $this->assertArrayHasKey('days', $roster['work_schedule']);
     }
 }

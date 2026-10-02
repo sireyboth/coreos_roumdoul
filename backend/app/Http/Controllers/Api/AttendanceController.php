@@ -3,34 +3,95 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AttendanceSession;
+use App\Models\AttendanceDay;
+use App\Models\AttendanceEvent;
 use App\Services\AttendanceService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/**
+ * Attendance as days: for each employee and date, what was expected next to
+ * what happened. The employee only ever "scans"; the schedule decides
+ * whether that was an IN or an OUT.
+ */
 class AttendanceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = $this->visibleSessions($request)->with([
-            'employee.branch',
-            'employee.currentAssignment',
-            'schedule.shift',
-            'checkInEvent.workLocation',
-            'checkInEvent.recordedBy:id,name',
-            'checkOutEvent.workLocation',
-            'checkOutEvent.recordedBy:id,name',
+        $request->validate([
+            'status' => ['nullable', Rule::in(AttendanceDay::STATUSES)],
+            'exception' => ['nullable', Rule::in(AttendanceDay::EXCEPTIONS)],
         ]);
 
-        // per_page (max 1000): a month of attendance for a whole company is far more than 50 rows.
-        $sessions = $query->orderByDesc('date')->orderByDesc('id')->paginate(min(max($request->integer('per_page', 50), 1), 1000));
+        $days = $this->visibleDays($request)
+            ->with(['employee.branch', 'employee.currentAssignment'])
+            ->orderByDesc('date')->orderByDesc('id')
+            // per_page (max 1000): a month of attendance for a whole company is far more than 50 rows.
+            ->paginate(min(max($request->integer('per_page', 50), 1), 1000));
 
-        // The dashboard's recent check-ins show each person's avatar.
-        $sessions->getCollection()->each(fn ($session) => $session->employee?->append('photo_url'));
+        $events = $this->eventsFor($days->getCollection());
+        $timezone = $this->timezone($request);
 
-        return $sessions;
+        $days->setCollection($days->getCollection()->map(fn (AttendanceDay $day) => $this->present($day, $events, $timezone)));
+
+        return $days;
+    }
+
+    /** One scan: IN or OUT is decided by the person's schedule. */
+    public function scan(Request $request, AttendanceService $attendance)
+    {
+        $result = $attendance->scan($this->requireEmployee($request), $this->scanData($request));
+        $timezone = $this->timezone($request);
+
+        return response()->json([
+            'event' => $result['event'],
+            'slot' => $result['slot'],
+            'day' => $result['day'] ? $this->present($result['day']->load('employee'), $this->eventsFor(collect([$result['day']])), $timezone) : null,
+            'message' => $this->scanMessage($result['slot'], $result['event'], $timezone),
+        ], 201);
+    }
+
+    /**
+     * Kept so older app versions still work: both now simply scan, and answer
+     * in the shape those versions read — the scan record itself — with the
+     * matched slot and the message added alongside.
+     */
+    public function checkIn(Request $request, AttendanceService $attendance)
+    {
+        return $this->legacyScan($request, $attendance);
+    }
+
+    public function checkOut(Request $request, AttendanceService $attendance)
+    {
+        return $this->legacyScan($request, $attendance);
+    }
+
+    private function legacyScan(Request $request, AttendanceService $attendance)
+    {
+        $result = $attendance->scan($this->requireEmployee($request), $this->scanData($request));
+
+        return response()->json([
+            ...$result['event']->toArray(),
+            'slot' => $result['slot'],
+            'message' => $this->scanMessage($result['slot'], $result['event'], $this->timezone($request)),
+        ], 201);
+    }
+
+    /** The signed-in person's day: expected slots, what's done, what's next. */
+    public function today(Request $request, AttendanceService $attendance)
+    {
+        $today = $attendance->today($this->requireEmployee($request));
+
+        if ($today['day']) {
+            $today['day'] = $this->present($today['day']->load('employee'), $this->eventsFor(collect([$today['day']])), $this->timezone($request));
+        }
+
+        return $today;
     }
 
     /**
@@ -51,14 +112,11 @@ class AttendanceController extends Controller
             throw ValidationException::withMessages(['to' => ['Pick a range of one year or less.']]);
         }
 
-        $timezone = $request->user()->company?->timezone ?: config('attendance.default_timezone');
-
-        $query = $this->visibleSessions($request)
-            ->with(['employee.branch', 'employee.department', 'employee.team', 'schedule.shift', 'checkInEvent.workLocation', 'checkOutEvent.workLocation'])
+        $timezone = $this->timezone($request);
+        $query = $this->visibleDays($request)
+            ->with(['employee.branch', 'employee.department', 'employee.team'])
             // Grouped by person, then by day, so each employee reads top to bottom.
-            ->orderBy('employee_id')
-            ->orderBy('date')
-            ->orderBy('id');
+            ->orderBy('employee_id')->orderBy('date')->orderBy('id');
 
         $filename = 'attendance-'.$request->input('from').'-to-'.$request->input('to').'.csv';
 
@@ -69,16 +127,18 @@ class AttendanceController extends Controller
             fwrite($out, "\xEF\xBB\xBF");
 
             fputcsv($out, [
-                'Employee ID', 'Employee', 'Branch', 'Department', 'Team', 'Date', 'Shift',
-                'Check in', 'Check out', 'Check-in location', 'Check-out location',
-                'Late (min)', 'Worked (hours)', 'Status',
+                'Employee ID', 'Employee', 'Branch', 'Department', 'Team', 'Date', 'Day type', 'Schedule',
+                'Expected', 'Scans', 'Late (min)', 'Early leave (min)', 'Worked (hours)', 'Overtime (hours)',
+                'Overtime type', 'Overtime status', 'Night (hours)', 'Status', 'Exceptions',
             ]);
 
-            $query->chunk(500, function ($sessions) use ($out, $timezone) {
-                foreach ($sessions as $session) {
-                    $employee = $session->employee;
-                    $in = $session->checkInEvent?->event_time?->copy()->setTimezone($timezone);
-                    $outTime = $session->checkOutEvent?->event_time?->copy()->setTimezone($timezone);
+            $hours = fn (int $minutes) => number_format($minutes / 60, 2, '.', '');
+            $time = fn (?string $iso) => $iso ? CarbonImmutable::parse($iso)->setTimezone($timezone)->format('H:i') : null;
+
+            $query->chunk(500, function ($days) use ($out, $hours, $time) {
+                foreach ($days as $day) {
+                    $employee = $day->employee;
+                    $slots = collect($day->slots ?? []);
 
                     fputcsv($out, array_map($this->safeCell(...), [
                         $employee?->employee_code,
@@ -86,15 +146,20 @@ class AttendanceController extends Controller
                         $employee?->branch?->name,
                         $employee?->department?->name,
                         $employee?->team?->name,
-                        $session->date->toDateString(),
-                        $session->schedule?->shift?->name,
-                        $in?->format('H:i'),
-                        $outTime?->format('H:i'),
-                        $session->checkInEvent?->workLocation?->name,
-                        $session->checkOutEvent?->workLocation?->name,
-                        $session->late_minutes,
-                        $session->worked_minutes === null ? null : number_format($session->worked_minutes / 60, 2, '.', ''),
-                        ucfirst(str_replace('_', ' ', $session->status)),
+                        $day->date->toDateString(),
+                        $this->label($day->kind),
+                        $day->expected['schedule_name'] ?? null,
+                        $slots->map(fn ($s) => strtoupper($s['type']).' '.$time($s['expected_at']))->join(', '),
+                        collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']))->join(', '),
+                        $day->late_minutes,
+                        $day->early_leave_minutes,
+                        $hours($day->worked_minutes),
+                        $hours($day->overtime_minutes),
+                        $day->overtime_type ? $this->label($day->overtime_type) : null,
+                        $day->overtime_status ? ucfirst($day->overtime_status) : null,
+                        $hours($day->night_minutes),
+                        $this->label($day->status),
+                        collect($day->exceptions ?? [])->map(fn ($e) => $this->label($e))->join(', '),
                     ]));
                 }
             });
@@ -104,30 +169,144 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Sessions the caller may see, narrowed by the optional employee_id / from / to
-     * filters. Shared by the list and the export so the two can never disagree.
+     * Days the caller may see, narrowed by the optional employee_id / from /
+     * to / status / exception filters. Shared by the list and the export so
+     * the two can never disagree.
      */
-    private function visibleSessions(Request $request): Builder
+    private function visibleDays(Request $request): Builder
     {
-        $query = AttendanceSession::query();
-
-        if (! $request->user()->hasCompanyPermission('attendance.manage')) {
-            $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
-        }
+        $query = AttendanceDay::query()->whereHas('employee', function ($q) use ($request) {
+            // Also applies a branch-limited manager's branch restriction.
+            if (! $request->user()->hasCompanyPermission('attendance.manage')) {
+                $q->where('user_id', $request->user()->id);
+            }
+        });
 
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->integer('employee_id'));
         }
-
         if ($request->filled('from')) {
             $query->whereDate('date', '>=', $request->date('from'));
         }
-
         if ($request->filled('to')) {
             $query->whereDate('date', '<=', $request->date('to'));
         }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('exception')) {
+            // A JSON list of codes; matching the quoted code works on every database.
+            $query->where('exceptions', 'like', '%"'.$request->input('exception').'"%');
+        }
 
         return $query;
+    }
+
+    /** Every scan referenced by these days, with its location, in one query. */
+    private function eventsFor(Collection $days): Collection
+    {
+        $ids = $days->flatMap(fn (AttendanceDay $day) => collect($day->scans ?? [])->pluck('scan_id'))->filter()->unique();
+
+        return $ids->isEmpty() ? collect() : AttendanceEvent::query()
+            ->with(['workLocation', 'recordedBy:id,name'])
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+    }
+
+    private function present(AttendanceDay $day, Collection $events, string $timezone): array
+    {
+        $scan = fn (?int $id) => $id && ($event = $events->get($id)) ? [
+            'id' => $event->id,
+            'at' => $event->event_time->setTimezone($timezone)->toIso8601String(),
+            'method' => $event->method,
+            'work_location' => $event->workLocation ? [
+                'id' => $event->workLocation->id,
+                'name' => $event->workLocation->name,
+                'address' => $event->workLocation->address,
+                'latitude' => $event->workLocation->latitude,
+                'longitude' => $event->workLocation->longitude,
+            ] : null,
+            'distance_meters' => $event->distance_meters,
+            // Where the phone said it was, for the map.
+            'latitude' => $event->latitude,
+            'longitude' => $event->longitude,
+            'device_id' => $event->device_id,
+            'recorded_by' => $event->recordedBy ? ['id' => $event->recordedBy->id, 'name' => $event->recordedBy->name] : null,
+            'notes' => $event->notes,
+        ] : null;
+
+        $employee = $day->employee;
+
+        return [
+            'id' => $day->id,
+            'date' => $day->date->toDateString(),
+            'kind' => $day->kind,
+            'label' => $day->label,
+            'holiday' => $day->expected['holiday'] ?? null,
+            'schedule' => $day->expected['schedule_name'] ?? null,
+            'status' => $day->status,
+            'is_closed' => $day->is_closed,
+            'slots' => collect($day->slots ?? [])->map(fn (array $slot) => [...$slot, 'scan' => $scan($slot['scan_id'])])->values(),
+            'extra_scans' => collect($day->extra_scans ?? [])->map(fn (array $extra) => [...$extra, 'scan' => $scan($extra['scan_id'])])->values(),
+            // Every scan in order with the part it played (in / out / extra) — also on days without slots.
+            'scans' => collect($day->scans ?? [])->map(fn (array $entry) => [...$entry, 'scan' => $scan($entry['scan_id'])])->values(),
+            'scan_count' => $day->scan_count,
+            'scheduled_minutes' => $day->scheduled_minutes,
+            'worked_minutes' => $day->worked_minutes,
+            'late_minutes' => $day->late_minutes,
+            'early_leave_minutes' => $day->early_leave_minutes,
+            'night_minutes' => $day->night_minutes,
+            'overtime_minutes' => $day->overtime_minutes,
+            'overtime_type' => $day->overtime_type,
+            'overtime_status' => $day->overtime_status,
+            'exceptions' => $day->exceptions ?? [],
+            'employee' => $employee ? [
+                'id' => $employee->id,
+                'name' => $employee->name,
+                'employee_code' => $employee->employee_code,
+                'branch' => $employee->relationLoaded('branch') && $employee->branch ? ['id' => $employee->branch->id, 'name' => $employee->branch->name] : null,
+                'job_title' => $employee->relationLoaded('currentAssignment') ? $employee->job_title : null,
+                // The list and the dashboard show each person's avatar.
+                'photo_url' => $employee->photo_url,
+            ] : null,
+        ];
+    }
+
+    /** What to tell the person right after a scan, e.g. "IN at 08:07 — 7 min late". */
+    private function scanMessage(?array $slot, AttendanceEvent $event, string $timezone): string
+    {
+        $at = $event->event_time->setTimezone($timezone)->format('H:i');
+
+        if (! $slot) {
+            return "Scan recorded at {$at}.";
+        }
+
+        $type = strtoupper($slot['type']);
+        $expected = CarbonImmutable::parse($slot['expected_at'])->setTimezone($timezone)->format('H:i');
+        $note = match (true) {
+            $slot['late_minutes'] > 0 => " — {$slot['late_minutes']} min late",
+            $slot['early_minutes'] > 0 => " — {$slot['early_minutes']} min early",
+            default => '',
+        };
+
+        return "{$type} recorded at {$at} (expected {$expected}){$note}.";
+    }
+
+    private function scanData(Request $request): array
+    {
+        return $request->validate([
+            'work_location_id' => ['nullable', 'exists:work_locations,id'],
+            'qr_token' => ['nullable', 'string'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'device_id' => ['nullable', 'string', 'max:255'],
+        ]);
+    }
+
+    private function label(string $code): string
+    {
+        return ucfirst(str_replace('_', ' ', $code));
     }
 
     /**
@@ -139,38 +318,9 @@ class AttendanceController extends Controller
         return is_string($value) && preg_match('/^[=+\-@\t\r]/', $value) ? "'".$value : $value;
     }
 
-    public function checkIn(Request $request, AttendanceService $attendance)
+    private function timezone(Request $request): string
     {
-        $employee = $this->requireEmployee($request);
-
-        $data = $request->validate([
-            'work_location_id' => ['nullable', 'exists:work_locations,id'],
-            'qr_token' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'device_id' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $event = $attendance->checkIn($employee, $data);
-
-        return response()->json($event, 201);
-    }
-
-    public function checkOut(Request $request, AttendanceService $attendance)
-    {
-        $employee = $this->requireEmployee($request);
-
-        $data = $request->validate([
-            'work_location_id' => ['nullable', 'exists:work_locations,id'],
-            'qr_token' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'device_id' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $event = $attendance->checkOut($employee, $data);
-
-        return response()->json($event, 201);
+        return $request->user()->company?->timezone ?: config('attendance.default_timezone');
     }
 
     private function requireEmployee(Request $request)

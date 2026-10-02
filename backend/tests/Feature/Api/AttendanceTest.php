@@ -69,16 +69,16 @@ class AttendanceTest extends TestCase
 
         $this->actingAs($user)->postJson('/api/attendance/check-out', $this->gps($company))->assertCreated();
 
-        $session = $employee->fresh();
         $response = $this->actingAs($admin)->getJson('/api/attendance');
         $response->assertOk();
         $data = $response->json('data');
         $this->assertCount(1, $data);
-        $this->assertEquals('completed', $data[0]['status']);
+        // No schedule assigned: the two scans still pair up into worked time.
+        $this->assertEquals(2, $data[0]['scan_count']);
         $this->assertEquals(240, $data[0]['worked_minutes']);
     }
 
-    public function test_cannot_check_in_twice_or_check_out_without_checking_in(): void
+    public function test_an_immediate_second_scan_is_a_double_tap_but_a_later_one_counts(): void
     {
         $company = app(CompanyProvisioner::class)->provision('Beta', 'Boss', 'boss@beta.test', 'password123');
         $this->subscribeToGrowth($company->id);
@@ -86,10 +86,11 @@ class AttendanceTest extends TestCase
         $user = $this->createUserWithRole($company, 'employee');
         Employee::query()->create(['company_id' => $company->id, 'name' => 'Worker', 'user_id' => $user->id]);
 
-        $this->actingAs($user)->postJson('/api/attendance/check-out', $this->gps($company))->assertStatus(422);
+        $this->actingAs($user)->postJson('/api/attendance/scan', $this->gps($company))->assertCreated();
+        $this->actingAs($user)->postJson('/api/attendance/scan', $this->gps($company))->assertStatus(422)->assertJsonValidationErrors('scan');
 
-        $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
-        $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertStatus(422);
+        $this->travel(3)->hours();
+        $this->actingAs($user)->postJson('/api/attendance/scan', $this->gps($company))->assertCreated();
     }
 
     public function test_employee_can_only_see_own_attendance(): void
@@ -139,10 +140,10 @@ class AttendanceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'approved');
 
-        $sessions = $this->actingAs($admin)->getJson('/api/attendance')->json('data');
-        $this->assertCount(1, $sessions);
-        $this->assertEquals('completed', $sessions[0]['status']);
-        $this->assertEquals(540, $sessions[0]['worked_minutes']);
+        $days = $this->actingAs($admin)->getJson('/api/attendance')->json('data');
+        $this->assertCount(1, $days);
+        $this->assertEquals(2, $days[0]['scan_count']);
+        $this->assertEquals(540, $days[0]['worked_minutes']);
     }
 
     public function test_employee_cannot_request_correction_for_another_employee(): void
