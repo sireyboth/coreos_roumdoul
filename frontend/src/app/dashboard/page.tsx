@@ -268,7 +268,7 @@ export default function DashboardPage() {
       value: summary ? (summary.attendance?.pending_corrections ?? null) : null,
       hint: "Waiting for review",
       icon: FileClock,
-      href: "/dashboard/attendance/corrections",
+      href: "/dashboard/attendance?tab=corrections",
       tone: "text-amber-600 dark:text-amber-400",
       soft: "bg-amber-500/14",
     });

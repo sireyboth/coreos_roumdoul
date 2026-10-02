@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight, Clock, Eye, FileDown, Hourglass, ListChecks, Sigma } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ChevronLeft, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Sigma } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
+import { AttendanceCorrections } from "@/components/dashboard/attendance-corrections";
 import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
 import { AttendanceSummary } from "@/components/dashboard/attendance-summary";
@@ -22,7 +23,9 @@ import { attendanceImport } from "@/lib/excel-specs/time";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
-type Tab = "records" | "overtime" | "summary";
+type Tab = "records" | "overtime" | "corrections" | "summary";
+
+const TABS: Tab[] = ["records", "overtime", "corrections", "summary"];
 
 /** The day's slots in one line: "08:07 ✓ · 12:00 ✗ · 13:02 ✓ · 17:15 ✓". */
 function SlotLine({ day }: { day: AttendanceDay }) {
@@ -61,7 +64,12 @@ function SlotLine({ day }: { day: AttendanceDay }) {
 export default function AttendancePage() {
   const { me } = useMe();
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
-  const [tab, setTab] = useState<Tab>("records");
+  // ?tab=corrections deep-links to a tab (the old Corrections page redirects here).
+  const [tab, setTab] = useState<Tab>(() => {
+    const wanted = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+    return TABS.includes(wanted as Tab) ? (wanted as Tab) : "records";
+  });
+  const pathname = usePathname();
   // The table shows one month at a time; a busy company records far more than one page a day.
   const [month, setMonth] = useState(currentMonth);
   const [reloads, setReloads] = useState(0);
@@ -71,6 +79,7 @@ export default function AttendancePage() {
   const [preview, setPreview] = useState<AttendanceDay | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingOvertime, setPendingOvertime] = useState(0);
+  const [pendingCorrections, setPendingCorrections] = useState(0);
 
   const key = `${month}|${reloads}`;
   const days = result?.key === key ? result.data : null;
@@ -116,7 +125,16 @@ export default function AttendancePage() {
       .overtime({ status: "pending" })
       .then((entries) => setPendingOvertime(entries.length))
       .catch(() => setPendingOvertime(0));
+    api.attendanceCorrections
+      .all()
+      .then((all) => setPendingCorrections(all.filter((c) => c.status === "pending").length))
+      .catch(() => setPendingCorrections(0));
   }, [canManage, reloads]);
+
+  function switchTab(next: Tab) {
+    setTab(next);
+    window.history.replaceState(null, "", next === "records" ? pathname : `${pathname}?tab=${next}`);
+  }
 
   const columns: DataTableColumn<AttendanceDay>[] = [
     ...(canManage
@@ -228,6 +246,8 @@ export default function AttendancePage() {
   const tabs: { id: Tab; label: string; icon: typeof Clock; visible: boolean; count?: number }[] = [
     { id: "records", label: "Records", icon: ListChecks, visible: true },
     { id: "overtime", label: "Overtime", icon: Hourglass, visible: canManage, count: pendingOvertime },
+    // Everyone: employees request their own corrections here, managers review them.
+    { id: "corrections", label: "Corrections", icon: FileClock, visible: true, count: canManage ? pendingCorrections : 0 },
     { id: "summary", label: "Monthly summary", icon: Sigma, visible: true },
   ];
 
@@ -236,11 +256,6 @@ export default function AttendancePage() {
       <div className="flex w-full flex-col gap-6">
         <PageHeader
           title="Attendance"
-          description={
-            <Link href="/dashboard/attendance/corrections" className="hover:underline">
-              Correction requests →
-            </Link>
-          }
           action={
             <div className="flex flex-wrap gap-2">
               {/* Export has its own dialog (date range, employee), so only Import comes from here. */}
@@ -258,9 +273,9 @@ export default function AttendancePage() {
             variant="warning"
             title={myIncomplete.length === 1 ? "One of your days is missing a scan" : `${myIncomplete.length} of your days are missing a scan`}
             action={
-              <Link href="/dashboard/attendance/corrections" className="text-sm font-medium underline">
+              <button type="button" onClick={() => switchTab("corrections")} className="text-sm font-medium underline">
                 Request a correction
-              </Link>
+              </button>
             }
           >
             {myIncomplete.map((d) => d.date).join(", ")} — those hours aren&apos;t fully counted until a correction adds the
@@ -296,7 +311,7 @@ export default function AttendancePage() {
                 type="button"
                 role="tab"
                 aria-selected={tab === t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => switchTab(t.id)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   tab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
@@ -360,6 +375,8 @@ export default function AttendancePage() {
         )}
 
         {tab === "overtime" && canManage && <OvertimeReview onChanged={load} />}
+
+        {tab === "corrections" && <AttendanceCorrections onChanged={load} />}
 
         {tab === "summary" && <AttendanceSummary canManage={canManage} />}
       </div>

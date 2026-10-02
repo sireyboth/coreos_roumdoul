@@ -19,11 +19,11 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
+import { dateOnly } from "@/lib/date";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function formatTime(iso: string): string {
@@ -50,7 +50,8 @@ function scansFor(date: string, times: string[]): string[] {
     });
 }
 
-export default function AttendanceCorrectionsPage() {
+/** The Corrections tab on the Attendance page: request a missed scan, and (managers) review requests. */
+export function AttendanceCorrections({ onChanged }: { onChanged?: () => void }) {
   const { me } = useMe();
   const [corrections, setCorrections] = useState<AttendanceCorrection[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -69,6 +70,12 @@ export default function AttendanceCorrectionsPage() {
     load();
   }, []);
 
+  // A review also changes the page's pending count, so the page reloads too.
+  function reload() {
+    load();
+    onChanged?.();
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -81,7 +88,7 @@ export default function AttendanceCorrectionsPage() {
       setReason("");
       setTimes([""]);
       setOpen(false);
-      load();
+      reload();
     } catch (err) {
       notifyError(err);
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
@@ -97,7 +104,7 @@ export default function AttendanceCorrectionsPage() {
     } catch (err) {
       notifyError(err);
     }
-    load();
+    reload();
   }
 
   async function handleReject(correction: AttendanceCorrection) {
@@ -107,160 +114,161 @@ export default function AttendanceCorrectionsPage() {
     } catch (err) {
       notifyError(err);
     }
-    load();
+    reload();
   }
 
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="flex w-full flex-col gap-6">
-        <PageHeader
-          title="Correction requests"
-          description="Fix a missed check-in or check-out."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <ExcelActions
-                onExport={exportCorrections}
-                // Importing files rows for other people, which only attendance managers may do.
-                importSpec={me?.permissions.includes("attendance.manage") ? attendanceImport : undefined}
-                onImported={load}
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">Fix a missed check-in or check-out.</p>
+        <div className="flex flex-wrap gap-2">
+          <ExcelActions
+            onExport={exportCorrections}
+            // Importing files rows for other people, which only attendance managers may do.
+            importSpec={me?.permissions.includes("attendance.manage") ? attendanceImport : undefined}
+            onImported={reload}
+          />
+          {me?.employee && (
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger
+                render={
+                  <Button>
+                    <Plus className="size-4" />
+                    Request correction
+                  </Button>
+                }
               />
-              {me?.employee && (
-                <Dialog open={open} onOpenChange={setOpen}>
-                  <DialogTrigger
-                    render={
-                      <Button>
-                        <Plus className="size-4" />
-                        Request correction
-                      </Button>
-                    }
-                  />
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Request a correction</DialogTitle>
-                      <DialogDescription>Your manager will need to approve this.</DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleCreate} className="flex flex-col gap-4">
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="date">Date</Label>
-                        <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label>Scans you missed</Label>
-                        <p className="-mt-1 text-xs text-muted-foreground">
-                          Only the ones you forgot — e.g. just 12:00 if you didn&apos;t scan out for lunch. Your schedule
-                          decides whether each is an IN or an OUT.
-                        </p>
-                        {times.map((time, i) => (
-                          <div key={i} className="flex items-center gap-2">
-                            <Input
-                              type="time"
-                              required
-                              aria-label={`Scan ${i + 1}`}
-                              value={time}
-                              onChange={(e) => setTimes((all) => all.map((t, j) => (j === i ? e.target.value : t)))}
-                              className="w-32"
-                            />
-                            {times.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label="Remove this time"
-                                onClick={() => setTimes((all) => all.filter((_, j) => j !== i))}
-                              >
-                                <X className="size-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                        {times.length < 8 && (
-                          <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setTimes((all) => [...all, ""])}>
-                            <Plus className="size-3.5" />
-                            Add another time
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Request a correction</DialogTitle>
+                  <DialogDescription>Your manager will need to approve this.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreate} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="date">Date</Label>
+                    <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>Scans you missed</Label>
+                    <p className="-mt-1 text-xs text-muted-foreground">
+                      Only the ones you forgot — e.g. just 12:00 if you didn&apos;t scan out for lunch. Your schedule
+                      decides whether each is an IN or an OUT.
+                    </p>
+                    {times.map((time, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          required
+                          aria-label={`Scan ${i + 1}`}
+                          value={time}
+                          onChange={(e) => setTimes((all) => all.map((t, j) => (j === i ? e.target.value : t)))}
+                          className="w-32"
+                        />
+                        {times.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Remove this time"
+                            onClick={() => setTimes((all) => all.filter((_, j) => j !== i))}
+                          >
+                            <X className="size-3.5" />
                           </Button>
                         )}
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="reason">Reason</Label>
-                        <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
-                      </div>
-                      {error && <Alert variant="destructive">{error}</Alert>}
-                      <DialogFooter>
-                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-                        <Button type="submit" disabled={saving}>
-                          {saving ? "Submitting…" : "Submit request"}
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          }
-        />
-
-        {corrections === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {corrections?.length === 0 && (
-          <EmptyState icon={FileEdit} title="No correction requests" description="Nothing to review right now." />
-        )}
-
-        {corrections && corrections.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canManage && <TableHead>Employee</TableHead>}
-                <TableHead>Date</TableHead>
-                <TableHead>Scans to add</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Status</TableHead>
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {corrections.map((correction) => (
-                <TableRow key={correction.id}>
-                  {canManage && <TableCell className="font-medium">{correction.employee.name}</TableCell>}
-                  <TableCell>{correction.date}</TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">
-                    {correction.requested_times.map(formatTime).join(" · ") || "—"}
-                  </TableCell>
-                  <TableCell className="max-w-48 truncate text-muted-foreground">{correction.reason}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        correction.status === "approved"
-                          ? "success"
-                          : correction.status === "rejected"
-                            ? "destructive"
-                            : "warning"
-                      }
-                    >
-                      {correction.status}
-                    </Badge>
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      {correction.status === "pending" && (
-                        <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleApprove(correction)}>
-                            Approve
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleReject(correction)}>
-                            Reject
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+                    ))}
+                    {times.length < 8 && (
+                      <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setTimes((all) => [...all, ""])}>
+                        <Plus className="size-3.5" />
+                        Add another time
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="reason">Reason</Label>
+                    <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
+                  </div>
+                  {error && <Alert variant="destructive">{error}</Alert>}
+                  <DialogFooter>
+                    <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? "Submitting…" : "Submit request"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
+
+      {corrections === null && <p className="text-sm text-muted-foreground">Loading…</p>}
+
+      {corrections?.length === 0 && (
+        <EmptyState icon={FileEdit} title="No correction requests" description="Nothing to review right now." />
+      )}
+
+      {corrections && corrections.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {canManage && <TableHead>Employee</TableHead>}
+              <TableHead>Date</TableHead>
+              <TableHead>Scans to add</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Status</TableHead>
+              {canManage && <TableHead className="text-right">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {corrections.map((correction) => (
+              <TableRow key={correction.id}>
+                {canManage && <TableCell className="font-medium">{correction.employee.name}</TableCell>}
+                <TableCell className="whitespace-nowrap">
+                  {new Date(dateOnly(correction.date) + "T00:00:00").toLocaleDateString([], {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </TableCell>
+                <TableCell className="tabular-nums text-muted-foreground">
+                  {correction.requested_times.map(formatTime).join(" · ") || "—"}
+                </TableCell>
+                <TableCell className="max-w-48 truncate text-muted-foreground">{correction.reason}</TableCell>
+                <TableCell>
+                  <Badge
+                    variant={
+                      correction.status === "approved"
+                        ? "success"
+                        : correction.status === "rejected"
+                          ? "destructive"
+                          : "warning"
+                    }
+                  >
+                    {correction.status}
+                  </Badge>
+                </TableCell>
+                {canManage && (
+                  <TableCell className="text-right">
+                    {correction.status === "pending" && (
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleApprove(correction)}>
+                          Approve
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleReject(correction)}>
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
