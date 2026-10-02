@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-// A forgotten check-out is flagged for a manager to fix, not left "open" forever.
-Schedule::command('attendance:close-stale')->hourly();
+// Turns unscanned work days into absences and unanswered slots into missing scans once each day closes.
+Schedule::command('attendance:close-days')->hourly();

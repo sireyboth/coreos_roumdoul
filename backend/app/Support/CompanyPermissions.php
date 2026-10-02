@@ -12,7 +12,7 @@ class CompanyPermissions
 {
     public const RESOURCES = [
         'branches', 'departments', 'teams', 'employees', 'users', 'roles',
-        'work_locations', 'shifts', 'holidays', 'schedules', 'attendance',
+        'work_locations', 'work_schedules', 'holidays', 'schedules', 'attendance',
         // An employee's pay. Separate from employees.* on purpose: someone can
         // run the staff list without seeing what anyone earns.
         'salary',
@@ -83,8 +83,8 @@ class CompanyPermissions
                 'employees.view',
                 'employees.manage',
                 'work_locations.view',
-                'shifts.view',
-                'shifts.manage',
+                'work_schedules.view',
+                'work_schedules.manage',
                 'holidays.view',
                 'holidays.manage',
                 'schedules.view',

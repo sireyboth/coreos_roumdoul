@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Attendance\AttendanceRecorder;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +15,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One per request (or job): it caches which months are locked, and
+        // that answer must not outlive the request that asked.
+        $this->app->scoped(AttendanceRecorder::class);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AttendanceService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -20,10 +21,13 @@ class AttendanceCorrectionController extends Controller
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
         }
 
-        return $query->orderByDesc('created_at')->paginate(min(max($request->integer('per_page', 50), 1), 500));
+        $corrections = $query->orderByDesc('created_at')->paginate(min(max($request->integer('per_page', 50), 1), 500));
+        $corrections->getCollection()->each(fn (AttendanceCorrection $c) => $c->append('requested_times'));
+
+        return $corrections;
     }
 
-    public function store(Request $request)
+    public function store(Request $request, AttendanceRecorder $recorder)
     {
         $canManageOthers = $request->user()->hasCompanyPermission('attendance.manage');
 
@@ -31,13 +35,20 @@ class AttendanceCorrectionController extends Controller
             'employee_id' => [$canManageOthers ? 'required' : 'nullable', 'exists:employees,id'],
             'date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
+            // Any number of scans to add, e.g. just the forgotten 12:00 OUT. Typed on
+            // the company's clock ("2026-10-05T12:00"). The older check-in / check-out
+            // pair is still accepted and simply becomes one or two scans.
+            'scans' => ['nullable', 'array', 'max:12'],
+            'scans.*' => ['required', 'date', 'distinct'],
             'requested_check_in' => ['nullable', 'date'],
             'requested_check_out' => ['nullable', 'date'],
         ]);
 
-        if (empty($data['requested_check_in']) && empty($data['requested_check_out'])) {
+        $times = array_values(array_filter([...($data['scans'] ?? []), $data['requested_check_in'] ?? null, $data['requested_check_out'] ?? null]));
+
+        if ($times === []) {
             throw ValidationException::withMessages([
-                'requested_check_in' => ['Provide a check-in and/or check-out time to request.'],
+                'scans' => ['Add at least one scan time to request.'],
             ]);
         }
 
@@ -55,21 +66,25 @@ class AttendanceCorrectionController extends Controller
 
         // The times were typed on the employee's wall clock — read them in the
         // company's timezone, then store them as the same instant in UTC.
-        $timezone = Employee::query()->findOrFail($employeeId)->company?->timezone ?: config('attendance.default_timezone');
-        $toUtc = fn (?string $value) => $value
-            ? Carbon::parse($value, $timezone)->setTimezone(config('app.timezone'))
-            : null;
+        $employee = Employee::query()->findOrFail($employeeId);
+        $timezone = $employee->company?->timezone ?: config('attendance.default_timezone');
+        $recorder->assertUnlocked($employee->company_id, Carbon::parse($data['date'])->toDateString());
+
+        $scans = collect($times)
+            ->map(fn (string $value) => Carbon::parse($value, $timezone)->setTimezone(config('app.timezone')))
+            ->sortBy(fn (Carbon $time) => $time->getTimestamp())
+            ->map(fn (Carbon $time) => $time->toIso8601String())
+            ->values()->all();
 
         $correction = AttendanceCorrection::query()->create([
             'employee_id' => $employeeId,
             'date' => $data['date'],
             'requested_by' => $request->user()->id,
             'reason' => $data['reason'],
-            'requested_check_in' => $toUtc($data['requested_check_in'] ?? null),
-            'requested_check_out' => $toUtc($data['requested_check_out'] ?? null),
+            'requested_scans' => $scans,
         ]);
 
-        return response()->json($correction->load('employee'), 201);
+        return response()->json($correction->load('employee')->append('requested_times'), 201);
     }
 
     public function approve(Request $request, AttendanceCorrection $correction, AttendanceService $attendance)
@@ -84,7 +99,7 @@ class AttendanceCorrectionController extends Controller
 
         $attendance->approveCorrection($correction, $request->user()->id, $data['review_notes'] ?? null);
 
-        return $correction->fresh(['employee', 'session']);
+        return $correction->fresh(['employee'])->append('requested_times');
     }
 
     public function reject(Request $request, AttendanceCorrection $correction)

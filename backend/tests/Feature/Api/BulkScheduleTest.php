@@ -7,17 +7,18 @@ use App\Models\DayOff;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\WorkLocation;
+use App\Models\WorkSchedule;
 use App\Services\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 class BulkScheduleTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private const WEEKDAYS = [1, 2, 3, 4, 5];
 
@@ -25,7 +26,7 @@ class BulkScheduleTest extends TestCase
 
     private $admin;
 
-    private Shift $shift;
+    private WorkSchedule $shift;
 
     /** @var array<int, Employee> */
     private array $staff = [];
@@ -37,10 +38,7 @@ class BulkScheduleTest extends TestCase
 
         $this->company = app(CompanyProvisioner::class)->provision('Roster Co', 'Boss', 'boss@roster.test', 'password123');
         $this->admin = $this->company->users()->first();
-        $this->shift = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00',
-            'break_minutes' => 60, 'grace_minutes' => 10,
-        ]);
+        $this->shift = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], ['name' => 'Day', 'late_grace_minutes' => 10, 'break_minutes' => 60]);
         foreach (['A', 'B', 'C'] as $name) {
             $this->staff[$name] = Employee::query()->create(['company_id' => $this->company->id, 'name' => $name]);
         }
@@ -52,7 +50,7 @@ class BulkScheduleTest extends TestCase
 
         return $this->actingAs($as ?? $this->admin)->postJson('/api/schedules/bulk', $overrides + [
             'employee_ids' => collect($this->staff)->pluck('id')->all(),
-            'shift_id' => $this->shift->id,
+            'work_schedule_id' => $this->shift->id,
             // 2026-09-14 (Mon) to 2026-09-27 (Sun): two full weeks.
             'from' => '2026-09-14',
             'to' => '2026-09-27',
@@ -68,7 +66,7 @@ class BulkScheduleTest extends TestCase
         $this->assertSame(30, Schedule::query()->count());
         $this->assertSame(0, Schedule::query()->whereIn(\DB::raw("strftime('%w', date)"), ['0', '6'])->count());
         $this->assertSame(10, Schedule::query()->where('employee_id', $this->staff['A']->id)->count());
-        $this->assertSame($this->shift->id, Schedule::query()->first()->shift_id);
+        $this->assertSame($this->shift->id, Schedule::query()->first()->work_schedule_id);
     }
 
     public function test_a_single_day_still_works_like_before(): void
@@ -84,7 +82,7 @@ class BulkScheduleTest extends TestCase
         Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Yearly', 'date' => '2020-09-17', 'is_recurring_yearly' => true]);
         DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $this->staff['A']->id, 'date' => '2026-09-18']);
         $existing = Schedule::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $this->staff['B']->id, 'shift_id' => $this->shift->id, 'date' => '2026-09-14',
+            'company_id' => $this->company->id, 'employee_id' => $this->staff['B']->id, 'work_schedule_id' => $this->shift->id, 'date' => '2026-09-14',
         ]);
         $gone = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Gone', 'employment_status' => 'terminated']);
 
@@ -129,11 +127,8 @@ class BulkScheduleTest extends TestCase
 
     public function test_the_shift_location_range_and_people_are_checked(): void
     {
-        $inactive = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Old', 'start_time' => '09:00', 'end_time' => '18:00',
-            'break_minutes' => 0, 'grace_minutes' => 0, 'is_active' => false,
-        ]);
-        $this->bulk(['shift_id' => $inactive->id])->assertStatus(422)->assertJsonValidationErrors('shift_id');
+        $inactive = $this->makeWorkSchedule($this->company, [['in', '09:00'], ['out', '18:00']], ['name' => 'Old', 'is_active' => false]);
+        $this->bulk(['work_schedule_id' => $inactive->id])->assertStatus(422)->assertJsonValidationErrors('work_schedule_id');
 
         $this->bulk(['from' => '2026-01-01', 'to' => '2026-12-31'])->assertStatus(422)->assertJsonValidationErrors('to');
         $this->bulk(['weekdays' => [0], 'from' => '2026-09-15', 'to' => '2026-09-19'])->assertStatus(422)->assertJsonValidationErrors('weekdays');
@@ -147,14 +142,12 @@ class BulkScheduleTest extends TestCase
     {
         $rival = app(CompanyProvisioner::class)->provision('Rival', 'Rival', 'boss@rival.test', 'password123');
         $spy = Employee::query()->create(['company_id' => $rival->id, 'name' => 'Spy']);
-        $rivalShift = Shift::query()->create([
-            'company_id' => $rival->id, 'name' => 'Theirs', 'start_time' => '08:00', 'end_time' => '17:00', 'break_minutes' => 0, 'grace_minutes' => 0,
-        ]);
+        $rivalShift = $this->makeWorkSchedule($rival, [['in', '08:00'], ['out', '17:00']], ['name' => 'Theirs']);
         $rivalBranch = Branch::query()->create(['company_id' => $rival->id, 'name' => 'HQ', 'latitude' => 1, 'longitude' => 1]);
         $rivalLocation = WorkLocation::query()->create(['company_id' => $rival->id, 'branch_id' => $rivalBranch->id, 'name' => 'HQ']);
 
         $this->bulk(['employee_ids' => [$this->staff['A']->id, $spy->id]])->assertStatus(422)->assertJsonValidationErrors('employee_ids');
-        $this->bulk(['shift_id' => $rivalShift->id])->assertStatus(422)->assertJsonValidationErrors('shift_id');
+        $this->bulk(['work_schedule_id' => $rivalShift->id])->assertStatus(422)->assertJsonValidationErrors('work_schedule_id');
         $this->bulk(['work_location_id' => $rivalLocation->id])->assertStatus(422)->assertJsonValidationErrors('work_location_id');
         $this->assertSame(0, Schedule::query()->count());
     }

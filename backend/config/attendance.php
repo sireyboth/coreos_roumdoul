@@ -33,4 +33,27 @@ return [
     // Used when a company has no timezone set.
     'default_timezone' => 'Asia/Phnom_Penh',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Matching scans to a work schedule's slots
+    |--------------------------------------------------------------------------
+    |
+    | duplicate_scan_minutes: two scans this close together are one (a double
+    | tap on the scanner). max_match_minutes: a scan further than this from
+    | a slot can't be that slot's scan. A slot with no scan is "pending"
+    | until missing_after_minutes past its time, then "missing". A day is
+    | final (closed) close_after_minutes after its last slot — that's when
+    | unanswered slots and absences become definite.
+    |
+    */
+
+    'duplicate_scan_minutes' => (int) env('ATTENDANCE_DUPLICATE_SCAN_MINUTES', 2),
+    'max_match_minutes' => (int) env('ATTENDANCE_MAX_MATCH_MINUTES', 360),
+    'missing_after_minutes' => (int) env('ATTENDANCE_MISSING_AFTER_MINUTES', 120),
+    'close_after_minutes' => (int) env('ATTENDANCE_CLOSE_AFTER_MINUTES', 240),
+
+    // Hours counted as night work (for payroll), on the company's clock.
+    'night_start' => env('ATTENDANCE_NIGHT_START', '22:00'),
+    'night_end' => env('ATTENDANCE_NIGHT_END', '05:00'),
+
 ];

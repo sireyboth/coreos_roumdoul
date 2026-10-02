@@ -2,15 +2,17 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\AttendanceSession;
+use App\Models\AttendanceEvent;
+use App\Models\Branch;
 use App\Models\DayOff;
 use App\Models\Employee;
 use App\Models\Holiday;
+use App\Models\MembershipBranchAccess;
 use App\Models\Plan;
-use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\WorkSchedule;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\CompanyProvisioner;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
@@ -18,11 +20,12 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 class CalendarTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
@@ -32,7 +35,7 @@ class CalendarTest extends TestCase
 
     private Employee $employee;
 
-    private Shift $shift;
+    private WorkSchedule $schedule;
 
     protected function setUp(): void
     {
@@ -51,9 +54,8 @@ class CalendarTest extends TestCase
         $this->admin = $this->company->users()->first();
         $this->user = $this->createUserWithRole($this->company, 'employee');
         $this->employee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Worker', 'user_id' => $this->user->id]);
-        $this->shift = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00',
-            'break_minutes' => 60, 'grace_minutes' => 10,
+        $this->schedule = $this->makeWorkSchedule($this->company, attributes: [
+            'name' => 'Day', 'break_minutes' => 60, 'late_grace_minutes' => 10,
         ]);
 
         // Mid-month, 10:00 in Phnom Penh.
@@ -73,31 +75,50 @@ class CalendarTest extends TestCase
         return collect($calendar['days'])->firstWhere('date', $date);
     }
 
-    private function schedule(string $date): Schedule
+    /** A scan at a Phnom Penh wall-clock time. */
+    private function scanAt(string $local): void
     {
-        return Schedule::query()->create([
+        AttendanceEvent::query()->create([
             'company_id' => $this->company->id, 'employee_id' => $this->employee->id,
-            'shift_id' => $this->shift->id, 'date' => $date,
+            'method' => 'qr', 'event_time' => Carbon::parse($local, 'Asia/Phnom_Penh')->utc(),
         ]);
     }
 
     public function test_each_day_is_classified_as_work_holiday_day_off_or_weekly_off(): void
     {
-        $this->company->update(['default_rest_days' => [0]]); // Sundays
-        $this->schedule('2026-09-14');
+        // Assigned from the 2nd, with Sundays off.
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-02', daysOff: [0]);
         Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Pchum Ben', 'date' => '2026-09-22']);
         DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'date' => '2026-09-23', 'reason' => 'Sick']);
 
         $calendar = $this->month();
 
         $this->assertCount(30, $calendar['days']);
-        $this->assertSame('work', $this->day($calendar, '2026-09-14')['type']);
+        $work = $this->day($calendar, '2026-09-14');
+        $this->assertSame('work', $work['type']);
+        $this->assertSame('Day', $work['schedule']['name']);
+        $this->assertSame('assignment', $work['schedule']['source']);
+        $this->assertSame(['in', 'out'], array_column($work['schedule']['slots'], 'type'));
         $this->assertSame('holiday', $this->day($calendar, '2026-09-22')['type']);
         $this->assertSame('Pchum Ben', $this->day($calendar, '2026-09-22')['label']);
         $this->assertSame('day_off', $this->day($calendar, '2026-09-23')['type']);
         $this->assertSame('Sick', $this->day($calendar, '2026-09-23')['label']);
         $this->assertSame('weekly_off', $this->day($calendar, '2026-09-20')['type']); // a Sunday
-        $this->assertSame('none', $this->day($calendar, '2026-09-16')['type']);
+        $this->assertSame('none', $this->day($calendar, '2026-09-01')['type']);      // before the assignment
+    }
+
+    public function test_a_roster_override_replaces_the_assignment_for_that_day(): void
+    {
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01');
+        $split = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '12:00'], ['in', '13:00'], ['out', '17:00']], ['name' => 'Split']);
+        $override = $this->overrideOn($this->employee, $split, '2026-09-18');
+
+        $day = $this->day($this->month(), '2026-09-18');
+
+        $this->assertSame('Split', $day['schedule']['name']);
+        $this->assertSame('override', $day['schedule']['source']);
+        $this->assertCount(4, $day['schedule']['slots']);
+        $this->assertSame($override->id, $day['schedule_id']);
     }
 
     public function test_yearly_holidays_show_up_in_other_years_months(): void
@@ -109,33 +130,30 @@ class CalendarTest extends TestCase
 
     public function test_past_work_days_show_what_happened(): void
     {
-        foreach (['2026-09-10', '2026-09-11', '2026-09-12', '2026-09-13', '2026-09-15', '2026-09-16'] as $date) {
-            $this->schedule($date);
-        }
-        $event = fn () => \App\Models\AttendanceEvent::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $this->employee->id,
-            'event_type' => 'check_in', 'event_time' => now(),
-        ]);
-        $session = fn (string $date, array $attrs) => AttendanceSession::query()->create(array_merge([
-            'company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'date' => $date,
-            'check_in_event_id' => $event()->id, 'status' => 'completed', 'late_minutes' => 0,
-        ], $attrs));
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-10');
 
-        $session('2026-09-10', []);
-        $session('2026-09-11', ['late_minutes' => 25]);
-        $session('2026-09-12', ['status' => 'missing_checkout']);
-        // 09-13: scheduled, never showed up. 09-15 is today with no check-in yet. 09-16 is the future.
+        $this->scanAt('2026-09-10 08:00');
+        $this->scanAt('2026-09-10 17:00');
+        $this->scanAt('2026-09-11 08:35'); // 25 min late (past the 10 min grace)
+        $this->scanAt('2026-09-11 17:00');
+        $this->scanAt('2026-09-12 08:00'); // never scanned out
+        // 13th and 14th: scheduled, never showed up. 15th is today (no scan yet), 16th the future.
+        app(AttendanceRecorder::class)->recalculateRange($this->employee, '2026-09-10', '2026-09-15');
 
         $calendar = $this->month();
 
         $this->assertSame('present', $this->day($calendar, '2026-09-10')['attendance']);
+        $this->assertSame(['08:00', '17:00'], $this->day($calendar, '2026-09-10')['scans']);
         $this->assertSame('late', $this->day($calendar, '2026-09-11')['attendance']);
-        $this->assertSame('missing_checkout', $this->day($calendar, '2026-09-12')['attendance']);
+        $this->assertSame(25, $this->day($calendar, '2026-09-11')['late_minutes']);
+        $this->assertSame('incomplete', $this->day($calendar, '2026-09-12')['attendance']);
+        $this->assertContains('missing_out', $this->day($calendar, '2026-09-12')['exceptions']);
         $this->assertSame('absent', $this->day($calendar, '2026-09-13')['attendance']);
         $this->assertNull($this->day($calendar, '2026-09-15')['attendance']);
         $this->assertNull($this->day($calendar, '2026-09-16')['attendance']);
-        $this->assertSame(1, $calendar['summary']['absent']);
+        $this->assertSame(2, $calendar['summary']['absent']);
         $this->assertSame(1, $calendar['summary']['late']);
+        $this->assertSame(1, $calendar['summary']['incomplete']);
         $this->assertSame(3, $calendar['summary']['present']);
     }
 
@@ -149,11 +167,24 @@ class CalendarTest extends TestCase
         $this->assertSame($otherEmployee->id, $this->month($this->admin, "&employee_id={$otherEmployee->id}")['employee']['id']);
     }
 
-    public function test_a_manager_can_set_weekly_days_off_and_mark_and_remove_a_day_off(): void
+    public function test_people_on_the_same_schedule_can_have_different_weekly_days_off(): void
     {
-        $this->actingAs($this->admin)->putJson('/api/calendar/weekly-off-days', ['days' => [6, 0]])
-            ->assertOk()->assertJson(['weekly_off_days' => [0, 6]]);
-        $this->assertSame([0, 6], $this->company->fresh()->default_rest_days);
+        $other = $this->createUserWithRole($this->company, 'employee');
+        $otherEmployee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Other', 'user_id' => $other->id]);
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01', daysOff: [0]); // Sundays
+        $this->assignSchedule($otherEmployee, $this->schedule, '2026-09-01', daysOff: [3]);  // Wednesdays
+
+        $mine = $this->month($this->admin, "&employee_id={$this->employee->id}");
+        $theirs = $this->month($this->admin, "&employee_id={$otherEmployee->id}");
+
+        // Sunday the 20th, Wednesday the 23rd.
+        $this->assertSame(['weekly_off', 'work'], [$this->day($mine, '2026-09-20')['type'], $this->day($mine, '2026-09-23')['type']]);
+        $this->assertSame(['work', 'weekly_off'], [$this->day($theirs, '2026-09-20')['type'], $this->day($theirs, '2026-09-23')['type']]);
+    }
+
+    public function test_a_manager_can_mark_and_remove_a_day_off(): void
+    {
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01');
 
         $this->app['auth']->forgetGuards();
         $id = $this->actingAs($this->admin)->postJson('/api/days-off', [
@@ -164,19 +195,17 @@ class CalendarTest extends TestCase
 
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->admin)->deleteJson("/api/days-off/{$id}")->assertNoContent();
-        $this->assertNotSame('day_off', $this->day($this->month($this->admin, "&employee_id={$this->employee->id}"), '2026-09-18')['type']);
+        $this->assertSame('work', $this->day($this->month($this->admin, "&employee_id={$this->employee->id}"), '2026-09-18')['type']);
     }
 
-    public function test_a_regular_employee_cannot_manage_days_off_or_weekly_days(): void
+    public function test_a_regular_employee_cannot_manage_days_off(): void
     {
         $this->actingAs($this->user)->postJson('/api/days-off', ['employee_id' => $this->employee->id, 'date' => '2026-09-18'])->assertForbidden();
-        $this->app['auth']->forgetGuards();
-        $this->actingAs($this->user)->putJson('/api/calendar/weekly-off-days', ['days' => [0]])->assertForbidden();
     }
 
-    public function test_a_day_off_and_a_shift_cannot_share_a_day(): void
+    public function test_a_day_off_and_a_roster_override_cannot_share_a_day(): void
     {
-        $this->schedule('2026-09-18');
+        $this->overrideOn($this->employee, $this->schedule, '2026-09-18');
 
         $this->actingAs($this->admin)->postJson('/api/days-off', ['employee_id' => $this->employee->id, 'date' => '2026-09-18'])
             ->assertStatus(422)->assertJsonValidationErrors('date');
@@ -184,7 +213,7 @@ class CalendarTest extends TestCase
         $this->app['auth']->forgetGuards();
         DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'date' => '2026-09-19']);
         $this->actingAs($this->admin)->postJson('/api/schedules', [
-            'employee_id' => $this->employee->id, 'shift_id' => $this->shift->id, 'date' => '2026-09-19',
+            'employee_id' => $this->employee->id, 'work_schedule_id' => $this->schedule->id, 'date' => '2026-09-19',
         ])->assertStatus(422)->assertJsonValidationErrors('date');
     }
 
@@ -208,7 +237,7 @@ class CalendarTest extends TestCase
     public function test_the_team_roster_shows_every_employee_with_the_same_day_types_as_their_own_calendar(): void
     {
         $other = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Aardvark']);
-        $this->schedule('2026-09-10');
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01', daysOff: [0]);
         Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Big Day', 'date' => '2026-09-24']);
 
         $team = $this->team()->assertOk()->json();
@@ -223,7 +252,10 @@ class CalendarTest extends TestCase
 
         // The roster and the personal calendar are built by the same code.
         // (The roster leaves out empty fields to keep the payload small; the app reads a missing one as "none".)
-        $personal = array_map(fn ($day) => array_filter($day, fn ($value) => $value !== null), $this->month($this->admin, "&employee_id={$this->employee->id}")['days']);
+        $personal = array_map(
+            fn ($day) => array_filter($day, fn ($value) => $value !== null && $value !== []),
+            $this->month($this->admin, "&employee_id={$this->employee->id}")['days'],
+        );
         $this->assertEquals($personal, $worker['days']);
         $this->assertSame('none', collect(collect($team['employees'])->firstWhere('id', $other->id)['days'])->firstWhere('date', '2026-09-10')['type']);
     }
@@ -235,9 +267,8 @@ class CalendarTest extends TestCase
 
     public function test_the_team_roster_can_be_filtered_by_branch_and_respects_branch_access(): void
     {
-        $branchA = \App\Models\Branch::query()->create(['company_id' => $this->company->id, 'name' => 'A']);
-        $branchB = \App\Models\Branch::query()->create(['company_id' => $this->company->id, 'name' => 'B']);
-
+        $branchA = Branch::query()->create(['company_id' => $this->company->id, 'name' => 'A']);
+        $branchB = Branch::query()->create(['company_id' => $this->company->id, 'name' => 'B']);
         $this->app['auth']->forgetGuards();
         $this->actingAs($this->admin)->postJson('/api/employees', ['name' => 'Alice', 'branch_id' => $branchA->id])->assertCreated();
         $this->actingAs($this->admin)->postJson('/api/employees', ['name' => 'Bob', 'branch_id' => $branchB->id])->assertCreated();
@@ -248,7 +279,7 @@ class CalendarTest extends TestCase
 
         // A manager limited to branch A never sees Bob, even without a filter.
         $manager = $this->createUserWithRole($this->company, 'manager');
-        \App\Models\MembershipBranchAccess::query()->create([
+        MembershipBranchAccess::query()->create([
             'company_membership_id' => $manager->membership->id, 'branch_id' => $branchA->id, 'created_at' => now(),
         ]);
 
@@ -306,15 +337,17 @@ class CalendarTest extends TestCase
         $this->actingAs($this->user)->postJson('/api/holidays/import', $payload)->assertForbidden();
     }
 
-    public function test_managers_can_read_the_current_weekly_days_off_and_others_cannot(): void
+    public function test_a_holiday_added_afterwards_turns_a_past_absence_into_a_holiday(): void
     {
-        $this->app['auth']->forgetGuards();
-        $this->actingAs($this->admin)->putJson('/api/calendar/weekly-off-days', ['days' => [0, 6]])->assertOk();
-
-        $this->actingAs($this->admin)->getJson('/api/calendar/weekly-off-days')
-            ->assertOk()->assertJsonPath('weekly_off_days', [0, 6]);
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01');
+        app(AttendanceRecorder::class)->recalculateRange($this->employee, '2026-09-10', '2026-09-10');
+        $this->assertSame('absent', $this->day($this->month(), '2026-09-10')['attendance']);
 
         $this->app['auth']->forgetGuards();
-        $this->actingAs($this->user)->getJson('/api/calendar/weekly-off-days')->assertForbidden();
+        $this->actingAs($this->admin)->postJson('/api/holidays', ['name' => 'Surprise', 'date' => '2026-09-10'])->assertCreated();
+
+        $day = $this->day($this->month(), '2026-09-10');
+        $this->assertSame('holiday', $day['type']);
+        $this->assertNull($day['attendance']);
     }
 }

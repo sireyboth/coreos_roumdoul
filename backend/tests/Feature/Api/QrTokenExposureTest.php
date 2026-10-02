@@ -5,7 +5,6 @@ namespace Tests\Feature\Api;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WorkLocation;
@@ -15,6 +14,7 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 /**
@@ -25,7 +25,7 @@ use Tests\TestCase;
  */
 class QrTokenExposureTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $admin;
 
@@ -66,11 +66,9 @@ class QrTokenExposureTest extends TestCase
         // Give the employee a schedule at the branch and a real QR check-in,
         // so schedules and attendance responses have a location to nest.
         $employee = Employee::query()->where('user_id', $this->employeeUser->id)->firstOrFail();
-        $shift = Shift::query()->create([
-            'company_id' => $company->id, 'name' => 'Day', 'start_time' => '00:00', 'end_time' => '23:59', 'break_minutes' => 0, 'grace_minutes' => 0,
-        ]);
+        $shift = $this->makeWorkSchedule($company, [['in', '00:00'], ['out', '23:59']], ['name' => 'Day']);
         Schedule::query()->create([
-            'company_id' => $company->id, 'employee_id' => $employee->id, 'shift_id' => $shift->id,
+            'company_id' => $company->id, 'employee_id' => $employee->id, 'work_schedule_id' => $shift->id,
             'work_location_id' => WorkLocation::query()->where('branch_id', $this->branchId)->value('id'), 'date' => now()->toDateString(),
         ]);
         $this->as($this->employeeUser)->postJson('/api/attendance/check-in', ['qr_token' => $this->token])->assertCreated();

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCompany;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,7 @@ class AttendanceCorrection extends Model
         'reason',
         'requested_check_in',
         'requested_check_out',
+        'requested_scans',
         'status',
         'reviewed_by',
         'reviewed_at',
@@ -33,6 +35,8 @@ class AttendanceCorrection extends Model
             'date' => 'date',
             'requested_check_in' => 'datetime',
             'requested_check_out' => 'datetime',
+            // UTC instants, like requested_check_in/out.
+            'requested_scans' => 'array',
             'reviewed_at' => 'datetime',
         ];
     }
@@ -42,9 +46,28 @@ class AttendanceCorrection extends Model
         return $this->belongsTo(Employee::class)->withTrashed();
     }
 
-    public function session(): BelongsTo
+    /**
+     * Every scan time this correction asks to add, oldest first. Newer
+     * requests list them in requested_scans; older ones only ever had a
+     * check-in and/or a check-out.
+     *
+     * @return array<int, Carbon>
+     */
+    /** The same times as ISO strings, for the API (`requested_times`). */
+    public function getRequestedTimesAttribute(): array
     {
-        return $this->belongsTo(AttendanceSession::class);
+        return array_map(fn (Carbon $time) => $time->toIso8601String(), $this->requestedTimes());
+    }
+
+    public function requestedTimes(): array
+    {
+        $times = $this->requested_scans
+            ? array_map(fn (string $time) => Carbon::parse($time), $this->requested_scans)
+            : array_filter([$this->requested_check_in, $this->requested_check_out]);
+
+        usort($times, fn (Carbon $a, Carbon $b) => $a->getTimestamp() <=> $b->getTimestamp());
+
+        return array_values($times);
     }
 
     public function requestedBy(): BelongsTo

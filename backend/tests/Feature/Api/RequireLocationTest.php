@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\AttendanceEvent;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -85,7 +86,7 @@ class RequireLocationTest extends TestCase
             ->assertJsonPath('code', 'location_required')
             ->assertJsonValidationErrors('latitude');
 
-        $this->assertSame(0, \App\Models\AttendanceEvent::query()->count());
+        $this->assertSame(0, AttendanceEvent::query()->count());
     }
 
     public function test_when_required_a_scan_from_inside_the_radius_works_and_from_outside_does_not(): void
@@ -103,6 +104,8 @@ class RequireLocationTest extends TestCase
     {
         $this->branch(true);
         $this->as($this->staff)->postJson('/api/attendance/check-in', ['qr_token' => $this->token] + self::HERE)->assertCreated();
+        // Later in the day (an immediate second scan would just be a double tap).
+        $this->travel(4)->hours();
 
         $this->as($this->staff)->postJson('/api/attendance/check-out', ['qr_token' => $this->token])
             ->assertStatus(422)->assertJsonPath('code', 'location_required');

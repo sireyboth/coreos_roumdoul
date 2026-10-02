@@ -1,5 +1,6 @@
 import {
   Building2,
+  CalendarClock,
   CalendarDays,
   Clock,
   FileClock,
@@ -10,7 +11,6 @@ import {
   Network,
   PartyPopper,
   ShieldCheck,
-  Timer,
   User,
   Users,
   UsersRound,
@@ -43,7 +43,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/attendance", label: "Attendance", icon: Clock, tone: "from-emerald-500 to-teal-500", permission: "attendance.view", module: "attendance" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, tone: "from-teal-500 to-cyan-500", permission: "schedules.view" },
-      { href: "/dashboard/shifts", label: "Shifts", icon: Timer, tone: "from-amber-500 to-orange-500", permission: "shifts.view" },
+      { href: "/dashboard/work-schedules", label: "Work Schedules", icon: CalendarClock, tone: "from-amber-500 to-orange-500", permission: "work_schedules.view" },
       { href: "/dashboard/holidays", label: "Holidays", icon: PartyPopper, tone: "from-pink-500 to-rose-500", permission: "holidays.view" },
     ],
   },

@@ -219,11 +219,12 @@ class AttendanceQrCheckInTest extends TestCase
 
         $this->assertSame('Reviewed', $record['employee']['name']);
         $this->assertSame('Riverside', $record['employee']['branch']['name']);
-        $this->assertSame('qr', $record['check_in_event']['method']);
-        $this->assertSame('Riverside', $record['check_in_event']['work_location']['name']);
-        $this->assertSame('12 Sisowath Quay', $record['check_in_event']['work_location']['address']);
-        $this->assertLessThan(100, $record['check_in_event']['distance_meters']);
-        $this->assertNull($record['check_out_event']);
+        $this->assertCount(1, $record['scans']);
+        $scan = $record['scans'][0]['scan'];
+        $this->assertSame('qr', $scan['method']);
+        $this->assertSame('Riverside', $scan['work_location']['name']);
+        $this->assertSame('12 Sisowath Quay', $scan['work_location']['address']);
+        $this->assertLessThan(100, $scan['distance_meters']);
     }
 
     public function test_a_check_in_with_neither_a_qr_scan_nor_gps_is_rejected(): void

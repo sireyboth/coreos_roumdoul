@@ -4,11 +4,14 @@ namespace Tests\Feature\Api;
 
 use App\Models\AttendanceCorrection;
 use App\Models\AttendanceEvent;
-use App\Models\AttendanceSession;
 use App\Models\Branch;
+use App\Models\CompanyPermission;
+use App\Models\CompanyRole;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Models\WorkSchedule;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\CompanyProvisioner;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
@@ -16,15 +19,21 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 class DashboardSummaryTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
     private $admin;
+
+    private ?WorkSchedule $schedule = null;
+
+    /** @var array<int, bool> employees already given the schedule */
+    private array $assigned = [];
 
     protected function setUp(): void
     {
@@ -53,17 +62,25 @@ class DashboardSummaryTest extends TestCase
         return $this->actingAs($as ?? $this->admin)->getJson('/api/dashboard/summary');
     }
 
-    private function attend(Employee $employee, string $date, array $extra = []): AttendanceSession
+    /**
+     * A scan at 08:05 Phnom Penh time (01:05 UTC) against an 08:00 schedule with
+     * a 10 min grace — or $late minutes past the grace — then the day as the
+     * engine records it.
+     */
+    private function attend(Employee $employee, string $date, int $late = 0): void
     {
-        $in = AttendanceEvent::query()->create([
-            'company_id' => $this->company->id, 'employee_id' => $employee->id, 'event_type' => 'check_in',
-            'method' => 'qr', 'event_time' => "{$date} 01:05:00",
+        $this->schedule ??= $this->makeWorkSchedule($this->company, attributes: ['late_grace_minutes' => 10]);
+        if (! isset($this->assigned[$employee->id])) {
+            $this->assignSchedule($employee, $this->schedule);
+            $this->assigned[$employee->id] = true;
+        }
+
+        AttendanceEvent::query()->create([
+            'company_id' => $this->company->id, 'employee_id' => $employee->id,
+            'method' => 'qr', 'event_time' => Carbon::parse("{$date} 01:05:00", 'UTC')->addMinutes($late > 0 ? $late + 5 : 0),
         ]);
 
-        return AttendanceSession::query()->create($extra + [
-            'company_id' => $this->company->id, 'employee_id' => $employee->id, 'date' => $date,
-            'check_in_event_id' => $in->id, 'late_minutes' => 0, 'status' => 'open',
-        ]);
+        app(AttendanceRecorder::class)->recalculate($employee, $date);
     }
 
     public function test_counts_are_exact_even_when_far_more_than_one_page_of_records_exist(): void
@@ -71,7 +88,7 @@ class DashboardSummaryTest extends TestCase
         // 70 people checked in today (the old approach counted from the newest 50 rows), 12 of them late.
         foreach (range(1, 70) as $i) {
             $employee = Employee::query()->create(['company_id' => $this->company->id, 'name' => "E{$i}"]);
-            $this->attend($employee, '2026-09-21', ['late_minutes' => $i <= 12 ? 15 : 0]);
+            $this->attend($employee, '2026-09-21', $i <= 12 ? 15 : 0);
             // ...and 40 of them also worked two days ago.
             if ($i <= 40) {
                 $this->attend($employee, '2026-09-19');
@@ -153,8 +170,8 @@ class DashboardSummaryTest extends TestCase
         $this->attend($other, '2026-09-21');
 
         // Give this ordinary employee the dashboard permission through a custom role.
-        $role = \App\Models\CompanyRole::query()->create(['company_id' => $this->company->id, 'name' => 'Viewer', 'code' => 'viewer']);
-        $role->permissions()->sync(\App\Models\CompanyPermission::query()->whereIn('code', ['dashboard.view', 'attendance.view'])->pluck('id'));
+        $role = CompanyRole::query()->create(['company_id' => $this->company->id, 'name' => 'Viewer', 'code' => 'viewer']);
+        $role->permissions()->sync(CompanyPermission::query()->whereIn('code', ['dashboard.view', 'attendance.view'])->pluck('id'));
         $mine->membership->roles()->sync([$role->id]);
 
         $attendance = $this->summary($mine->fresh())->assertOk()->json('attendance');

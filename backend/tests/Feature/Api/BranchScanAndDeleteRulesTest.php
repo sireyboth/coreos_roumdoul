@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Api;
 
-use App\Models\AttendanceSession;
+use App\Models\AttendanceEvent;
 use App\Models\Employee;
+use App\Models\EmployeeScheduleAssignment;
 use App\Models\Plan;
 use App\Models\Schedule;
-use App\Models\Shift;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WorkLocation;
@@ -15,6 +15,7 @@ use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 /**
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class BranchScanAndDeleteRulesTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
@@ -91,7 +92,7 @@ class BranchScanAndDeleteRulesTest extends TestCase
             ->assertStatus(422)
             ->assertJsonPath('errors.qr_token.0', fn ($m) => str_contains($m, 'assigned to Branch A'));
 
-        $this->assertSame(0, AttendanceSession::query()->count());
+        $this->assertSame(0, AttendanceEvent::query()->count());
 
         $this->actingAs($user)->postJson('/api/attendance/check-in', ['qr_token' => $this->qrOf($this->branchA)])->assertCreated();
     }
@@ -112,15 +113,10 @@ class BranchScanAndDeleteRulesTest extends TestCase
     {
         [$employee, $user] = $this->makeEmployee('Vanna', $this->branchA);
         $locationB = WorkLocation::query()->where('branch_id', $this->branchB)->firstOrFail();
-        $shift = Shift::query()->create(['company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '00:00', 'end_time' => '23:59']);
+        $allDay = $this->makeWorkSchedule($this->company, [['in', '00:00'], ['out', '23:59']]);
 
-        Schedule::query()->create([
-            'company_id' => $this->company->id,
-            'employee_id' => $employee->id,
-            'shift_id' => $shift->id,
-            'work_location_id' => $locationB->id,
-            'date' => now('Asia/Phnom_Penh')->toDateString(),
-        ]);
+        // A roster override for today, at Branch B's check-in point.
+        $this->overrideOn($employee, $allDay, now('Asia/Phnom_Penh')->toDateString(), $locationB->id);
 
         $this->actingAs($user)->postJson('/api/attendance/check-in', ['qr_token' => $locationB->qr_token])->assertCreated();
     }
@@ -167,28 +163,40 @@ class BranchScanAndDeleteRulesTest extends TestCase
         $this->actingAs($this->admin)->deleteJson("/api/work_locations/{$standalone->id}")->assertNoContent();
     }
 
-    public function test_a_shift_still_scheduled_ahead_cannot_be_deleted_but_a_past_only_one_can_and_history_survives(): void
+    public function test_a_work_schedule_still_used_ahead_cannot_be_deleted_but_a_past_only_one_can_and_history_survives(): void
     {
         [$employee] = $this->makeEmployee('Sreyneang', $this->branchA);
-        $used = Shift::query()->create(['company_id' => $this->company->id, 'name' => 'Busy', 'start_time' => '08:00', 'end_time' => '17:00']);
-        $old = Shift::query()->create(['company_id' => $this->company->id, 'name' => 'Retired', 'start_time' => '09:00', 'end_time' => '18:00']);
+        $used = $this->makeWorkSchedule($this->company, attributes: ['name' => 'Busy']);
+        $old = $this->makeWorkSchedule($this->company, [['in', '09:00'], ['out', '18:00']], ['name' => 'Retired']);
 
-        Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $used->id, 'date' => now()->addDays(3)->toDateString()]);
-        Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $old->id, 'date' => now()->subDays(5)->toDateString()]);
+        $this->overrideOn($employee, $used, now()->addDays(3)->toDateString());
+        $this->overrideOn($employee, $old, now()->subDays(5)->toDateString());
 
-        $this->actingAs($this->admin)->deleteJson("/api/shifts/{$used->id}")->assertStatus(422)->assertJsonPath('code', 'in_use');
-        $this->actingAs($this->admin)->deleteJson("/api/shifts/{$old->id}")->assertNoContent();
+        $this->actingAs($this->admin)->deleteJson("/api/work_schedules/{$used->id}")->assertStatus(422)->assertJsonPath('code', 'in_use');
+        $this->actingAs($this->admin)->deleteJson("/api/work_schedules/{$old->id}")->assertNoContent();
 
-        // The old schedule still lists, with the deleted shift's name — no crash, no blank.
-        $names = collect($this->actingAs($this->admin)->getJson('/api/schedules')->assertOk()->json('data'))->pluck('shift.name');
+        // The old roster entry still lists, with the deleted schedule's name — no crash, no blank.
+        $names = collect($this->actingAs($this->admin)->getJson('/api/schedules')->assertOk()->json('data'))->pluck('work_schedule.name');
         $this->assertContains('Retired', $names->all());
+    }
+
+    public function test_a_work_schedule_someone_is_assigned_to_cannot_be_deleted(): void
+    {
+        [$employee] = $this->makeEmployee('Pisey', $this->branchA);
+        $schedule = $this->makeWorkSchedule($this->company);
+        $this->assignSchedule($employee, $schedule);
+
+        $this->actingAs($this->admin)->deleteJson("/api/work_schedules/{$schedule->id}")
+            ->assertStatus(422)
+            ->assertJsonPath('message', '1 person is assigned to it. Move them to another schedule first, or set this one to inactive.');
     }
 
     public function test_removing_an_employee_kills_their_login_and_future_shifts_but_keeps_their_history(): void
     {
         [$employee, $user] = $this->makeEmployee('Bopha', $this->branchA);
-        $shift = Shift::query()->create(['company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00']);
-        Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $shift->id, 'date' => now()->addDays(2)->toDateString()]);
+        $schedule = $this->makeWorkSchedule($this->company);
+        $this->overrideOn($employee, $schedule, now()->addDays(2)->toDateString());
+        $this->assignSchedule($employee, $schedule);
 
         $this->actingAs($user)->postJson('/api/attendance/check-in', ['qr_token' => $this->qrOf($this->branchA)])->assertCreated();
         $user->createToken('phone');
@@ -198,6 +206,8 @@ class BranchScanAndDeleteRulesTest extends TestCase
         $this->assertFalse($user->fresh()->is_active);
         $this->assertSame(0, $user->fresh()->tokens()->count());
         $this->assertSame(0, Schedule::query()->where('employee_id', $employee->id)->count());
+        // Their schedule ends today, so no absences pile up afterwards.
+        $this->assertNotNull(EmployeeScheduleAssignment::query()->where('employee_id', $employee->id)->value('effective_to'));
 
         // Attendance history still names them.
         $names = collect($this->actingAs($this->admin)->getJson('/api/attendance')->assertOk()->json('data'))->pluck('employee.name');

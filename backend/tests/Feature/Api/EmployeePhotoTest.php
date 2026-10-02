@@ -5,18 +5,18 @@ namespace Tests\Feature\Api;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Schedule;
-use App\Models\Shift;
 use App\Services\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\Concerns\CreatesCompanyUsers;
+use Tests\Concerns\CreatesWorkSchedules;
 use Tests\TestCase;
 
 class EmployeePhotoTest extends TestCase
 {
-    use CreatesCompanyUsers, RefreshDatabase;
+    use CreatesCompanyUsers, CreatesWorkSchedules, RefreshDatabase;
 
     private $company;
 
@@ -163,10 +163,8 @@ class EmployeePhotoTest extends TestCase
     {
         $this->upload()->assertOk();
         $employee = Employee::query()->findOrFail($this->employeeId);
-        $shift = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00', 'break_minutes' => 0, 'grace_minutes' => 0,
-        ]);
-        Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'shift_id' => $shift->id, 'date' => '2026-09-22']);
+        $shift = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], ['name' => 'Day']);
+        Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $employee->id, 'work_schedule_id' => $shift->id, 'date' => '2026-09-22']);
 
         // The employee list shows avatars, so it carries the link.
         $listed = collect($this->as($this->admin)->getJson('/api/employees')->assertOk()->json('data'))->firstWhere('id', $this->employeeId);
@@ -181,11 +179,9 @@ class EmployeePhotoTest extends TestCase
     public function test_the_roster_can_be_filtered_to_one_employee(): void
     {
         $other = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Other']);
-        $shift = Shift::query()->create([
-            'company_id' => $this->company->id, 'name' => 'Day', 'start_time' => '08:00', 'end_time' => '17:00', 'break_minutes' => 0, 'grace_minutes' => 0,
-        ]);
+        $shift = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], ['name' => 'Day']);
         foreach ([$this->employeeId, $other->id] as $id) {
-            Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $id, 'shift_id' => $shift->id, 'date' => '2026-09-22']);
+            Schedule::query()->create(['company_id' => $this->company->id, 'employee_id' => $id, 'work_schedule_id' => $shift->id, 'date' => '2026-09-22']);
         }
 
         $rows = $this->as($this->admin)->getJson("/api/schedules?from=2026-09-01&to=2026-09-30&employee_id={$this->employeeId}")->assertOk()->json('data');

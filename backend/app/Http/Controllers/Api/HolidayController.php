@@ -4,10 +4,17 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Holiday;
+use App\Services\Attendance\AttendanceRecorder;
 use Illuminate\Http\Request;
 
+/**
+ * Company holidays. Adding, moving or removing one changes what was expected
+ * on that date for everyone, so days already started are recalculated.
+ */
 class HolidayController extends Controller
 {
+    public function __construct(private readonly AttendanceRecorder $recorder) {}
+
     public function index()
     {
         return Holiday::query()->orderBy('date')->paginate(50);
@@ -21,7 +28,10 @@ class HolidayController extends Controller
             'is_recurring_yearly' => ['boolean'],
         ]);
 
-        return response()->json(Holiday::query()->create($data), 201);
+        $holiday = Holiday::query()->create($data);
+        $this->recalculate($request, $this->datesOf($holiday));
+
+        return response()->json($holiday, 201);
     }
 
     /**
@@ -49,6 +59,7 @@ class HolidayController extends Controller
 
         $created = 0;
         $skipped = [];
+        $added = [];
 
         foreach ($data['holidays'] as $holiday) {
             if (in_array($holiday['date'], $existing, true)) {
@@ -64,7 +75,10 @@ class HolidayController extends Controller
                 'is_recurring_yearly' => false,
             ]);
             $created++;
+            $added[] = $holiday['date'];
         }
+
+        $this->recalculate($request, $added);
 
         return ['created' => $created, 'skipped' => $skipped];
     }
@@ -82,15 +96,36 @@ class HolidayController extends Controller
             'is_recurring_yearly' => ['boolean'],
         ]);
 
+        $before = $this->datesOf($holiday);
         $holiday->update($data);
+        $this->recalculate($request, [...$before, ...$this->datesOf($holiday)]);
 
         return $holiday;
     }
 
     public function destroy(Holiday $holiday)
     {
+        $dates = $this->datesOf($holiday);
         $holiday->delete();
+        $this->recalculate($request, $dates);
 
         return response()->noContent();
+    }
+
+    /** The dates a holiday falls on that can matter now: its own, and this year's for a yearly one. */
+    private function datesOf(Holiday $holiday): array
+    {
+        $dates = [$holiday->date->toDateString()];
+
+        if ($holiday->is_recurring_yearly) {
+            $dates[] = now()->format('Y').'-'.$holiday->date->format('m-d');
+        }
+
+        return $dates;
+    }
+
+    private function recalculate(Request $request, array $dates): void
+    {
+        $this->recorder->recalculateDatesForCompany($request->user()->company, $dates);
     }
 }

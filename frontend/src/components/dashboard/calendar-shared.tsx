@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType } from "@/lib/api";
 import { khmerDay } from "@/lib/khmer";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { EXCEPTIONS, formatMinutes, slotsSummary } from "@/lib/schedule";
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -35,8 +36,9 @@ export const TYPE_STYLES: Record<CalendarDayType, { cell: string; label: string;
 export const ATTENDANCE: Record<CalendarAttendance, { label: string; dot: string; variant: "success" | "warning" | "destructive" }> = {
   present: { label: "Present", dot: "bg-success", variant: "success" },
   late: { label: "Late", dot: "bg-warning", variant: "warning" },
-  missing_checkout: { label: "No check-out", dot: "bg-warning", variant: "warning" },
+  incomplete: { label: "Missing a scan", dot: "bg-warning", variant: "warning" },
   absent: { label: "Absent", dot: "bg-destructive", variant: "destructive" },
+  worked: { label: "Worked", dot: "bg-success", variant: "success" },
 };
 
 export function currentMonth(): string {
@@ -156,24 +158,45 @@ export function DayDialog({
               {day.attendance && <Badge variant={ATTENDANCE[day.attendance].variant}>{ATTENDANCE[day.attendance].label}</Badge>}
             </div>
 
-            {day.shift && (
-              <p>
-                <span className="font-medium">{day.shift.name}</span>{" "}
-                <span className="text-muted-foreground">
-                  {day.shift.start_time} – {day.shift.end_time}
-                </span>
-                {day.work_location && <span className="text-muted-foreground"> · at {day.work_location}</span>}
-              </p>
+            {day.schedule && (
+              <div className="flex flex-col gap-0.5">
+                <p>
+                  <span className="font-medium">{day.schedule.name}</span>{" "}
+                  <span className="text-muted-foreground">{slotsSummary(day.schedule.slots)}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {day.schedule.source === "override" ? "A one-off change on the roster for this day" : "Their usual work schedule"}
+                  {day.work_location && ` · at ${day.work_location}`}
+                  {day.holiday && ` · on the ${day.holiday} holiday`}
+                </p>
+              </div>
             )}
 
-            {(day.check_in || day.check_out) && (
-              <p className="text-muted-foreground">
-                Checked in {day.check_in ?? "—"}, out {day.check_out ?? "—"}
-                {day.late_minutes ? ` · ${day.late_minutes} min late` : ""}
-              </p>
+            {day.scans && day.scans.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <p className="text-muted-foreground">
+                  Scans: <span className="font-medium text-foreground tabular-nums">{day.scans.join(" · ")}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Worked {formatMinutes(day.worked_minutes)}
+                  {day.late_minutes ? ` · ${day.late_minutes} min late` : ""}
+                  {day.early_leave_minutes ? ` · left ${day.early_leave_minutes} min early` : ""}
+                  {day.overtime_minutes ? ` · ${formatMinutes(day.overtime_minutes)} overtime` : ""}
+                </p>
+              </div>
             )}
 
-            {canManage && (day.type === "none" || day.type === "weekly_off") && (
+            {day.exceptions && day.exceptions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {day.exceptions.map((code) => (
+                  <Badge key={code} variant={EXCEPTIONS[code].tone}>
+                    {EXCEPTIONS[code].label}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {canManage && (day.type === "none" || day.type === "weekly_off" || (day.type === "work" && day.schedule?.source === "assignment")) && (
               <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                 <Label htmlFor="reason">Mark {employee?.name} as off this day</Label>
                 <Input
@@ -197,7 +220,11 @@ export function DayDialog({
 
             {canManage && (day.type === "work" || day.type === "none") && (
               <p className="text-muted-foreground">
-                To {day.type === "work" ? "change or remove the shift" : "give them a shift"}, use the{" "}
+                {day.schedule?.source === "override"
+                  ? "To change or remove this day's change, use the "
+                  : day.type === "none"
+                    ? "They have no work schedule on this date. Assign one from their profile or Work Schedules, or set this one day on the "
+                    : "To give them different hours on just this day, use the "}
                 <Link href="/dashboard/employees?tab=roster" className="font-medium text-primary hover:underline">
                   Roster
                 </Link>

@@ -24,6 +24,8 @@ export type ImportField = {
   example?: string;
   /** Other headers that mean the same column (e.g. the export's wording). */
   aliases?: string[];
+  /** An extra format check, run while reviewing: returns the problem, or null when fine. */
+  validate?: (text: string) => string | null;
 };
 
 export type RowValue = string | number | boolean;
@@ -195,8 +197,9 @@ export function parseRows(fields: ImportField[], columns: Record<string, string 
       }
 
       const { value, problem } = parseValue(field, text);
-      if (problem) problems.push(problem);
-      else if (value !== undefined) values[field.key] = value;
+      const invalid = problem ?? field.validate?.(text) ?? null;
+      if (invalid) problems.push(invalid);
+      if (!invalid && value !== undefined) values[field.key] = value;
     }
 
     return { rowNumber, cells, row: new Row(values), problems };
