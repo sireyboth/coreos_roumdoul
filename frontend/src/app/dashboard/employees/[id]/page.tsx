@@ -199,7 +199,7 @@ export default function EmployeePage() {
     const ok = await confirm({
       title: `Delete ${employee.name}?`,
       description:
-        "Their upcoming schedule is cleared and their login is deactivated. Past attendance keeps its history. If they've only left, set their status to Terminated instead.",
+        "This can't be undone: their attendance, schedules and login are deleted too. If they've only left, set their status to Terminated instead.",
       destructive: true,
     });
     if (!ok) return;

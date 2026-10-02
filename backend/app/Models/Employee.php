@@ -12,12 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\URL;
 
 class Employee extends Model
 {
-    use Auditable, BelongsToCompany, HasFactory, RestrictedToAccessibleBranches, SoftDeletes;
+    use Auditable, BelongsToCompany, HasFactory, RestrictedToAccessibleBranches;
 
     protected static function booted(): void
     {
@@ -91,7 +90,7 @@ class Employee extends Model
         'name_km',
         'photo_path',
         'company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days',
-        'created_at', 'updated_at', 'deleted_at',
+        'created_at', 'updated_at',
         'currentAssignment',
     ];
 

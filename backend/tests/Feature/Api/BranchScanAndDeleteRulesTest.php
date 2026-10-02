@@ -191,7 +191,7 @@ class BranchScanAndDeleteRulesTest extends TestCase
             ->assertJsonPath('message', '1 person is assigned to it. Move them to another schedule first, or set this one to inactive.');
     }
 
-    public function test_removing_an_employee_kills_their_login_and_future_shifts_but_keeps_their_history(): void
+    public function test_deleting_an_employee_removes_them_their_login_and_everything_they_had(): void
     {
         [$employee, $user] = $this->makeEmployee('Bopha', $this->branchA);
         $schedule = $this->makeWorkSchedule($this->company);
@@ -203,15 +203,67 @@ class BranchScanAndDeleteRulesTest extends TestCase
 
         $this->actingAs($this->admin)->deleteJson("/api/employees/{$employee->id}")->assertNoContent();
 
-        $this->assertFalse($user->fresh()->is_active);
-        $this->assertSame(0, $user->fresh()->tokens()->count());
+        $this->assertDatabaseMissing('employees', ['id' => $employee->id]);
+        $this->assertDatabaseMissing('users', ['id' => $user->id]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $user->id]);
         $this->assertSame(0, Schedule::query()->where('employee_id', $employee->id)->count());
-        // Their schedule ends today, so no absences pile up afterwards.
-        $this->assertNotNull(EmployeeScheduleAssignment::query()->where('employee_id', $employee->id)->value('effective_to'));
+        $this->assertSame(0, EmployeeScheduleAssignment::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(0, AttendanceEvent::query()->where('employee_id', $employee->id)->count());
+    }
 
-        // Attendance history still names them.
-        $names = collect($this->actingAs($this->admin)->getJson('/api/attendance')->assertOk()->json('data'))->pluck('employee.name');
-        $this->assertContains('Bopha', $names->all());
+    public function test_a_deleted_employees_id_and_email_can_be_used_again(): void
+    {
+        $create = fn () => $this->actingAs($this->admin)->postJson('/api/employees', [
+            'name' => 'Sophea',
+            'employee_code' => 'EMP-7',
+            'email' => 'sophea@scanco.test',
+            'password' => 'password123',
+            'branch_id' => $this->branchA,
+        ]);
+
+        $id = $create()->assertCreated()->json('id');
+        $this->actingAs($this->admin)->deleteJson("/api/employees/{$id}")->assertNoContent();
+
+        $create()->assertCreated();
+    }
+
+    public function test_employees_can_be_deleted_in_bulk(): void
+    {
+        [$a] = $this->makeEmployee('Vanna', $this->branchA);
+        [$b] = $this->makeEmployee('Rithy', $this->branchB);
+        [$keep] = $this->makeEmployee('Chenda', $this->branchA);
+
+        $this->actingAs($this->admin)->postJson('/api/employees/bulk-delete', ['ids' => [$a->id, $b->id]])
+            ->assertOk()
+            ->assertJsonPath('deleted', 2);
+
+        $this->assertSame([$keep->id], Employee::query()->withoutGlobalScopes()->pluck('id')->all());
+    }
+
+    public function test_a_bulk_delete_with_an_unknown_id_deletes_nothing(): void
+    {
+        [$a] = $this->makeEmployee('Vanna', $this->branchA);
+
+        $this->actingAs($this->admin)->postJson('/api/employees/bulk-delete', ['ids' => [$a->id, 999999]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('ids');
+
+        $this->assertDatabaseHas('employees', ['id' => $a->id]);
+    }
+
+    public function test_you_cannot_delete_your_own_employee_record(): void
+    {
+        $own = Employee::query()->withoutGlobalScopes()->create([
+            'company_id' => $this->company->id,
+            'user_id' => $this->admin->id,
+            'name' => 'Boss',
+        ]);
+
+        $this->actingAs($this->admin)->deleteJson("/api/employees/{$own->id}")->assertStatus(422);
+        $this->actingAs($this->admin)->postJson('/api/employees/bulk-delete', ['ids' => [$own->id]])->assertStatus(422);
+
+        $this->assertDatabaseHas('employees', ['id' => $own->id]);
+        $this->assertDatabaseHas('users', ['id' => $this->admin->id]);
     }
 
     public function test_a_standalone_locations_qr_code_can_be_regenerated_and_the_old_one_stops_working(): void

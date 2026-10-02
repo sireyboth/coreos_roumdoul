@@ -78,11 +78,13 @@ export default function EmployeesPage() {
     window.history.replaceState(null, "", next === "roster" ? `${pathname}?tab=roster` : pathname);
   }
 
+  const DELETE_WARNING =
+    "This can't be undone: their attendance, schedules and login are deleted too. If they've only left, set their status to Terminated instead.";
+
   async function handleDelete(employee: Employee) {
     const ok = await confirm({
       title: `Delete ${employee.name}?`,
-      description:
-        "Their upcoming schedule is cleared and their login is deactivated. Past attendance keeps its history. If they've only left, set their status to Terminated instead.",
+      description: DELETE_WARNING,
       destructive: true,
     });
     if (!ok) return;
@@ -90,6 +92,25 @@ export default function EmployeesPage() {
     try {
       await api.employees.remove(employee.id);
       notifySuccess(`${employee.name} deleted`);
+      refresh();
+    } catch (err) {
+      notifyError(err);
+    }
+    load();
+  }
+
+  async function handleBulkDelete(selected: Employee[], clearSelection: () => void) {
+    const ok = await confirm({
+      title: selected.length === 1 ? `Delete ${selected[0].name}?` : `Delete ${selected.length} employees?`,
+      description: DELETE_WARNING,
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      const { deleted } = await api.employees.removeMany(selected.map((employee) => employee.id));
+      notifySuccess(`${deleted} ${deleted === 1 ? "employee" : "employees"} deleted`);
+      clearSelection();
       refresh();
     } catch (err) {
       notifyError(err);
@@ -381,6 +402,16 @@ export default function EmployeesPage() {
               searchPlaceholder="Search by name, code, email, phone, branch or job title…"
               initialSort={{ columnId: "name", direction: "asc" }}
               onRowClick={open}
+              bulkActions={
+                canManage
+                  ? (selected, clearSelection) => (
+                      <Button variant="destructive" size="sm" onClick={() => handleBulkDelete(selected, clearSelection)}>
+                        <Trash2 className="size-3.5" />
+                        Delete {selected.length}
+                      </Button>
+                    )
+                  : undefined
+              }
               emptyState={{
                 icon: Users,
                 title: "No employees yet",

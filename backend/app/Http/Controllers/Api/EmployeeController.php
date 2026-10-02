@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
 use App\Models\Employee;
-use App\Models\Schedule;
 use App\Models\Team;
-use App\Services\AuditLogger;
 use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
-use App\Services\ScheduleAssignmentService;
+use App\Services\EmployeeRemover;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -433,25 +431,31 @@ class EmployeeController extends Controller
         return $this->reveal($request, $employee->fresh(['branch', 'department', 'team']));
     }
 
-    public function destroy(Request $request, Employee $employee)
+    public function destroy(Request $request, Employee $employee, EmployeeRemover $remover)
     {
-        $today = now($request->user()->company->timezone ?: config('attendance.default_timezone'))->toDateString();
-
-        DB::transaction(function () use ($employee, $today) {
-            // A removed employee must not keep a working login or a future rota.
-            Schedule::query()->where('employee_id', $employee->id)->whereDate('date', '>=', $today)->delete();
-            // Nor a schedule to be judged against: absences would keep piling up.
-            app(ScheduleAssignmentService::class)->endAll($employee, $today);
-
-            if ($user = $employee->user) {
-                $user->update(['is_active' => false]);
-                $user->tokens()->delete();
-                AuditLogger::record('user.deactivated', $user, ['reason' => 'employee removed']);
-            }
-
-            $employee->delete();
-        });
+        $remover->remove([$employee], $request->user());
 
         return response()->noContent();
+    }
+
+    public function bulkDestroy(Request $request, EmployeeRemover $remover)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:1000'],
+            'ids.*' => ['integer', 'distinct'],
+        ]);
+
+        // Scoped to the caller's company and branches, so a missing id is one they can't touch.
+        $employees = Employee::query()->with('user')->whereKey($data['ids'])->get();
+
+        if ($employees->count() !== count($data['ids'])) {
+            throw ValidationException::withMessages([
+                'ids' => ['Some of these employees no longer exist or are outside your branches. Reload and try again.'],
+            ]);
+        }
+
+        $remover->remove($employees, $request->user());
+
+        return response()->json(['deleted' => $employees->count()]);
     }
 }

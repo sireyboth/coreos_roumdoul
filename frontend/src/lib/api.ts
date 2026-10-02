@@ -782,6 +782,8 @@ export const api = {
     update: (id: number, data: EmployeeInput) =>
       request<Employee>(`/api/employees/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/employees/${id}`, { method: "DELETE" }),
+    removeMany: (ids: number[]) =>
+      request<{ deleted: number }>("/api/employees/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
     createLogin: (id: number, data: LoginSetup) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
     // A PDF, not JSON, so it can't go through request() — same reasoning as

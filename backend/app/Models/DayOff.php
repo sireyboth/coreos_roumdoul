@@ -27,6 +27,6 @@ class DayOff extends Model
 
     public function employee(): BelongsTo
     {
-        return $this->belongsTo(Employee::class)->withTrashed();
+        return $this->belongsTo(Employee::class);
     }
 }

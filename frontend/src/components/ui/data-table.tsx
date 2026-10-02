@@ -76,6 +76,11 @@ export type DataTableProps<T> = {
   emptyState: { icon: LucideIcon; title: string; description?: string; action?: React.ReactNode };
   /** Extra controls placed next to the search box. */
   toolbar?: React.ReactNode;
+  /**
+   * Turns on a checkbox per row. Once something is ticked, a bar above the
+   * table shows the count and these actions for the ticked rows.
+   */
+  bulkActions?: (selected: T[], clearSelection: () => void) => React.ReactNode;
   initialSort?: { columnId: string; direction: "asc" | "desc" };
   pageSizeOptions?: number[];
   defaultPageSize?: number;
@@ -102,6 +107,7 @@ export function DataTable<T>({
   onRowClick,
   emptyState,
   toolbar,
+  bulkActions,
   initialSort,
   pageSizeOptions = [10, 25, 50],
   defaultPageSize,
@@ -111,6 +117,7 @@ export function DataTable<T>({
   const [sort, setSort] = useState<Sort>(initialSort ?? null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize ?? pageSizeOptions[0]);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string | number>>(new Set());
 
   const hasActiveFilters = search.trim() !== "" || Object.values(filterValues).some((v) => v !== "");
 
@@ -158,6 +165,37 @@ export function DataTable<T>({
   const currentPage = Math.min(page, pageCount);
   const start = (currentPage - 1) * pageSize;
   const pageRows = rows.slice(start, start + pageSize);
+
+  // Looked up in `data`, so rows that disappear on a reload drop out of the selection by themselves.
+  const selectedRows = bulkActions && data ? data.filter((row) => selectedIds.has(getRowId(row))) : [];
+  const pageSelected = pageRows.filter((row) => selectedIds.has(getRowId(row))).length;
+  const allPageSelected = pageRows.length > 0 && pageSelected === pageRows.length;
+
+  function setSelected(ids: (string | number)[], selected: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of ids) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  function rowCheckbox(row: T) {
+    const id = getRowId(row);
+    return (
+      <input
+        type="checkbox"
+        aria-label="Select row"
+        checked={selectedIds.has(id)}
+        onChange={(e) => setSelected([id], e.target.checked)}
+        className="size-4 cursor-pointer rounded border-input accent-primary"
+      />
+    );
+  }
 
   function updateSearch(value: string) {
     setSearch(value);
@@ -279,11 +317,40 @@ export function DataTable<T>({
 
       {data !== null && rows.length > 0 && (
         <>
+          {bulkActions && selectedRows.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
+              <span className="font-medium">{selectedRows.length} selected</span>
+              {selectedRows.length < rows.length && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(rows.map(getRowId), true)}>
+                  Select all {rows.length}
+                </Button>
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                Clear selection
+              </Button>
+              <div className="ml-auto flex items-center gap-2">{bulkActions(selectedRows, clearSelection)}</div>
+            </div>
+          )}
+
           {/* Desktop: a real table. */}
           <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {bulkActions && (
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all rows on this page"
+                        checked={allPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = pageSelected > 0 && !allPageSelected;
+                        }}
+                        onChange={(e) => setSelected(pageRows.map(getRowId), e.target.checked)}
+                        className="size-4 cursor-pointer rounded border-input accent-primary"
+                      />
+                    </TableHead>
+                  )}
                   {columns.map((column) => {
                     const sorted = sort?.columnId === column.id ? sort.direction : null;
 
@@ -323,7 +390,13 @@ export function DataTable<T>({
                     key={getRowId(row)}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     className={cn(onRowClick && "cursor-pointer")}
+                    data-state={selectedIds.has(getRowId(row)) ? "selected" : undefined}
                   >
+                    {bulkActions && (
+                      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                        {rowCheckbox(row)}
+                      </TableCell>
+                    )}
                     {columns.map((column) => (
                       <TableCell key={column.id} className={column.className}>
                         {column.cell(row)}
@@ -351,7 +424,14 @@ export function DataTable<T>({
                   onRowClick && "cursor-pointer active:bg-muted/50",
                 )}
               >
-                <div className="min-w-0 text-sm font-semibold">{primaryColumn.cell(row)}</div>
+                <div className="flex items-start gap-3">
+                  {bulkActions && (
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      {rowCheckbox(row)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 text-sm font-semibold">{primaryColumn.cell(row)}</div>
+                </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
                   {cardColumns.map((column) => (
                     <div key={column.id} className="min-w-0">

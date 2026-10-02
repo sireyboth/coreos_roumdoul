@@ -116,6 +116,7 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
     });
 
     Route::middleware('company_permission:employees.manage')->group(function () {
+        Route::post('/employees/bulk-delete', [EmployeeController::class, 'bulkDestroy']);
         Route::post('/employees/{employee}/photo', [EmployeePhotoController::class, 'store']);
         Route::delete('/employees/{employee}/photo', [EmployeePhotoController::class, 'destroy']);
         Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);

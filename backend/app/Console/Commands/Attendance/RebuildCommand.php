@@ -38,7 +38,7 @@ class RebuildCommand extends Command
                 continue;
             }
 
-            $employees = Employee::query()->withoutGlobalScopes()->where('company_id', $company->id)->whereNull('deleted_at')->get();
+            $employees = Employee::query()->withoutGlobalScopes()->where('company_id', $company->id)->get();
             $this->line("{$company->name}: {$employees->count()} employee(s), {$from} to {$to}");
 
             $bar = $this->output->createProgressBar($employees->count());

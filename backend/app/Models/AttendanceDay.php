@@ -65,7 +65,7 @@ class AttendanceDay extends Model
 
     public function employee(): BelongsTo
     {
-        return $this->belongsTo(Employee::class)->withTrashed();
+        return $this->belongsTo(Employee::class);
     }
 
     public function workSchedule(): BelongsTo

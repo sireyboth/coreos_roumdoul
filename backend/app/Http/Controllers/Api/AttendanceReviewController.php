@@ -220,7 +220,7 @@ class AttendanceReviewController extends Controller
         }
 
         // Every employee, regardless of the caller's branch restriction: a lock is company-wide.
-        Employee::query()->withoutGlobalScope('branch_access')->withTrashed()->each(
+        Employee::query()->withoutGlobalScope('branch_access')->each(
             fn (Employee $employee) => $this->recorder->recalculateRange($employee, $start->toDateString(), $end->toDateString())
         );
 

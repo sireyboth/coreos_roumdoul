@@ -202,7 +202,6 @@ class AttendanceRecorder
 
         Employee::query()->withoutGlobalScopes()
             ->where('company_id', $company->id)
-            ->whereNull('deleted_at')
             ->with('company')
             ->each(function (Employee $employee) use ($dates) {
                 foreach ($dates as $date) {
