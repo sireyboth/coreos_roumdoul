@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { hasLeft } from "@/components/dashboard/employee-form";
 import { WEEKDAYS } from "@/components/dashboard/calendar-shared";
 import { api, ApiError, Employee, ScheduleBulkInput, ScheduleBulkResult, WorkLocation, WorkSchedule } from "@/lib/api";
 import { weekSummary } from "@/lib/schedule";
@@ -97,7 +98,7 @@ export function BulkScheduleDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const roster = useMemo(() => employees.filter((e) => e.employment_status !== "terminated"), [employees]);
+  const roster = useMemo(() => employees.filter((e) => !hasLeft(e.employment_status)), [employees]);
   const activeSchedules = useMemo(() => schedules.filter((s) => s.is_active), [schedules]);
 
   const [picked, setPicked] = useState<Set<number>>(() => new Set(fixedEmployee ? [fixedEmployee.id] : []));

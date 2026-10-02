@@ -205,12 +205,13 @@ class OrganizationStructureTest extends TestCase
         $this->employee('Bob', ['department_id' => $sales->id]);
         $this->employee('Cara');
         $this->employee('Left', ['department_id' => $sales->id, 'employment_status' => 'terminated']);
+        $this->employee('Quit', ['department_id' => $sales->id, 'employment_status' => 'resigned']);
 
         $names = fn ($query) => collect($this->as($this->admin)->getJson("/api/employees?{$query}")->assertOk()->json('data'))->pluck('name')->all();
 
         $this->assertSame(['Alice', 'Bob'], $names("department_id={$sales->id}"));
         $this->assertSame(['Alice'], $names("team_id={$field->id}"));
-        $this->assertCount(4, $names(''));
+        $this->assertCount(5, $names(''));
         $this->assertNotNull($a);
     }
 

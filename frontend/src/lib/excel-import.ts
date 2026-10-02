@@ -17,8 +17,8 @@ export type ImportField = {
   header: string;
   type?: FieldType;
   required?: boolean;
-  /** Accepted values. Matched case-insensitively against the label or the value. */
-  options?: { value: string; label: string }[];
+  /** Accepted values. Matched against the label, the value or an alias, ignoring case and punctuation. */
+  options?: { value: string; label: string; aliases?: string[] }[];
   /** What to type — shown on the template's header and Instructions sheet. */
   hint: string;
   example?: string;
@@ -126,13 +126,33 @@ function parseTime(text: string): string | null {
 const YES = ["yes", "y", "true", "1", "on", "active"];
 const NO = ["no", "n", "false", "0", "off", "inactive"];
 
+// "On-leave", "on_leave" and "ON LEAVE" all mean On leave.
+const squash = (value: string) => value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+/**
+ * The option a cell means: its label, value or one of its aliases, ignoring
+ * case, spaces and punctuation. Failing that, a clear start of one
+ * ("Terminate", "Susp") — but only when it fits a single option, so nothing
+ * is guessed.
+ */
+function matchOption<O extends { value: string; label: string; aliases?: string[] }>(options: O[], text: string): O | undefined {
+  const wanted = squash(text);
+  if (!wanted) return undefined;
+
+  const names = (o: O) => [o.label, o.value, ...(o.aliases ?? [])].map(squash);
+  const exact = options.find((o) => names(o).includes(wanted));
+  if (exact || wanted.length < 4) return exact;
+
+  const started = options.filter((o) => names(o).some((name) => name.startsWith(wanted)));
+  return started.length === 1 ? started[0] : undefined;
+}
+
 function parseValue(field: ImportField, text: string): { value?: RowValue; problem?: string } {
   if (field.options) {
-    const wanted = text.toLowerCase();
-    const option = field.options.find((o) => o.label.toLowerCase() === wanted || o.value.toLowerCase() === wanted);
+    const option = matchOption(field.options, text);
     return option
       ? { value: option.value }
-      : { problem: `${field.header} must be one of: ${field.options.map((o) => o.label).join(", ")}.` };
+      : { problem: `${field.header} "${text}" isn't valid. Use one of: ${field.options.map((o) => o.label).join(", ")}.` };
   }
 
   switch (field.type) {

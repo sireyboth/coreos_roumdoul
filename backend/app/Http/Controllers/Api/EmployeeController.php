@@ -180,10 +180,10 @@ class EmployeeController extends Controller
         // without this every row would run its own query.
         $employees = Employee::query()->with(['branch', 'department', 'team', 'currentAssignment'])
             ->when($request->filled('department_id'), fn ($q) => $q
-                ->where('employment_status', '!=', 'terminated')
+                ->whereNotIn('employment_status', Employee::LEFT_STATUSES)
                 ->whereHas('currentAssignment', fn ($a) => $a->where('department_id', $request->integer('department_id'))))
             ->when($request->filled('team_id'), fn ($q) => $q
-                ->where('employment_status', '!=', 'terminated')
+                ->whereNotIn('employment_status', Employee::LEFT_STATUSES)
                 ->whereHas('currentAssignment', fn ($a) => $a->where('team_id', $request->integer('team_id'))))
             ->orderBy('display_name')->orderBy('id')
             ->paginate(min(max($request->integer('per_page', 25), 1), 500));
@@ -218,7 +218,7 @@ class EmployeeController extends Controller
             ...($method === 'employee_id' ? ['employee_code' => $this->employeeIdRules($request)] : []),
             'password' => ['nullable', 'string', 'min:8'],
             'job_title' => ['nullable', 'string', 'max:255'],
-            'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
+            'employment_status' => ['sometimes', Rule::in(Employee::STATUSES)],
             'branch_id' => ['required', ...$this->branchRule($request)],
             'department_id' => ['nullable', $this->ownDepartment($request)],
             'team_id' => ['nullable', $this->ownTeam($request)],
@@ -392,7 +392,7 @@ class EmployeeController extends Controller
             ...$this->profileRules($request, $employee),
             'email' => ['nullable', 'email', 'max:255'],
             'job_title' => ['nullable', 'string', 'max:255'],
-            'employment_status' => ['sometimes', 'in:active,on_leave,suspended,terminated'],
+            'employment_status' => ['sometimes', Rule::in(Employee::STATUSES)],
             'termination_date' => ['nullable', 'date'],
             'branch_id' => ['nullable', ...$this->branchRule($request)],
             'department_id' => ['nullable', $this->ownDepartment($request)],

@@ -59,6 +59,23 @@ class Employee extends Model
         'salary_currency',
     ];
 
+    /** Every employment status, in the order screens list them. */
+    public const STATUSES = ['active', 'probation', 'on_leave', 'suspended', 'resigned', 'terminated', 'contract_ended', 'retired'];
+
+    /**
+     * The statuses of someone who no longer works here: off the roster and
+     * team counts, can't check in, and never marked absent after they left.
+     */
+    public const LEFT_STATUSES = ['resigned', 'terminated', 'contract_ended', 'retired'];
+
+    /** Statuses that can't check in: everyone who has left, plus suspended. */
+    public const NO_CHECK_IN_STATUSES = [...self::LEFT_STATUSES, 'suspended'];
+
+    public function hasLeft(): bool
+    {
+        return in_array($this->employment_status, self::LEFT_STATUSES, true);
+    }
+
     /**
      * Personal details are hidden by default so they can't leak through the
      * many places an employee is nested (attendance, calendar, ...). Only

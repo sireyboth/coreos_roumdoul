@@ -158,9 +158,11 @@ class AttendanceService
 
     private function assertEmployeeMayScan(Employee $employee): void
     {
-        if (in_array($employee->employment_status, ['terminated', 'suspended'], true)) {
+        if (in_array($employee->employment_status, Employee::NO_CHECK_IN_STATUSES, true)) {
+            $status = str_replace('_', ' ', $employee->employment_status);
+
             throw ValidationException::withMessages([
-                'employee' => ["Your employment status is \"{$employee->employment_status}\", so you can't check in. Ask your manager."],
+                'employee' => ["Your employment status is \"{$status}\", so you can't check in. Ask your manager."],
             ]);
         }
     }

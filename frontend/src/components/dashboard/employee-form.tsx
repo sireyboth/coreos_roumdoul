@@ -5,12 +5,30 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { Branch, Department, Employee, EmployeeInput, SalaryCurrency, Team } from "@/lib/api";
 
+// Kept in step with Employee::STATUSES on the server. `aliases` are other
+// words an Excel import accepts for the same status.
 export const EMPLOYMENT_STATUSES = [
-  { value: "active", label: "Active" },
-  { value: "on_leave", label: "On leave" },
+  { value: "active", label: "Active", aliases: ["Working", "Permanent"] },
+  { value: "probation", label: "Probation", aliases: ["Probationary", "Trial"] },
+  { value: "on_leave", label: "On leave", aliases: ["Leave", "Maternity leave", "Sick leave", "Unpaid leave"] },
   { value: "suspended", label: "Suspended" },
-  { value: "terminated", label: "Terminated" },
+  { value: "resigned", label: "Resigned", aliases: ["Quit", "Left"] },
+  { value: "terminated", label: "Terminated", aliases: ["Fired", "Dismissed"] },
+  { value: "contract_ended", label: "Contract ended", aliases: ["End of contract", "Contract expired"] },
+  { value: "retired", label: "Retired" },
 ];
+
+/** No longer works here: can't check in, off the roster. Matches Employee::LEFT_STATUSES. */
+export const LEFT_STATUSES = ["resigned", "terminated", "contract_ended", "retired"];
+
+export const hasLeft = (status: string) => LEFT_STATUSES.includes(status);
+
+export function statusVariant(status: string): "success" | "info" | "warning" | "secondary" | "destructive" {
+  if (status === "active") return "success";
+  if (status === "probation") return "info";
+  if (status === "on_leave") return "warning";
+  return hasLeft(status) ? "destructive" : "secondary";
+}
 
 export const EMPLOYMENT_TYPES = [
   { value: "full_time", label: "Full-time" },
@@ -195,7 +213,7 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
     employment_status: form.employment_status,
     hire_date: orNull(form.hire_date),
     // Only meaningful for someone who has left.
-    termination_date: form.employment_status === "terminated" ? orNull(form.termination_date) : null,
+    termination_date: hasLeft(form.employment_status) ? orNull(form.termination_date) : null,
     gender: orNull(form.gender),
     date_of_birth: orNull(form.date_of_birth),
     address: orNull(form.address),
@@ -447,8 +465,8 @@ export function EmployeeFormFields({
         <Field
           label="Status"
           htmlFor={id("status")}
-          hint="Suspended and terminated employees can't check in."
-          wide={form.employment_status !== "terminated"}
+          hint="Suspended employees and anyone who has left can't check in."
+          wide={!hasLeft(form.employment_status)}
         >
           <SearchableSelect
             id={id("status")}
@@ -459,7 +477,7 @@ export function EmployeeFormFields({
             className="h-9 w-full rounded-md"
           />
         </Field>
-        {form.employment_status === "terminated" && (
+        {hasLeft(form.employment_status) && (
           <Field label="Last working day" htmlFor={id("term")}>
             <Input
               id={id("term")}

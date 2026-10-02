@@ -78,7 +78,7 @@ class ScheduleAssignmentController extends Controller
         $skipped = [];
 
         foreach ($employees as $employee) {
-            if ($employee->employment_status === 'terminated') {
+            if ($employee->hasLeft()) {
                 $skipped[] = ['employee_id' => $employee->id, 'name' => $employee->name, 'reason' => 'Has left the company.'];
 
                 continue;

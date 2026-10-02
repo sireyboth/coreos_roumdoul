@@ -12,7 +12,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelFor } from "@/components/dashboard/employee-form";
+import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelFor, statusVariant } from "@/components/dashboard/employee-form";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { RosterView } from "@/components/dashboard/roster-view";
@@ -216,17 +216,7 @@ export default function EmployeesPage() {
       id: "status",
       header: "Status",
       cell: (employee) => (
-        <Badge
-          variant={
-            employee.employment_status === "active"
-              ? "success"
-              : employee.employment_status === "on_leave"
-                ? "warning"
-                : employee.employment_status === "terminated"
-                  ? "destructive"
-                  : "secondary"
-          }
-        >
+        <Badge variant={statusVariant(employee.employment_status)}>
           {labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}
         </Badge>
       ),

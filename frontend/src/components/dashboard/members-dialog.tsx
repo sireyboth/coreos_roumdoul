@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
+import { EMPLOYMENT_STATUSES, hasLeft, labelFor, statusVariant } from "@/components/dashboard/employee-form";
 import { api, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -81,7 +82,7 @@ export function MembersDialog({
     if (candidates) return;
     try {
       const res = await api.employees.list();
-      setCandidates(res.data.filter((e) => e.employment_status !== "terminated"));
+      setCandidates(res.data.filter((e) => !hasLeft(e.employment_status)));
     } catch (err) {
       notifyError(err);
       setMode("list");
@@ -199,8 +200,8 @@ export function MembersDialog({
                       </p>
                     </div>
                     {employee.employment_status !== "active" && (
-                      <Badge variant="warning" className="capitalize">
-                        {employee.employment_status.replace("_", " ")}
+                      <Badge variant={statusVariant(employee.employment_status)}>
+                        {labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}
                       </Badge>
                     )}
                     {canManage && (

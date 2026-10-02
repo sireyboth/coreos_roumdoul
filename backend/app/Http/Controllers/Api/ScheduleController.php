@@ -165,7 +165,7 @@ class ScheduleController extends Controller
         $now = now();
 
         foreach ($employees as $employee) {
-            if ($employee->employment_status === 'terminated') {
+            if ($employee->hasLeft()) {
                 $skipped['employee_left'] += count($dates);
 
                 continue;

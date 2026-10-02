@@ -28,7 +28,7 @@ class CloseDaysCommand extends Command
 
             Employee::query()->withoutGlobalScopes()
                 ->where('company_id', $company->id)
-                ->where('employment_status', '!=', 'terminated')
+                ->whereNotIn('employment_status', Employee::LEFT_STATUSES)
                 ->each(function (Employee $employee) use ($recorder, $company, $today, &$count) {
                     $employee->setRelation('company', $company);
                     $recorder->recalculateRange($employee, $today->subDay()->toDateString(), $today->toDateString());

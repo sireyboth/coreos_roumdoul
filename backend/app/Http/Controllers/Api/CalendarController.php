@@ -74,7 +74,7 @@ class CalendarController extends Controller
 
         $query = Employee::query()->with(['company', 'branch'])
             // People who left before this month have nothing to show.
-            ->where(fn ($q) => $q->where('employment_status', '!=', 'terminated')->orWhere('termination_date', '>=', $from))
+            ->where(fn ($q) => $q->whereNotIn('employment_status', Employee::LEFT_STATUSES)->orWhere('termination_date', '>=', $from))
             ->when($request->filled('branch_id'), fn ($q) => $q->whereHas(
                 'currentAssignment',
                 fn ($a) => $a->where('branch_id', $request->integer('branch_id')),

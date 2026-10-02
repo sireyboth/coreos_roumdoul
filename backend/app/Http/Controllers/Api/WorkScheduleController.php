@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\EmployeeScheduleAssignment;
 use App\Models\Schedule;
 use App\Models\WorkSchedule;
@@ -26,7 +27,7 @@ class WorkScheduleController extends Controller
 
         // How many people follow each one today — shown on the list, and why a delete may be refused.
         $current = EmployeeScheduleAssignment::query()->covering($today)
-            ->whereHas('employee', fn ($q) => $q->where('employment_status', '!=', 'terminated'))
+            ->whereHas('employee', fn ($q) => $q->whereNotIn('employment_status', Employee::LEFT_STATUSES))
             ->selectRaw('work_schedule_id, count(*) as total')->groupBy('work_schedule_id')
             ->pluck('total', 'work_schedule_id');
 

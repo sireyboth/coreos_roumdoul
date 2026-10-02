@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { hasLeft } from "@/components/dashboard/employee-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, type Employee, type WorkSchedule } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -94,7 +95,7 @@ function AssignForm({
     if (employee) return;
     api.employees
       .all()
-      .then((all) => setEmployees(all.filter((e) => e.employment_status !== "terminated").sort((a, b) => a.name.localeCompare(b.name))))
+      .then((all) => setEmployees(all.filter((e) => !hasLeft(e.employment_status)).sort((a, b) => a.name.localeCompare(b.name))))
       .catch(() => setEmployees([]));
   }, [employee]);
 

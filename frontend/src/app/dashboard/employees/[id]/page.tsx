@@ -23,6 +23,7 @@ import {
   type SalaryAccess,
   formatSalary,
   labelFor,
+  statusVariant,
   toPayload,
   type EmployeeForm,
 } from "@/components/dashboard/employee-form";
@@ -250,14 +251,6 @@ export default function EmployeePage() {
   // has_login without details means an older response — assume the safe case (email).
   const emailIsSignIn = employee.has_login && !idIsSignIn;
 
-  const statusVariant =
-    employee.employment_status === "active"
-      ? "success"
-      : employee.employment_status === "on_leave"
-        ? "warning"
-        : employee.employment_status === "terminated"
-          ? "destructive"
-          : "secondary";
 
   const tabs = [
     { id: "profile" as const, label: "Profile", icon: User, visible: true },
@@ -291,7 +284,7 @@ export default function EmployeePage() {
                     </p>
                   )}
                   {employee.job_title && <p className="text-sm text-muted-foreground">{employee.job_title}</p>}
-                  <Badge variant={statusVariant}>{labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}</Badge>
+                  <Badge variant={statusVariant(employee.employment_status)}>{labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}</Badge>
                 </div>
 
                 <dl className="w-full divide-y divide-border border-t border-border pt-1">

@@ -132,7 +132,7 @@ class AttendanceRecorder
         $isFuture = $expected->date > $now->setTimezone($expected->timezone)->toDateString();
 
         // Someone who has left isn't absent from work they no longer have.
-        $hasLeft = $employee->employment_status === 'terminated'
+        $hasLeft = $employee->hasLeft()
             && ($employee->termination_date === null || $expected->date > $employee->termination_date->toDateString());
 
         if ($events->isEmpty() && (! $expected->isWork() || $isFuture || $hasLeft)) {

@@ -33,7 +33,7 @@ class TeamController extends Controller
             ->whereNull('effective_to')
             ->whereIn('team_id', $ids)
             ->whereHas('employee', function ($q) use ($everyone) {
-                $q->where('employment_status', '!=', 'terminated');
+                $q->whereNotIn('employment_status', Employee::LEFT_STATUSES);
                 if ($everyone) {
                     $q->withoutGlobalScope('branch_access');
                 }

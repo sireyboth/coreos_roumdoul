@@ -60,7 +60,7 @@ class DepartmentController extends Controller
             ->whereNull('effective_to')
             ->whereIn('department_id', $ids)
             ->whereHas('employee', function ($q) use ($everyone) {
-                $q->where('employment_status', '!=', 'terminated');
+                $q->whereNotIn('employment_status', Employee::LEFT_STATUSES);
                 // A branch-limited manager sees their own headcount, but the
                 // delete guard below must count everyone.
                 if ($everyone) {

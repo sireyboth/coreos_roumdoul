@@ -269,16 +269,16 @@ class AttendanceRulesTest extends TestCase
 
     // ---- 4. Who may scan -----------------------------------------------------
 
-    public function test_terminated_and_suspended_employees_cannot_scan(): void
+    public function test_suspended_employees_and_everyone_who_has_left_cannot_scan(): void
     {
-        foreach (['terminated', 'suspended'] as $status) {
+        foreach (['suspended', 'resigned', 'terminated', 'contract_ended', 'retired'] as $status) {
             $this->employee->update(['employment_status' => $status]);
             $this->user->unsetRelation('employee'); // a real request loads it fresh
 
             $this->scan()->assertStatus(422)->assertJsonValidationErrors('employee');
         }
 
-        $this->employee->update(['employment_status' => 'on_leave']);
+        $this->employee->update(['employment_status' => 'probation']);
         $this->user->unsetRelation('employee');
         $this->scan()->assertCreated();
     }
