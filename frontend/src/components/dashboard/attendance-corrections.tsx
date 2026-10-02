@@ -16,8 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
@@ -25,6 +24,12 @@ import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
 import { dateOnly } from "@/lib/date";
 import { notifyError, notifySuccess } from "@/lib/notify";
+
+const STATUS = {
+  pending: { label: "Pending", variant: "warning" },
+  approved: { label: "Approved", variant: "success" },
+  rejected: { label: "Rejected", variant: "destructive" },
+} as const;
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -119,6 +124,49 @@ export function AttendanceCorrections({ onChanged }: { onChanged?: () => void })
 
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
 
+  const columns: DataTableColumn<AttendanceCorrection>[] = [
+    ...(canManage
+      ? [
+          {
+            id: "employee",
+            header: "Employee",
+            primary: true,
+            cell: (c: AttendanceCorrection) => <span className="font-medium">{c.employee.name}</span>,
+            sortValue: (c: AttendanceCorrection) => c.employee.name,
+            searchValue: (c: AttendanceCorrection) => c.employee.name,
+          },
+        ]
+      : []),
+    {
+      id: "date",
+      header: "Date",
+      primary: !canManage,
+      className: "whitespace-nowrap",
+      cell: (c) =>
+        new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }),
+      sortValue: (c) => dateOnly(c.date),
+    },
+    {
+      id: "scans",
+      header: "Scans to add",
+      cell: (c) => <span className="tabular-nums text-muted-foreground">{c.requested_times.map(formatTime).join(" · ") || "—"}</span>,
+    },
+    {
+      id: "reason",
+      header: "Reason",
+      // Truncated in the table; wraps in full on a phone card.
+      className: "max-w-48 truncate",
+      cell: (c) => <span className="text-muted-foreground">{c.reason}</span>,
+      searchValue: (c) => c.reason,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (c) => <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>,
+      sortValue: (c) => c.status,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -204,71 +252,39 @@ export function AttendanceCorrections({ onChanged }: { onChanged?: () => void })
         </div>
       </div>
 
-      {corrections === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-      {corrections?.length === 0 && (
-        <EmptyState icon={FileEdit} title="No correction requests" description="Nothing to review right now." />
-      )}
-
-      {corrections && corrections.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {canManage && <TableHead>Employee</TableHead>}
-              <TableHead>Date</TableHead>
-              <TableHead>Scans to add</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Status</TableHead>
-              {canManage && <TableHead className="text-right">Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {corrections.map((correction) => (
-              <TableRow key={correction.id}>
-                {canManage && <TableCell className="font-medium">{correction.employee.name}</TableCell>}
-                <TableCell className="whitespace-nowrap">
-                  {new Date(dateOnly(correction.date) + "T00:00:00").toLocaleDateString([], {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </TableCell>
-                <TableCell className="tabular-nums text-muted-foreground">
-                  {correction.requested_times.map(formatTime).join(" · ") || "—"}
-                </TableCell>
-                <TableCell className="max-w-48 truncate text-muted-foreground">{correction.reason}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      correction.status === "approved"
-                        ? "success"
-                        : correction.status === "rejected"
-                          ? "destructive"
-                          : "warning"
-                    }
-                  >
-                    {correction.status}
-                  </Badge>
-                </TableCell>
-                {canManage && (
-                  <TableCell className="text-right">
-                    {correction.status === "pending" && (
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleApprove(correction)}>
-                          Approve
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleReject(correction)}>
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      {/* A table on desktop, stacked cards on phones. */}
+      <DataTable
+        data={corrections}
+        getRowId={(correction) => correction.id}
+        columns={columns}
+        filters={[
+          {
+            type: "select",
+            id: "status",
+            label: "Status",
+            options: Object.entries(STATUS).map(([value, s]) => ({ value, label: s.label })),
+            getValue: (correction) => correction.status,
+          },
+        ]}
+        searchPlaceholder={canManage ? "Search by employee or reason…" : "Search by reason…"}
+        initialSort={{ columnId: "date", direction: "desc" }}
+        emptyState={{ icon: FileEdit, title: "No correction requests", description: "Nothing to review right now." }}
+        rowActions={
+          canManage
+            ? (correction) =>
+                correction.status === "pending" ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => handleApprove(correction)}>
+                      Approve
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleReject(correction)}>
+                      Reject
+                    </Button>
+                  </>
+                ) : null
+            : undefined
+        }
+      />
     </div>
   );
 }

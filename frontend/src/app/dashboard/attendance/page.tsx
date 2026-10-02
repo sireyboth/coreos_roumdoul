@@ -302,7 +302,8 @@ export default function AttendancePage() {
           </p>
         )}
 
-        <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
+        {/* Scrolls sideways on a narrow phone instead of widening the page. */}
+        <div className="inline-flex max-w-full self-start overflow-x-auto rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
           {tabs
             .filter((t) => t.visible)
             .map((t) => (
@@ -313,7 +314,7 @@ export default function AttendancePage() {
                 aria-selected={tab === t.id}
                 onClick={() => switchTab(t.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                   tab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                 )}
               >

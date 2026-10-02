@@ -452,7 +452,8 @@ export function DataTable<T>({
                     </div>
                   ))}
                 </dl>
-                {rowActions && (
+                {/* A row with no actions (e.g. an already reviewed request) gets no empty footer. */}
+                {rowActions?.(row) != null && (
                   <div
                     className="mt-3 flex flex-wrap justify-end gap-2 border-t border-border pt-3"
                     onClick={(e) => e.stopPropagation()}
