@@ -259,7 +259,14 @@ export default function EmployeesPage() {
   ];
 
   const filters: DataTableFilter<Employee>[] = [
-    { type: "select", id: "status", label: "Status", options: EMPLOYMENT_STATUSES, getValue: (e) => e.employment_status },
+    {
+      type: "select",
+      id: "status",
+      label: "Status",
+      options: EMPLOYMENT_STATUSES,
+      getValue: (e) => e.employment_status,
+      searchable: true,
+    },
     { type: "select", id: "type", label: "Type", options: EMPLOYMENT_TYPES, getValue: (e) => e.employment_type },
     {
       type: "select",

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
@@ -52,6 +53,8 @@ export type DataTableFilter<T> =
       getValue: (row: T) => string | null | undefined;
       /** For rows that can match several options (e.g. a list of tags). Defaults to getValue(row) === selected. */
       matches?: (row: T, selected: string) => boolean;
+      /** Lets people type to find an option — for long lists. */
+      searchable?: boolean;
     }
   | {
       type: "date-range";
@@ -246,7 +249,16 @@ export function DataTable<T>({
           </div>
 
           {filters.map((filter) =>
-            filter.type === "select" ? (
+            filter.type === "select" && filter.searchable ? (
+              <SearchableSelect
+                key={filter.id}
+                ariaLabel={filter.label}
+                placeholder={`${filter.label}: all`}
+                options={filter.options}
+                value={filterValues[filter.id] ?? ""}
+                onChange={(value) => updateFilter(filter.id, value)}
+              />
+            ) : filter.type === "select" ? (
               <select
                 key={filter.id}
                 aria-label={filter.label}

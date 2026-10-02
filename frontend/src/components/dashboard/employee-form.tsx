@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { Branch, Department, Employee, EmployeeInput, SalaryCurrency, Team } from "@/lib/api";
 
 export const EMPLOYMENT_STATUSES = [
@@ -449,18 +450,14 @@ export function EmployeeFormFields({
           hint="Suspended and terminated employees can't check in."
           wide={form.employment_status !== "terminated"}
         >
-          <select
+          <SearchableSelect
             id={id("status")}
+            options={EMPLOYMENT_STATUSES}
             value={form.employment_status}
-            onChange={(e) => onChange({ employment_status: e.target.value })}
-            className={SELECT_CLASS}
-          >
-            {EMPLOYMENT_STATUSES.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onChange({ employment_status: value })}
+            clearable={false}
+            className="h-9 w-full rounded-md"
+          />
         </Field>
         {form.employment_status === "terminated" && (
           <Field label="Last working day" htmlFor={id("term")}>
