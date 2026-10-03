@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AttendanceAdjustment;
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
+use App\Models\Employee;
 use App\Services\AttendanceService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,9 +37,10 @@ class AttendanceController extends Controller
             ->paginate(min(max($request->integer('per_page', 50), 1), 1000));
 
         $events = $this->eventsFor($days->getCollection());
+        $adjustments = $this->adjustmentsFor($days->getCollection());
         $timezone = $this->timezone($request);
 
-        $days->setCollection($days->getCollection()->map(fn (AttendanceDay $day) => $this->present($day, $events, $timezone)));
+        $days->setCollection($days->getCollection()->map(fn (AttendanceDay $day) => $this->present($day, $events, $timezone, $adjustments)));
 
         return $days;
     }
@@ -80,6 +83,40 @@ class AttendanceController extends Controller
             'slot' => $result['slot'],
             'message' => $this->scanMessage($result['slot'], $result['event'], $this->timezone($request)),
         ], 201);
+    }
+
+    /**
+     * An admin fixing one employee's day directly: void wrong scans, add
+     * missing ones (typed on the company's clock, e.g. "2026-10-05T17:00").
+     * Answers with the recalculated day, or day: null when nothing is left
+     * to keep (e.g. every scan on a day off voided).
+     */
+    public function adjust(Request $request, AttendanceService $attendance)
+    {
+        $data = $request->validate([
+            'employee_id' => ['required', 'integer'],
+            'date' => ['required', 'date_format:Y-m-d'],
+            'reason' => ['required', 'string', 'max:255'],
+            'add' => ['nullable', 'array', 'max:12'],
+            'add.*' => ['required', 'date', 'distinct'],
+            'void' => ['nullable', 'array', 'max:24'],
+            'void.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        if (empty($data['add']) && empty($data['void'])) {
+            throw ValidationException::withMessages(['add' => ['Add or remove at least one scan.']]);
+        }
+
+        // Scoped like every employee lookup, so a branch-limited manager only reaches their branch.
+        $employee = Employee::query()->findOrFail($data['employee_id']);
+        $timezone = $this->timezone($request);
+        $add = array_map(fn (string $value) => CarbonImmutable::parse($value, $timezone)->utc(), $data['add'] ?? []);
+
+        $day = $attendance->adjustDay($employee, $data['date'], $add, $data['void'] ?? [], $data['reason'], $request->user()->id);
+
+        return response()->json([
+            'day' => $day ? $this->present($day->load(['employee.branch', 'employee.currentAssignment']), $this->eventsFor(collect([$day])), $timezone, $this->adjustmentsFor(collect([$day]))) : null,
+        ]);
     }
 
     /** The signed-in person's day: expected slots, what's done, what's next. */
@@ -130,15 +167,28 @@ class AttendanceController extends Controller
                 'Employee ID', 'Employee', 'Branch', 'Department', 'Team', 'Date', 'Day type', 'Schedule',
                 'Expected', 'Scans', 'Late (min)', 'Early leave (min)', 'Worked (hours)', 'Overtime (hours)',
                 'Overtime type', 'Overtime status', 'Night (hours)', 'Status', 'Exceptions',
+                'Adjusted by', 'Adjusted at', 'Adjustment reason', 'Adjustment changes',
             ]);
 
             $hours = fn (int $minutes) => number_format($minutes / 60, 2, '.', '');
             $time = fn (?string $iso) => $iso ? CarbonImmutable::parse($iso)->setTimezone($timezone)->format('H:i') : null;
 
-            $query->chunk(500, function ($days) use ($out, $hours, $time) {
+            // How each scan was made, when it wasn't a plain QR / GPS scan.
+            $how = fn (?string $method) => match ($method) {
+                'adjustment' => ' (adjusted)',
+                'correction' => ' (correction)',
+                'auto' => ' (auto)',
+                default => '',
+            };
+
+            $query->chunk(500, function ($days) use ($out, $hours, $time, $how, $timezone) {
+                $adjustments = $this->adjustmentsFor($days);
+
                 foreach ($days as $day) {
                     $employee = $day->employee;
                     $slots = collect($day->slots ?? []);
+                    // A day adjusted more than once lists each, oldest first, split by " | ".
+                    $adjusted = $adjustments->get($day->employee_id.'|'.$day->date->toDateString(), collect());
 
                     fputcsv($out, array_map($this->safeCell(...), [
                         $employee?->employee_code,
@@ -150,7 +200,7 @@ class AttendanceController extends Controller
                         $this->label($day->kind),
                         $day->expected['schedule_name'] ?? null,
                         $slots->map(fn ($s) => strtoupper($s['type']).' '.$time($s['expected_at']))->join(', '),
-                        collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']))->join(', '),
+                        collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']).$how($scan['method'] ?? null))->join(', '),
                         $day->late_minutes,
                         $day->early_leave_minutes,
                         $hours($day->worked_minutes),
@@ -160,6 +210,10 @@ class AttendanceController extends Controller
                         $hours($day->night_minutes),
                         $this->label($day->status),
                         collect($day->exceptions ?? [])->map(fn ($e) => $this->label($e))->join(', '),
+                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->adjustedBy?->name ?? 'Deleted user')->join(' | '),
+                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->created_at->setTimezone($timezone)->format('Y-m-d H:i'))->join(' | '),
+                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->reason)->join(' | '),
+                        $adjusted->map(fn (AttendanceAdjustment $a) => $this->describeAdjustment($a, $timezone))->join(' | '),
                     ]));
                 }
             });
@@ -202,6 +256,37 @@ class AttendanceController extends Controller
         return $query;
     }
 
+    /**
+     * Admin adjustments to these days, with who made them, keyed
+     * "employeeId|Y-m-d" — one query for the whole batch.
+     */
+    private function adjustmentsFor(Collection $days): Collection
+    {
+        if ($days->isEmpty()) {
+            return collect();
+        }
+
+        return AttendanceAdjustment::query()
+            ->with('adjustedBy:id,name')
+            ->whereIn('employee_id', $days->pluck('employee_id')->unique())
+            ->whereDate('date', '>=', $days->min('date'))
+            ->whereDate('date', '<=', $days->max('date'))
+            ->orderBy('created_at')->orderBy('id')
+            ->get()
+            ->groupBy(fn (AttendanceAdjustment $a) => $a->employee_id.'|'.$a->date->toDateString());
+    }
+
+    /** "Removed 09:30; added 08:00", on the company's clock. */
+    private function describeAdjustment(AttendanceAdjustment $adjustment, string $timezone): string
+    {
+        $times = fn (?array $list) => collect($list ?? [])->map(fn (string $iso) => CarbonImmutable::parse($iso)->setTimezone($timezone)->format('H:i'))->join(', ');
+
+        return collect([
+            $adjustment->removed ? 'Removed '.$times($adjustment->removed) : null,
+            $adjustment->added ? 'Added '.$times($adjustment->added) : null,
+        ])->filter()->join('; ');
+    }
+
     /** Every scan referenced by these days, with its location, in one query. */
     private function eventsFor(Collection $days): Collection
     {
@@ -214,7 +299,8 @@ class AttendanceController extends Controller
             ->keyBy('id');
     }
 
-    private function present(AttendanceDay $day, Collection $events, string $timezone): array
+    /** @param  Collection|null  $adjustments  from adjustmentsFor(); left out where the history isn't shown */
+    private function present(AttendanceDay $day, Collection $events, string $timezone, ?Collection $adjustments = null): array
     {
         $scan = fn (?int $id) => $id && ($event = $events->get($id)) ? [
             'id' => $event->id,
@@ -261,6 +347,15 @@ class AttendanceController extends Controller
             'overtime_type' => $day->overtime_type,
             'overtime_status' => $day->overtime_status,
             'exceptions' => $day->exceptions ?? [],
+            // Who changed this day by hand, when, and why — oldest first.
+            'adjustments' => ($adjustments?->get($day->employee_id.'|'.$day->date->toDateString()) ?? collect())
+                ->map(fn (AttendanceAdjustment $a) => [
+                    'id' => $a->id,
+                    'at' => $a->created_at->setTimezone($timezone)->toIso8601String(),
+                    'by' => $a->adjustedBy?->name,
+                    'reason' => $a->reason,
+                    'changes' => $this->describeAdjustment($a, $timezone),
+                ])->values(),
             'employee' => $employee ? [
                 'id' => $employee->id,
                 'name' => $employee->name,

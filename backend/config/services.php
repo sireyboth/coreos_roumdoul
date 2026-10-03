@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    // Web Push to phones and computers, even when the app is closed. Generate
+    // the key pair once with `php artisan webpush:vapid` — changing it later
+    // signs everyone out of push until they turn it on again.
+    'webpush' => [
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        // Push services contact this if something goes wrong with our pushes.
+        'subject' => env('VAPID_SUBJECT') ?: 'mailto:'.env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+    ],
+
 ];

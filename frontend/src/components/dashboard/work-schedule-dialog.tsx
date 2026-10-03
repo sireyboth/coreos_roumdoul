@@ -84,6 +84,7 @@ export function WorkScheduleDialog({
   const [name, setName] = useState(schedule?.name ?? "");
   const [description, setDescription] = useState(schedule?.description ?? "");
   const [active, setActive] = useState(schedule?.is_active ?? true);
+  const [autoAttendance, setAutoAttendance] = useState(schedule?.auto_attendance ?? false);
   // Per weekday: its stretches (empty = day off).
   const [week, setWeek] = useState<Record<number, Stretch[]>>(() =>
     Object.fromEntries(
@@ -156,6 +157,7 @@ export function WorkScheduleDialog({
       name,
       description: description || null,
       is_active: active,
+      auto_attendance: autoAttendance,
       late_grace_minutes: Number(lateGrace) || 0,
       early_leave_grace_minutes: Number(earlyGrace) || 0,
       break_minutes: Number(breakMinutes) || 0,
@@ -298,6 +300,26 @@ export function WorkScheduleDialog({
                 );
               })}
             </ul>
+          </section>
+
+          {/* ── Scanning ── */}
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">Scanning</h3>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoAttendance}
+                onChange={(e) => setAutoAttendance(e.target.checked)}
+                className="mt-0.5 size-4 rounded border-input"
+              />
+              <span className="flex flex-col">
+                Automatic attendance — no scanning needed
+                <span className="text-xs text-muted-foreground">
+                  For top management and others who don&apos;t scan. Each IN and OUT is recorded at its scheduled time once
+                  it passes, so they&apos;re never late or absent. Holidays and days off still apply.
+                </span>
+              </span>
+            </label>
           </section>
 
           {/* ── Tolerances ── */}

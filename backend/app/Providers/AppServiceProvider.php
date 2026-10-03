@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Services\Attendance\AttendanceRecorder;
+use App\Services\Push\PushSender;
+use App\Services\Push\WebPushSender;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
         // One per request (or job): it caches which months are locked, and
         // that answer must not outlive the request that asked.
         $this->app->scoped(AttendanceRecorder::class);
+
+        $this->app->bind(PushSender::class, WebPushSender::class);
     }
 
     /**

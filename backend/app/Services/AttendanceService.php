@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AttendanceAdjustment;
 use App\Models\AttendanceCorrection;
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
@@ -13,8 +14,10 @@ use App\Services\Attendance\ExpectedDay;
 use App\Services\Attendance\ScheduleResolver;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -56,6 +59,12 @@ class AttendanceService
         if ($expected->kind === 'unscheduled' && config('attendance.require_schedule')) {
             throw ValidationException::withMessages([
                 'schedule' => ["You don't have a work schedule for today. Ask your manager to assign you one."],
+            ]);
+        }
+
+        if ($expected->isWork() && ($expected->rules['auto_attendance'] ?? false)) {
+            throw ValidationException::withMessages([
+                'schedule' => ["Your attendance is recorded automatically on {$expected->scheduleName}, so there's no need to scan."],
             ]);
         }
 
@@ -114,6 +123,8 @@ class AttendanceService
             'kind' => $expected->kind,
             'label' => $expected->label,
             'schedule' => $expected->scheduleName,
+            // Filled in automatically: nothing to scan today.
+            'auto' => $expected->isWork() && ($expected->rules['auto_attendance'] ?? false),
             'slots' => $slots,
             'next' => collect($slots)->first(fn (array $slot) => $slot['actual_at'] === null && $slot['status'] !== 'missing'),
             'day' => $day,
@@ -154,6 +165,69 @@ class AttendanceService
         $days = $this->recorder->recalculateRange($employee, $date, CarbonImmutable::parse($date)->addDay()->toDateString());
 
         return $days->get($date);
+    }
+
+    /**
+     * An admin's direct fix to one work day, without a request: wrong scans
+     * are voided (soft-deleted, with who and why) and missing ones added as
+     * 'adjustment' scans. Changing a scan's time is voiding it and adding the
+     * right one. Every day the change can touch is then recalculated.
+     *
+     * @param  array<int, CarbonInterface>  $add  instants to add
+     * @param  array<int, int>  $voidIds  this employee's scans to void
+     */
+    public function adjustDay(Employee $employee, string $date, array $add, array $voidIds, string $reason, int $adminId): ?AttendanceDay
+    {
+        $toVoid = AttendanceEvent::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('id', $voidIds)
+            ->get();
+
+        if ($toVoid->count() !== count(array_unique($voidIds))) {
+            throw ValidationException::withMessages(['void' => ["Some of those scans don't belong to {$employee->name}."]]);
+        }
+
+        // Every work date involved: the day itself, the next (a night shift's
+        // OUT), and wherever a voided or added scan falls.
+        $dates = collect([$date, CarbonImmutable::parse($date)->addDay()->toDateString()])
+            ->merge($toVoid->map(fn (AttendanceEvent $event) => $this->recorder->workDateFor($employee, $event->event_time)))
+            ->merge(array_map(fn (CarbonInterface $time) => $this->recorder->workDateFor($employee, $time), $add))
+            ->unique()->sort()->values();
+
+        foreach ($dates as $affected) {
+            $this->recorder->assertUnlocked($employee->company_id, $affected);
+        }
+
+        DB::transaction(function () use ($employee, $date, $add, $toVoid, $reason, $adminId) {
+            AttendanceAdjustment::query()->create([
+                'company_id' => $employee->company_id,
+                'employee_id' => $employee->id,
+                'date' => $date,
+                'adjusted_by' => $adminId,
+                'reason' => $reason,
+                'removed' => $toVoid->map(fn (AttendanceEvent $event) => $event->event_time->utc()->toIso8601String())->values()->all(),
+                'added' => array_map(fn (CarbonInterface $time) => CarbonImmutable::instance($time)->utc()->toIso8601String(), $add),
+            ]);
+
+            foreach ($toVoid as $event) {
+                $event->update(['voided_by' => $adminId, 'void_reason' => $reason]);
+                $event->delete();
+            }
+
+            foreach ($add as $time) {
+                AttendanceEvent::query()->create([
+                    'company_id' => $employee->company_id,
+                    'employee_id' => $employee->id,
+                    'event_type' => null,
+                    'method' => 'adjustment',
+                    'event_time' => $time,
+                    'recorded_by' => $adminId,
+                    'notes' => "Adjusted by admin: {$reason}",
+                ]);
+            }
+        });
+
+        return $this->recorder->recalculateRange($employee, $dates->first(), $dates->last())->get($date);
     }
 
     private function assertEmployeeMayScan(Employee $employee): void

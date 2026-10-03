@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
+use App\Services\Attendance\AttendanceNotifier;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AttendanceService;
 use Carbon\Carbon;
@@ -27,7 +28,7 @@ class AttendanceCorrectionController extends Controller
         return $corrections;
     }
 
-    public function store(Request $request, AttendanceRecorder $recorder)
+    public function store(Request $request, AttendanceRecorder $recorder, AttendanceNotifier $notifier)
     {
         $canManageOthers = $request->user()->hasCompanyPermission('attendance.manage');
 
@@ -84,10 +85,12 @@ class AttendanceCorrectionController extends Controller
             'requested_scans' => $scans,
         ]);
 
+        $notifier->correctionRequested($correction, $request->user());
+
         return response()->json($correction->load('employee')->append('requested_times'), 201);
     }
 
-    public function approve(Request $request, AttendanceCorrection $correction, AttendanceService $attendance)
+    public function approve(Request $request, AttendanceCorrection $correction, AttendanceService $attendance, AttendanceNotifier $notifier)
     {
         $this->authorizeSameCompany($request, $correction);
 
@@ -98,11 +101,12 @@ class AttendanceCorrectionController extends Controller
         $data = $request->validate(['review_notes' => ['nullable', 'string', 'max:255']]);
 
         $attendance->approveCorrection($correction, $request->user()->id, $data['review_notes'] ?? null);
+        $notifier->correctionDecided($correction, $request->user());
 
         return $correction->fresh(['employee'])->append('requested_times');
     }
 
-    public function reject(Request $request, AttendanceCorrection $correction)
+    public function reject(Request $request, AttendanceCorrection $correction, AttendanceNotifier $notifier)
     {
         $this->authorizeSameCompany($request, $correction);
 
@@ -118,6 +122,7 @@ class AttendanceCorrectionController extends Controller
             'reviewed_at' => now(),
             'review_notes' => $data['review_notes'] ?? null,
         ]);
+        $notifier->correctionDecided($correction, $request->user());
 
         return $correction;
     }

@@ -383,7 +383,15 @@ export default function AttendancePage() {
       </div>
 
       <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
-      <AttendanceDayDialog day={preview} onOpenChange={(open) => !open && setPreview(null)} />
+      <AttendanceDayDialog
+        day={preview}
+        onOpenChange={(open) => !open && setPreview(null)}
+        canManage={canManage}
+        onAdjusted={(day) => {
+          setPreview(day);
+          load();
+        }}
+      />
     </div>
   );
 }

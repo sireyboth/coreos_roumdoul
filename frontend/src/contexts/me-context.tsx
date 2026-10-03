@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACCOUNT_BLOCKED_EVENT, api, clearToken, getMeSnapshot, getToken, MeResponse, saveMeSnapshot } from "@/lib/api";
+import { disablePush } from "@/lib/push";
 
 type BlockedInfo = { code: string; message: string };
 
@@ -70,6 +71,8 @@ export function MeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function logout() {
+    // Before the token goes: a shared phone must stop getting this person's alerts.
+    await disablePush().catch(() => {});
     try {
       await api.logout();
     } catch {

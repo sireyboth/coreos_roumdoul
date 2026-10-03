@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, PencilLine } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { AttendanceDay, DaySlot, ScanDetail } from "@/lib/api";
+import { AttendanceAdjustScans } from "@/components/dashboard/attendance-adjust-scans";
 import { parseDate } from "@/components/dashboard/calendar-shared";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes, OVERTIME_TYPE } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,8 @@ const METHOD_LABELS: Record<string, string> = {
   qr: "QR scan",
   gps: "GPS",
   correction: "Approved correction",
+  adjustment: "Adjusted by admin",
+  auto: "Automatic",
   none: "Not verified",
 };
 
@@ -126,9 +130,28 @@ function ScanCard({ title, scan }: { title: string; scan: ScanDetail }) {
   );
 }
 
-/** One employee's day in full: expected next to actual, every scan, and what follows from them. */
-export function AttendanceDayDialog({ day, onOpenChange }: { day: AttendanceDay | null; onOpenChange: (open: boolean) => void }) {
+/**
+ * One employee's day in full: expected next to actual, every scan, and what
+ * follows from them. Someone who manages attendance can adjust the scans here.
+ */
+export function AttendanceDayDialog({
+  day,
+  onOpenChange,
+  canManage = false,
+  onAdjusted,
+}: {
+  day: AttendanceDay | null;
+  onOpenChange: (open: boolean) => void;
+  canManage?: boolean;
+  // The recalculated day, or null when nothing is left to keep.
+  onAdjusted?: (day: AttendanceDay | null) => void;
+}) {
   const status = day ? DAY_STATUS[day.status] : null;
+  // Which day is being edited, so opening another day starts in the normal view.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const editing = day !== null && editingId === day.id;
+  // On an automatic-attendance schedule the times come from the schedule, not scans.
+  const automatic = day?.scans.some((entry) => entry.method === "auto") ?? false;
 
   return (
     <Dialog open={day !== null} onOpenChange={onOpenChange}>
@@ -219,7 +242,45 @@ export function AttendanceDayDialog({ day, onOpenChange }: { day: AttendanceDay 
               </section>
             )}
 
-            {day.scans.length > 0 && (
+            {editing && (
+              <AttendanceAdjustScans
+                day={day}
+                onCancel={() => setEditingId(null)}
+                onSaved={(updated) => {
+                  setEditingId(null);
+                  onAdjusted?.(updated);
+                }}
+              />
+            )}
+
+            {!editing && day.adjustments.length > 0 && (
+              <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold">Adjusted by an admin</h3>
+                <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
+                  {day.adjustments.map((a) => (
+                    <li key={a.id} className="flex flex-col gap-0.5 px-3 py-2 text-sm">
+                      <span>
+                        <span className="font-medium">{a.by ?? "Deleted user"}</span>
+                        <span className="text-muted-foreground">
+                          {" · "}
+                          {new Date(a.at).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </span>
+                      <span className="tabular-nums">{a.changes}</span>
+                      <span className="text-xs text-muted-foreground">Reason: {a.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {automatic && (
+              <p className="text-sm text-muted-foreground">
+                Recorded automatically from the schedule — this person doesn&apos;t need to scan.
+              </p>
+            )}
+
+            {!editing && !automatic && day.scans.length > 0 && (
               <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-semibold">Scans ({day.scans.length})</h3>
                 {day.scans.map(
@@ -235,11 +296,17 @@ export function AttendanceDayDialog({ day, onOpenChange }: { day: AttendanceDay 
               </section>
             )}
 
-            {day.scans.length === 0 && <p className="text-sm text-muted-foreground">No scans on this day.</p>}
+            {!editing && day.scans.length === 0 && <p className="text-sm text-muted-foreground">No scans on this day.</p>}
           </div>
         )}
 
         <DialogFooter>
+          {canManage && day?.employee && !editing && !automatic && (
+            <Button type="button" variant="outline" onClick={() => setEditingId(day.id)}>
+              <PencilLine className="size-4" />
+              Adjust scans
+            </Button>
+          )}
           <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
         </DialogFooter>
       </DialogContent>

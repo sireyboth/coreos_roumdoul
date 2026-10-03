@@ -7,10 +7,13 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class AttendanceEvent extends Model
 {
-    use Auditable, BelongsToCompany, HasFactory;
+    // A scan voided by an admin adjustment is soft-deleted: out of every
+    // calculation, but still on record with voided_by and void_reason.
+    use Auditable, BelongsToCompany, HasFactory, SoftDeletes;
 
     // Internal columns no screen reads; hidden so they aren't repeated in every nested copy.
     protected $hidden = ['company_id', 'created_at', 'updated_at', 'deleted_at', 'laravel_through_key'];
@@ -27,6 +30,8 @@ class AttendanceEvent extends Model
         'device_id',
         'recorded_by',
         'notes',
+        'voided_by',
+        'void_reason',
     ];
 
     protected $appends = ['distance_meters'];

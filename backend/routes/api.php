@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\EmployeePhotoController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\ScheduleAssignmentController;
 use App\Http\Controllers\Api\ScheduleController;
@@ -60,8 +61,13 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 
     Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    Route::get('/push/key', [PushSubscriptionController::class, 'key']);
+    Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
+    Route::delete('/push/subscriptions', [PushSubscriptionController::class, 'destroy']);
 
     foreach ([
         'branches' => BranchController::class,
@@ -172,6 +178,7 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
         Route::middleware('company_permission:attendance.manage')->group(function () {
             Route::post('/attendance/corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve']);
             Route::post('/attendance/corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject']);
+            Route::post('/attendance/adjustments', [AttendanceController::class, 'adjust']);
             Route::get('/attendance/overtime', [AttendanceReviewController::class, 'overtime']);
             Route::post('/attendance/days/{day}/overtime/approve', [AttendanceReviewController::class, 'approveOvertime']);
             Route::post('/attendance/days/{day}/overtime/reject', [AttendanceReviewController::class, 'rejectOvertime']);

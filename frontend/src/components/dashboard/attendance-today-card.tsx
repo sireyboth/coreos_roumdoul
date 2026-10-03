@@ -122,7 +122,9 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
         <CardDescription>
           {!today
             ? "Loading your day…"
-            : next
+            : today.auto
+              ? "Your attendance is recorded automatically — no need to scan."
+              : next
               ? `Next: ${next.type === "in" ? "IN" : "OUT"} at ${clock(next.expected_at)}`
               : done
                 ? "Every scan for today is done."
@@ -140,7 +142,8 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
         {today && today.slots.length > 0 && (
           <ol className="flex flex-wrap gap-2">
             {today.slots.map((slot) => {
-              const isNext = next?.sequence === slot.sequence;
+              // An automatic slot fills itself in, so there's no "next" to scan.
+              const isNext = !today.auto && next?.sequence === slot.sequence;
               const Icon = slot.actual_at ? CheckCircle2 : slot.status === "missing" ? XCircle : isNext ? Clock3 : Circle;
               return (
                 <li
@@ -172,16 +175,18 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
           </ol>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => setScannerOpen(true)} disabled={working} size="lg">
-            <QrCode className="size-4" />
-            {working ? "Recording…" : next ? `Scan QR — ${next.type === "in" ? "IN" : "OUT"}` : "Scan QR"}
-          </Button>
-          <Button onClick={handleGps} disabled={working} variant="outline" size="lg">
-            <MapPin className="size-4" />
-            Use GPS instead
-          </Button>
-        </div>
+        {!today?.auto && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setScannerOpen(true)} disabled={working} size="lg">
+              <QrCode className="size-4" />
+              {working ? "Recording…" : next ? `Scan QR — ${next.type === "in" ? "IN" : "OUT"}` : "Scan QR"}
+            </Button>
+            <Button onClick={handleGps} disabled={working} variant="outline" size="lg">
+              <MapPin className="size-4" />
+              Use GPS instead
+            </Button>
+          </div>
+        )}
 
         {message && <Alert variant="success">{message}</Alert>}
         {error && <Alert variant="destructive">{error}</Alert>}
@@ -198,9 +203,11 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
           </div>
         )}
 
-        <Link href="/dashboard/scan" className="text-sm text-muted-foreground underline">
-          Open instant-scan mode →
-        </Link>
+        {!today?.auto && (
+          <Link href="/dashboard/scan" className="text-sm text-muted-foreground underline">
+            Open instant-scan mode →
+          </Link>
+        )}
       </CardContent>
 
       <QrScanDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleQr} />

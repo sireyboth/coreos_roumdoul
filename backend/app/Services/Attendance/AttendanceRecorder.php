@@ -78,6 +78,7 @@ class AttendanceRecorder
 
         // Every scan that could belong to these days: from the evening before to two mornings after.
         $events = AttendanceEvent::query()->withoutGlobalScopes()
+            ->whereNull('deleted_at') // voided by an admin adjustment
             ->where('company_id', $employee->company_id)
             ->where('employee_id', $employee->id)
             ->where('event_time', '>=', $start->subDay()->utc())
@@ -146,6 +147,16 @@ class AttendanceRecorder
             'at' => CarbonImmutable::instance($event->event_time),
             'method' => $event->method,
         ])->values()->all();
+
+        // Automatic attendance (e.g. top management): each slot counts as
+        // scanned at its own time once that time has passed. Nothing is
+        // written to attendance_events, and any real scans are left out.
+        if ($expected->isWork() && ($expected->rules['auto_attendance'] ?? false)) {
+            $scans = collect($expected->slots)
+                ->filter(fn (array $slot) => $slot['at']->lte($now))
+                ->map(fn (array $slot) => ['id' => -$slot['sequence'], 'at' => $slot['at'], 'method' => 'auto'])
+                ->values()->all();
+        }
 
         $attributes = AttendanceCalculator::calculate($expected, $scans, $now);
 

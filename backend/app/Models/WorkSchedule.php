@@ -28,6 +28,7 @@ class WorkSchedule extends Model
         'name',
         'description',
         'is_active',
+        'auto_attendance',
         'late_grace_minutes',
         'early_leave_grace_minutes',
         'break_minutes',
@@ -44,6 +45,7 @@ class WorkSchedule extends Model
     {
         return [
             'is_active' => 'boolean',
+            'auto_attendance' => 'boolean',
             'is_break_paid' => 'boolean',
             'overtime_count_early' => 'boolean',
             'overtime_requires_approval' => 'boolean',
@@ -103,6 +105,7 @@ class WorkSchedule extends Model
             'overtime_count_early' => $this->overtime_count_early,
             'overtime_round_minutes' => $this->overtime_round_minutes,
             'overtime_requires_approval' => $this->overtime_requires_approval,
+            'auto_attendance' => $this->auto_attendance,
         ];
     }
 }

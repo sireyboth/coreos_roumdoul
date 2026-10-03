@@ -405,8 +405,18 @@ export type DashboardSummary = {
 
 export type Notification = {
   id: number;
+  // e.g. "attendance.correction_requested", "attendance.correction_decided", "welcome".
+  type: string;
   data: { title: string; body?: string; [key: string]: unknown };
+  // Where clicking it goes (a dashboard path), if anywhere.
+  link: string | null;
+  // Who caused it (the requester, the reviewer).
+  actor: string | null;
   read_at: string | null;
+  // Someone already acted on what it's about: resolution is "approved" / "rejected", by resolved_by.
+  resolved_at: string | null;
+  resolution: string | null;
+  resolved_by: string | null;
   created_at: string;
 };
 
@@ -458,6 +468,8 @@ export type WorkSchedule = {
   name: string;
   description: string | null;
   is_active: boolean;
+  // No scanning (e.g. top management): each IN/OUT is filled in at its time once it passes.
+  auto_attendance: boolean;
   late_grace_minutes: number;
   early_leave_grace_minutes: number;
   // Deducted only on a day with one IN/OUT pair (people who don't scan out for lunch).
@@ -546,8 +558,8 @@ export type AttendanceEvent = {
   // Only on scans recorded before work schedules; the schedule decides now.
   event_type: "check_in" | "check_out" | null;
   event_time: string;
-  // qr / gps / correction / none — how presence was verified.
-  method: "qr" | "gps" | "correction" | "none" | null;
+  // qr / gps / correction / adjustment / none — how presence was verified.
+  method: "qr" | "gps" | "correction" | "adjustment" | "auto" | "none" | null;
   latitude: number | null;
   longitude: number | null;
   // Meters from the work location, when both sides had coordinates.
@@ -639,6 +651,8 @@ export type AttendanceDay = {
   overtime_type: "workday" | "day_off" | "holiday" | null;
   overtime_status: "pending" | "approved" | "rejected" | null;
   exceptions: AttendanceException[];
+  // Admin adjustments to this day, oldest first. changes: "Removed 09:30; Added 08:00".
+  adjustments: { id: number; at: string; by: string | null; reason: string; changes: string }[];
   employee: {
     id: number;
     name: string;
@@ -655,6 +669,8 @@ export type AttendanceToday = {
   kind: AttendanceDay["kind"];
   label: string | null;
   schedule: string | null;
+  // Automatic attendance: slots fill themselves in, nothing to scan.
+  auto: boolean;
   slots: Omit<DaySlot, "scan" | "method">[];
   // The next slot still to scan, if any.
   next: Omit<DaySlot, "scan" | "method"> | null;
@@ -988,7 +1004,11 @@ export const api = {
     scan: (data?: { qr_token?: string; latitude?: number; longitude?: number }) =>
       request<ScanResult>("/api/attendance/scan", { method: "POST", body: JSON.stringify(data ?? {}) }),
     today: () => request<AttendanceToday>("/api/attendance/today"),
-    overtime: (params: { status?: "pending" | "approved" | "rejected"; from?: string; to?: string } = {}) => {
+    // An admin fixing a day directly: void wrong scans, add missing ones ("2026-10-05T17:00", company clock).
+    // day is null when nothing is left to keep (e.g. every scan on a day off removed).
+    adjust: (data: { employee_id: number; date: string; reason: string; add: string[]; void: number[] }) =>
+      request<{ day: AttendanceDay | null }>("/api/attendance/adjustments", { method: "POST", body: JSON.stringify(data) }),
+    overtime:(params: { status?: "pending" | "approved" | "rejected"; from?: string; to?: string } = {}) => {
       const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);
       return request<OvertimeEntry[]>(`/api/attendance/overtime${query.size ? `?${query}` : ""}`);
     },
@@ -1049,9 +1069,20 @@ export const api = {
 
   notifications: {
     list: () => request<Notification[]>("/api/notifications"),
+    // Cheap to poll: the unread count and the newest unread alert's id.
+    unreadCount: () => request<{ count: number; latest_id: number | null }>("/api/notifications/unread-count"),
     markAsRead: (id: number) =>
       request<void>(`/api/notifications/${id}/read`, { method: "POST" }),
     markAllAsRead: () => request<void>("/api/notifications/read-all", { method: "POST" }),
+  },
+
+  // Push notifications to this device, even with the app closed.
+  push: {
+    // enabled is false when the server has no push keys set up.
+    key: () => request<{ enabled: boolean; public_key: string | null }>("/api/push/key"),
+    subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string }; content_encoding?: string }) =>
+      request<void>("/api/push/subscriptions", { method: "POST", body: JSON.stringify(subscription) }),
+    unsubscribe: (endpoint: string) => request<void>("/api/push/subscriptions", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
   },
 
   profile: {

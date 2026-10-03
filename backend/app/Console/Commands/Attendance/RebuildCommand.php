@@ -30,7 +30,7 @@ class RebuildCommand extends Command
 
         foreach ($companies as $company) {
             $today = CarbonImmutable::now($company->timezone ?: config('attendance.default_timezone'))->toDateString();
-            $firstScan = AttendanceEvent::query()->withoutGlobalScopes()->where('company_id', $company->id)->min('event_time');
+            $firstScan = AttendanceEvent::query()->withoutGlobalScopes()->whereNull('deleted_at')->where('company_id', $company->id)->min('event_time');
             $from = $this->option('from') ?: ($firstScan ? CarbonImmutable::parse($firstScan)->toDateString() : $today);
             $to = min($this->option('to') ?: $today, $today);
 

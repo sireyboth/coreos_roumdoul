@@ -108,6 +108,7 @@ class WorkScheduleController extends Controller
                 Rule::unique('work_schedules', 'name')->where('company_id', $request->user()->company_id)->whereNull('deleted_at')->ignore($schedule?->id)],
             'description' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'auto_attendance' => ['boolean'],
             'late_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:240'],
             'early_leave_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:240'],
             'break_minutes' => ['sometimes', 'integer', 'min:0', 'max:480'],
