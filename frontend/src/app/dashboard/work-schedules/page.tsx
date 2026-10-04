@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarClock, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { CalendarClock, Pencil, Plus, Trash2, UserPlus, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -9,6 +9,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { AssignScheduleDialog } from "@/components/dashboard/assign-schedule-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { SchedulePeopleDialog } from "@/components/dashboard/schedule-people-dialog";
 import { WorkScheduleDialog } from "@/components/dashboard/work-schedule-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, type WorkSchedule } from "@/lib/api";
@@ -57,9 +58,12 @@ export default function WorkSchedulesPage() {
   // Bumped on every open so the form always starts from fresh values.
   const [formKey, setFormKey] = useState(0);
   const [assigning, setAssigning] = useState<WorkSchedule | null>(null);
+  const [viewingPeople, setViewingPeople] = useState<WorkSchedule | null>(null);
 
   const canManage = me?.permissions.includes("work_schedules.manage") ?? false;
   const canAssign = me?.permissions.includes("schedules.manage") ?? false;
+  // Who follows a schedule comes from the assignments, which need the roster permission.
+  const canSeePeople = me?.permissions.includes("schedules.view") ?? false;
 
   function load() {
     api.workSchedules.list().then(setSchedules).catch(() => setSchedules([]));
@@ -192,9 +196,15 @@ export default function WorkSchedulesPage() {
             ) : undefined,
           }}
           rowActions={
-            canManage || canAssign
+            canManage || canAssign || canSeePeople
               ? (s) => (
                   <>
+                    {canSeePeople && (
+                      <Button variant="outline" size="sm" onClick={() => setViewingPeople(s)}>
+                        <Users className="size-3.5" />
+                        People ({s.assigned_count ?? 0})
+                      </Button>
+                    )}
                     {canAssign && s.is_active && (
                       <Button variant="outline" size="sm" onClick={() => setAssigning(s)}>
                         <UserPlus className="size-3.5" />
@@ -221,6 +231,7 @@ export default function WorkSchedulesPage() {
       </div>
 
       <WorkScheduleDialog key={formKey} schedule={editing} open={formOpen} onOpenChange={setFormOpen} onSaved={load} />
+      <SchedulePeopleDialog schedule={viewingPeople} onOpenChange={(open) => !open && setViewingPeople(null)} />
       {assigning && (
         <AssignScheduleDialog
           open

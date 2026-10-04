@@ -499,7 +499,8 @@ export type WorkScheduleInput = Partial<Omit<WorkSchedule, "id" | "days" | "week
 export type ScheduleAssignment = {
   id: number;
   employee_id: number;
-  employee: { id: number; name: string; employee_code: string | null } | null;
+  // has_left: still on record, but no longer counts as following the schedule.
+  employee: { id: number; name: string; employee_code: string | null; has_left?: boolean } | null;
   work_schedule: { id: number; name: string; is_active: boolean } | null;
   effective_from: string;
   effective_to: string | null;

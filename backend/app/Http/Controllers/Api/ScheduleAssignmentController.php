@@ -27,7 +27,7 @@ class ScheduleAssignmentController extends Controller
         $manages = $request->user()->hasCompanyPermission('schedules.manage');
 
         return EmployeeScheduleAssignment::query()
-            ->with(['workSchedule:id,name,is_active', 'employee:id,display_name,first_name,last_name,employee_code'])
+            ->with(['workSchedule:id,name,is_active', 'employee:id,display_name,first_name,last_name,employee_code,employment_status'])
             // Through the employee, so the branch-access restriction applies — and
             // someone who can't manage the roster only ever sees their own.
             ->whereHas('employee', fn ($q) => $manages ? $q : $q->where('user_id', $request->user()->id))
@@ -185,6 +185,8 @@ class ScheduleAssignmentController extends Controller
                 'id' => $assignment->employee->id,
                 'name' => $assignment->employee->name,
                 'employee_code' => $assignment->employee->employee_code,
+                // Someone who left still has their assignment on record, but no longer "follows" it.
+                'has_left' => $assignment->employee->hasLeft(),
             ] : null,
             'work_schedule' => $assignment->workSchedule ? [
                 'id' => $assignment->workSchedule->id,
