@@ -108,7 +108,6 @@ export default function IdCardsPage() {
             getRowId={(employee) => employee.id}
             columns={columns}
             searchPlaceholder="Search by name or employee ID…"
-            initialSort={{ columnId: "name", direction: "asc" }}
             emptyState={{
               icon: IdCard,
               title: "No employees yet",

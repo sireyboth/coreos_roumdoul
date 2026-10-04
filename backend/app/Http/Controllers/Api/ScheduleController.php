@@ -52,7 +52,9 @@ class ScheduleController extends Controller
         }
 
         // per_page (max 2000) lets a month view load a whole company's roster at once.
-        return $query->orderBy('date')->orderBy('id')->paginate(min(max($request->integer('per_page', 50), 1), 2000));
+        return $query->orderBy('date')
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'schedules.employee_id'))
+            ->orderBy('id')->paginate(min(max($request->integer('per_page', 50), 1), 2000));
     }
 
     public function store(Request $request)

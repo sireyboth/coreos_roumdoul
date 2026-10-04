@@ -263,6 +263,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
       hideOnMobile: true,
       cell: (schedule) => <span className="text-muted-foreground">{schedule.work_location?.name ?? "Own branch"}</span>,
       searchValue: (schedule) => schedule.work_location?.name,
+      sortValue: (schedule) => schedule.work_location?.name ?? "Own branch",
     },
   ];
 

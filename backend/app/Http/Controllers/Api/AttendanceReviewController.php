@@ -37,7 +37,10 @@ class AttendanceReviewController extends Controller
             ->when($request->filled('status'), fn ($q) => $q->where('overtime_status', $request->input('status')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('date', '>=', $request->date('from')))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('date', '<=', $request->date('to')))
+            // Waiting for review first; then each person in display order, their days newest first.
             ->orderByRaw("case when overtime_status = 'pending' then 0 else 1 end")
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'attendance_days.employee_id'))
+            ->orderBy('employee_id')
             ->orderByDesc('date')
             ->limit(500)
             ->get()
@@ -119,7 +122,7 @@ class AttendanceReviewController extends Controller
             ->when($request->filled('employee_id'), fn ($q) => $q->whereKey($request->integer('employee_id')))
             // People who left before this month have nothing to show.
             ->where(fn ($q) => $q->whereNotIn('employment_status', Employee::LEFT_STATUSES)->orWhereDate('termination_date', '>=', $start->toDateString()))
-            ->orderBy('display_name')->orderBy('id')
+            ->inDisplayOrder()
             ->limit(1000)
             ->get();
 

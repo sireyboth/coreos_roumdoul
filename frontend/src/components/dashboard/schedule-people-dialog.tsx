@@ -59,8 +59,7 @@ export function SchedulePeopleDialog({
 
   const query = search.trim().toLowerCase();
   const rows = groups[view]
-    .filter((a) => !query || [a.employee?.name, a.employee?.employee_code].some((v) => v?.toLowerCase().includes(query)))
-    .sort((a, b) => (a.employee?.name ?? "").localeCompare(b.employee?.name ?? ""));
+    .filter((a) => !query || [a.employee?.name, a.employee?.employee_code].some((v) => v?.toLowerCase().includes(query)));
 
   function handleOpenChange(open: boolean) {
     if (!open) {

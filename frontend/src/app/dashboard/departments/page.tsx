@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MembersDialog } from "@/components/dashboard/members-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department } from "@/lib/api";
@@ -66,6 +67,7 @@ function DepartmentFormDialog({
   const [parentId, setParentId] = useState(department?.parent_department_id != null ? String(department.parent_department_id) : "");
   const [branchId, setBranchId] = useState(department?.branch_id != null ? String(department.branch_id) : "");
   const [status, setStatus] = useState<Department["status"]>(department?.status ?? "active");
+  const [sortOrder, setSortOrder] = useState(fromSortOrder(department?.sort_order));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +86,7 @@ function DepartmentFormDialog({
       parent_department_id: parentId ? Number(parentId) : null,
       branch_id: branchId ? Number(branchId) : null,
       status,
+      sort_order: toSortOrder(sortOrder),
     };
 
     try {
@@ -164,6 +167,7 @@ function DepartmentFormDialog({
               </p>
             </div>
           )}
+          <DisplayOrderField id="dept-order" value={sortOrder} onChange={setSortOrder} example="the main department" />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -239,6 +243,7 @@ export default function DepartmentsPage() {
       sortValue: (department) => department.name,
       searchValue: (department) => [department.name, department.code].filter(Boolean).join(" "),
     },
+    displayOrderColumn<Department>(),
     {
       id: "parent",
       header: "Part of",
@@ -320,7 +325,6 @@ export default function DepartmentsPage() {
           columns={columns}
           filters={filters}
           searchPlaceholder="Search departments…"
-          initialSort={{ columnId: "name", direction: "asc" }}
           emptyState={{
             icon: Network,
             title: "No departments yet",

@@ -23,6 +23,7 @@ class TeamController extends Controller
             'code' => ['nullable', 'string', 'max:255'],
             'department_id' => ['nullable', Rule::exists('departments', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at')],
             'status' => ['sometimes', 'in:active,inactive'],
+            ...Team::displayOrderRules(),
         ];
     }
 
@@ -46,7 +47,7 @@ class TeamController extends Controller
 
     public function index(Request $request)
     {
-        $teams = Team::query()->with('department')->orderBy('name')
+        $teams = Team::query()->with('department')->inDisplayOrder()
             ->paginate(min(max($request->integer('per_page', 25), 1), 200));
 
         $members = $this->memberCounts($teams->getCollection()->pluck('id')->all());

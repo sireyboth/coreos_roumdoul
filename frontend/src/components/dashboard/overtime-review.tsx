@@ -102,12 +102,14 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
         </span>
       ),
       hideOnMobile: true,
+      sortValue: (e) => e.worked_minutes,
     },
     {
       id: "schedule",
       header: "Schedule",
       cell: (e) => <span className="text-muted-foreground">{e.schedule ?? "—"}</span>,
       hideOnMobile: true,
+      sortValue: (e) => e.schedule,
     },
     ...(status !== "pending"
       ? [
@@ -115,6 +117,7 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
             id: "reviewed",
             header: "Reviewed by",
             cell: (e: OvertimeEntry) => <span className="text-muted-foreground">{e.reviewed_by?.name ?? "Automatic"}</span>,
+            sortValue: (e: OvertimeEntry) => e.reviewed_by?.name ?? "Automatic",
           },
         ]
       : []),
@@ -145,7 +148,6 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
         getRowId={(e) => e.id}
         columns={columns}
         searchPlaceholder="Search employee…"
-        initialSort={{ columnId: "date", direction: "desc" }}
         emptyState={{
           icon: Hourglass,
           title: status === "pending" ? "Nothing waiting for approval" : `No ${status} overtime`,

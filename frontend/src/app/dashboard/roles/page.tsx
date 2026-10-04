@@ -16,9 +16,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, PermissionGroup, Role } from "@/lib/api";
@@ -88,11 +88,13 @@ export default function RolesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>([]);
+  const [newRoleOrder, setNewRoleOrder] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
+  const [editOrder, setEditOrder] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -111,10 +113,11 @@ export default function RolesPage() {
     setCreating(true);
 
     try {
-      await api.roles.create({ name: newRoleName, permissions: newRolePermissions });
+      await api.roles.create({ name: newRoleName, permissions: newRolePermissions, sort_order: toSortOrder(newRoleOrder) });
       notifySuccess("Role created");
       setNewRoleName("");
       setNewRolePermissions([]);
+      setNewRoleOrder("");
       setCreateOpen(false);
       load();
     } catch (err) {
@@ -128,6 +131,7 @@ export default function RolesPage() {
   function openEdit(role: Role) {
     setEditingRole(role);
     setEditPermissions(role.permissions);
+    setEditOrder(fromSortOrder(role.sort_order));
     setEditError(null);
   }
 
@@ -138,8 +142,9 @@ export default function RolesPage() {
     setSavingEdit(true);
 
     try {
-      await api.roles.update(editingRole.id, { permissions: editPermissions });
-      notifySuccess("Role permissions updated");
+      const sortOrder = toSortOrder(editOrder);
+      await api.roles.update(editingRole.id, editingRole.protected ? { sort_order: sortOrder } : { permissions: editPermissions, sort_order: sortOrder });
+      notifySuccess(editingRole.protected ? "Role order updated" : "Role updated");
       setEditingRole(null);
       load();
     } catch (err) {
@@ -167,6 +172,34 @@ export default function RolesPage() {
   }
 
   const canManage = me?.permissions.includes("roles.manage") ?? false;
+  const totalPermissions = groups.reduce((n, g) => n + g.permissions.length, 0);
+
+  const columns: DataTableColumn<Role>[] = [
+    {
+      id: "name",
+      header: "Role",
+      primary: true,
+      cell: (role) => (
+        <div className="flex items-center gap-2 font-medium">
+          {role.name}
+          {role.protected && <Badge variant="secondary">Protected</Badge>}
+        </div>
+      ),
+      sortValue: (role) => role.name,
+      searchValue: (role) => role.name,
+    },
+    displayOrderColumn<Role>(),
+    {
+      id: "permissions",
+      header: "Permissions",
+      cell: (role) => (
+        <span className="text-muted-foreground">
+          {role.permissions.length} of {totalPermissions}
+        </span>
+      ),
+      sortValue: (role) => role.permissions.length,
+    },
+  ];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -210,6 +243,7 @@ export default function RolesPage() {
                           onChange={setNewRolePermissions}
                         />
                       </div>
+                      <DisplayOrderField id="role-order" value={newRoleOrder} onChange={setNewRoleOrder} example="the most senior role" />
                       {createError && <Alert variant="destructive">{createError}</Alert>}
                       <DialogFooter>
                         <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -225,67 +259,46 @@ export default function RolesPage() {
           }
         />
 
-        {roles === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {roles?.length === 0 && (
-          <EmptyState
-            icon={ShieldCheck}
-            title="No roles yet"
-            description="Create a role to control what your team can access."
-          />
-        )}
-
-        {roles && roles.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Role</TableHead>
-                <TableHead>Permissions</TableHead>
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roles.map((role) => (
-                <TableRow key={role.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {role.name}
-                      {role.protected && <Badge variant="secondary">Protected</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {role.permissions.length} of {groups.reduce((n, g) => n + g.permissions.length, 0)}
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        {!role.protected && (
-                          <>
-                            <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
-                              Edit permissions
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleDelete(role)}>
-                              Delete
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          data={roles}
+          getRowId={(role) => role.id}
+          columns={columns}
+          searchPlaceholder="Search roles…"
+          emptyState={{ icon: ShieldCheck, title: "No roles yet", description: "Create a role to control what your team can access." }}
+          rowActions={
+            canManage
+              ? (role) =>
+                  role.protected ? (
+                    <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
+                      Edit order
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openEdit(role)}>
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(role)}>
+                        Delete
+                      </Button>
+                    </>
+                  )
+              : undefined
+          }
+        />
 
         <Dialog open={!!editingRole} onOpenChange={(open) => !open && setEditingRole(null)}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Edit &quot;{editingRole?.name}&quot; permissions</DialogTitle>
-              <DialogDescription>Changes apply immediately to everyone with this role.</DialogDescription>
+              <DialogTitle>Edit &quot;{editingRole?.name}&quot;</DialogTitle>
+              <DialogDescription>
+                {editingRole?.protected
+                  ? "This role's permissions are fixed. You can change where it appears in lists."
+                  : "Changes apply immediately to everyone with this role."}
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
-              <PermissionCheckboxes groups={groups} selected={editPermissions} onChange={setEditPermissions} />
+              {!editingRole?.protected && <PermissionCheckboxes groups={groups} selected={editPermissions} onChange={setEditPermissions} />}
+              <DisplayOrderField id="role-edit-order" value={editOrder} onChange={setEditOrder} example="the most senior role" />
               {editError && <Alert variant="destructive">{editError}</Alert>}
               <DialogFooter>
                 <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

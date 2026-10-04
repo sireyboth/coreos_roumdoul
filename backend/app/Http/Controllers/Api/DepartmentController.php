@@ -32,6 +32,7 @@ class DepartmentController extends Controller
             'branch_id' => ['nullable', Rule::exists('branches', 'id')->where('company_id', $companyId)->whereNull('deleted_at')],
             'parent_department_id' => ['nullable', Rule::exists('departments', 'id')->where('company_id', $companyId)->whereNull('deleted_at')],
             'status' => ['sometimes', 'in:active,inactive'],
+            ...Department::displayOrderRules(),
         ];
     }
 
@@ -75,7 +76,7 @@ class DepartmentController extends Controller
 
     public function index(Request $request)
     {
-        $departments = Department::query()->with(['branch', 'parent'])->orderBy('name')
+        $departments = Department::query()->with(['branch', 'parent'])->inDisplayOrder()
             ->paginate(min(max($request->integer('per_page', 25), 1), 200));
 
         $ids = $departments->getCollection()->pluck('id')->all();

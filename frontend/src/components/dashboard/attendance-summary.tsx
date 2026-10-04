@@ -221,7 +221,6 @@ export function AttendanceSummary({ canManage }: { canManage: boolean }) {
         getRowId={(r) => r.employee.id}
         columns={columns}
         searchPlaceholder="Search employee…"
-        initialSort={{ columnId: "employee", direction: "asc" }}
         emptyState={{
           icon: Sigma,
           title: "No one to summarise",

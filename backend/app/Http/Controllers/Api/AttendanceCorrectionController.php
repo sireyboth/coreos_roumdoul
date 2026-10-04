@@ -22,7 +22,11 @@ class AttendanceCorrectionController extends Controller
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
         }
 
-        $corrections = $query->orderByDesc('created_at')->paginate(min(max($request->integer('per_page', 50), 1), 500));
+        // Each person together, in the company's display order; their days newest first.
+        $corrections = $query
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'attendance_corrections.employee_id'))
+            ->orderBy('employee_id')->orderByDesc('date')->orderByDesc('created_at')
+            ->paginate(min(max($request->integer('per_page', 50), 1), 500));
         $corrections->getCollection()->each(fn (AttendanceCorrection $c) => $c->append('requested_times'));
 
         return $corrections;

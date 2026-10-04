@@ -79,7 +79,7 @@ class CalendarController extends Controller
                 'currentAssignment',
                 fn ($a) => $a->where('branch_id', $request->integer('branch_id')),
             ))
-            ->orderBy('display_name')->orderBy('id');
+            ->inDisplayOrder();
 
         $total = (clone $query)->count();
         $employees = $query->limit($limit)->get();

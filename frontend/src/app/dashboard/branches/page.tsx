@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch } from "@/lib/api";
@@ -36,6 +37,7 @@ type BranchFormState = {
   longitude: string;
   is_active: boolean;
   require_location: boolean;
+  sort_order: string;
 };
 
 const EMPTY_FORM: BranchFormState = {
@@ -46,6 +48,7 @@ const EMPTY_FORM: BranchFormState = {
   longitude: "",
   is_active: true,
   require_location: false,
+  sort_order: "",
 };
 
 function BranchFormFields({
@@ -164,6 +167,7 @@ function BranchFormFields({
           </span>
         </span>
       </label>
+      <DisplayOrderField id="branch-order" value={form.sort_order} onChange={(value) => onChange({ ...form, sort_order: value })} example="head office" />
     </>
   );
 }
@@ -202,6 +206,7 @@ export default function BranchesPage() {
       longitude: form.longitude === "" ? null : Number(form.longitude),
       is_active: form.is_active,
       require_location: form.require_location,
+      sort_order: toSortOrder(form.sort_order),
     };
   }
 
@@ -254,6 +259,7 @@ export default function BranchesPage() {
       longitude: branch.longitude != null ? String(branch.longitude) : "",
       is_active: branch.is_active,
       require_location: Boolean(branch.require_location),
+      sort_order: fromSortOrder(branch.sort_order),
     });
     setEditError(null);
   }
@@ -288,6 +294,7 @@ export default function BranchesPage() {
       sortValue: (branch) => branch.name,
       searchValue: (branch) => `${branch.name} ${branch.address ?? ""}`,
     },
+    displayOrderColumn<Branch>(),
     {
       id: "code",
       header: "Code",
@@ -318,6 +325,7 @@ export default function BranchesPage() {
           <Badge variant="warning">QR only</Badge>
         ),
       sortValue: (branch) => (branch.require_location ? 1 : 0),
+      sortLabels: ["QR only first", "Location required first"],
     },
     {
       id: "status",
@@ -326,6 +334,7 @@ export default function BranchesPage() {
         <Badge variant={branch.is_active ? "success" : "secondary"}>{branch.is_active ? "Active" : "Inactive"}</Badge>
       ),
       sortValue: (branch) => (branch.is_active ? 1 : 0),
+      sortLabels: ["Inactive first", "Active first"],
     },
   ];
   const atBranchLimit = me?.plan?.max_branches != null && (me.usage?.branches ?? 0) >= me.plan.max_branches;

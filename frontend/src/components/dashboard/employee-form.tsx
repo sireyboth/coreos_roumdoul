@@ -88,6 +88,7 @@ export type EmployeeForm = {
   employment_status: string;
   hire_date: string;
   termination_date: string;
+  sort_order: string;
   gender: string;
   date_of_birth: string;
   address: string;
@@ -132,6 +133,7 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
     employment_status: "active",
     hire_date: "",
     termination_date: "",
+    sort_order: "",
     gender: "",
     date_of_birth: "",
     address: "",
@@ -166,6 +168,7 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
     employment_status: employee.employment_status,
     hire_date: employee.hire_date?.slice(0, 10) ?? "",
     termination_date: employee.termination_date?.slice(0, 10) ?? "",
+    sort_order: employee.sort_order != null ? String(employee.sort_order) : "",
     gender: employee.gender ?? "",
     date_of_birth: employee.date_of_birth?.slice(0, 10) ?? "",
     address: employee.address ?? "",
@@ -212,6 +215,7 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
     employment_type: orNull(form.employment_type),
     employment_status: form.employment_status,
     hire_date: orNull(form.hire_date),
+    sort_order: form.sort_order.trim() === "" ? null : Number(form.sort_order),
     // Only meaningful for someone who has left.
     termination_date: hasLeft(form.employment_status) ? orNull(form.termination_date) : null,
     gender: orNull(form.gender),
@@ -438,6 +442,23 @@ export function EmployeeFormFields({
         )}
         <Field label="Job title (optional)" htmlFor={id("job")}>
           <Input id={id("job")} value={form.job_title} onChange={(e) => onChange({ job_title: e.target.value })} />
+        </Field>
+        <Field
+          label="Display order (optional)"
+          htmlFor={id("order")}
+          hint="Lowest shows first in every list (e.g. 1 = director). Empty = after numbered people."
+        >
+          <Input
+            id={id("order")}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={99999}
+            step={1}
+            placeholder="e.g. 1"
+            value={form.sort_order}
+            onChange={(e) => onChange({ sort_order: e.target.value })}
+          />
         </Field>
         <Field label="Employment type" htmlFor={id("type")}>
           <select

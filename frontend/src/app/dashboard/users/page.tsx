@@ -258,12 +258,15 @@ export default function UsersPage() {
       header: "Status",
       cell: (user) => (user.is_active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Deactivated</Badge>),
       sortValue: (user) => (user.is_active ? 1 : 0),
+      sortLabels: ["Deactivated first", "Active first"],
     },
     ...(branches.length > 0
       ? [
           {
             id: "branches",
             header: "Branch access",
+            sortValue: (user: CompanyUser) =>
+              user.branch_ids?.length ? user.branch_ids.map((id) => branches.find((b) => b.id === id)?.name ?? "").join(", ") : "All branches",
             cell: (user: CompanyUser) =>
               user.branch_ids && user.branch_ids.length > 0 ? (
                 <span className="flex flex-wrap gap-1">

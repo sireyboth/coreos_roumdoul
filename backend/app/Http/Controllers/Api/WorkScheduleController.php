@@ -23,7 +23,7 @@ class WorkScheduleController extends Controller
     {
         $today = now($request->user()->company->timezone ?: config('attendance.default_timezone'))->toDateString();
 
-        $schedules = WorkSchedule::query()->with('days.slots')->orderBy('name')->get();
+        $schedules = WorkSchedule::query()->with('days.slots')->inDisplayOrder()->get();
 
         // How many people follow each one today — shown on the list, and why a delete may be refused.
         $current = EmployeeScheduleAssignment::query()->covering($today)
@@ -109,6 +109,7 @@ class WorkScheduleController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'auto_attendance' => ['boolean'],
+            ...WorkSchedule::displayOrderRules(),
             'late_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:240'],
             'early_leave_grace_minutes' => ['sometimes', 'integer', 'min:0', 'max:240'],
             'break_minutes' => ['sometimes', 'integer', 'min:0', 'max:480'],
@@ -209,6 +210,7 @@ class WorkScheduleController extends Controller
             'name' => $schedule->name,
             'description' => $schedule->description,
             'is_active' => $schedule->is_active,
+            'sort_order' => $schedule->sort_order,
             ...$schedule->rules(),
             'default_days_off' => array_map('intval', $schedule->default_days_off ?? []),
             'days' => $days,

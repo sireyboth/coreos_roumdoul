@@ -18,7 +18,7 @@ import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { OvertimeReview } from "@/components/dashboard/overtime-review";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
-import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceException } from "@/lib/api";
+import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceException, type DaySlot } from "@/lib/api";
 import { attendanceImport } from "@/lib/excel-specs/time";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -27,36 +27,82 @@ type Tab = "records" | "overtime" | "corrections" | "summary";
 
 const TABS: Tab[] = ["records", "overtime", "corrections", "summary"];
 
-/** The day's slots in one line: "08:07 ✓ · 12:00 ✗ · 13:02 ✓ · 17:15 ✓". */
-function SlotLine({ day }: { day: AttendanceDay }) {
+type Punch = {
+  at: string | null;
+  expected: string | null;
+  status: DaySlot["status"] | "unscheduled";
+  late: number;
+  early: number;
+};
+
+/**
+ * The day's check-in (first IN) and check-out (last OUT), and how many scans
+ * fall between them (a lunch break, a split shift, an extra tap). Without a
+ * schedule, the first and last scan.
+ */
+function dayEnds(day: AttendanceDay): { in: Punch | null; out: Punch | null; between: number } {
   if (day.slots.length === 0) {
-    return day.scans.length === 0 ? (
-      <span className="text-muted-foreground">—</span>
-    ) : (
-      <span className="tabular-nums text-muted-foreground">{day.scans.map((s) => clock(s.at)).join(" · ")}</span>
+    const first = day.scans[0];
+    const last = day.scans.length > 1 ? day.scans[day.scans.length - 1] : undefined;
+    const punch = (at: string): Punch => ({ at, expected: null, status: "unscheduled", late: 0, early: 0 });
+    return { in: first ? punch(first.at) : null, out: last ? punch(last.at) : null, between: Math.max(0, day.scans.length - 2) };
+  }
+
+  const toPunch = (slot: DaySlot): Punch => ({
+    at: slot.actual_at,
+    expected: slot.expected_at,
+    status: slot.status,
+    late: slot.late_minutes,
+    early: slot.early_minutes,
+  });
+  const firstIn = day.slots.find((slot) => slot.type === "in");
+  const lastOut = [...day.slots].reverse().find((slot) => slot.type === "out");
+  const answeredBetween = day.slots.filter((slot) => slot !== firstIn && slot !== lastOut && slot.actual_at).length;
+
+  return {
+    in: firstIn ? toPunch(firstIn) : null,
+    out: lastOut ? toPunch(lastOut) : null,
+    between: answeredBetween + day.extra_scans.length,
+  };
+}
+
+/** One time, coloured by how it went, with the reason underneath. */
+function PunchCell({ punch, more }: { punch: Punch | null; more?: number }) {
+  const extra = more ? <span className="text-xs text-muted-foreground">+{more} more {more === 1 ? "scan" : "scans"}</span> : null;
+
+  if (!punch) {
+    return (
+      <span className="flex flex-col">
+        <span className="text-muted-foreground">—</span>
+        {extra}
+      </span>
     );
   }
 
+  const note =
+    punch.status === "late"
+      ? `${punch.late}m late`
+      : punch.status === "early"
+        ? `${punch.early}m early`
+        : punch.status === "missing" || punch.status === "pending"
+          ? `expected ${clock(punch.expected)}`
+          : null;
+
   return (
-    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-      {day.slots.map((slot, i) => (
-        <span key={slot.sequence} className="inline-flex items-center gap-1.5">
-          {i > 0 && <span className="text-border">·</span>}
-          <span
-            title={`${slot.type.toUpperCase()} expected ${clock(slot.expected_at)}`}
-            className={cn(
-              "rounded px-1.5 py-0.5 tabular-nums",
-              slot.status === "ok" && "bg-success/10 text-success",
-              (slot.status === "late" || slot.status === "early") && "bg-warning/15 text-warning",
-              slot.status === "missing" && "bg-destructive/10 text-destructive line-through decoration-destructive/40",
-              slot.status === "pending" && "bg-muted text-muted-foreground",
-            )}
-          >
-            {slot.actual_at ? clock(slot.actual_at) : clock(slot.expected_at)}
-          </span>
-        </span>
-      ))}
-      {day.extra_scans.length > 0 && <Badge variant="secondary">+{day.extra_scans.length}</Badge>}
+    <span className="flex flex-col">
+      <span
+        className={cn(
+          "font-medium tabular-nums",
+          punch.status === "ok" && "text-success",
+          (punch.status === "late" || punch.status === "early") && "text-warning",
+          punch.status === "missing" && "text-destructive",
+          (punch.status === "pending" || punch.status === "unscheduled") && "text-muted-foreground",
+        )}
+      >
+        {punch.at ? clock(punch.at) : punch.status === "missing" ? "Missing" : "Not yet"}
+      </span>
+      {note && <span className={cn("text-xs", punch.status === "missing" ? "text-destructive/80" : "text-muted-foreground")}>{note}</span>}
+      {extra}
     </span>
   );
 }
@@ -67,11 +113,16 @@ function AttendancePageContent() {
   // ?tab=corrections deep-links to a tab (the old Corrections page redirects here).
   // The tab lives in the address (?tab=corrections), so links — e.g. from a notification — open the right one,
   // even when you're already on this page.
-  const wanted = useSearchParams().get("tab");
+  const params = useSearchParams();
+  const wanted = params.get("tab");
+  // Filters a link can preset, e.g. from the dashboard: ?tab=corrections&status=pending, or ?date=2026-10-04.
+  const linkedStatus = params.get("status") ?? undefined;
+  const linkedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "") ? params.get("date")! : null;
   const tab: Tab = TABS.includes(wanted as Tab) ? (wanted as Tab) : "records";
   const pathname = usePathname();
   // The table shows one month at a time; a busy company records far more than one page a day.
-  const [month, setMonth] = useState(currentMonth);
+  // A linked date opens its own month.
+  const [month, setMonth] = useState(() => linkedDate?.slice(0, 7) ?? currentMonth());
   const [reloads, setReloads] = useState(0);
   const [result, setResult] = useState<{ key: string; data: AttendanceDay[]; total: number } | null>(null);
   // The signed-in person's own days that are missing a scan, so they can ask for a correction.
@@ -167,10 +218,22 @@ function AttendancePageContent() {
       searchValue: (d) => d.schedule,
     },
     {
-      id: "scans",
-      header: "Scans",
-      cell: (d) => <SlotLine day={d} />,
-      className: "min-w-56",
+      id: "check_in",
+      header: "Check in",
+      cell: (d) => <PunchCell punch={dayEnds(d).in} />,
+      // By time of day ("08:01"); days without one go last.
+      sortValue: (d) => (dayEnds(d).in?.at ? clock(dayEnds(d).in!.at) : null),
+      sortLabels: ["Earliest first", "Latest first"],
+    },
+    {
+      id: "check_out",
+      header: "Check out",
+      cell: (d) => {
+        const ends = dayEnds(d);
+        return <PunchCell punch={ends.out} more={ends.between} />;
+      },
+      sortValue: (d) => (dayEnds(d).out?.at ? clock(dayEnds(d).out!.at) : null),
+      sortLabels: ["Earliest first", "Latest first"],
     },
     {
       id: "worked",
@@ -353,12 +416,13 @@ function AttendancePageContent() {
             )}
 
             <DataTable
+              key={linkedDate ?? "all"}
+              initialFilters={linkedDate ? { "date.from": linkedDate, "date.to": linkedDate } : undefined}
               data={days}
               getRowId={(d) => d.id}
               columns={columns}
               filters={filters}
               searchPlaceholder="Search by employee or schedule…"
-              initialSort={{ columnId: "date", direction: "desc" }}
               emptyState={{
                 icon: Clock,
                 title: "No attendance this month",
@@ -376,7 +440,7 @@ function AttendancePageContent() {
 
         {tab === "overtime" && canManage && <OvertimeReview onChanged={load} />}
 
-        {tab === "corrections" && <AttendanceCorrections onChanged={load} />}
+        {tab === "corrections" && <AttendanceCorrections key={linkedStatus ?? "all"} onChanged={load} initialStatus={linkedStatus} />}
 
         {tab === "summary" && <AttendanceSummary canManage={canManage} />}
       </div>

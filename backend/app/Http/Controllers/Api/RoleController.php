@@ -25,6 +25,7 @@ class RoleController extends Controller
         return CompanyRole::query()
             ->where('company_id', $request->user()->company_id)
             ->with('permissions')
+            ->inDisplayOrder()
             ->get()
             ->map(fn (CompanyRole $role) => $this->present($role));
     }
@@ -40,12 +41,14 @@ class RoleController extends Controller
             ],
             'permissions' => ['array'],
             'permissions.*' => [Rule::in(CompanyPermissions::all())],
+            ...CompanyRole::displayOrderRules(),
         ]);
 
         $role = CompanyRole::query()->create([
             'company_id' => $companyId,
             'name' => $data['name'],
             'code' => $data['name'],
+            'sort_order' => $data['sort_order'] ?? null,
         ]);
 
         $this->syncPermissions($role, $data['permissions'] ?? []);
@@ -59,12 +62,6 @@ class RoleController extends Controller
     {
         $this->authorizeSameCompany($request, $role);
 
-        if ($role->code === self::PROTECTED_ROLE) {
-            throw ValidationException::withMessages([
-                'role' => ['The company-admin role\'s permissions cannot be changed.'],
-            ]);
-        }
-
         $companyId = $request->user()->company_id;
 
         $data = $request->validate([
@@ -73,7 +70,19 @@ class RoleController extends Controller
                 Rule::unique('company_roles', 'name')->where(fn ($query) => $query->where('company_id', $companyId))->ignore($role->id),
             ],
             'permissions' => ['array'],
+            ...CompanyRole::displayOrderRules(),
         ]);
+
+        // company-admin's name and permissions are locked; only where it sits in lists can change.
+        if ($role->code === self::PROTECTED_ROLE && (isset($data['name']) || isset($data['permissions']))) {
+            throw ValidationException::withMessages([
+                'role' => ['The company-admin role\'s permissions cannot be changed.'],
+            ]);
+        }
+
+        if (array_key_exists('sort_order', $data)) {
+            $role->update(['sort_order' => $data['sort_order']]);
+        }
 
         if (isset($data['permissions'])) {
             $this->syncPermissions($role, $data['permissions']);
@@ -147,6 +156,7 @@ class RoleController extends Controller
             'id' => $role->id,
             'name' => $role->name,
             'protected' => $role->code === self::PROTECTED_ROLE,
+            'sort_order' => $role->sort_order,
             'permissions' => $role->permissions->pluck('code'),
         ];
     }

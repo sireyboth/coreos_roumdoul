@@ -238,7 +238,7 @@ export default function DashboardPage() {
       value: summary ? (summary.attendance?.checked_in_today ?? null) : null,
       hint: "People who scanned today",
       icon: CalendarCheck2,
-      href: "/dashboard/attendance",
+      href: `/dashboard/attendance?date=${isoDate(new Date())}`,
       tone: "text-emerald-600 dark:text-emerald-400",
       soft: "bg-emerald-500/12",
     });
@@ -268,7 +268,7 @@ export default function DashboardPage() {
       value: summary ? (summary.attendance?.pending_corrections ?? null) : null,
       hint: "Waiting for review",
       icon: FileClock,
-      href: "/dashboard/attendance?tab=corrections",
+      href: "/dashboard/attendance?tab=corrections&status=pending",
       tone: "text-amber-600 dark:text-amber-400",
       soft: "bg-amber-500/14",
     });
@@ -279,7 +279,8 @@ export default function DashboardPage() {
       value: summary.attendance.pending_overtime,
       hint: "Waiting for approval",
       icon: Hourglass,
-      href: "/dashboard/attendance",
+      // The Overtime tab opens on "Waiting".
+      href: "/dashboard/attendance?tab=overtime",
       tone: "text-sky-600 dark:text-sky-400",
       soft: "bg-sky-500/12",
     });

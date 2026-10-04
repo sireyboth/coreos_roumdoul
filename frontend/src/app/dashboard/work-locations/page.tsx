@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { QrCodeDialog } from "@/components/dashboard/qr-code-dialog";
 import { useMe } from "@/contexts/me-context";
@@ -48,6 +49,7 @@ function WorkLocationFormDialog({
   const [radius, setRadius] = useState(String(location?.radius_meters ?? 100));
   const [active, setActive] = useState(location?.is_active ?? true);
   const [requireLocation, setRequireLocation] = useState(location?.require_location ?? false);
+  const [sortOrder, setSortOrder] = useState(fromSortOrder(location?.sort_order));
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -83,7 +85,7 @@ function WorkLocationFormDialog({
     try {
       if (location) {
         const payload = managedByBranch
-          ? { radius_meters: Number(radius), is_active: active }
+          ? { radius_meters: Number(radius), is_active: active, sort_order: toSortOrder(sortOrder) }
           : {
               name,
               address: address || null,
@@ -92,6 +94,7 @@ function WorkLocationFormDialog({
               radius_meters: Number(radius),
               require_location: requireLocation,
               is_active: active,
+              sort_order: toSortOrder(sortOrder),
             };
         await api.workLocations.update(location.id, payload);
         notifySuccess("Work location updated");
@@ -103,6 +106,7 @@ function WorkLocationFormDialog({
           longitude: longitude === "" ? null : Number(longitude),
           radius_meters: Number(radius),
           require_location: requireLocation,
+          sort_order: toSortOrder(sortOrder),
         });
         notifySuccess("Work location added");
       }
@@ -234,6 +238,7 @@ function WorkLocationFormDialog({
               Active
             </label>
           )}
+          <DisplayOrderField id="location-order" value={sortOrder} onChange={setSortOrder} example="the main site" />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -300,6 +305,7 @@ export default function WorkLocationsPage() {
       sortValue: (location) => location.name,
       searchValue: (location) => `${location.name} ${location.address ?? ""}`,
     },
+    displayOrderColumn<WorkLocation>(),
     {
       id: "branch",
       header: "Branch",
@@ -332,6 +338,7 @@ export default function WorkLocationsPage() {
         <Badge variant={location.is_active ? "success" : "secondary"}>{location.is_active ? "Active" : "Inactive"}</Badge>
       ),
       sortValue: (location) => (location.is_active ? 1 : 0),
+      sortLabels: ["Inactive first", "Active first"],
     },
   ];
 

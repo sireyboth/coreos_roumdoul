@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCompany;
 use App\Models\Concerns\RestrictedToAccessibleBranches;
 use App\Services\UsageRecorder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -46,6 +47,7 @@ class Employee extends Model
         'passport_number',
         'address',
         'employment_status',
+        'sort_order',
         'employment_type',
         'hire_date',
         'termination_date',
@@ -74,6 +76,35 @@ class Employee extends Model
     public function hasLeft(): bool
     {
         return in_array($this->employment_status, self::LEFT_STATUSES, true);
+    }
+
+    /** Stands in for "no display order" so those people sort after everyone numbered. */
+    private const UNORDERED = 2147483647;
+
+    /**
+     * The company's display order: lowest sort_order first (e.g. the director
+     * 1, managers 2), people without one after them, then by name.
+     */
+    public function scopeInDisplayOrder(Builder $query): Builder
+    {
+        return $query->orderByRaw('coalesce(sort_order, '.self::UNORDERED.')')->orderBy('display_name')->orderBy('id');
+    }
+
+    /**
+     * The same order for rows of another table that belong to an employee
+     * (attendance days, roster entries…): call it after any date ordering, so
+     * people line up the same way within each day.
+     */
+    public static function orderRowsByEmployee(Builder $query, string $employeeIdColumn): Builder
+    {
+        $employee = fn (string $select) => static::query()->withoutGlobalScopes()
+            ->selectRaw($select)
+            ->whereColumn('employees.id', $employeeIdColumn)
+            ->limit(1);
+
+        return $query
+            ->orderBy($employee('coalesce(sort_order, '.self::UNORDERED.')'))
+            ->orderBy($employee('display_name'));
     }
 
     /**
@@ -121,6 +152,7 @@ class Employee extends Model
     {
         return [
             'hire_date' => 'date',
+            'sort_order' => 'integer',
             'termination_date' => 'date',
             'date_of_birth' => 'date',
             'rest_days' => 'array',

@@ -181,6 +181,8 @@ export type MeResponse = {
 export type Branch = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   code: string | null;
   address: string | null;
   latitude: number | null;
@@ -195,6 +197,8 @@ export type Branch = {
 export type Department = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   code: string | null;
   status: "active" | "inactive";
   branch_id: number | null;
@@ -209,6 +213,8 @@ export type Department = {
 export type Team = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   code: string | null;
   status: "active" | "inactive";
   department_id: number | null;
@@ -231,6 +237,8 @@ export type EmployeeInput = {
   employment_type?: string | null;
   hire_date?: string | null;
   termination_date?: string | null;
+  // Lowest first in every list; null = after everyone numbered.
+  sort_order?: number | null;
   gender?: string | null;
   date_of_birth?: string | null;
   address?: string | null;
@@ -265,6 +273,8 @@ export type Employee = {
   job_title: string | null;
   phone: string | null;
   employment_status: string;
+  // Display order: lowest first in every list (e.g. director 1, managers 2); null = after everyone numbered.
+  sort_order: number | null;
   // full_time / part_time / contract / temporary
   employment_type: string | null;
   // Serialized as an ISO datetime — take the first 10 chars for a date input.
@@ -435,6 +445,8 @@ export type CompanyUser = {
 export type Role = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   protected: boolean;
   permissions: string[];
 };
@@ -447,6 +459,8 @@ export type PermissionGroup = {
 export type WorkLocation = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   address: string | null;
   latitude: number | string | null;
   longitude: number | string | null;
@@ -466,6 +480,8 @@ export type OvertimeMode = "off" | "after_last_out" | "above_scheduled";
 export type WorkSchedule = {
   id: number;
   name: string;
+  // Display order: lowest first in every list; null = after everything numbered.
+  sort_order?: number | null;
   description: string | null;
   is_active: boolean;
   // No scanning (e.g. top management): each IN/OUT is filled in at its time once it passes.
@@ -842,9 +858,9 @@ export const api = {
   roles: {
     list: () => request<Role[]>("/api/roles"),
     permissions: () => request<PermissionGroup[]>("/api/permissions"),
-    create: (data: { name: string; permissions: string[] }) =>
+    create: (data: { name: string; permissions: string[]; sort_order?: number | null }) =>
       request<Role>("/api/roles", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: number, data: { name?: string; permissions?: string[] }) =>
+    update: (id: number, data: { name?: string; permissions?: string[]; sort_order?: number | null }) =>
       request<Role>(`/api/roles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/roles/${id}`, { method: "DELETE" }),
   },

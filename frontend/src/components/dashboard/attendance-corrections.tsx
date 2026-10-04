@@ -56,7 +56,8 @@ function scansFor(date: string, times: string[]): string[] {
 }
 
 /** The Corrections tab on the Attendance page: request a missed scan, and (managers) review requests. */
-export function AttendanceCorrections({ onChanged }: { onChanged?: () => void }) {
+/** initialStatus: start filtered, e.g. "pending" when opened from the dashboard. */
+export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?: () => void; initialStatus?: string }) {
   const { me } = useMe();
   const [corrections, setCorrections] = useState<AttendanceCorrection[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -150,6 +151,8 @@ export function AttendanceCorrections({ onChanged }: { onChanged?: () => void })
       id: "scans",
       header: "Scans to add",
       cell: (c) => <span className="tabular-nums text-muted-foreground">{c.requested_times.map(formatTime).join(" · ") || "—"}</span>,
+      sortValue: (c) => c.requested_times[0],
+      sortLabels: ["Earliest first", "Latest first"],
     },
     {
       id: "reason",
@@ -158,6 +161,7 @@ export function AttendanceCorrections({ onChanged }: { onChanged?: () => void })
       className: "max-w-48 truncate",
       cell: (c) => <span className="text-muted-foreground">{c.reason}</span>,
       searchValue: (c) => c.reason,
+      sortValue: (c) => c.reason,
     },
     {
       id: "status",
@@ -267,7 +271,7 @@ export function AttendanceCorrections({ onChanged }: { onChanged?: () => void })
           },
         ]}
         searchPlaceholder={canManage ? "Search by employee or reason…" : "Search by reason…"}
-        initialSort={{ columnId: "date", direction: "desc" }}
+        initialFilters={initialStatus && initialStatus in STATUS ? { status: initialStatus } : undefined}
         emptyState={{ icon: FileEdit, title: "No correction requests", description: "Nothing to review right now." }}
         rowActions={
           canManage

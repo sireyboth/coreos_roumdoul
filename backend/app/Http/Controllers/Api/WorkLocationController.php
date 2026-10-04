@@ -28,7 +28,7 @@ class WorkLocationController extends Controller
 
     public function index(Request $request)
     {
-        $locations = WorkLocation::query()->with('branch')->latest()->paginate(25);
+        $locations = WorkLocation::query()->with('branch')->inDisplayOrder()->paginate(25);
 
         if ($request->user()->hasCompanyPermission('work_locations.manage')) {
             $locations->getCollection()->each->makeVisible('qr_token');
@@ -48,6 +48,7 @@ class WorkLocationController extends Controller
             'radius_meters' => ['sometimes', 'integer', 'min:10', 'max:5000'],
             'require_location' => ['boolean'],
             'is_active' => ['boolean'],
+            ...WorkLocation::displayOrderRules(),
         ]);
 
         $this->assertCanRequireLocation($data['require_location'] ?? false, $data['latitude'] ?? null, $data['longitude'] ?? null);
@@ -79,6 +80,7 @@ class WorkLocationController extends Controller
             'radius_meters' => ['sometimes', 'integer', 'min:10', 'max:5000'],
             'require_location' => ['boolean'],
             'is_active' => ['boolean'],
+            ...WorkLocation::displayOrderRules(),
         ]);
 
         $this->assertCanRequireLocation(

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MembersDialog } from "@/components/dashboard/members-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Department, Team } from "@/lib/api";
@@ -46,6 +47,7 @@ function TeamFormDialog({
   const [code, setCode] = useState(team?.code ?? "");
   const [departmentId, setDepartmentId] = useState(team?.department_id != null ? String(team.department_id) : "");
   const [status, setStatus] = useState<Team["status"]>(team?.status ?? "active");
+  const [sortOrder, setSortOrder] = useState(fromSortOrder(team?.sort_order));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +65,7 @@ function TeamFormDialog({
       // Left out when the picker isn't shown, so an edit can't clear it by accident.
       ...(departments.length > 0 ? { department_id: departmentId ? Number(departmentId) : null } : {}),
       status,
+      sort_order: toSortOrder(sortOrder),
     };
 
     try {
@@ -133,6 +136,7 @@ function TeamFormDialog({
               </select>
             </div>
           )}
+          <DisplayOrderField id="team-order" value={sortOrder} onChange={setSortOrder} example="the lead team" />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
@@ -207,6 +211,7 @@ export default function TeamsPage() {
       sortValue: (team) => team.name,
       searchValue: (team) => [team.name, team.code].filter(Boolean).join(" "),
     },
+    displayOrderColumn<Team>(),
     {
       id: "department",
       header: "Department",
@@ -286,7 +291,6 @@ export default function TeamsPage() {
           columns={columns}
           filters={filters}
           searchPlaceholder="Search teams…"
-          initialSort={{ columnId: "name", direction: "asc" }}
           emptyState={{
             icon: UsersRound,
             title: "No teams yet",

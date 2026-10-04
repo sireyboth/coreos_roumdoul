@@ -18,8 +18,13 @@ class UserController extends Controller
         return $request->user()
             ->company
             ->users()
-            ->with('membership.roles')
+            ->with(['membership.roles', 'employee:id,user_id,sort_order'])
             ->get()
+            ->sortBy([
+                fn (User $a, User $b) => ($a->employee?->sort_order ?? PHP_INT_MAX) <=> ($b->employee?->sort_order ?? PHP_INT_MAX),
+                fn (User $a, User $b) => strcasecmp($a->name, $b->name),
+            ])
+            ->values()
             ->map(fn (User $user) => $this->present($user));
     }
 

@@ -17,6 +17,7 @@ export async function exportBranches(): Promise<string> {
     rows: await api.branches.all(),
     columns: [
       { header: "Name", value: (b) => b.name },
+      { header: "Display order", value: (b) => b.sort_order, type: "number" },
       { header: "Code", value: (b) => b.code },
       { header: "Address", value: (b) => b.address },
       { header: "Latitude", value: (b) => b.latitude, type: "number" },
@@ -35,6 +36,7 @@ export const branchImport: ImportSpec<{ branches: Lookup<Branch> }> = {
   notes: ["Latitude and longitude are needed for a new branch — copy them from Google Maps (right-click the spot)."],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The branch's name.", example: "Phnom Penh HQ" },
+    { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for head office.", example: "1" },
     { key: "code", header: "Code", hint: "A short code, optional.", example: "PP-01" },
     { key: "address", header: "Address", hint: "Street address, optional.", example: "St. 271, Phnom Penh" },
     { key: "latitude", header: "Latitude", type: "number", hint: "Between -90 and 90. Required for a new branch.", example: "11.5564" },
@@ -51,7 +53,7 @@ export const branchImport: ImportSpec<{ branches: Lookup<Branch> }> = {
   load: async () => ({ branches: new Lookup(await api.branches.all(), [(b) => b.code, (b) => b.name], "branch") }),
   save: async (row, ctx) => {
     const existing = ctx.branches.find(row.text("code")) ?? ctx.branches.find(row.text("name"));
-    const fields = row.pick("name", "code", "address", "latitude", "longitude", "is_active", "require_location") as Partial<Branch>;
+    const fields = row.pick("name", "code", "address", "latitude", "longitude", "is_active", "require_location", "sort_order") as Partial<Branch>;
 
     if (existing) {
       ctx.branches.put(await api.branches.update(existing.id, fields));
@@ -75,6 +77,7 @@ export async function exportDepartments(): Promise<string> {
     rows: await api.departments.all(),
     columns: [
       { header: "Name", value: (d) => d.name },
+      { header: "Display order", value: (d) => d.sort_order, type: "number" },
       { header: "Code", value: (d) => d.code },
       { header: "Branch", value: (d) => d.branch?.name },
       { header: "Parent department", value: (d) => d.parent?.name },
@@ -95,6 +98,7 @@ export const departmentImport: ImportSpec<DepartmentCtx> = {
   notes: ["A parent department must already exist, or appear on an earlier row of the same file."],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The department's name.", example: "Finance" },
+    { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the main department.", example: "1" },
     { key: "code", header: "Code", hint: "A short code, optional.", example: "FIN" },
     { key: "branch", header: "Branch", hint: "The branch it belongs to (name or code), optional.", example: "Phnom Penh HQ" },
     { key: "parent", header: "Parent department", hint: "The department it sits under, optional.", example: "Operations" },
@@ -109,7 +113,7 @@ export const departmentImport: ImportSpec<DepartmentCtx> = {
   },
   choices: (ctx) => ({ branch: ctx.branches.names(), parent: ctx.departments.names() }),
   save: async (row, ctx) => {
-    const payload: Partial<Omit<Department, "id">> = row.pick("name", "code", "status") as Partial<Department>;
+    const payload: Partial<Omit<Department, "id">> = row.pick("name", "code", "status", "sort_order") as Partial<Department>;
     const branch = row.text("branch");
     const parent = row.text("parent");
     if (branch) payload.branch_id = ctx.branches.require(branch).id;
@@ -134,6 +138,7 @@ export async function exportTeams(): Promise<string> {
     rows: await api.teams.all(),
     columns: [
       { header: "Name", value: (t) => t.name },
+      { header: "Display order", value: (t) => t.sort_order, type: "number" },
       { header: "Code", value: (t) => t.code },
       { header: "Department", value: (t) => t.department?.name },
       { header: "Status", value: (t) => optionLabel(STATUS_OPTIONS, t.status) },
@@ -149,6 +154,7 @@ export const teamImport: ImportSpec<{ teams: Lookup<Team>; departments: Lookup<D
   matching: "A row whose Name matches an existing team updates that team.",
   fields: [
     { key: "name", header: "Name", required: true, hint: "The team's name.", example: "Payroll" },
+    { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the lead team.", example: "1" },
     { key: "code", header: "Code", hint: "A short code, optional.", example: "PAY" },
     { key: "department", header: "Department", hint: "The department it belongs to, optional.", example: "Finance" },
     { key: "status", header: "Status", options: STATUS_OPTIONS, hint: "Active or Inactive. New teams are active.", example: "Active" },
@@ -162,7 +168,7 @@ export const teamImport: ImportSpec<{ teams: Lookup<Team>; departments: Lookup<D
   },
   choices: (ctx) => ({ department: ctx.departments.names() }),
   save: async (row, ctx) => {
-    const payload: Partial<Omit<Team, "id">> = row.pick("name", "code", "status") as Partial<Team>;
+    const payload: Partial<Omit<Team, "id">> = row.pick("name", "code", "status", "sort_order") as Partial<Team>;
     const department = row.text("department");
     if (department) payload.department_id = ctx.departments.require(department).id;
 
@@ -185,6 +191,7 @@ export async function exportWorkLocations(): Promise<string> {
     rows: await api.workLocations.all(),
     columns: [
       { header: "Name", value: (l) => l.name },
+      { header: "Display order", value: (l) => l.sort_order, type: "number" },
       { header: "Branch", value: (l) => l.branch?.name },
       { header: "Address", value: (l) => l.address },
       { header: "Latitude", value: (l) => (l.latitude == null ? null : Number(l.latitude)), type: "number" },
@@ -206,6 +213,7 @@ export const workLocationImport: ImportSpec<{ locations: Lookup<WorkLocation> }>
   ],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The location's name.", example: "Client site — Toul Kork" },
+    { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the main site.", example: "1" },
     { key: "address", header: "Address", hint: "Street address, optional.", example: "St. 315, Phnom Penh" },
     { key: "latitude", header: "Latitude", type: "number", hint: "Between -90 and 90, optional.", example: "11.5833" },
     { key: "longitude", header: "Longitude", type: "number", hint: "Between -180 and 180, optional.", example: "104.9000" },
@@ -226,15 +234,15 @@ export const workLocationImport: ImportSpec<{ locations: Lookup<WorkLocation> }>
     if (existing) {
       const fields =
         existing.branch_id != null
-          ? row.pick("radius_meters", "is_active")
-          : row.pick("name", "address", "latitude", "longitude", "radius_meters", "require_location", "is_active");
+          ? row.pick("radius_meters", "is_active", "sort_order")
+          : row.pick("name", "address", "latitude", "longitude", "radius_meters", "require_location", "is_active", "sort_order");
       ctx.locations.put(await api.workLocations.update(existing.id, fields as Partial<WorkLocation>));
       return "updated";
     }
 
     ctx.locations.add(
       await api.workLocations.create(
-        row.pick("name", "address", "latitude", "longitude", "radius_meters", "require_location", "is_active") as Partial<WorkLocation>,
+        row.pick("name", "address", "latitude", "longitude", "radius_meters", "require_location", "is_active", "sort_order") as Partial<WorkLocation>,
       ),
     );
     return "created";

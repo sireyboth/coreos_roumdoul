@@ -32,6 +32,12 @@ export type DataTableColumn<T> = {
   cell: (row: T) => React.ReactNode;
   /** Makes the column sortable by this value. */
   sortValue?: (row: T) => string | number | null | undefined;
+  /**
+   * Words for the two directions in the Sort menu. Worked out from the values
+   * when left out: "A → Z" for text, "Low → High" for numbers, "Oldest first"
+   * for dates.
+   */
+  sortLabels?: [ascending: string, descending: string];
   /** Text this column contributes to the search box. */
   searchValue?: (row: T) => string | null | undefined;
   /** Used as the card heading on mobile. Defaults to the first column. */
@@ -87,6 +93,12 @@ export type DataTableProps<T> = {
    */
   bulkActions?: (selected: T[], clearSelection: () => void) => React.ReactNode;
   initialSort?: { columnId: string; direction: "asc" | "desc" };
+  /**
+   * Filters already set when the table first shows, e.g. from a link ("pending
+   * only"). Keyed by filter id; a date range uses "<id>.from" / "<id>.to".
+   * Read once — give the table a new key to apply different ones.
+   */
+  initialFilters?: Record<string, string>;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
 };
@@ -95,6 +107,27 @@ type Sort = { columnId: string; direction: "asc" | "desc" } | null;
 
 const SELECT_CLASS =
   "h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/** "A → Z" for text, "Low → High" for numbers, "Oldest first" for dates — judged by the first value present. */
+function sortLabelsFor<T>(getValue: (row: T) => string | number | null | undefined, rows: T[]): [string, string] {
+  const sample = rows.map(getValue).find((value) => value != null && value !== "");
+  if (typeof sample === "number") return ["Low → High", "High → Low"];
+  if (typeof sample === "string" && /^\d{4}-\d{2}-\d{2}/.test(sample)) return ["Oldest first", "Newest first"];
+  return ["A → Z", "Z → A"];
+}
+
+/*
+ * When a table is wider than the screen (a laptop with the sidebar open), the
+ * first column and the actions stay pinned while the columns between scroll,
+ * so you always see whose row it is and can always reach its buttons. Pinned
+ * cells need a solid background; the header / hover / selected tints are
+ * layered on top of it so they look the same as the rest of the row.
+ */
+const PIN_BODY =
+  "sticky z-10 bg-card bg-linear-to-r group-hover:from-accent/40 group-hover:to-accent/40 group-data-[state=selected]:from-muted group-data-[state=selected]:to-muted";
+const PIN_HEAD = "sticky z-10 bg-card bg-linear-to-r from-muted/60 to-muted/60";
+const PIN_LEFT_EDGE = "shadow-[inset_-1px_0_0_var(--color-border)]";
+const PIN_RIGHT_EDGE = "right-0 shadow-[inset_1px_0_0_var(--color-border)]";
 
 function compareValues(a: string | number, b: string | number): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
@@ -114,11 +147,12 @@ export function DataTable<T>({
   toolbar,
   bulkActions,
   initialSort,
+  initialFilters,
   pageSizeOptions = [10, 25, 50],
   defaultPageSize,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState("");
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(initialFilters ?? {});
   const [sort, setSort] = useState<Sort>(initialSort ?? null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize ?? pageSizeOptions[0]);
@@ -227,6 +261,27 @@ export function DataTable<T>({
     setPage(1);
   }
 
+  // Every sortable column in both directions, for the Sort menu (phones have no headers to click).
+  const sortOptions = columns
+    .filter((column) => column.sortValue)
+    .flatMap((column) => {
+      const [asc, desc] = column.sortLabels ?? sortLabelsFor(column.sortValue!, data ?? []);
+      return [
+        { value: `${column.id}:asc`, label: `${column.header}: ${asc}` },
+        { value: `${column.id}:desc`, label: `${column.header}: ${desc}` },
+      ];
+    });
+
+  function chooseSort(value: string) {
+    if (!value) {
+      setSort(initialSort ?? null);
+    } else {
+      const [columnId, direction] = value.split(":") as [string, "asc" | "desc"];
+      setSort({ columnId, direction });
+    }
+    setPage(1);
+  }
+
   const primaryColumn = columns.find((column) => column.primary) ?? columns[0];
   const cardColumns = columns.filter((column) => column !== primaryColumn && !column.hideOnMobile);
   const showToolbar = Boolean(data && data.length > 0);
@@ -298,6 +353,22 @@ export function DataTable<T>({
             ),
           )}
 
+          {sortOptions.length > 0 && (
+            <select
+              aria-label="Sort"
+              value={sort ? `${sort.columnId}:${sort.direction}` : ""}
+              onChange={(e) => chooseSort(e.target.value)}
+              className={SELECT_CLASS}
+            >
+              <option value="">Sort: default order</option>
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  Sort: {option.label}
+                </option>
+              ))}
+            </select>
+          )}
+
           {hasActiveFilters && (
             <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
               <X className="size-3.5" />
@@ -353,7 +424,7 @@ export function DataTable<T>({
               <TableHeader>
                 <TableRow>
                   {bulkActions && (
-                    <TableHead className="w-10">
+                    <TableHead className={cn("left-0 w-12 min-w-12 max-w-12", PIN_HEAD)}>
                       <input
                         type="checkbox"
                         aria-label="Select all rows on this page"
@@ -366,13 +437,13 @@ export function DataTable<T>({
                       />
                     </TableHead>
                   )}
-                  {columns.map((column) => {
+                  {columns.map((column, index) => {
                     const sorted = sort?.columnId === column.id ? sort.direction : null;
 
                     return (
                       <TableHead
                         key={column.id}
-                        className={column.className}
+                        className={cn(column.className, index === 0 && [PIN_HEAD, PIN_LEFT_EDGE, bulkActions ? "left-12" : "left-0"])}
                         aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : undefined}
                       >
                         {column.sortValue ? (
@@ -396,7 +467,7 @@ export function DataTable<T>({
                       </TableHead>
                     );
                   })}
-                  {rowActions && <TableHead className="text-right">{actionsHeader}</TableHead>}
+                  {rowActions && <TableHead className={cn("text-right", PIN_HEAD, PIN_RIGHT_EDGE)}>{actionsHeader}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -404,21 +475,24 @@ export function DataTable<T>({
                   <TableRow
                     key={getRowId(row)}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={cn(onRowClick && "cursor-pointer")}
+                    className={cn("group", onRowClick && "cursor-pointer")}
                     data-state={selectedIds.has(getRowId(row)) ? "selected" : undefined}
                   >
                     {bulkActions && (
-                      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={cn("left-0 w-12 min-w-12 max-w-12", PIN_BODY)} onClick={(e) => e.stopPropagation()}>
                         {rowCheckbox(row)}
                       </TableCell>
                     )}
-                    {columns.map((column) => (
-                      <TableCell key={column.id} className={column.className}>
+                    {columns.map((column, index) => (
+                      <TableCell
+                        key={column.id}
+                        className={cn(column.className, index === 0 && [PIN_BODY, PIN_LEFT_EDGE, bulkActions ? "left-12" : "left-0"])}
+                      >
                         {column.cell(row)}
                       </TableCell>
                     ))}
                     {rowActions && (
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className={cn("text-right", PIN_BODY, PIN_RIGHT_EDGE)} onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">{rowActions(row)}</div>
                       </TableCell>
                     )}

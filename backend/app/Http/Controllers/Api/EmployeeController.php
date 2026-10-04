@@ -92,6 +92,8 @@ class EmployeeController extends Controller
             'employment_type' => ['nullable', 'in:full_time,part_time,contract,temporary'],
             'hire_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // Lowest first in every list; empty = after everyone numbered.
+            'sort_order' => ['nullable', 'integer', 'min:0', 'max:99999'],
 
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
@@ -185,7 +187,7 @@ class EmployeeController extends Controller
             ->when($request->filled('team_id'), fn ($q) => $q
                 ->whereNotIn('employment_status', Employee::LEFT_STATUSES)
                 ->whereHas('currentAssignment', fn ($a) => $a->where('team_id', $request->integer('team_id'))))
-            ->orderBy('display_name')->orderBy('id')
+            ->inDisplayOrder()
             ->paginate(min(max($request->integer('per_page', 25), 1), 500));
         $fields = $this->visibleFields($request);
         $employees->getCollection()->each(fn (Employee $e) => $this->reveal($request, $e, $fields));

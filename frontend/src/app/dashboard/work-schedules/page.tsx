@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { AssignScheduleDialog } from "@/components/dashboard/assign-schedule-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SchedulePeopleDialog } from "@/components/dashboard/schedule-people-dialog";
 import { WorkScheduleDialog } from "@/components/dashboard/work-schedule-dialog";
@@ -111,6 +112,7 @@ export default function WorkSchedulesPage() {
       sortValue: (s) => s.name,
       searchValue: (s) => [s.name, s.description].filter(Boolean).join(" "),
     },
+    displayOrderColumn<WorkSchedule>(),
     {
       id: "week",
       header: "Week",
@@ -134,6 +136,9 @@ export default function WorkSchedulesPage() {
         </div>
       ),
       hideOnMobile: true,
+      // By how many minutes late is tolerated.
+      sortValue: (s) => s.late_grace_minutes,
+      sortLabels: ["Strictest first", "Most lenient first"],
     },
     {
       id: "people",
@@ -151,6 +156,7 @@ export default function WorkSchedulesPage() {
       header: "Status",
       cell: (s) => <Badge variant={s.is_active ? "success" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge>,
       sortValue: (s) => (s.is_active ? 1 : 0),
+      sortLabels: ["Inactive first", "Active first"],
     },
   ];
 

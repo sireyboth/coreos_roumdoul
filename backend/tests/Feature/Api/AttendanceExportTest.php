@@ -92,7 +92,9 @@ class AttendanceExportTest extends TestCase
 
         $this->assertSame('Employee ID', $rows[0][0]);
         $this->assertCount(3, $rows); // header + two people
-        $row = $rows[1];
+        // People are in the company's display order — here nobody has one, so by name.
+        $this->assertSame(['Chan Vy', 'Sok Dara'], [$rows[1][1], $rows[2][1]]);
+        $row = $rows[2];
         $this->assertSame(['E-001', 'Sok Dara'], array_slice($row, 0, 2));
         $this->assertSame('2026-09-10', $row[$columns['Date']]);
         $this->assertSame('Office', $row[$columns['Schedule']]);

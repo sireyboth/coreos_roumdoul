@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasDisplayOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CompanyRole extends Model
 {
+    use HasDisplayOrder;
+
     protected $fillable = ['company_id', 'name', 'code', 'description', 'is_system_role'];
 
     protected function casts(): array

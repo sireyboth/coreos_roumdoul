@@ -32,6 +32,7 @@ export async function exportEmployees({ salary }: SalaryOptions): Promise<string
       { header: "Team", value: (e) => e.team?.name },
       { header: "Status", value: (e) => optionLabel(EMPLOYMENT_STATUSES, e.employment_status) },
       { header: "Employment type", value: (e) => optionLabel(EMPLOYMENT_TYPES, e.employment_type) },
+      { header: "Display order", value: (e) => e.sort_order, type: "number" },
       { header: "Hire date", value: (e) => (e.hire_date ? dateOnly(e.hire_date) : null), type: "date" },
       { header: "Termination date", value: (e) => (e.termination_date ? dateOnly(e.termination_date) : null), type: "date" },
       // Personal details only arrive for people who manage employees — blank for everyone else.
@@ -90,6 +91,7 @@ export function employeeImport({ salary }: SalaryOptions): ImportSpec<EmployeeCt
       { key: "team", header: "Team", hint: "Team name, optional. Must belong to the department.", example: "Payroll" },
       { key: "employment_status", header: "Status", options: EMPLOYMENT_STATUSES, hint: "New employees are Active unless you say otherwise.", example: "Active" },
       { key: "employment_type", header: "Employment type", options: EMPLOYMENT_TYPES, hint: "Optional.", example: "Full-time" },
+      { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the director, 2 for managers.", example: "1" },
       { key: "hire_date", header: "Hire date", type: "date", hint: "YYYY-MM-DD, optional.", example: "2026-01-15" },
       { key: "gender", header: "Gender", options: GENDERS, hint: "Optional.", example: "Female" },
       { key: "date_of_birth", header: "Date of birth", type: "date", hint: "YYYY-MM-DD, optional.", example: "1995-04-20" },
@@ -138,7 +140,7 @@ export function employeeImport({ salary }: SalaryOptions): ImportSpec<EmployeeCt
     save: async (row, ctx) => {
       const payload: EmployeeInput = row.pick(
         "name", "first_name", "last_name", "name_km", "employee_code", "email", "phone", "job_title",
-        "employment_status", "employment_type", "hire_date", "gender", "date_of_birth", "address", "notes",
+        "employment_status", "employment_type", "sort_order", "hire_date", "gender", "date_of_birth", "address", "notes",
         "nationality", "national_id_number", "passport_number", "nssf_number", "tax_id", "bank_name", "bank_account_number",
         ...(salary ? ["base_salary", "salary_currency"] : []),
       ) as EmployeeInput;
@@ -251,6 +253,7 @@ export async function exportRoles(): Promise<string> {
     rows: await api.roles.list(),
     columns: [
       { header: "Role", value: (r) => r.name },
+      { header: "Display order", value: (r) => r.sort_order, type: "number" },
       { header: "Permissions", value: (r) => r.permissions.join(", "), width: 80 },
       { header: "Permission count", value: (r) => r.permissions.length, type: "number" },
       { header: "Built-in", value: (r) => yesNo(r.protected) },

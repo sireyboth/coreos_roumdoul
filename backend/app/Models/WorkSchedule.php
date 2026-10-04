@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCompany;
+use App\Models\Concerns\HasDisplayOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class WorkSchedule extends Model
 {
-    use Auditable, BelongsToCompany, SoftDeletes;
+    use Auditable, BelongsToCompany, HasDisplayOrder, SoftDeletes;
 
     public const OVERTIME_MODES = ['off', 'after_last_out', 'above_scheduled'];
 

@@ -19,6 +19,7 @@ import { api, ApiError, type OvertimeMode, type ScheduleSlot, type WorkSchedule,
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { formatMinutes, slotsOn, WEEK_ORDER, WEEKDAY_LONG, WEEKDAY_SHORT } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
+import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 
 /** One stretch of work: scan IN at `in`, scan OUT at `out`. */
 type Stretch = { in: string; out: string };
@@ -85,6 +86,7 @@ export function WorkScheduleDialog({
   const [description, setDescription] = useState(schedule?.description ?? "");
   const [active, setActive] = useState(schedule?.is_active ?? true);
   const [autoAttendance, setAutoAttendance] = useState(schedule?.auto_attendance ?? false);
+  const [sortOrder, setSortOrder] = useState(fromSortOrder(schedule?.sort_order));
   // Per weekday: its stretches (empty = day off).
   const [week, setWeek] = useState<Record<number, Stretch[]>>(() =>
     Object.fromEntries(
@@ -158,6 +160,7 @@ export function WorkScheduleDialog({
       description: description || null,
       is_active: active,
       auto_attendance: autoAttendance,
+      sort_order: toSortOrder(sortOrder),
       late_grace_minutes: Number(lateGrace) || 0,
       early_leave_grace_minutes: Number(earlyGrace) || 0,
       break_minutes: Number(breakMinutes) || 0,
@@ -456,6 +459,8 @@ export function WorkScheduleDialog({
               Active — inactive schedules can&apos;t be newly assigned
             </label>
           )}
+
+          <DisplayOrderField id="ws-order" value={sortOrder} onChange={setSortOrder} example="the most used schedule" />
 
           {error && <Alert variant="destructive">{error}</Alert>}
 

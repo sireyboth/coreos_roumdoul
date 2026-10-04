@@ -34,6 +34,7 @@ class ScheduleAssignmentController extends Controller
             ->when($request->filled('employee_id'), fn ($q) => $q->where('employee_id', $request->integer('employee_id')))
             ->when($request->filled('work_schedule_id'), fn ($q) => $q->where('work_schedule_id', $request->integer('work_schedule_id')))
             ->when($request->boolean('current_only'), fn ($q) => $q->covering($today))
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'employee_schedule_assignments.employee_id'))
             ->orderBy('employee_id')->orderByDesc('effective_from')
             ->limit(2000)
             ->get()

@@ -32,7 +32,7 @@ class BranchController extends Controller
 
     public function index(Request $request)
     {
-        $branches = Branch::query()->with('workLocation')->latest()->paginate(25);
+        $branches = Branch::query()->with('workLocation')->inDisplayOrder()->paginate(25);
         $canSeeQr = $this->canSeeQr($request);
 
         $branches->getCollection()->each(fn (Branch $branch) => $this->present($branch, $canSeeQr));
@@ -61,6 +61,7 @@ class BranchController extends Controller
             'timezone' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'require_location' => ['boolean'],
+            ...Branch::displayOrderRules(),
         ]);
 
         $branch = Branch::query()->create(Arr::except($data, 'require_location'));
@@ -88,6 +89,7 @@ class BranchController extends Controller
             'timezone' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
             'require_location' => ['boolean'],
+            ...Branch::displayOrderRules(),
         ]);
 
         $branch->update(Arr::except($data, 'require_location'));

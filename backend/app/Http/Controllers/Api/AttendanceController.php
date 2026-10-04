@@ -32,7 +32,11 @@ class AttendanceController extends Controller
 
         $days = $this->visibleDays($request)
             ->with(['employee.branch', 'employee.currentAssignment'])
-            ->orderByDesc('date')->orderByDesc('id')
+            // Each person together, in the company's display order; their days newest first.
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'attendance_days.employee_id'))
+            ->orderBy('employee_id')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
             // per_page (max 1000): a month of attendance for a whole company is far more than 50 rows.
             ->paginate(min(max($request->integer('per_page', 50), 1), 1000));
 
@@ -152,7 +156,8 @@ class AttendanceController extends Controller
         $timezone = $this->timezone($request);
         $query = $this->visibleDays($request)
             ->with(['employee.branch', 'employee.department', 'employee.team'])
-            // Grouped by person, then by day, so each employee reads top to bottom.
+            // Grouped by person (in the company's display order), then by day, so each employee reads top to bottom.
+            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'attendance_days.employee_id'))
             ->orderBy('employee_id')->orderBy('date')->orderBy('id');
 
         $filename = 'attendance-'.$request->input('from').'-to-'.$request->input('to').'.csv';

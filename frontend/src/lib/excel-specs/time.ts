@@ -139,6 +139,7 @@ export async function exportWorkSchedules(): Promise<string> {
     rows: await api.workSchedules.list(),
     columns: [
       { header: "Name", value: (s) => s.name },
+      { header: "Display order", value: (s) => s.sort_order, type: "number" },
       ...WEEK_ORDER.map((weekday) => ({
         header: WEEKDAY_SHORT[weekday],
         value: (s: WorkSchedule) => hoursText(slotsOn(s, weekday)),
@@ -173,6 +174,7 @@ export const workScheduleImport: ImportSpec<{ schedules: Lookup<WorkSchedule> }>
   ],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The schedule's name.", example: "Split shift" },
+    { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the most used schedule.", example: "1" },
     ...WEEK_ORDER.map((weekday) => ({
       key: `day_${weekday}`,
       header: WEEKDAY_SHORT[weekday],
@@ -202,7 +204,7 @@ export const workScheduleImport: ImportSpec<{ schedules: Lookup<WorkSchedule> }>
   save: async (row, ctx) => {
     const payload: WorkScheduleInput = row.pick(
       "name", "late_grace_minutes", "early_leave_grace_minutes", "break_minutes", "overtime_mode",
-      "overtime_min_minutes", "overtime_requires_approval", "is_active", "description",
+      "overtime_min_minutes", "overtime_requires_approval", "is_active", "description", "sort_order",
     ) as WorkScheduleInput;
 
     const anyDay = WEEK_ORDER.some((d) => row.has(`day_${d}`));

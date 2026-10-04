@@ -149,6 +149,16 @@ function EmployeesPageContent() {
       searchValue: (employee) => [employee.name, employee.name_km, employee.employee_code, employee.email].filter(Boolean).join(" "),
     },
     {
+      id: "order",
+      header: "Order",
+      // The display order every list follows (lowest first). Set on the employee's profile.
+      cell: (employee) => <span className="tabular-nums text-muted-foreground">{employee.sort_order ?? "—"}</span>,
+      sortValue: (employee) => employee.sort_order,
+      sortLabels: ["Lowest first", "Highest first"],
+      hideOnMobile: true,
+      className: "hidden xl:table-cell w-20",
+    },
+    {
       id: "branch",
       header: "Branch",
       cell: (employee) => <span className="text-muted-foreground">{employee.branch?.name ?? "—"}</span>,
@@ -181,8 +191,11 @@ function EmployeesPageContent() {
       id: "phone",
       header: "Phone",
       hideOnMobile: true,
+      // Only on very wide screens — the table has many columns. Still searchable, and on the employee page.
+      className: "hidden 2xl:table-cell",
       cell: (employee) => <span className="text-muted-foreground">{employee.phone ?? "—"}</span>,
       searchValue: (employee) => employee.phone,
+      sortValue: (employee) => employee.phone,
     },
     {
       id: "type",
@@ -224,7 +237,10 @@ function EmployeesPageContent() {
     {
       id: "login",
       header: "Login",
+      // Very wide screens only in the table; always on the phone card and in the Login filter.
+      className: "hidden 2xl:table-cell",
       sortValue: (employee) => (employee.has_login ? 1 : 0),
+      sortLabels: ["No login first", "Has login first"],
       cell: (employee) =>
         employee.has_login ? (
           <Badge variant="outline">Has login</Badge>
@@ -396,7 +412,6 @@ function EmployeesPageContent() {
               columns={columns}
               filters={filters}
               searchPlaceholder="Search by name, code, email, phone, branch or job title…"
-              initialSort={{ columnId: "name", direction: "asc" }}
               onRowClick={open}
               bulkActions={
                 canManage
