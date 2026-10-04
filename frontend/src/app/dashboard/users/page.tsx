@@ -17,8 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
@@ -219,6 +218,69 @@ export default function UsersPage() {
   const canManage = me?.permissions.includes("users.manage") ?? false;
   const canManageRoles = me?.permissions.includes("roles.view") ?? false;
 
+
+  const columns: DataTableColumn<CompanyUser>[] = [
+    {
+      id: "name",
+      header: "Name",
+      primary: true,
+      cell: (user) => (
+        <span className="font-medium">
+          {user.name} {user.id === me?.user.id && <span className="text-muted-foreground">(you)</span>}
+        </span>
+      ),
+      sortValue: (user) => user.name,
+      searchValue: (user) => [user.name, user.email, user.login_id].filter(Boolean).join(" "),
+    },
+    {
+      id: "login",
+      header: "Email / ID",
+      cell: (user) => (
+        <span className="break-all text-muted-foreground">
+          {user.email ?? (user.login_id ? <span title="Signs in with their employee ID">ID: {user.login_id}</span> : "—")}
+        </span>
+      ),
+      sortValue: (user) => user.email ?? user.login_id,
+    },
+    {
+      id: "role",
+      header: "Role",
+      cell: (user) =>
+        canManage && user.id !== me?.user.id ? (
+          <RoleSelect roles={roles} value={user.role ?? ""} onChange={(newRole) => handleRoleChange(user, newRole)} />
+        ) : (
+          <Badge variant="outline">{user.role ?? "no role"}</Badge>
+        ),
+      sortValue: (user) => user.role,
+    },
+    {
+      id: "status",
+      header: "Status",
+      cell: (user) => (user.is_active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Deactivated</Badge>),
+      sortValue: (user) => (user.is_active ? 1 : 0),
+    },
+    ...(branches.length > 0
+      ? [
+          {
+            id: "branches",
+            header: "Branch access",
+            cell: (user: CompanyUser) =>
+              user.branch_ids && user.branch_ids.length > 0 ? (
+                <span className="flex flex-wrap gap-1">
+                  {user.branch_ids.map((id) => (
+                    <Badge key={id} variant="info">
+                      {branches.find((b) => b.id === id)?.name ?? `#${id}`}
+                    </Badge>
+                  ))}
+                </span>
+              ) : (
+                <Badge variant="outline">All branches</Badge>
+              ),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
@@ -294,98 +356,38 @@ export default function UsersPage() {
           }
         />
 
-        {users === null && <p className="text-sm text-muted-foreground">Loading…</p>}
-
-        {users?.length === 0 && (
-          <EmptyState
-            icon={KeyRound}
-            title="No users yet"
-            description="Invite your first teammate to give them access."
-          />
-        )}
-
-        {users && users.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email / ID</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                {branches.length > 0 && <TableHead>Branch access</TableHead>}
-                {canManage && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => {
-                const isSelf = user.id === me?.user.id;
-
-                return (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.name} {isSelf && <span className="text-muted-foreground">(you)</span>}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {user.email ?? (user.login_id ? <span title="Signs in with their employee ID">ID: {user.login_id}</span> : "—")}
-                    </TableCell>
-                    <TableCell>
-                      {canManage && !isSelf ? (
-                        <RoleSelect
-                          roles={roles}
-                          value={user.role ?? ""}
-                          onChange={(newRole) => handleRoleChange(user, newRole)}
-                        />
-                      ) : (
-                        <Badge variant="outline">{user.role ?? "no role"}</Badge>
+        {/* Cards on a phone, a table from tablet width up — Role and the actions stay reachable on both. */}
+        <DataTable
+          data={users}
+          getRowId={(u) => u.id}
+          columns={columns}
+          searchPlaceholder="Search by name, email or ID…"
+          emptyState={{
+            icon: KeyRound,
+            title: "No users yet",
+            description: "Invite your first teammate to give them access.",
+          }}
+          rowActions={
+            canManage
+              ? (user) =>
+                  user.id === me?.user.id ? null : (
+                    <>
+                      {branches.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => setBranchAccessUser(user)}>
+                          Branch access
+                        </Button>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {user.is_active ? (
-                        <Badge variant="success">Active</Badge>
-                      ) : (
-                        <Badge variant="secondary">Deactivated</Badge>
-                      )}
-                    </TableCell>
-                    {branches.length > 0 && (
-                      <TableCell>
-                        {user.branch_ids && user.branch_ids.length > 0 ? (
-                          <span className="flex flex-wrap gap-1">
-                            {user.branch_ids.map((id) => (
-                              <Badge key={id} variant="info">
-                                {branches.find((b) => b.id === id)?.name ?? `#${id}`}
-                              </Badge>
-                            ))}
-                          </span>
-                        ) : (
-                          <Badge variant="outline">All branches</Badge>
-                        )}
-                      </TableCell>
-                    )}
-                    {canManage && (
-                      <TableCell className="text-right">
-                        {!isSelf && (
-                          <div className="flex justify-end gap-2">
-                            {branches.length > 0 && (
-                              <Button variant="outline" size="sm" onClick={() => setBranchAccessUser(user)}>
-                                Branch access
-                              </Button>
-                            )}
-                            <Button variant="outline" size="sm" onClick={() => handleToggleActive(user)}>
-                              {user.is_active ? "Deactivate" : "Activate"}
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleRemove(user)}>
-                              Remove
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
+                      <Button variant="outline" size="sm" onClick={() => handleToggleActive(user)}>
+                        {user.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleRemove(user)}>
+                        Remove
+                      </Button>
+                    </>
+                  )
+              : undefined
+          }
+        />
       </div>
 
       <BranchAccessDialog

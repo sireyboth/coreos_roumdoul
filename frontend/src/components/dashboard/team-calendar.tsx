@@ -179,7 +179,8 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
           <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
             <thead>
               <tr>
-                <th className="sticky left-0 z-20 min-w-44 border-b border-r border-border bg-muted px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {/* Narrow on a phone so more days fit beside it; names are cut short there. */}
+                <th className="sticky left-0 z-20 min-w-28 border-b border-r border-border bg-muted px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:min-w-44 sm:px-3">
                   Employee
                 </th>
                 {dates.map((date) => {
@@ -220,9 +221,12 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
             <tbody>
               {employees.map((employee) => (
                 <tr key={employee.id} className="group">
-                  <td className="sticky left-0 z-10 border-b border-r border-border bg-card px-3 py-1.5 group-hover:bg-accent/40">
-                    <div className="truncate text-sm font-medium">{employee.name}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">
+                  <td
+                    title={employee.name}
+                    className="sticky left-0 z-10 border-b border-r border-border bg-card px-2 py-1.5 group-hover:bg-accent/40 sm:px-3"
+                  >
+                    <div className="max-w-24 truncate text-sm font-medium sm:max-w-56">{employee.name}</div>
+                    <div className="max-w-24 truncate text-[11px] text-muted-foreground sm:max-w-56">
                       {[employee.employee_code, employee.branch].filter(Boolean).join(" · ") || "—"}
                     </div>
                   </td>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Sigma } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -61,14 +61,14 @@ function SlotLine({ day }: { day: AttendanceDay }) {
   );
 }
 
-export default function AttendancePage() {
+function AttendancePageContent() {
   const { me } = useMe();
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
   // ?tab=corrections deep-links to a tab (the old Corrections page redirects here).
-  const [tab, setTab] = useState<Tab>(() => {
-    const wanted = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
-    return TABS.includes(wanted as Tab) ? (wanted as Tab) : "records";
-  });
+  // The tab lives in the address (?tab=corrections), so links — e.g. from a notification — open the right one,
+  // even when you're already on this page.
+  const wanted = useSearchParams().get("tab");
+  const tab: Tab = TABS.includes(wanted as Tab) ? (wanted as Tab) : "records";
   const pathname = usePathname();
   // The table shows one month at a time; a busy company records far more than one page a day.
   const [month, setMonth] = useState(currentMonth);
@@ -132,7 +132,6 @@ export default function AttendancePage() {
   }, [canManage, reloads]);
 
   function switchTab(next: Tab) {
-    setTab(next);
     window.history.replaceState(null, "", next === "records" ? pathname : `${pathname}?tab=${next}`);
   }
 
@@ -393,5 +392,14 @@ export default function AttendancePage() {
         }}
       />
     </div>
+  );
+}
+
+// useSearchParams needs a Suspense boundary so the page can still be prerendered.
+export default function AttendancePage() {
+  return (
+    <Suspense>
+      <AttendancePageContent />
+    </Suspense>
   );
 }

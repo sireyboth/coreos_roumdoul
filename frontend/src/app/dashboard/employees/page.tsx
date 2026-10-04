@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarRange, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 
 type Tab = "people" | "roster";
 
-export default function EmployeesPage() {
+function EmployeesPageContent() {
   const { me, refresh } = useMe();
   const confirm = useConfirm();
   const router = useRouter();
@@ -41,9 +41,8 @@ export default function EmployeesPage() {
   const importSpec = useMemo(() => employeeImport({ salary: canEditSalary }), [canEditSalary]);
 
   // ?tab=roster deep-links to the roster (the old Schedule page redirects here).
-  const [tab, setTab] = useState<Tab>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "roster" ? "roster" : "people",
-  );
+  // The tab lives in the address, so links open the right one even from another page.
+  const tab: Tab = useSearchParams().get("tab") === "roster" ? "roster" : "people";
   // Someone who can only see one of the two never gets an empty tab.
   const activeTab: Tab = tab === "roster" ? (canRoster ? "roster" : "people") : canPeople ? "people" : "roster";
 
@@ -74,7 +73,7 @@ export default function EmployeesPage() {
   }, [canPeople]);
 
   function switchTab(next: Tab) {
-    setTab(next);
+    // Next.js picks this up in useSearchParams, which switches the tab.
     window.history.replaceState(null, "", next === "roster" ? `${pathname}?tab=roster` : pathname);
   }
 
@@ -444,5 +443,14 @@ export default function EmployeesPage() {
         onSaved={load}
       />
     </div>
+  );
+}
+
+// useSearchParams needs a Suspense boundary so the page can still be prerendered.
+export default function EmployeesPage() {
+  return (
+    <Suspense>
+      <EmployeesPageContent />
+    </Suspense>
   );
 }

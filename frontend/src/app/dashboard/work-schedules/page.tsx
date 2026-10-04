@@ -40,8 +40,8 @@ function WeekStrip({ schedule }: { schedule: WorkSchedule }) {
                 : "rounded border border-primary/25 bg-primary/8 px-0.5 py-0.5 text-center text-[10px] leading-tight font-medium text-primary"
             }
           >
-            <div>{WEEKDAY_SHORT[weekday]}</div>
-            <div className="font-normal opacity-80">{slots.length === 0 ? "off" : stretches > 1 ? `${stretches}×` : slots[0].time.slice(0, 5)}</div>
+            <div className="whitespace-nowrap">{WEEKDAY_SHORT[weekday]}</div>
+            <div className="whitespace-nowrap font-normal tabular-nums opacity-80">{slots.length === 0 ? "off" : stretches > 1 ? `${stretches}×` : slots[0].time.slice(0, 5)}</div>
           </div>
         );
       })}
@@ -116,6 +116,7 @@ export default function WorkSchedulesPage() {
       header: "Week",
       cell: (s) => <WeekStrip schedule={s} />,
       className: "min-w-56",
+      fullWidthOnMobile: true,
     },
     {
       id: "hours",

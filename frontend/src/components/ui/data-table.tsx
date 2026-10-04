@@ -38,6 +38,8 @@ export type DataTableColumn<T> = {
   primary?: boolean;
   /** Left out of the mobile card. */
   hideOnMobile?: boolean;
+  /** Takes the whole width of the mobile card instead of half — for wide content like a week strip. */
+  fullWidthOnMobile?: boolean;
   /** Extra classes for this column's header and cells on desktop. */
   className?: string;
 };
@@ -274,22 +276,23 @@ export function DataTable<T>({
                 ))}
               </select>
             ) : (
-              <div key={filter.id} className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">{filter.label}</span>
+              // On a phone the two dates share one full-width row instead of running off the screen.
+              <div key={filter.id} className="flex w-full items-center gap-1.5 sm:w-auto">
+                <span className="shrink-0 text-xs text-muted-foreground">{filter.label}</span>
                 <Input
                   type="date"
                   aria-label={`${filter.label} from`}
                   value={filterValues[`${filter.id}.from`] ?? ""}
                   onChange={(e) => updateFilter(`${filter.id}.from`, e.target.value)}
-                  className="w-auto"
+                  className="min-w-0 flex-1 sm:w-auto sm:flex-none"
                 />
-                <span className="text-xs text-muted-foreground">to</span>
+                <span className="shrink-0 text-xs text-muted-foreground">to</span>
                 <Input
                   type="date"
                   aria-label={`${filter.label} to`}
                   value={filterValues[`${filter.id}.to`] ?? ""}
                   onChange={(e) => updateFilter(`${filter.id}.to`, e.target.value)}
-                  className="w-auto"
+                  className="min-w-0 flex-1 sm:w-auto sm:flex-none"
                 />
               </div>
             ),
@@ -446,7 +449,7 @@ export function DataTable<T>({
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
                   {cardColumns.map((column) => (
-                    <div key={column.id} className="min-w-0">
+                    <div key={column.id} className={cn("min-w-0", column.fullWidthOnMobile && "col-span-2")}>
                       <dt className="text-xs text-muted-foreground">{column.header}</dt>
                       <dd className="mt-0.5 break-words text-sm">{column.cell(row)}</dd>
                     </div>
