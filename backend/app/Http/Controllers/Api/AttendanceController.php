@@ -365,6 +365,7 @@ class AttendanceController extends Controller
                 'id' => $employee->id,
                 'name' => $employee->name,
                 'employee_code' => $employee->employee_code,
+                'sort_order' => $employee->sort_order,
                 'branch' => $employee->relationLoaded('branch') && $employee->branch ? ['id' => $employee->branch->id, 'name' => $employee->branch->name] : null,
                 'job_title' => $employee->relationLoaded('currentAssignment') ? $employee->job_title : null,
                 // The list and the dashboard show each person's avatar.

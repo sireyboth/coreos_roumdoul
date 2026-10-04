@@ -19,6 +19,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useMe } from "@/contexts/me-context";
+import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
@@ -136,6 +137,7 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
             sortValue: (c: AttendanceCorrection) => c.employee.name,
             searchValue: (c: AttendanceCorrection) => c.employee.name,
           },
+          displayOrderColumn<AttendanceCorrection>((c) => c.employee.sort_order),
         ]
       : []),
     {

@@ -31,7 +31,7 @@ class AttendanceReviewController extends Controller
         $request->validate(['status' => ['nullable', Rule::in(['pending', 'approved', 'rejected'])]]);
 
         return AttendanceDay::query()
-            ->with(['employee:id,display_name,first_name,last_name,employee_code,photo_path', 'overtimeReviewedBy:id,name'])
+            ->with(['employee:id,display_name,first_name,last_name,employee_code,photo_path,sort_order', 'overtimeReviewedBy:id,name'])
             ->whereHas('employee')
             ->where('overtime_minutes', '>', 0)
             ->when($request->filled('status'), fn ($q) => $q->where('overtime_status', $request->input('status')))
@@ -47,7 +47,7 @@ class AttendanceReviewController extends Controller
             ->map(fn (AttendanceDay $day) => [
                 'id' => $day->id,
                 'date' => $day->date->toDateString(),
-                'employee' => ['id' => $day->employee->id, 'name' => $day->employee->name, 'employee_code' => $day->employee->employee_code],
+                'employee' => ['id' => $day->employee->id, 'name' => $day->employee->name, 'employee_code' => $day->employee->employee_code, 'sort_order' => $day->employee->sort_order],
                 'schedule' => $day->expected['schedule_name'] ?? null,
                 'worked_minutes' => $day->worked_minutes,
                 'scheduled_minutes' => $day->scheduled_minutes,
@@ -147,6 +147,7 @@ class AttendanceReviewController extends Controller
                     'id' => $employee->id,
                     'name' => $employee->name,
                     'employee_code' => $employee->employee_code,
+                    'sort_order' => $employee->sort_order,
                     'branch' => $employee->branch?->name,
                 ],
                 'scheduled_days' => $planned['work'],

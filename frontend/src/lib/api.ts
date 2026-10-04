@@ -674,6 +674,8 @@ export type AttendanceDay = {
     id: number;
     name: string;
     employee_code: string | null;
+    // Their display order (lowest first).
+    sort_order?: number | null;
     branch: { id: number; name: string } | null;
     job_title: string | null;
     photo_url: string | null;
@@ -706,7 +708,7 @@ export type ScanResult = {
 export type OvertimeEntry = {
   id: number;
   date: string;
-  employee: { id: number; name: string; employee_code: string | null };
+  employee: { id: number; name: string; employee_code: string | null; sort_order?: number | null };
   schedule: string | null;
   worked_minutes: number;
   scheduled_minutes: number;
@@ -720,7 +722,7 @@ export type OvertimeEntry = {
 
 // One employee's month — what payroll reads. Overtime counts once approved.
 export type AttendanceSummaryRow = {
-  employee: { id: number; name: string; employee_code: string | null; branch: string | null };
+  employee: { id: number; name: string; employee_code: string | null; sort_order?: number | null; branch: string | null };
   scheduled_days: number;
   weekly_days_off: number;
   days_off: number;

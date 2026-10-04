@@ -18,6 +18,7 @@ import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { OvertimeReview } from "@/components/dashboard/overtime-review";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
+import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceException, type DaySlot } from "@/lib/api";
 import { attendanceImport } from "@/lib/excel-specs/time";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
@@ -202,6 +203,7 @@ function AttendancePageContent() {
             sortValue: (d: AttendanceDay) => d.employee?.name,
             searchValue: (d: AttendanceDay) => [d.employee?.name, d.employee?.employee_code].filter(Boolean).join(" "),
           },
+          displayOrderColumn<AttendanceDay>((d) => d.employee?.sort_order),
         ]
       : []),
     {

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { parseDate } from "@/components/dashboard/calendar-shared";
+import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, type OvertimeEntry } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { formatMinutes, OVERTIME_TYPE } from "@/lib/schedule";
@@ -76,6 +77,7 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
       sortValue: (e) => e.employee.name,
       searchValue: (e) => [e.employee.name, e.employee.employee_code].filter(Boolean).join(" "),
     },
+    displayOrderColumn<OvertimeEntry>((e) => e.employee.sort_order),
     {
       id: "date",
       header: "Date",

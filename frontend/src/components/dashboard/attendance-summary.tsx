@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, ApiError, type AttendanceSummary as Summary, type AttendanceSummaryRow } from "@/lib/api";
 import { exportAttendanceSummary } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -128,6 +129,7 @@ export function AttendanceSummary({ canManage }: { canManage: boolean }) {
       sortValue: (r) => r.employee.name,
       searchValue: (r) => [r.employee.name, r.employee.employee_code, r.employee.branch].filter(Boolean).join(" "),
     },
+    displayOrderColumn<AttendanceSummaryRow>((r) => r.employee.sort_order),
     { id: "scheduled", header: "Work days", cell: (r) => num(r.scheduled_days), sortValue: (r) => r.scheduled_days },
     { id: "present", header: "Present", cell: (r) => num(r.present_days), sortValue: (r) => r.present_days },
     {

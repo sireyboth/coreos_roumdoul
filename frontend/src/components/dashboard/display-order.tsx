@@ -52,13 +52,17 @@ export function DisplayOrderField({
   );
 }
 
-/** An "Order" column for a table: shows the number, sorts lowest / highest first. Wide screens only. */
-export function displayOrderColumn<T extends { sort_order?: number | null }>(): DataTableColumn<T> {
+/**
+ * An "Order" column for a table: shows the number, sorts lowest / highest first. Wide screens only.
+ * By default it reads the row's own sort_order; pass `getOrder` for rows that belong to an employee
+ * (attendance days, requests…), e.g. `(day) => day.employee?.sort_order`.
+ */
+export function displayOrderColumn<T>(getOrder: (row: T) => number | null | undefined = (row) => (row as { sort_order?: number | null }).sort_order): DataTableColumn<T> {
   return {
     id: "order",
     header: "Order",
-    cell: (row) => <span className="tabular-nums text-muted-foreground">{row.sort_order ?? "—"}</span>,
-    sortValue: (row) => row.sort_order,
+    cell: (row) => <span className="tabular-nums text-muted-foreground">{getOrder(row) ?? "—"}</span>,
+    sortValue: getOrder,
     sortLabels: ["Lowest first", "Highest first"],
     hideOnMobile: true,
     className: "hidden xl:table-cell w-20",
