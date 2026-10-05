@@ -5,6 +5,7 @@ import { FileEdit, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -30,7 +31,138 @@ const STATUS = {
   pending: { label: "Pending", variant: "warning" },
   approved: { label: "Approved", variant: "success" },
   rejected: { label: "Rejected", variant: "destructive" },
+  cancelled: { label: "Cancelled", variant: "secondary" },
 } as const;
+
+/**
+ * One correction with what can be done to it. Every decision can carry a
+ * remark the employee reads: optional when approving, required when
+ * rejecting or when a manager cancels someone else's.
+ */
+function CorrectionReviewDialog({
+  correction,
+  canManage,
+  isOwn,
+  onClose,
+  onDone,
+}: {
+  correction: AttendanceCorrection | null;
+  canManage: boolean;
+  isOwn: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [remark, setRemark] = useState("");
+  const [missing, setMissing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const c = correction;
+  const pending = c?.status === "pending";
+  const canDecide = canManage && pending && !isOwn;
+  const canCancel = pending && (isOwn || canManage);
+  const remarkRequiredToCancel = canCancel && !isOwn;
+
+  function close() {
+    setRemark("");
+    setMissing(false);
+    onClose();
+  }
+
+  async function act(action: "approve" | "reject" | "cancel") {
+    if (!c) return;
+    const text = remark.trim();
+    if (!text && (action === "reject" || (action === "cancel" && remarkRequiredToCancel))) {
+      setMissing(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      if (action === "approve") await api.attendanceCorrections.approve(c.id, text);
+      else if (action === "reject") await api.attendanceCorrections.reject(c.id, text);
+      else await api.attendanceCorrections.cancel(c.id, text);
+      notifySuccess(
+        action === "approve" ? "Correction approved" : action === "reject" ? "Correction rejected" : "Correction cancelled",
+        action === "approve" ? "The scans were added and the day recalculated." : undefined,
+      );
+      close();
+      onDone();
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open={c !== null} onOpenChange={(open) => !open && close()}>
+      <DialogContent className="sm:max-w-md">
+        {c && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                Correction <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>
+              </DialogTitle>
+              <DialogDescription>
+                {c.employee.name} ·{" "}
+                {new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-3 text-sm">
+              <p>
+                Add: <span className="font-medium tabular-nums">{c.requested_times.map(formatTime).join(" · ") || "—"}</span>
+              </p>
+              <p className="rounded-md bg-muted/50 px-3 py-2">{c.reason}</p>
+              {c.reviewed_by && (
+                <p className="text-xs text-muted-foreground">
+                  {STATUS[c.status].label} by {c.reviewed_by.name}
+                  {c.review_notes ? ` — “${c.review_notes}”` : ""}
+                </p>
+              )}
+
+              {(canDecide || canCancel) && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="correction-remark">{canDecide ? "Remark to the employee" : isOwn ? "Reason (optional)" : "Remark to the employee"}</Label>
+                  <Textarea
+                    id="correction-remark"
+                    value={remark}
+                    onChange={(e) => {
+                      setRemark(e.target.value);
+                      setMissing(false);
+                    }}
+                    maxLength={500}
+                    aria-invalid={missing}
+                    placeholder={canDecide ? "Optional when approving, needed when rejecting" : ""}
+                  />
+                  {missing && <p className="text-xs text-destructive">Add a remark — the employee will see it.</p>}
+                </div>
+              )}
+            </div>
+
+            {(canDecide || canCancel) && (
+              <DialogFooter>
+                {canCancel && (
+                  <Button variant="outline" onClick={() => act("cancel")} disabled={busy} className="sm:mr-auto">
+                    Cancel request
+                  </Button>
+                )}
+                {canDecide && (
+                  <>
+                    <Button variant="outline" onClick={() => act("reject")} disabled={busy}>
+                      Reject
+                    </Button>
+                    <Button onClick={() => act("approve")} disabled={busy}>
+                      Approve
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            )}
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -104,27 +236,9 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
     }
   }
 
-  async function handleApprove(correction: AttendanceCorrection) {
-    try {
-      await api.attendanceCorrections.approve(correction.id);
-      notifySuccess("Correction approved", "The scans were added and the day recalculated.");
-    } catch (err) {
-      notifyError(err);
-    }
-    reload();
-  }
-
-  async function handleReject(correction: AttendanceCorrection) {
-    try {
-      await api.attendanceCorrections.reject(correction.id);
-      notifySuccess("Correction rejected");
-    } catch (err) {
-      notifyError(err);
-    }
-    reload();
-  }
-
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
+  const [reviewing, setReviewing] = useState<AttendanceCorrection | null>(null);
+  const isOwn = (c: AttendanceCorrection) => c.employee.id === me?.employee?.id || c.requested_by?.id === me?.user.id;
 
   const columns: DataTableColumn<AttendanceCorrection>[] = [
     ...(canManage
@@ -168,7 +282,14 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
     {
       id: "status",
       header: "Status",
-      cell: (c) => <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>,
+      cell: (c) => (
+        <div className="flex flex-col items-start gap-0.5">
+          <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>
+          {c.reviewed_by && <span className="text-xs text-muted-foreground">by {c.reviewed_by.name}</span>}
+          {/* The remark the employee reads. */}
+          {c.review_notes && <span className="max-w-56 text-xs italic text-muted-foreground">“{c.review_notes}”</span>}
+        </div>
+      ),
       sortValue: (c) => c.status,
     },
   ];
@@ -275,21 +396,22 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
         searchPlaceholder={canManage ? "Search by employee or reason…" : "Search by reason…"}
         initialFilters={initialStatus && initialStatus in STATUS ? { status: initialStatus } : undefined}
         emptyState={{ icon: FileEdit, title: "No correction requests", description: "Nothing to review right now." }}
-        rowActions={
-          canManage
-            ? (correction) =>
-                correction.status === "pending" ? (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => handleApprove(correction)}>
-                      Approve
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleReject(correction)}>
-                      Reject
-                    </Button>
-                  </>
-                ) : null
-            : undefined
+        onRowClick={setReviewing}
+        rowActions={(correction) =>
+          correction.status === "pending" && (canManage || isOwn(correction)) ? (
+            <Button variant="outline" size="sm" onClick={() => setReviewing(correction)}>
+              {canManage && !isOwn(correction) ? "Review" : "Open"}
+            </Button>
+          ) : null
         }
+      />
+
+      <CorrectionReviewDialog
+        correction={reviewing}
+        canManage={canManage}
+        isOwn={reviewing ? isOwn(reviewing) : false}
+        onClose={() => setReviewing(null)}
+        onDone={reload}
       />
     </div>
   );

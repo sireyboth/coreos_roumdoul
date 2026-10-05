@@ -20,6 +20,7 @@ const KIND_LABEL: Record<AttendanceToday["kind"], string> = {
   holiday: "Holiday",
   day_off: "Day off",
   weekly_off: "Your day off",
+  leave: "You're on leave today",
   unscheduled: "No work schedule today",
 };
 

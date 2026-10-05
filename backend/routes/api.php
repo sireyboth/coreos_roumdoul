@@ -12,7 +12,9 @@ use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeCardController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeePhotoController;
+use App\Http\Controllers\Api\EmployeeRequestController;
 use App\Http\Controllers\Api\HolidayController;
+use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -41,6 +43,13 @@ Route::get('/health', function () {
 Route::get('/employees/{employee}/photo', [EmployeePhotoController::class, 'show'])
     ->middleware('signed:relative')
     ->name('employees.photo');
+
+// A request's file (e.g. a medical certificate) opens in a new tab, which
+// can't send a login header either: the same kind of short-lived signed link.
+Route::get('/attachments/{attachment}', [EmployeeRequestController::class, 'attachment'])
+    ->middleware('signed:relative')
+    ->whereNumber('attachment')
+    ->name('attachments.show');
 
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
@@ -170,6 +179,8 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
             Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
             Route::get('/attendance/corrections', [AttendanceCorrectionController::class, 'index']);
             Route::post('/attendance/corrections', [AttendanceCorrectionController::class, 'store']);
+            // The employee withdraws their own; a manager can cancel one with a remark.
+            Route::post('/attendance/corrections/{correction}/cancel', [AttendanceCorrectionController::class, 'cancel']);
             // Everyone gets their own row; managers get everyone's.
             Route::get('/attendance/summary', [AttendanceReviewController::class, 'summary']);
             Route::get('/attendance/periods', [AttendanceReviewController::class, 'periods']);
@@ -184,6 +195,31 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
             Route::post('/attendance/days/{day}/overtime/reject', [AttendanceReviewController::class, 'rejectOvertime']);
             Route::post('/attendance/periods', [AttendanceReviewController::class, 'lock']);
             Route::delete('/attendance/periods/{month}', [AttendanceReviewController::class, 'unlock'])->where('month', '\d{4}-\d{2}');
+        });
+
+        // Leave and other requests. Sending and following your own needs only
+        // requests.view; who may decide one is checked per request (a line
+        // manager decides their team's without extra permissions).
+        Route::middleware('company_permission:requests.view')->group(function () {
+            Route::get('/leave-types', [LeaveController::class, 'types']);
+            Route::get('/leave-balances', [LeaveController::class, 'balances']);
+            Route::get('/request-settings/{type}', [LeaveController::class, 'settings']);
+            Route::get('/requests', [EmployeeRequestController::class, 'index']);
+            Route::get('/requests/waiting-count', [EmployeeRequestController::class, 'waitingCount']);
+            Route::post('/requests/preview', [EmployeeRequestController::class, 'preview']);
+            Route::post('/requests', [EmployeeRequestController::class, 'store']);
+            Route::get('/requests/{employeeRequest}', [EmployeeRequestController::class, 'show'])->whereNumber('employeeRequest');
+            Route::post('/requests/{employeeRequest}/approve', [EmployeeRequestController::class, 'approve'])->whereNumber('employeeRequest');
+            Route::post('/requests/{employeeRequest}/reject', [EmployeeRequestController::class, 'reject'])->whereNumber('employeeRequest');
+            Route::post('/requests/{employeeRequest}/cancel', [EmployeeRequestController::class, 'cancel'])->whereNumber('employeeRequest');
+        });
+
+        Route::middleware('company_permission:leave_policies.manage')->group(function () {
+            Route::post('/leave-types', [LeaveController::class, 'storeType']);
+            Route::put('/leave-types/{leaveType}', [LeaveController::class, 'updateType']);
+            Route::get('/leave-adjustments', [LeaveController::class, 'adjustments']);
+            Route::post('/leave-adjustments', [LeaveController::class, 'adjust']);
+            Route::put('/request-settings/{type}', [LeaveController::class, 'updateSettings']);
         });
     });
 });

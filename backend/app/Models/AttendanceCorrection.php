@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCompany;
+use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +69,28 @@ class AttendanceCorrection extends Model
         usort($times, fn (Carbon $a, Carbon $b) => $a->getTimestamp() <=> $b->getTimestamp());
 
         return array_values($times);
+    }
+
+    /**
+     * Records the decision only if the request is still pending, in one
+     * conditional UPDATE — so of two managers deciding at the same moment,
+     * exactly one wins. Returns false for the one that lost. Audited like a
+     * normal update.
+     */
+    public function decide(string $status, int $reviewerId, ?string $notes): bool
+    {
+        $changes = ['status' => $status, 'reviewed_by' => $reviewerId, 'reviewed_at' => now(), 'review_notes' => $notes];
+
+        $claimed = static::query()->withoutGlobalScopes()->whereKey($this->getKey())->where('status', 'pending')->update($changes);
+
+        if (! $claimed) {
+            return false;
+        }
+
+        AuditLogger::record(static::auditEventName('updated'), $this, $changes, beforeData: ['status' => 'pending']);
+        $this->refresh();
+
+        return true;
     }
 
     public function requestedBy(): BelongsTo

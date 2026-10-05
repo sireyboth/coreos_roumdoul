@@ -350,4 +350,16 @@ class CalendarTest extends TestCase
         $this->assertSame('holiday', $day['type']);
         $this->assertNull($day['attendance']);
     }
+
+    public function test_deleting_a_holiday_turns_the_day_back_into_an_absence(): void
+    {
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01');
+        $this->app['auth']->forgetGuards();
+        $id = $this->actingAs($this->admin)->postJson('/api/holidays', ['name' => 'Mistake', 'date' => '2026-09-10'])->assertCreated()->json('id');
+        $this->assertSame('holiday', $this->day($this->month(), '2026-09-10')['type']);
+
+        $this->actingAs($this->admin)->deleteJson("/api/holidays/{$id}")->assertNoContent();
+
+        $this->assertSame('absent', $this->day($this->month(), '2026-09-10')['attendance']);
+    }
 }

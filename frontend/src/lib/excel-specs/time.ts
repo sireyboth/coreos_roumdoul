@@ -675,6 +675,7 @@ const DAY_TYPE_LABEL: Record<string, string> = {
   holiday: "Holiday",
   day_off: "Day off",
   weekly_off: "Weekly off",
+  leave: "On leave",
   none: "",
 };
 
@@ -682,6 +683,7 @@ const DAY_TYPE_LABEL: Record<string, string> = {
 function dayCell(day: CalendarDay): string {
   if (day.type === "holiday") return day.label ? `Holiday: ${day.label}` : "Holiday";
   if (day.type === "day_off") return "Day off";
+  if (day.type === "leave") return day.label ? `Leave: ${day.label}` : "On leave";
   if (day.type === "weekly_off") return day.attendance ? `Off · ${ATTENDANCE_LABEL[day.attendance]}` : "Weekly off";
   const parts = [day.schedule ? slotsSummary(day.schedule.slots) : null, day.attendance ? ATTENDANCE_LABEL[day.attendance] : null].filter(Boolean);
   return parts.join(" · ");
@@ -762,6 +764,10 @@ export async function exportAttendanceSummary(summary: AttendanceSummary): Promi
       { header: "Work days", value: (r) => r.scheduled_days, type: "number" },
       { header: "Present", value: (r) => r.present_days, type: "number" },
       { header: "Absent", value: (r) => r.absent_days, type: "number" },
+      { header: "Paid leave (days)", value: (r) => r.paid_leave_days ?? 0, type: "number" },
+      { header: "Unpaid leave (days)", value: (r) => r.unpaid_leave_days ?? 0, type: "number" },
+      { header: "Approved late/early (min)", value: (r) => r.excused_minutes ?? 0, type: "number" },
+      { header: "Unpaid late/early (min)", value: (r) => r.unpaid_excused_minutes ?? 0, type: "number" },
       { header: "Missing a scan", value: (r) => r.incomplete_days, type: "number" },
       { header: "Late days", value: (r) => r.late_days, type: "number" },
       { header: "Late (min)", value: (r) => r.late_minutes, type: "number" },

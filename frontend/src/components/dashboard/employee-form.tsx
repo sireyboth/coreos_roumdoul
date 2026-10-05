@@ -83,6 +83,7 @@ export type EmployeeForm = {
   branch_id: string;
   department_id: string;
   team_id: string;
+  manager_employee_id: string;
   job_title: string;
   employment_type: string;
   employment_status: string;
@@ -128,6 +129,7 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
     branch_id: branchId,
     department_id: "",
     team_id: "",
+    manager_employee_id: "",
     job_title: "",
     employment_type: "",
     employment_status: "active",
@@ -163,6 +165,7 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
     branch_id: employee.branch?.id != null ? String(employee.branch.id) : "",
     department_id: employee.department?.id != null ? String(employee.department.id) : "",
     team_id: employee.team?.id != null ? String(employee.team.id) : "",
+    manager_employee_id: employee.manager_employee_id != null ? String(employee.manager_employee_id) : "",
     job_title: employee.job_title ?? "",
     employment_type: employee.employment_type ?? "",
     employment_status: employee.employment_status,
@@ -182,7 +185,7 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
  * employee's department just by editing their phone number. `salary` works
  * the same way: pay is only sent by someone allowed to change it.
  */
-export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: boolean }): EmployeeInput {
+export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: boolean; manager?: boolean }): EmployeeInput {
   const orNull = (value: string) => value.trim() || null;
   const salary = form.base_salary.trim() === "" ? null : Number(form.base_salary);
 
@@ -211,6 +214,8 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
           team_id: form.team_id ? Number(form.team_id) : null,
         }
       : {}),
+    // Like department/team: only when the picker was there to choose from.
+    ...(options.manager ? { manager_employee_id: form.manager_employee_id ? Number(form.manager_employee_id) : null } : {}),
     job_title: orNull(form.job_title),
     employment_type: orNull(form.employment_type),
     employment_status: form.employment_status,
@@ -265,6 +270,9 @@ export function EmployeeFormFields({
   branches,
   departments = [],
   teams = [],
+  managers,
+  selfId,
+  currentManager,
   emailHint,
   emailDisabled,
   emailRequired,
@@ -279,6 +287,11 @@ export function EmployeeFormFields({
   branches: Branch[];
   departments?: Department[];
   teams?: Team[];
+  // People who can be picked as line manager; leave out to hide the picker.
+  managers?: { id: number; name: string }[];
+  // The employee being edited, so they can't be their own manager.
+  selfId?: number;
+  currentManager?: { id: number; name: string } | null;
   emailHint?: string;
   emailDisabled?: boolean;
   emailRequired?: boolean;
@@ -302,6 +315,13 @@ export function EmployeeFormFields({
     const following = form.name.trim() === "" || form.name.trim() === before;
     onChange({ ...patch, ...(following ? { name: after } : {}) });
   }
+
+  // Anyone but the person themselves; their current manager stays listed even
+  // if they work in a branch the viewer can't otherwise see.
+  const managerOptions = [
+    ...(managers ?? []).filter((m) => m.id !== selfId),
+    ...(currentManager && !(managers ?? []).some((m) => m.id === currentManager.id) ? [currentManager] : []),
+  ].map((m) => ({ value: String(m.id), label: m.name }));
 
   // Inactive ones can't be newly chosen, but stay visible if the employee is already in one.
   const departmentOptions = departments.filter((d) => d.status === "active" || String(d.id) === form.department_id);
@@ -443,6 +463,22 @@ export function EmployeeFormFields({
         <Field label="Job title (optional)" htmlFor={id("job")}>
           <Input id={id("job")} value={form.job_title} onChange={(e) => onChange({ job_title: e.target.value })} />
         </Field>
+        {managers && (
+          <Field
+            label="Line manager (optional)"
+            htmlFor={id("manager")}
+            hint="Approves this person's leave and other requests first. Empty = anyone who can approve requests in their branch."
+          >
+            <SearchableSelect
+              id={id("manager")}
+              options={managerOptions}
+              value={form.manager_employee_id}
+              onChange={(value) => onChange({ manager_employee_id: value })}
+              placeholder="No line manager"
+              className="h-9 w-full rounded-md"
+            />
+          </Field>
+        )}
         <Field
           label="Display order (optional)"
           htmlFor={id("order")}

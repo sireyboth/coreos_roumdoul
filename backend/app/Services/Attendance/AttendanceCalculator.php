@@ -258,7 +258,7 @@ final class AttendanceCalculator
         if ($scans !== []) {
             if ($day->holidayName !== null) {
                 $found[] = 'worked_holiday';
-            } elseif (in_array($day->kind, ['day_off', 'weekly_off'], true)) {
+            } elseif (in_array($day->kind, ['day_off', 'weekly_off', 'leave'], true)) {
                 $found[] = 'worked_day_off';
             } elseif ($day->kind === 'unscheduled') {
                 $found[] = 'unscheduled_work';

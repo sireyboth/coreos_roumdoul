@@ -13,16 +13,24 @@ use App\Models\User;
  */
 class CompanyUserService
 {
+    /** A built-in role (company-admin, manager, employee) by its fixed code — whatever it's called now. */
+    public static function roleByCode(int $companyId, string $code): CompanyRole
+    {
+        return CompanyRole::query()->where('company_id', $companyId)->where('code', $code)->firstOrFail();
+    }
+
     /**
      * @param  string|null  $email  null for someone who signs in with an employee ID instead
      * @param  string|null  $loginId  the employee ID they sign in with (with the company code)
      */
-    public function create(int $companyId, string $name, ?string $email, string $password, string $roleName, ?string $loginId = null): User
+    public function create(int $companyId, string $name, ?string $email, string $password, CompanyRole|string $roleName, ?string $loginId = null): User
     {
-        $role = CompanyRole::query()
-            ->where('company_id', $companyId)
-            ->where('name', $roleName)
-            ->firstOrFail();
+        // A role picked on screen comes by the name people see; code that means
+        // a built-in role passes the role itself (see roleByCode), so renaming
+        // a role never breaks it.
+        $role = $roleName instanceof CompanyRole
+            ? $roleName
+            : CompanyRole::query()->where('company_id', $companyId)->where('name', $roleName)->firstOrFail();
 
         $user = User::query()->create([
             'name' => $name,

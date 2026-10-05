@@ -96,6 +96,9 @@
 }
 
 .dark {
+  /* The browser draws native controls itself (a <select>'s open list, date
+     pickers, scrollbars): tell it the page is dark, or they stay white. */
+  color-scheme: dark;
   --background: oklch(0.15 0.022 275);
   --foreground: oklch(0.975 0.005 275);
   --card: oklch(0.2 0.028 275);

@@ -73,8 +73,9 @@ class RoleController extends Controller
             ...CompanyRole::displayOrderRules(),
         ]);
 
-        // company-admin's name and permissions are locked; only where it sits in lists can change.
-        if ($role->code === self::PROTECTED_ROLE && (isset($data['name']) || isset($data['permissions']))) {
+        // company-admin's permissions are locked (nobody can lock themselves out);
+        // its name is only a label and can change like any other role's.
+        if ($role->code === self::PROTECTED_ROLE && isset($data['permissions'])) {
             throw ValidationException::withMessages([
                 'role' => ['The company-admin role\'s permissions cannot be changed.'],
             ]);

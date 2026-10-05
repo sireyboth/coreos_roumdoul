@@ -133,9 +133,23 @@ class AttendanceReviewController extends Controller
         $resolver = new ScheduleResolver($company, $employees->pluck('id'), $start->toDateString(), $end->toDateString());
 
         $rows = $employees->map(function (Employee $employee) use ($days, $resolver, $start, $end, $today) {
-            $planned = ['work' => 0, 'weekly_off' => 0, 'day_off' => 0, 'holiday' => 0, 'unscheduled' => 0];
+            $planned = ['work' => 0, 'weekly_off' => 0, 'day_off' => 0, 'holiday' => 0, 'leave' => 0, 'unscheduled' => 0];
+            // Leave in days (a half day is 0.5), split by whether it is paid, and by type.
+            $leave = ['paid' => 0.0, 'unpaid' => 0.0, 'by_type' => []];
+            $excused = ['all' => 0, 'unpaid' => 0];
             for ($day = $start; $day->lte($end); $day = $day->addDay()) {
-                $planned[$resolver->resolve($employee->id, $day->toDateString())->kind]++;
+                $expected = $resolver->resolve($employee->id, $day->toDateString());
+                $planned[$expected->kind]++;
+
+                if ($expected->leave) {
+                    $leave[$expected->leave['pay_percent'] > 0 ? 'paid' : 'unpaid'] += $expected->leave['portion'];
+                    $leave['by_type'][$expected->leave['type']] = ($leave['by_type'][$expected->leave['type']] ?? 0) + $expected->leave['portion'];
+                }
+                // Approved late arrival / early leave: minutes excused, paid or not.
+                foreach ($expected->permission ?? [] as $permit) {
+                    $excused['all'] += $permit['minutes'];
+                    $excused['unpaid'] += $permit['pay_percent'] > 0 ? 0 : $permit['minutes'];
+                }
             }
 
             $mine = $days->get($employee->id, collect());
@@ -154,6 +168,12 @@ class AttendanceReviewController extends Controller
                 'weekly_days_off' => $planned['weekly_off'],
                 'days_off' => $planned['day_off'],
                 'holidays' => $planned['holiday'],
+                'leave_days' => $leave['paid'] + $leave['unpaid'],
+                'paid_leave_days' => $leave['paid'],
+                'unpaid_leave_days' => $leave['unpaid'],
+                'excused_minutes' => $excused['all'],
+                'unpaid_excused_minutes' => $excused['unpaid'],
+                'leave_by_type' => collect($leave['by_type'])->map(fn (float $days, string $type) => ['type' => $type, 'days' => $days])->values(),
                 'present_days' => $worked->where('kind', 'work')->count(),
                 'absent_days' => $mine->where('status', 'absent')->count(),
                 'incomplete_days' => $mine->where('status', 'incomplete')->count(),

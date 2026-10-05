@@ -76,6 +76,8 @@ export default function EmployeePage() {
   // Empty when the role can't see them (the pickers then don't show at all).
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  // Who can be picked as line manager; null until loaded (the picker waits for it).
+  const [managers, setManagers] = useState<{ id: number; name: string }[] | null>(null);
   const [tab, setTab] = useState<Tab>(() =>
     typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "schedule" ? "schedule" : "profile",
   );
@@ -130,6 +132,7 @@ export default function EmployeePage() {
     api.branches.list().then((res) => setBranches(res.data)).catch(() => setBranches([]));
     api.departments.list(200).then((res) => setDepartments(res.data)).catch(() => setDepartments([]));
     api.teams.list(200).then((res) => setTeams(res.data)).catch(() => setTeams([]));
+    api.employees.all().then((list) => setManagers(list.map((e) => ({ id: e.id, name: e.name })))).catch(() => setManagers(null));
   }, []);
 
   function reload() {
@@ -149,7 +152,7 @@ export default function EmployeePage() {
     setSaving(true);
 
     try {
-      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0, salary: salaryAccess === "edit" });
+      const payload = toPayload(form, { org: departments.length > 0 || teams.length > 0, manager: managers !== null, salary: salaryAccess === "edit" });
       // With an email login the email is their sign-in — it's changed from Users, not here.
       // (For an employee-ID login the email is only a contact detail, so it stays editable.)
       if (emailIsSignIn) delete payload.email;
@@ -412,6 +415,9 @@ export default function EmployeePage() {
                       branches={branches}
                       departments={departments}
                       teams={teams}
+                      managers={managers ?? undefined}
+                      selfId={employee?.id}
+                      currentManager={employee?.manager}
                       emailDisabled={emailIsSignIn}
                       emailHint={emailIsSignIn ? "This is their sign-in email — change it from Users." : undefined}
                       codeDisabled={idIsSignIn}

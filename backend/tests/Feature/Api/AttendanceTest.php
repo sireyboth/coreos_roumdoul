@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\WorkLocation;
 use App\Services\CompanyProvisioner;
+use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
@@ -63,6 +64,8 @@ class AttendanceTest extends TestCase
         $user = $this->createUserWithRole($company, 'employee');
         $employee = Employee::query()->create(['company_id' => $company->id, 'name' => 'Worker', 'user_id' => $user->id]);
 
+        // A fixed morning: run late in the evening, "+4 hours" would cross local midnight and split into two days.
+        $this->travelTo(Carbon::parse('2026-03-10 09:00', 'Asia/Phnom_Penh'));
         $this->actingAs($user)->postJson('/api/attendance/check-in', $this->gps($company))->assertCreated();
 
         $this->travel(4)->hours();

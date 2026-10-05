@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Holiday;
 use App\Services\Attendance\AttendanceRecorder;
+use App\Services\Requests\EmployeeRequestService;
 use Illuminate\Http\Request;
 
 /**
@@ -103,7 +104,7 @@ class HolidayController extends Controller
         return $holiday;
     }
 
-    public function destroy(Holiday $holiday)
+    public function destroy(Request $request, Holiday $holiday)
     {
         $dates = $this->datesOf($holiday);
         $holiday->delete();
@@ -126,6 +127,8 @@ class HolidayController extends Controller
 
     private function recalculate(Request $request, array $dates): void
     {
+        // Leave first: a day that became a holiday is no longer a leave day, then attendance follows.
+        app(EmployeeRequestService::class)->recountForDates($request->user()->company_id, array_values(array_unique($dates)));
         $this->recorder->recalculateDatesForCompany($request->user()->company, $dates);
     }
 }

@@ -93,6 +93,7 @@ export default function RolesPage() {
   const [creating, setCreating] = useState(false);
 
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [editName, setEditName] = useState("");
   const [editPermissions, setEditPermissions] = useState<string[]>([]);
   const [editOrder, setEditOrder] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -130,6 +131,7 @@ export default function RolesPage() {
 
   function openEdit(role: Role) {
     setEditingRole(role);
+    setEditName(role.name);
     setEditPermissions(role.permissions);
     setEditOrder(fromSortOrder(role.sort_order));
     setEditError(null);
@@ -143,8 +145,14 @@ export default function RolesPage() {
 
     try {
       const sortOrder = toSortOrder(editOrder);
-      await api.roles.update(editingRole.id, editingRole.protected ? { sort_order: sortOrder } : { permissions: editPermissions, sort_order: sortOrder });
-      notifySuccess(editingRole.protected ? "Role order updated" : "Role updated");
+      const name = editName.trim();
+      // The built-in admin role keeps its permissions; its name can change like any other.
+      await api.roles.update(editingRole.id, {
+        ...(name && name !== editingRole.name ? { name } : {}),
+        ...(editingRole.protected ? {} : { permissions: editPermissions }),
+        sort_order: sortOrder,
+      });
+      notifySuccess("Role updated");
       setEditingRole(null);
       load();
     } catch (err) {
@@ -292,11 +300,16 @@ export default function RolesPage() {
               <DialogTitle>Edit &quot;{editingRole?.name}&quot;</DialogTitle>
               <DialogDescription>
                 {editingRole?.protected
-                  ? "This role's permissions are fixed. You can change where it appears in lists."
+                  ? "This role's permissions are fixed. You can rename it and change where it appears in lists."
                   : "Changes apply immediately to everyone with this role."}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="role_edit_name">Role name</Label>
+                <Input id="role_edit_name" required maxLength={255} value={editName} onChange={(e) => setEditName(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Only the name changes — everyone with this role keeps it.</p>
+              </div>
               {!editingRole?.protected && <PermissionCheckboxes groups={groups} selected={editPermissions} onChange={setEditPermissions} />}
               <DisplayOrderField id="role-edit-order" value={editOrder} onChange={setEditOrder} example="the most senior role" />
               {editError && <Alert variant="destructive">{editError}</Alert>}

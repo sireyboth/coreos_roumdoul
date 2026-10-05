@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\Company;
 use App\Models\CompanyPermission;
 use App\Models\CompanyRole;
+use App\Models\LeaveType;
 use App\Models\User;
 use App\Support\CompanyPermissions;
+use App\Support\LeaveDefaults;
 use Illuminate\Support\Str;
 
 /**
@@ -46,6 +48,10 @@ class CompanyProvisioner
             $role->permissions()->sync($permissionIds);
 
             $roles[$roleCode] = $role;
+        }
+
+        foreach (LeaveDefaults::types() as $type) {
+            LeaveType::query()->create([...$type, 'company_id' => $company->id]);
         }
 
         $admin = User::query()->create([

@@ -71,6 +71,33 @@ class RoleManagementTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_any_role_can_be_renamed_and_everything_keeps_working(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Delta', 'Boss', 'boss@delta.test', 'password123');
+        $admin = $company->users()->first();
+        $role = fn (string $code) => CompanyRole::query()->where('code', $code)->where('company_id', $company->id)->firstOrFail();
+
+        // The built-in admin role: its name can change, its permissions can't.
+        $this->actingAs($admin)->putJson("/api/roles/{$role('company-admin')->id}", ['name' => 'Owner'])
+            ->assertOk()->assertJsonPath('name', 'Owner')->assertJsonPath('protected', true);
+        $this->actingAs($admin)->putJson("/api/roles/{$role('company-admin')->id}", ['name' => 'Owner', 'permissions' => ['branches.view']])
+            ->assertStatus(422);
+
+        $this->actingAs($admin)->putJson("/api/roles/{$role('employee')->id}", ['name' => 'Staff'])->assertOk()->assertJsonPath('name', 'Staff');
+        $this->actingAs($admin)->putJson("/api/roles/{$role('manager')->id}", ['name' => 'Staff'])
+            ->assertStatus(422)->assertJsonValidationErrors('name');
+
+        // Giving an employee a login still finds the (renamed) employee role.
+        $branch = \App\Models\Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+        $this->actingAs($admin)->postJson('/api/employees', [
+            'name' => 'Dara', 'branch_id' => $branch->id, 'email' => 'dara@delta.test', 'password' => 'password123', 'login_method' => 'email',
+        ])->assertCreated();
+        $this->assertSame('Staff', \App\Models\User::query()->where('email', 'dara@delta.test')->firstOrFail()->membership->roles->sole()->name);
+
+        // The admin still has every permission, under the new name.
+        $this->actingAs($admin)->getJson('/api/me')->assertJsonPath('roles', ['Owner'])->assertJsonFragment(['requests.manage']);
+    }
+
     public function test_role_still_assigned_to_a_user_cannot_be_deleted(): void
     {
         $company = app(CompanyProvisioner::class)->provision('Delta', 'Boss', 'boss@delta.test', 'password123');

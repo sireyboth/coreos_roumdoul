@@ -20,6 +20,9 @@ class AttendanceCorrectionController extends Controller
 
         if (! $request->user()->hasCompanyPermission('attendance.manage')) {
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
+        } else {
+            // Through Employee, so a manager limited to some branches only sees theirs.
+            $query->whereHas('employee');
         }
 
         // Each person together, in the company's display order; their days newest first.
@@ -102,12 +105,13 @@ class AttendanceCorrectionController extends Controller
             throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
         }
 
-        $data = $request->validate(['review_notes' => ['nullable', 'string', 'max:255']]);
+        // A remark to the employee: optional when approving.
+        $data = $request->validate(['review_notes' => ['nullable', 'string', 'max:500']]);
 
         $attendance->approveCorrection($correction, $request->user()->id, $data['review_notes'] ?? null);
         $notifier->correctionDecided($correction, $request->user());
 
-        return $correction->fresh(['employee'])->append('requested_times');
+        return $correction->fresh(['employee', 'reviewedBy'])->append('requested_times');
     }
 
     public function reject(Request $request, AttendanceCorrection $correction, AttendanceNotifier $notifier)
@@ -118,21 +122,50 @@ class AttendanceCorrectionController extends Controller
             throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
         }
 
-        $data = $request->validate(['review_notes' => ['nullable', 'string', 'max:255']]);
+        // A "no" always says why — the employee reads it.
+        $data = $request->validate(['review_notes' => ['required', 'string', 'max:500']]);
 
-        $correction->update([
-            'status' => 'rejected',
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'review_notes' => $data['review_notes'] ?? null,
-        ]);
+        // Only if still pending: another manager may have decided it a moment ago.
+        if (! $correction->decide('rejected', $request->user()->id, $data['review_notes'])) {
+            throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+        }
+
         $notifier->correctionDecided($correction, $request->user());
 
-        return $correction;
+        return $correction->load(['employee', 'reviewedBy'])->append('requested_times');
     }
 
+    /**
+     * Withdraws a correction still waiting. The employee can, for any reason;
+     * a manager can too, with a remark the employee reads. An approved one
+     * can't be cancelled — its scans are in; fix the day with an adjustment.
+     */
+    public function cancel(Request $request, AttendanceCorrection $correction, AttendanceNotifier $notifier)
+    {
+        abort_unless($correction->company_id === $request->user()->company_id, 404);
+        $user = $request->user();
+        $own = $correction->requested_by === $user->id
+            || Employee::query()->withoutGlobalScope('branch_access')->whereKey($correction->employee_id)->value('user_id') === $user->id;
+        $manages = $user->hasCompanyPermission('attendance.manage') && Employee::query()->whereKey($correction->employee_id)->exists();
+        abort_unless($own || $manages, 404);
+
+        $data = $request->validate(['review_notes' => [$own ? 'nullable' : 'required', 'string', 'max:500']]);
+
+        if ($correction->status !== 'pending' || ! $correction->decide('cancelled', $user->id, $data['review_notes'] ?? null)) {
+            throw ValidationException::withMessages(['status' => [$correction->status === 'approved'
+                ? 'This correction is already approved — ask a manager to adjust the day instead.'
+                : 'This request has already been '.$correction->status.'.']]);
+        }
+
+        $notifier->correctionCancelled($correction, $user);
+
+        return $correction->load(['employee', 'reviewedBy'])->append('requested_times');
+    }
+
+    /** Same company, and an employee the reviewer can see — a manager limited to some branches decides only theirs. */
     private function authorizeSameCompany(Request $request, AttendanceCorrection $correction): void
     {
         abort_unless($correction->company_id === $request->user()->company_id, 404);
+        abort_unless(Employee::query()->whereKey($correction->employee_id)->exists(), 404);
     }
 }

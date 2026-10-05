@@ -37,6 +37,8 @@ export default function NewEmployeePage() {
   // Empty when the role can't see them (the pickers then don't show at all).
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  // Who can be picked as line manager; null until loaded (the picker waits for it).
+  const [managers, setManagers] = useState<{ id: number; name: string }[] | null>(null);
   const [form, setForm] = useState<EmployeeForm>(() => emptyEmployeeForm());
   const [loginPassword, setLoginPassword] = useState("");
   // One way to sign in, never both.
@@ -61,6 +63,7 @@ export default function NewEmployeePage() {
       .catch(() => setBranches([]));
     api.departments.list(200).then((res) => setDepartments(res.data)).catch(() => setDepartments([]));
     api.teams.list(200).then((res) => setTeams(res.data)).catch(() => setTeams([]));
+    api.employees.all().then((list) => setManagers(list.map((e) => ({ id: e.id, name: e.name })))).catch(() => setManagers(null));
   }, []);
 
   // Free the preview image when it's replaced or the page is left.
@@ -79,7 +82,7 @@ export default function NewEmployeePage() {
 
     try {
       const created = await api.employees.create({
-        ...toPayload(form, { org: departments.length > 0 || teams.length > 0, salary: canEditSalary }),
+        ...toPayload(form, { org: departments.length > 0 || teams.length > 0, manager: managers !== null, salary: canEditSalary }),
         name: form.name.trim(),
         branch_id: Number(form.branch_id),
         // Whichever way was chosen (their email, or their employee ID) is their sign-in.
@@ -166,6 +169,7 @@ export default function NewEmployeePage() {
                   branches={branches ?? []}
                   departments={departments}
                   teams={teams}
+                  managers={managers ?? undefined}
                   emailRequired={loginPassword !== "" && method === "email"}
                   codeRequired={loginPassword !== "" && method === "employee_id"}
                   codeHint={loginPassword !== "" && method === "employee_id" ? "This is what they'll sign in with." : undefined}

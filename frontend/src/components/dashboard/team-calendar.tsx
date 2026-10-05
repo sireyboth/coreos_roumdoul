@@ -88,7 +88,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
       if (!day) continue;
       found = true;
       if (day.type === "work") counts.working++;
-      if (day.type === "day_off" || day.type === "weekly_off" || day.type === "holiday") counts.off++;
+      if (day.type === "day_off" || day.type === "weekly_off" || day.type === "holiday" || day.type === "leave") counts.off++;
       if (day.attendance === "present" || day.attendance === "incomplete" || day.attendance === "worked") counts.present++;
       if (day.attendance === "late") counts.late++;
       if (day.attendance === "absent") counts.absent++;

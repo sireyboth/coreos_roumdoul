@@ -85,9 +85,11 @@ class SetupDisplayOrderTest extends TestCase
         $adminRole = CompanyRole::query()->where('company_id', $this->company->id)->where('code', 'company-admin')->firstOrFail();
 
         $this->actingAs($this->admin)->putJson("/api/roles/{$adminRole->id}", ['sort_order' => 1])->assertOk()->assertJsonPath('sort_order', 1);
-        $this->actingAs($this->admin)->putJson("/api/roles/{$adminRole->id}", ['name' => 'Boss'])->assertJsonValidationErrors('role');
+        // Its name is only a label; its permissions stay locked.
+        $this->actingAs($this->admin)->putJson("/api/roles/{$adminRole->id}", ['permissions' => []])->assertJsonValidationErrors('role');
+        $this->actingAs($this->admin)->putJson("/api/roles/{$adminRole->id}", ['name' => 'Boss'])->assertOk();
 
-        $this->assertSame('company-admin', $this->names('/api/roles')[0]);
+        $this->assertSame('Boss', $this->names('/api/roles')[0]);
     }
 
     public function test_users_follow_their_employees_display_order(): void

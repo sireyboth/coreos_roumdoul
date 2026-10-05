@@ -16,6 +16,9 @@ class CompanyPermissions
         // An employee's pay. Separate from employees.* on purpose: someone can
         // run the staff list without seeing what anyone earns.
         'salary',
+        // Leave and other requests: .view to send your own, .manage to approve
+        // for the branches you cover. leave_policies: leave types and balances.
+        'requests', 'leave_policies',
     ];
 
     /**
@@ -91,12 +94,15 @@ class CompanyPermissions
                 'schedules.manage',
                 'attendance.view',
                 'attendance.manage',
+                'requests.view',
+                'requests.manage',
             ],
             'employee' => [
                 'employees.view',
                 'schedules.view',
                 'holidays.view',
                 'attendance.view',
+                'requests.view',
             ],
             default => [],
         };

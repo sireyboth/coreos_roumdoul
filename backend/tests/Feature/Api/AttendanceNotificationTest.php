@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Models\AttendanceCorrection;
+use App\Models\AttendanceEvent;
+use App\Models\AuditLog;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
@@ -11,12 +13,14 @@ use App\Models\Notification;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\AttendanceService;
 use App\Services\CompanyProvisioner;
 use App\Services\NotificationService;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesCompanyUsers;
 use Tests\TestCase;
 
@@ -96,6 +100,42 @@ class AttendanceNotificationTest extends TestCase
             ->get();
     }
 
+    public function test_a_manager_limited_to_another_branch_cannot_see_or_decide_the_request(): void
+    {
+        $otherBranch = $this->managerOf($this->branchB);
+        $sameBranch = $this->managerOf($this->branchA);
+        $correction = $this->requestCorrection();
+
+        $this->actingAs($otherBranch)->getJson('/api/attendance/corrections')->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($otherBranch)->postJson("/api/attendance/corrections/{$correction->id}/approve")->assertNotFound();
+        $this->actingAs($otherBranch)->postJson("/api/attendance/corrections/{$correction->id}/reject")->assertNotFound();
+        $this->assertSame('pending', $correction->fresh()->status);
+
+        $this->actingAs($sameBranch)->getJson('/api/attendance/corrections')->assertOk()->assertJsonCount(1, 'data');
+        $this->actingAs($sameBranch)->postJson("/api/attendance/corrections/{$correction->id}/approve")->assertOk();
+
+        // The decision is still in the audit log, with who made it.
+        $audit = AuditLog::query()->withoutGlobalScopes()->where('event', 'attendance_correction.updated')->where('subject_id', $correction->id)->sole();
+        $this->assertSame('approved', $audit->after_data['status']);
+        $this->assertSame('pending', $audit->before_data['status']);
+        $this->assertSame($sameBranch->id, $audit->after_data['reviewed_by']);
+    }
+
+    public function test_a_request_decided_meanwhile_is_never_applied_twice(): void
+    {
+        $correction = $this->requestCorrection();
+        // Another manager approved it a moment ago; this copy was loaded before that.
+        $stale = AttendanceCorrection::query()->withoutGlobalScopes()->findOrFail($correction->id);
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$correction->id}/approve")->assertOk();
+
+        $this->expectException(ValidationException::class);
+        try {
+            app(AttendanceService::class)->approveCorrection($stale, $this->admin->id);
+        } finally {
+            $this->assertSame(1, AttendanceEvent::query()->withoutGlobalScopes()->where('method', 'correction')->count());
+        }
+    }
+
     public function test_a_correction_request_alerts_the_managers_who_can_decide_it(): void
     {
         $sameBranch = $this->managerOf($this->branchA);
@@ -126,8 +166,8 @@ class AttendanceNotificationTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$correction->id}/approve", ['review_notes' => 'OK this time'])->assertOk();
 
         $decision = $this->alertsFor($this->staff, 'attendance.correction_decided')->sole();
-        $this->assertSame('Your correction for Mon 21 Sep was approved', $decision->title);
-        $this->assertSame('By Boss. Note: OK this time', $decision->body);
+        $this->assertSame('✅ Correction approved', $decision->title);
+        $this->assertSame('Your correction for Mon 21 Sep was approved by Boss. Remark: OK this time', $decision->body);
         $this->assertSame($this->admin->id, $decision->actor_user_id);
 
         $other = $this->alertsFor($manager)->sole();
@@ -144,9 +184,45 @@ class AttendanceNotificationTest extends TestCase
     {
         $correction = $this->requestCorrection();
 
-        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$correction->id}/reject")->assertOk();
+        // A "no" always says why.
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$correction->id}/reject")
+            ->assertStatus(422)->assertJsonValidationErrors('review_notes');
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$correction->id}/reject", ['review_notes' => 'The camera shows you left at 16:00'])
+            ->assertOk()->assertJsonPath('review_notes', 'The camera shows you left at 16:00');
 
-        $this->assertSame('Your correction for Mon 21 Sep was rejected', $this->alertsFor($this->staff, 'attendance.correction_decided')->sole()->title);
+        $decision = $this->alertsFor($this->staff, 'attendance.correction_decided')->sole();
+        $this->assertSame('❌ Correction rejected', $decision->title);
+        $this->assertSame('Your correction for Mon 21 Sep was rejected by Boss. Remark: The camera shows you left at 16:00', $decision->body);
+    }
+
+    public function test_a_waiting_correction_can_be_cancelled_by_the_employee_or_by_a_manager_with_a_remark(): void
+    {
+        // The employee withdraws their own: no remark needed, the managers' alert closes.
+        $mine = $this->requestCorrection();
+        $this->actingAs($this->staff)->postJson("/api/attendance/corrections/{$mine->id}/cancel")->assertOk()->assertJsonPath('status', 'cancelled');
+        $this->assertNotNull($this->alertsFor($this->admin, 'attendance.correction_requested')->sole()->resolved_at);
+        $this->assertCount(0, $this->alertsFor($this->staff, 'attendance.correction_cancelled'));
+
+        // A manager cancels one: the remark is required and reaches the employee.
+        $other = AttendanceCorrection::query()->withoutGlobalScopes()->findOrFail(
+            $this->actingAs($this->staff)->postJson('/api/attendance/corrections', ['date' => '2026-09-22', 'reason' => 'Forgot', 'scans' => ['2026-09-22T17:00']])->json('id')
+        );
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$other->id}/cancel")
+            ->assertStatus(422)->assertJsonValidationErrors('review_notes');
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$other->id}/cancel", ['review_notes' => 'Sent twice — keeping the other one'])
+            ->assertOk()->assertJsonPath('reviewed_by.name', 'Boss');
+        $this->assertSame(
+            'Your correction for Tue 22 Sep was cancelled by Boss. Remark: Sent twice — keeping the other one',
+            $this->alertsFor($this->staff, 'attendance.correction_cancelled')->sole()->body,
+        );
+
+        // Approved ones are final, and a colleague can't touch someone else's.
+        $approved = $this->requestCorrection();
+        $this->actingAs($this->admin)->postJson("/api/attendance/corrections/{$approved->id}/approve")->assertOk();
+        $this->actingAs($this->staff)->postJson("/api/attendance/corrections/{$approved->id}/cancel")
+            ->assertStatus(422)->assertJsonValidationErrors(['status' => 'already approved']);
+        $colleague = $this->createUserWithRole($this->company, 'employee');
+        $this->actingAs($colleague)->postJson("/api/attendance/corrections/{$other->id}/cancel")->assertNotFound();
     }
 
     public function test_the_same_event_never_alerts_twice(): void

@@ -142,24 +142,24 @@ class AttendanceService
         $date = Carbon::parse($correction->date)->toDateString();
         $this->recorder->assertUnlocked($employee->company_id, $date, 'status');
 
-        foreach ($correction->requestedTimes() as $time) {
-            AttendanceEvent::query()->create([
-                'company_id' => $correction->company_id,
-                'employee_id' => $correction->employee_id,
-                'event_type' => null,
-                'method' => 'correction',
-                'event_time' => $time,
-                'recorded_by' => $reviewerId,
-                'notes' => "Correction #{$correction->id}: {$correction->reason}",
-            ]);
-        }
+        DB::transaction(function () use ($correction, $reviewerId, $notes) {
+            // Claim it first: two managers approving at the same moment must not add the scans twice.
+            if (! $correction->decide('approved', $reviewerId, $notes)) {
+                throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+            }
 
-        $correction->update([
-            'status' => 'approved',
-            'reviewed_by' => $reviewerId,
-            'reviewed_at' => now(),
-            'review_notes' => $notes,
-        ]);
+            foreach ($correction->requestedTimes() as $time) {
+                AttendanceEvent::query()->create([
+                    'company_id' => $correction->company_id,
+                    'employee_id' => $correction->employee_id,
+                    'event_type' => null,
+                    'method' => 'correction',
+                    'event_time' => $time,
+                    'recorded_by' => $reviewerId,
+                    'notes' => "Correction #{$correction->id}: {$correction->reason}",
+                ]);
+            }
+        });
 
         // A night shift's correction can add a scan on the next calendar day; recalculate both.
         $days = $this->recorder->recalculateRange($employee, $date, CarbonImmutable::parse($date)->addDay()->toDateString());

@@ -30,6 +30,7 @@ export const TYPE_STYLES: Record<CalendarDayType, { cell: string; label: string;
   holiday: { cell: "border-destructive/30 bg-destructive/10", label: "Holiday", swatch: "bg-destructive/40" },
   day_off: { cell: "border-warning/40 bg-warning/15", label: "Day off", swatch: "bg-warning/50" },
   weekly_off: { cell: "border-border bg-muted", label: "Weekly day off", swatch: "bg-muted-foreground/30" },
+  leave: { cell: "border-violet-500/30 bg-violet-500/10", label: "On leave", swatch: "bg-violet-500/40" },
   none: { cell: "border-border bg-background", label: "Nothing planned", swatch: "bg-background border border-border" },
 };
 
@@ -156,6 +157,12 @@ export function DayDialog({
                 <span className="text-muted-foreground">{day.label}</span>
               )}
               {day.attendance && <Badge variant={ATTENDANCE[day.attendance].variant}>{ATTENDANCE[day.attendance].label}</Badge>}
+              {/* Half a day on leave: still a work day, with only the other half expected. */}
+              {day.leave && day.leave.part !== "full" && (
+                <Badge variant="outline" className="border-violet-500/40 text-violet-600 dark:text-violet-400">
+                  {day.leave.type} ({day.leave.part === "am" ? "morning" : "afternoon"})
+                </Badge>
+              )}
             </div>
 
             {day.schedule && (

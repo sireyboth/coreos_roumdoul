@@ -233,6 +233,7 @@ export type EmployeeInput = {
   // null clears it; leave them out to keep what the employee has.
   department_id?: number | null;
   team_id?: number | null;
+  manager_employee_id?: number | null;
   employment_status?: string;
   employment_type?: string | null;
   hire_date?: string | null;
@@ -304,6 +305,9 @@ export type Employee = {
   branch: Branch | null;
   department?: { id: number; name: string } | null;
   team?: { id: number; name: string } | null;
+  // Line manager: approves this person's requests first.
+  manager_employee_id?: number | null;
+  manager?: { id: number; name: string } | null;
   // A short-lived signed link — use photoSrc() to turn it into an image URL.
   photo_url?: string | null;
   // How this person signs in — only sent (to managers) when they have a login.
@@ -315,7 +319,7 @@ export type Employee = {
 
 type Paginated<T> = { data: T[]; total: number; last_page?: number };
 
-export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "none";
+export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "leave" | "none";
 // "worked" = scans on a day with nothing planned (a day off, or no schedule).
 export type CalendarAttendance = "present" | "late" | "absent" | "incomplete" | "worked";
 
@@ -328,6 +332,8 @@ export type CalendarDay = {
   label: string | null;
   // A holiday's name — also set on a holiday someone was rostered to work.
   holiday?: string | null;
+  // Approved leave on the date: the whole day (type "leave"), or a morning / afternoon.
+  leave?: { type: string; part: DayPart } | null;
   day_off_id: number | null;
   // What was planned: the schedule's slots for this weekday, and where it came from.
   schedule: { id: number; name: string; source: "assignment" | "override"; slots: ScheduleSlot[] } | null;
@@ -349,6 +355,8 @@ export type CalendarSummary = {
   work_days: number;
   holidays: number;
   days_off: number;
+  // A half day counts 0.5.
+  leave_days?: number;
   present: number;
   late: number;
   absent: number;
@@ -648,7 +656,7 @@ export type DaySlot = {
 export type AttendanceDay = {
   id: number;
   date: string;
-  kind: "work" | "holiday" | "day_off" | "weekly_off" | "unscheduled";
+  kind: "work" | "holiday" | "day_off" | "weekly_off" | "leave" | "unscheduled";
   label: string | null;
   holiday: string | null;
   schedule: string | null;
@@ -727,6 +735,14 @@ export type AttendanceSummaryRow = {
   weekly_days_off: number;
   days_off: number;
   holidays: number;
+  // Approved leave in days (a half day is 0.5), split by pay.
+  leave_days?: number;
+  paid_leave_days?: number;
+  unpaid_leave_days?: number;
+  leave_by_type?: { type: string; days: number }[];
+  // Approved late arrival / early leave, in minutes; the unpaid part when the company doesn't pay it.
+  excused_minutes?: number;
+  unpaid_excused_minutes?: number;
   present_days: number;
   absent_days: number;
   incomplete_days: number;
@@ -749,6 +765,145 @@ export type AttendanceSummary = { month: string; locked: boolean; rows: Attendan
 
 export type AttendancePeriod = { month: string; locked_at: string; locked_by: { id: number; name: string } | null };
 
+// ───────────── Leave and other requests ─────────────
+
+export type LeaveType = {
+  id: number;
+  code: string;
+  name: string;
+  name_km: string | null;
+  // 0 unpaid, 50 half pay (maternity), 100 full pay.
+  pay_percent: number;
+  // work_days: holidays and days off inside a range are free; calendar_days: every day counts.
+  counts: "work_days" | "calendar_days";
+  accrual: "none" | "monthly" | "yearly";
+  yearly_days: number | null;
+  seniority_every_years: number | null;
+  seniority_extra_days: number | null;
+  eligible_after_months: number | null;
+  requires_balance: boolean;
+  allow_half_day: boolean;
+  // A file is needed for requests of at least this many days (1 = always); null = never.
+  attachment_from_days: number | null;
+  min_notice_days: number | null;
+  max_days_per_request: number | null;
+  gender: "male" | "female" | null;
+  is_active: boolean;
+  sort_order: number | null;
+};
+
+export type LeaveTypeInput = Partial<Omit<LeaveType, "id">>;
+
+// Worked out by the server, never stored: earned + adjustments − used − pending.
+export type LeaveBalance = {
+  leave_type: { id: number; code: string; name: string; name_km: string | null };
+  year: number;
+  // Earned so far this year; full_year is what the whole year gives.
+  earned: number;
+  full_year: number;
+  adjustments: number;
+  used: number;
+  pending: number;
+  available: number;
+};
+
+export type LeaveBalances = {
+  employee: { id: number; name: string; hire_date: string | null };
+  year: number;
+  balances: LeaveBalance[];
+  can_adjust: boolean;
+};
+
+export type LeaveAdjustment = {
+  id: number;
+  employee_id: number;
+  year: number;
+  days: number;
+  reason: string;
+  leave_type: { id: number; name: string } | null;
+  created_by: { id: number; name: string } | null;
+  created_at: string;
+};
+
+export type RequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type DayPart = "full" | "am" | "pm";
+export type RequestDate = { date: string; portion: number; part: DayPart };
+
+export type EmployeeRequest = {
+  id: number;
+  type: "leave" | "late_early";
+  // In words: "Annual leave", "Late arrival", "Early leave".
+  label: string;
+  // late_early only: which end of the day, the approved time, and the minutes it excuses.
+  details: { kind: "late" | "early"; time: string; minutes: number } | null;
+  status: RequestStatus;
+  employee: { id: number; name: string; branch: string | null };
+  leave_type: { id: number; code: string; name: string; name_km: string | null; pay_percent: number } | null;
+  start_date: string;
+  end_date: string;
+  day_part: DayPart;
+  days: number;
+  dates: RequestDate[];
+  reason: string | null;
+  // Signed, short-lived links — open with photoSrc().
+  attachments: { id: number; name: string; mime: string; size: number; url: string }[];
+  requested_by: { id: number; name: string } | null;
+  created_at: string | null;
+  // The line manager it waits on; null = any approver for the branch.
+  waiting_on: { id: number; name: string } | null;
+  decided_by: { id: number; name: string } | null;
+  decided_at: string | null;
+  decision_notes: string | null;
+  cancelled_by: { id: number; name: string } | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  can: { decide: boolean; cancel: boolean };
+};
+
+export type LeaveRequestInput = {
+  employee_id?: number;
+  leave_type_id: number;
+  start_date: string;
+  end_date: string;
+  day_part?: DayPart;
+  reason?: string;
+  // Recording leave for someone else: approve it straight away.
+  approve?: boolean;
+};
+
+// Permission to arrive late or leave early on one work day.
+export type LateEarlyInput = {
+  employee_id?: number;
+  date: string;
+  kind: "late" | "early";
+  // HH:MM — when they will arrive, or leave.
+  time: string;
+  reason?: string;
+  approve?: boolean;
+};
+
+export type LateEarlyPreview = {
+  // The usual start (late) or end (early) that day, HH:MM.
+  expected: string | null;
+  minutes: number;
+  used_this_month: number;
+  // null = no limit.
+  monthly_limit: number | null;
+  problems: Record<string, string>;
+};
+
+export type LateEarlySettings = { type: "late_early"; is_active: boolean; pay_percent: 0 | 100; monthly_limit: number | null };
+
+export type LeavePreview = {
+  days: RequestDate[];
+  total: number;
+  // One per calendar year the request touches; empty when the type keeps no balance.
+  balances: (LeaveBalance & { after: number })[];
+  attachment_required: boolean;
+  // Field → message: anything that would stop it being sent.
+  problems: Record<string, string>;
+};
+
 export type AttendanceCorrection = {
   id: number;
   date: string;
@@ -758,7 +913,8 @@ export type AttendanceCorrection = {
   requested_check_out: string | null;
   // Every scan the request asks to add, oldest first (ISO).
   requested_times: string[];
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  // The remark from whoever approved, rejected or cancelled it — the employee reads it.
   review_notes: string | null;
   employee: Employee;
   requested_by: { id: number; name: string };
@@ -1066,6 +1222,69 @@ export const api = {
     },
   },
 
+  leave: {
+    // all = include turned-off types (for the policy page).
+    types: (all = false) => request<LeaveType[]>(`/api/leave-types${all ? "?all=1" : ""}`),
+    createType: (data: LeaveTypeInput & { code: string }) =>
+      request<LeaveType>("/api/leave-types", { method: "POST", body: JSON.stringify(data) }),
+    updateType: (id: number, data: LeaveTypeInput) =>
+      request<LeaveType>(`/api/leave-types/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    balances: (params: { employeeId?: number; year?: number } = {}) => {
+      const query = new URLSearchParams();
+      if (params.employeeId) query.set("employee_id", String(params.employeeId));
+      if (params.year) query.set("year", String(params.year));
+      return request<LeaveBalances>(`/api/leave-balances?${query}`);
+    },
+    lateEarlySettings: () => request<LateEarlySettings>("/api/request-settings/late_early"),
+    updateLateEarlySettings: (data: Partial<Omit<LateEarlySettings, "type">>) =>
+      request<LateEarlySettings>("/api/request-settings/late_early", { method: "PUT", body: JSON.stringify(data) }),
+    adjustments: (employeeId: number) => request<LeaveAdjustment[]>(`/api/leave-adjustments?employee_id=${employeeId}`),
+    adjust: (data: { employee_id: number; leave_type_id: number; year: number; days: number; reason: string }) =>
+      request<LeaveAdjustment>("/api/leave-adjustments", { method: "POST", body: JSON.stringify(data) }),
+  },
+  requests: {
+    // mine = about me; approvals = waiting on me; all = my branches (requests.manage).
+    list: (params: { scope?: "mine" | "approvals" | "all"; status?: RequestStatus } = {}) => {
+      const query = new URLSearchParams({ per_page: "500", scope: params.scope ?? "mine" });
+      if (params.status) query.set("status", params.status);
+      return request<Paginated<EmployeeRequest>>(`/api/requests?${query}`).then((page) => page.data);
+    },
+    waitingCount: () => request<{ count: number }>("/api/requests/waiting-count"),
+    get: (id: number) => request<EmployeeRequest>(`/api/requests/${id}`),
+    preview: (data: LeaveRequestInput) => request<LeavePreview>("/api/requests/preview", { method: "POST", body: JSON.stringify(data) }),
+    // Multipart, so a certificate can go with it.
+    create: (data: LeaveRequestInput, attachment?: File | null) => {
+      const body = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") return;
+        body.append(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
+      });
+      if (attachment) body.append("attachment", attachment);
+      return request<EmployeeRequest>("/api/requests", { method: "POST", body });
+    },
+    previewLateEarly: ({ date, ...rest }: LateEarlyInput) =>
+      request<LateEarlyPreview>("/api/requests/preview", {
+        method: "POST",
+        body: JSON.stringify({ ...rest, type: "late_early", start_date: date, end_date: date }),
+      }),
+    createLateEarly: ({ date, ...rest }: LateEarlyInput, attachment?: File | null) => {
+      const body = new FormData();
+      const fields: Record<string, unknown> = { ...rest, type: "late_early", start_date: date, end_date: date };
+      Object.entries(fields).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") return;
+        body.append(key, typeof value === "boolean" ? (value ? "1" : "0") : String(value));
+      });
+      if (attachment) body.append("attachment", attachment);
+      return request<EmployeeRequest>("/api/requests", { method: "POST", body });
+    },
+    approve: (id: number, notes?: string) =>
+      request<EmployeeRequest>(`/api/requests/${id}/approve`, { method: "POST", body: JSON.stringify({ notes: notes || null }) }),
+    // A rejection always needs a reason.
+    reject: (id: number, notes: string) =>
+      request<EmployeeRequest>(`/api/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
+    cancel: (id: number, reason?: string) =>
+      request<EmployeeRequest>(`/api/requests/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason: reason || null }) }),
+  },
   attendanceCorrections: {
     list: () => request<Paginated<AttendanceCorrection>>("/api/attendance/corrections"),
     all: () => requestAll<AttendanceCorrection>("/api/attendance/corrections?per_page=500"),
@@ -1080,10 +1299,14 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    approve: (id: number) =>
-      request<AttendanceCorrection>(`/api/attendance/corrections/${id}/approve`, { method: "POST", body: "{}" }),
-    reject: (id: number) =>
-      request<AttendanceCorrection>(`/api/attendance/corrections/${id}/reject`, { method: "POST", body: "{}" }),
+    approve: (id: number, remark?: string) =>
+      request<AttendanceCorrection>(`/api/attendance/corrections/${id}/approve`, { method: "POST", body: JSON.stringify({ review_notes: remark || null }) }),
+    // A rejection always needs a remark.
+    reject: (id: number, remark: string) =>
+      request<AttendanceCorrection>(`/api/attendance/corrections/${id}/reject`, { method: "POST", body: JSON.stringify({ review_notes: remark }) }),
+    // Only while waiting. Your own: remark optional; a manager cancelling: remark required.
+    cancel: (id: number, remark?: string) =>
+      request<AttendanceCorrection>(`/api/attendance/corrections/${id}/cancel`, { method: "POST", body: JSON.stringify({ review_notes: remark || null }) }),
   },
 
   notifications: {

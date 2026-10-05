@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
 use App\Models\Employee;
+use App\Models\EmployeeAssignment;
 use App\Models\Team;
 use App\Services\CompanyUserService;
 use App\Services\EmployeeAssignmentService;
@@ -43,6 +44,39 @@ class EmployeeController extends Controller
     private function ownTeam(Request $request): Exists
     {
         return Rule::exists('teams', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
+    }
+
+    /** A line manager is another employee of the same company — in any branch. */
+    private function ownEmployee(Request $request): Exists
+    {
+        return Rule::exists('employees', 'id')->where('company_id', $request->user()->company_id);
+    }
+
+    /**
+     * Never their own manager, and never a loop: walking up from the new
+     * manager must not lead back to this employee (A → B → C → A), or
+     * approvals would go round in circles.
+     */
+    private function assertManagerFits(array $data, ?Employee $employee): void
+    {
+        $managerId = $data['manager_employee_id'] ?? null;
+
+        if (! $employee || ! $managerId) {
+            return;
+        }
+
+        $seen = [];
+        for ($id = (int) $managerId; $id && ! isset($seen[$id]); $id = (int) EmployeeAssignment::query()
+            ->where('employee_id', $id)->whereNull('effective_to')->value('manager_employee_id')) {
+            if ($id === $employee->id) {
+                throw ValidationException::withMessages([
+                    'manager_employee_id' => [(int) $managerId === $employee->id
+                        ? 'Someone can\'t be their own manager.'
+                        : 'That would make a loop — this person already manages the chosen manager, directly or through someone else.'],
+                ]);
+            }
+            $seen[$id] = true;
+        }
     }
 
     /**
@@ -224,6 +258,7 @@ class EmployeeController extends Controller
             'branch_id' => ['required', ...$this->branchRule($request)],
             'department_id' => ['nullable', $this->ownDepartment($request)],
             'team_id' => ['nullable', $this->ownTeam($request)],
+            'manager_employee_id' => ['nullable', 'integer', $this->ownEmployee($request)],
         ]);
 
         $this->assertTeamFitsDepartment($data, null);
@@ -232,7 +267,7 @@ class EmployeeController extends Controller
 
         $employee = DB::transaction(function () use ($request, $data, $withLogin, $method) {
             $employee = Employee::query()->create(
-                collect($data)->except(['password', 'login_method', 'job_title', 'branch_id', 'department_id', 'team_id'])->all()
+                collect($data)->except(['password', 'login_method', 'job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id'])->all()
             );
 
             $this->assignments->open($employee, $data);
@@ -244,7 +279,7 @@ class EmployeeController extends Controller
             return $employee;
         });
 
-        return response()->json($this->withLoginInfo($request, $this->reveal($request, $employee->fresh(['branch', 'department', 'team']))), 201);
+        return response()->json($this->withLoginInfo($request, $this->reveal($request, $employee->fresh(['branch', 'department', 'team', 'manager']))), 201);
     }
 
     /**
@@ -287,7 +322,7 @@ class EmployeeController extends Controller
             $this->linkNewLogin($request, $employee, $method, $data['password']);
         });
 
-        return $this->withLoginInfo($request, $this->reveal($request, $employee->fresh(['branch', 'department', 'team'])));
+        return $this->withLoginInfo($request, $this->reveal($request, $employee->fresh(['branch', 'department', 'team', 'manager'])));
     }
 
     /**
@@ -369,7 +404,7 @@ class EmployeeController extends Controller
             $employee->name,
             $byId ? null : $employee->email,
             $password,
-            'employee',
+            CompanyUserService::roleByCode($request->user()->company_id, 'employee'),
             $byId ? $employee->employee_code : null,
         );
 
@@ -384,7 +419,7 @@ class EmployeeController extends Controller
 
     public function show(Request $request, Employee $employee)
     {
-        return $this->withLoginInfo($request, $this->reveal($request, $employee->load(['branch', 'department', 'team'])));
+        return $this->withLoginInfo($request, $this->reveal($request, $employee->load(['branch', 'department', 'team', 'manager'])));
     }
 
     public function update(Request $request, Employee $employee)
@@ -399,9 +434,11 @@ class EmployeeController extends Controller
             'branch_id' => ['nullable', ...$this->branchRule($request)],
             'department_id' => ['nullable', $this->ownDepartment($request)],
             'team_id' => ['nullable', $this->ownTeam($request)],
+            'manager_employee_id' => ['nullable', 'integer', $this->ownEmployee($request)],
         ]);
 
         $this->assertTeamFitsDepartment($data, $employee);
+        $this->assertManagerFits($data, $employee);
         $this->assertSignInIdUnchanged($employee, $data);
         $this->assertMayChangeSalary($request, array_filter(
             $data,
@@ -415,7 +452,7 @@ class EmployeeController extends Controller
         $data = $this->withName($data, $employee);
 
         $employee->update(
-            collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id'])->all()
+            collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id'])->all()
         );
 
         $branchBefore = $employee->currentAssignment()->value('branch_id');
@@ -430,7 +467,7 @@ class EmployeeController extends Controller
             );
         }
 
-        return $this->reveal($request, $employee->fresh(['branch', 'department', 'team']));
+        return $this->reveal($request, $employee->fresh(['branch', 'department', 'team', 'manager']));
     }
 
     public function destroy(Request $request, Employee $employee, EmployeeRemover $remover)

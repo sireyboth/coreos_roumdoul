@@ -115,13 +115,15 @@ class AttendanceRecorder
         // judged by: editing a schedule's times or rules changes the future,
         // not days already done. (Changing WHICH schedule applies — another
         // assignment, an override, a holiday — is a deliberate correction and
-        // does take effect.)
+        // does take effect. So does leave approved or cancelled afterwards.)
         $now = CarbonImmutable::now();
 
         if ($existing?->expected
             && $existing->kind === $expected->kind
             && $existing->source === $expected->source
-            && $existing->work_schedule_id === $expected->workScheduleId) {
+            && $existing->work_schedule_id === $expected->workScheduleId
+            && ($existing->expected['leave'] ?? null) == $expected->leave
+            && ($existing->expected['permission'] ?? null) == $expected->permission) {
             $frozen = ExpectedDay::fromSnapshot($expected->date, $expected->timezone, $existing->expected, $expected->label, $expected->workLocationId);
 
             // "Finished" by the clock, not only by the stored flag — a day nobody

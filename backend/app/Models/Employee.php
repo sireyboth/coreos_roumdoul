@@ -145,6 +145,7 @@ class Employee extends Model
     protected $appends = [
         'name',
         'job_title',
+        'manager_employee_id',
         'has_login',
     ];
 
@@ -254,6 +255,22 @@ class Employee extends Model
     {
         return $this->hasOneThrough(Team::class, EmployeeAssignment::class, 'employee_id', 'id', 'id', 'team_id')
             ->whereNull('employee_assignments.effective_to');
+    }
+
+    /**
+     * The line manager: first to approve this person's requests. Shown even
+     * when they work in a branch the viewer can't otherwise see.
+     */
+    public function manager(): HasOneThrough
+    {
+        return $this->hasOneThrough(self::class, EmployeeAssignment::class, 'employee_id', 'id', 'id', 'manager_employee_id')
+            ->whereNull('employee_assignments.effective_to')
+            ->withoutGlobalScope('branch_access');
+    }
+
+    public function getManagerEmployeeIdAttribute(): ?int
+    {
+        return $this->currentAssignment?->manager_employee_id;
     }
 
     public function user(): BelongsTo

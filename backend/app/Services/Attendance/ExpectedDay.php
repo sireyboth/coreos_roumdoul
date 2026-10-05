@@ -15,13 +15,18 @@ use Carbon\CarbonImmutable;
  *  - day_off      a one-off day off for this person
  *  - weekly_off   one of this person's weekly days off, or a weekday their
  *                 schedule has no slots on
+ *  - leave        approved leave for the whole day
  *  - unscheduled  no assignment covers the date
+ *
+ * `leave` describes approved leave on the date — the whole day (kind leave)
+ * or half of it (kind work, with only the other half's slots).
  */
 final class ExpectedDay
 {
     /**
      * @param  array<int, array{sequence: int, type: string, time: string, next_day: bool, at: CarbonImmutable}>  $slots
      * @param  array<string, mixed>|null  $rules  the schedule's tolerance and overtime rules (null when unscheduled)
+     * @param  array{request_ids: array<int>, type: string, code: ?string, portion: float, part: string, pay_percent: int}|null  $leave
      */
     public function __construct(
         public readonly string $date,
@@ -35,6 +40,8 @@ final class ExpectedDay
         public readonly ?array $rules = null,
         public readonly array $slots = [],
         public readonly ?int $workLocationId = null,
+        public readonly ?array $leave = null,
+        public readonly ?array $permission = null,
     ) {}
 
     public function isWork(): bool
@@ -44,7 +51,111 @@ final class ExpectedDay
 
     public function isOff(): bool
     {
-        return in_array($this->kind, ['holiday', 'day_off', 'weekly_off'], true);
+        return in_array($this->kind, ['holiday', 'day_off', 'weekly_off', 'leave'], true);
+    }
+
+    /**
+     * The same work day with approved permission to arrive late (the first IN
+     * moves to the approved time) and / or leave early (the last OUT moves).
+     * Lateness or early leave beyond the approved time still counts.
+     *
+     * @param  array<int, array{request_id: int, kind: string, time: string, minutes: int, pay_percent: int}>  $permits
+     */
+    public function withPermission(array $permits): self
+    {
+        $slots = $this->slots;
+        $labels = [];
+
+        foreach ($permits as $permit) {
+            $index = $permit['kind'] === 'late' ? 0 : array_key_last($slots);
+            [$hour, $minute] = array_map('intval', explode(':', $permit['time']));
+            $at = $this->startOfDay()->setTime($hour, $minute);
+            // A night shift's end is the next morning.
+            if ($at->lt($slots[0]['at'])) {
+                $at = $at->addDay();
+            }
+            $slots[$index] = [...$slots[$index], 'time' => $at->format('H:i'), 'next_day' => $at->toDateString() !== $this->date, 'at' => $at];
+            $labels[] = ($permit['kind'] === 'late' ? 'Late arrival ' : 'Early leave ').$permit['time'].' (approved)';
+        }
+
+        return new self(
+            date: $this->date,
+            timezone: $this->timezone,
+            kind: $this->kind,
+            source: $this->source,
+            workScheduleId: $this->workScheduleId,
+            scheduleName: $this->scheduleName,
+            label: trim($this->label.' · '.implode(' · ', $labels), ' ·'),
+            holidayName: $this->holidayName,
+            rules: $this->rules,
+            slots: $slots,
+            workLocationId: $this->workLocationId,
+            leave: $this->leave,
+            permission: $permits,
+        );
+    }
+
+    /** The same day, noting leave on it without changing what is expected. */
+    public function withLeave(array $leave): self
+    {
+        return new self(
+            date: $this->date,
+            timezone: $this->timezone,
+            kind: $this->kind,
+            source: $this->source,
+            workScheduleId: $this->workScheduleId,
+            scheduleName: $this->scheduleName,
+            label: $this->label,
+            holidayName: $this->holidayName,
+            rules: $this->rules,
+            slots: $this->slots,
+            workLocationId: $this->workLocationId,
+            leave: $leave,
+        );
+    }
+
+    /**
+     * The same work day with half of it on leave: only the other half's
+     * slots are expected. With several IN/OUT pairs the morning is the first
+     * half of them (08:00–12:00 of 08:00–12:00 + 13:00–17:00); with a single
+     * pair it is split at its midpoint. The break is then outside what is
+     * expected, so none comes off.
+     */
+    public function withHalfDayOff(string $part, array $leave): self
+    {
+        $pairs = array_chunk($this->slots, 2);
+        $keepFrom = (int) ceil(count($pairs) / 2);
+
+        if (count($pairs) > 1) {
+            $kept = $part === 'am' ? array_slice($pairs, $keepFrom) : array_slice($pairs, 0, $keepFrom);
+            $slots = array_merge(...$kept);
+        } else {
+            [$in, $out] = $pairs[0];
+            $middle = $in['at']->addMinutes(intdiv((int) $in['at']->diffInMinutes($out['at']), 2));
+            $moved = [
+                'time' => $middle->format('H:i'),
+                'next_day' => $middle->toDateString() !== $this->date,
+                'at' => $middle,
+            ];
+            $slots = $part === 'am' ? [[...$in, ...$moved], $out] : [$in, [...$out, ...$moved]];
+        }
+
+        $halfLabel = $part === 'am' ? 'morning' : 'afternoon';
+
+        return new self(
+            date: $this->date,
+            timezone: $this->timezone,
+            kind: $this->kind,
+            source: $this->source,
+            workScheduleId: $this->workScheduleId,
+            scheduleName: $this->scheduleName,
+            label: "{$this->label} · {$leave['type']} ({$halfLabel})",
+            holidayName: $this->holidayName,
+            rules: [...($this->rules ?? []), 'break_minutes' => 0],
+            slots: array_values($slots),
+            workLocationId: $this->workLocationId,
+            leave: $leave,
+        );
     }
 
     public function firstSlotAt(): ?CarbonImmutable
@@ -106,6 +217,8 @@ final class ExpectedDay
                 'at' => CarbonImmutable::parse($slot['at'])->setTimezone($timezone),
             ], $snapshot['slots'] ?? []),
             workLocationId: $workLocationId,
+            leave: $snapshot['leave'] ?? null,
+            permission: $snapshot['permission'] ?? null,
         );
     }
 
@@ -126,6 +239,8 @@ final class ExpectedDay
                 'next_day' => $slot['next_day'],
                 'at' => $slot['at']->toIso8601String(),
             ], $this->slots),
+            'leave' => $this->leave,
+            'permission' => $this->permission,
         ];
     }
 }

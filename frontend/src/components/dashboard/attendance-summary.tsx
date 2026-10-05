@@ -139,6 +139,40 @@ export function AttendanceSummary({ canManage }: { canManage: boolean }) {
       sortValue: (r) => r.absent_days,
     },
     {
+      id: "leave",
+      header: "Leave",
+      cell: (r) => {
+        if (!r.leave_days) return num(0);
+        return (
+          <div className="flex flex-col text-xs">
+            <span className="text-sm font-medium tabular-nums">{r.leave_days}</span>
+            {r.unpaid_leave_days ? <span className="text-warning">{r.unpaid_leave_days} unpaid</span> : null}
+            {(r.leave_by_type ?? []).map((t) => (
+              <span key={t.type} className="text-muted-foreground">
+                {t.type} {t.days}
+              </span>
+            ))}
+          </div>
+        );
+      },
+      sortValue: (r) => r.leave_days ?? 0,
+    },
+    {
+      id: "excused",
+      header: "Late / early (approved)",
+      cell: (r) =>
+        r.excused_minutes ? (
+          <div className="flex flex-col text-xs">
+            <span className="text-sm tabular-nums">{formatMinutes(r.excused_minutes)}</span>
+            {r.unpaid_excused_minutes ? <span className="text-warning">{formatMinutes(r.unpaid_excused_minutes)} unpaid</span> : null}
+          </div>
+        ) : (
+          num(0)
+        ),
+      sortValue: (r) => r.excused_minutes ?? 0,
+      hideOnMobile: true,
+    },
+    {
       id: "incomplete",
       header: "Missing scan",
       cell: (r) => (r.incomplete_days ? <span className="tabular-nums text-warning">{r.incomplete_days}</span> : num(0)),

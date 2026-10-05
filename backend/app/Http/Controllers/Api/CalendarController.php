@@ -152,7 +152,7 @@ class CalendarController extends Controller
     {
         $days = [];
         $summary = [
-            'work_days' => 0, 'holidays' => 0, 'days_off' => 0,
+            'work_days' => 0, 'holidays' => 0, 'days_off' => 0, 'leave_days' => 0,
             'present' => 0, 'late' => 0, 'absent' => 0, 'incomplete' => 0,
             'worked_minutes' => 0, 'overtime_minutes' => 0,
         ];
@@ -178,6 +178,7 @@ class CalendarController extends Controller
                 'day_off', 'weekly_off' => $summary['days_off']++,
                 default => null,
             };
+            $summary['leave_days'] += $expected->leave['portion'] ?? 0;
             if (in_array($attendance, ['present', 'late', 'incomplete', 'worked'], true)) {
                 $summary['present']++;
             }
@@ -198,6 +199,8 @@ class CalendarController extends Controller
                 'type' => $type,
                 'label' => $expected->kind === 'unscheduled' ? null : $expected->label,
                 'holiday' => $expected->holidayName,
+                // Approved leave on the date: the whole day, or a morning / afternoon.
+                'leave' => $expected->leave ? ['type' => $expected->leave['type'], 'part' => $expected->leave['part']] : null,
                 'day_off_id' => $dayOff?->id,
                 'schedule' => $expected->isWork() ? [
                     'id' => $expected->workScheduleId,

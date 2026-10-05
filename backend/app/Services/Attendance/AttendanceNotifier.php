@@ -50,6 +50,11 @@ class AttendanceNotifier
 
     public function correctionDecided(AttendanceCorrection $correction, User $reviewer): void
     {
+        // The outcome leads the title: a phone's lock screen cuts long titles
+        // short, and "approved"/"rejected" is the one word that matters.
+        $approved = $correction->status === 'approved';
+        $reviewerName = trim($reviewer->name);
+
         $this->requestDecided(
             subject: $correction,
             employee: $correction->employee,
@@ -57,10 +62,45 @@ class AttendanceNotifier
             reviewer: $reviewer,
             requestType: 'attendance.correction_requested',
             type: 'attendance.correction_decided',
-            title: "Your correction for {$this->dateLabel($correction->date)} was {$correction->status}",
-            body: collect(["By {$reviewer->name}.", $correction->review_notes ? "Note: {$correction->review_notes}" : null])->filter()->join(' '),
+            title: $approved ? '✅ Correction approved' : '❌ Correction rejected',
+            body: collect([
+                "Your correction for {$this->dateLabel($correction->date)} was {$correction->status} by {$reviewerName}.",
+                $correction->review_notes ? "Remark: {$correction->review_notes}" : null,
+            ])->filter()->join(' '),
             link: self::LINK_CORRECTIONS,
         );
+    }
+
+    /**
+     * A correction withdrawn while it waited: the managers' alerts close. When
+     * a manager cancelled it, the employee is told why.
+     */
+    public function correctionCancelled(AttendanceCorrection $correction, User $by): void
+    {
+        DB::afterCommit(function () use ($correction, $by) {
+            NotificationService::resolve($correction, 'attendance.correction_requested', 'cancelled', $by);
+
+            $recipients = User::query()
+                ->whereIn('id', array_filter([$correction->requested_by, $correction->employee->user_id]))
+                ->where('id', '!=', $by->id)
+                ->where('is_active', true)
+                ->get();
+
+            foreach ($recipients as $recipient) {
+                NotificationService::send(
+                    $recipient, 'attendance.correction_cancelled', '🚫 Correction cancelled',
+                    collect([
+                        "Your correction for {$this->dateLabel($correction->date)} was cancelled by ".trim($by->name).'.',
+                        $correction->review_notes ? "Remark: {$correction->review_notes}" : null,
+                    ])->filter()->join(' '),
+                    data: ['decision' => 'cancelled'],
+                    subject: $correction,
+                    actor: $by,
+                    link: self::LINK_CORRECTIONS,
+                    dedupeKey: "attendance.correction_cancelled:{$correction->getMorphClass()}:{$correction->getKey()}:{$recipient->id}",
+                );
+            }
+        });
     }
 
     /** Alerts everyone who can decide this request. */
@@ -115,7 +155,7 @@ class AttendanceNotifier
      *
      * @return Collection<int, User>
      */
-    public function managersFor(Employee $employee, ?User $except = null): Collection
+    public function managersFor(Employee $employee, ?User $except = null, string $permission = 'attendance.manage'): Collection
     {
         $branchId = $employee->currentAssignment?->branch_id;
 
@@ -124,7 +164,7 @@ class AttendanceNotifier
             ->where('status', 'active')
             ->when($except, fn (Builder $q) => $q->where('user_id', '!=', $except->id))
             ->whereHas('user', fn (Builder $q) => $q->where('is_active', true))
-            ->whereHas('roles.permissions', fn (Builder $q) => $q->where('code', 'attendance.manage'))
+            ->whereHas('roles.permissions', fn (Builder $q) => $q->where('code', $permission))
             ->where(fn (Builder $q) => $q
                 ->whereDoesntHave('branchAccess')
                 ->when($branchId, fn (Builder $q) => $q->orWhereHas('branchAccess', fn (Builder $b) => $b->where('branch_id', $branchId))))

@@ -2,6 +2,7 @@ import {
   Building2,
   CalendarClock,
   CalendarDays,
+  CalendarHeart,
   Clock,
   FileClock,
   IdCard,
@@ -10,6 +11,7 @@ import {
   MapPin,
   Network,
   PartyPopper,
+  Scale,
   ShieldCheck,
   User,
   Users,
@@ -42,9 +44,11 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Time & Attendance",
     items: [
       { href: "/dashboard/attendance", label: "Attendance", icon: Clock, tone: "from-emerald-500 to-teal-500", permission: "attendance.view", module: "attendance" },
+      { href: "/dashboard/requests", label: "Leave & Requests", icon: CalendarHeart, tone: "from-violet-500 to-purple-500", permission: "requests.view", module: "attendance" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, tone: "from-teal-500 to-cyan-500", permission: "schedules.view" },
       { href: "/dashboard/work-schedules", label: "Work Schedules", icon: CalendarClock, tone: "from-amber-500 to-orange-500", permission: "work_schedules.view" },
       { href: "/dashboard/holidays", label: "Holidays", icon: PartyPopper, tone: "from-pink-500 to-rose-500", permission: "holidays.view" },
+      { href: "/dashboard/leave-policy", label: "Leave Policy", icon: Scale, tone: "from-purple-500 to-indigo-500", permission: "leave_policies.manage", module: "attendance" },
     ],
   },
   {
