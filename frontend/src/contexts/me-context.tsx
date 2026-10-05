@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ACCOUNT_BLOCKED_EVENT, api, clearToken, getMeSnapshot, getToken, MeResponse, saveMeSnapshot } from "@/lib/api";
+import { ACCOUNT_BLOCKED_EVENT, ApiError, api, clearToken, getMeSnapshot, getToken, MeResponse, saveMeSnapshot } from "@/lib/api";
 import { disablePush } from "@/lib/push";
 
 type BlockedInfo = { code: string; message: string };
@@ -46,17 +46,32 @@ export function MeProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    verify(token, 0);
+  }
+
+  // Signs out only when the server says the token is no good (401). Anything
+  // else — no signal yet right after reopening the app, the server waking up,
+  // a hiccup — keeps the person signed in and tries again shortly; otherwise
+  // closing the app on a phone and reopening it would sign them out.
+  function verify(token: string, attempt: number) {
     api
       .me()
       .then((fresh) => {
         saveMeSnapshot(token, fresh);
         setMe(fresh);
+        setLoading(false);
       })
-      .catch(() => {
-        clearToken();
-        router.push("/login");
-      })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          clearToken();
+          router.push("/login");
+          setLoading(false);
+          return;
+        }
+        // Signed out elsewhere meanwhile (e.g. another tab): stop retrying.
+        if (getToken() !== token) return;
+        setTimeout(() => verify(token, attempt + 1), Math.min(2000 * 2 ** attempt, 30_000));
+      });
   }
 
   useEffect(() => {
