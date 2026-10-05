@@ -7,6 +7,7 @@ import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountBanner } from "@/components/dashboard/account-banner";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { PushPrompt } from "@/components/dashboard/push-prompt";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
 import { findNavItem } from "@/components/dashboard/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -131,7 +132,12 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   // The instant-scan page is meant to be bookmarked as a home-screen
   // shortcut and open straight to the camera — no sidebar/header chrome.
   if (pathname === "/dashboard/scan") {
-    return <div className="h-screen overflow-hidden bg-background">{children}</div>;
+    return (
+      <div className="h-screen overflow-hidden bg-background">
+        {children}
+        <PushPrompt />
+      </div>
+    );
   }
 
   return (
@@ -160,6 +166,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+      <PushPrompt />
     </div>
   );
 }

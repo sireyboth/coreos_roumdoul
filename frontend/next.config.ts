@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // `npm run dev` only: lets a phone open the dev server through a Cloudflare
+  // tunnel (needed to test push on mobile). Without it the page loads but
+  // its scripts are blocked, so nothing on it works.
+  allowedDevOrigins: ["*.trycloudflare.com"],
   async headers() {
     return [
       {

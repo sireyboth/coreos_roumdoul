@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { requestSystemPermission, showSystemNotification, systemPermission, type SystemPermission } from "@/lib/alert-signals";
 import { api, type Notification } from "@/lib/api";
-import { disablePush, enablePush, pushState, setAppBadge, syncPush, type PushState } from "@/lib/push";
+import { disablePush, enablePush, onPushChange, pushState, setAppBadge, syncPush, type PushState } from "@/lib/push";
 import { cn } from "@/lib/utils";
 
 // How often to ask for new alerts while the tab is open; also checked whenever the tab regains focus.
@@ -108,6 +108,8 @@ export function NotificationBell() {
       pushSynced = true;
       syncPush();
     }
+    // Turned on from the prompt (or the other mounted bell).
+    return onPushChange(setPush);
   }, []);
 
   async function togglePush() {

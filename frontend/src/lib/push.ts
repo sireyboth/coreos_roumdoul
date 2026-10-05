@@ -18,6 +18,22 @@ export type PushState = "unsupported" | "needs-install" | "unavailable" | "block
 
 const SW_URL = "/sw.js";
 
+// Fired on window whenever push is turned on or off here, so every part of the
+// page that shows the state (the bell, the prompt) stays in step.
+const PUSH_CHANGE_EVENT = "push-state-change";
+
+function announce(state: PushState): PushState {
+  window.dispatchEvent(new CustomEvent<PushState>(PUSH_CHANGE_EVENT, { detail: state }));
+  return state;
+}
+
+/** Calls back with the new state whenever push is turned on or off on this page. Returns the unsubscribe. */
+export function onPushChange(listener: (state: PushState) => void): () => void {
+  const handler = (event: Event) => listener((event as CustomEvent<PushState>).detail);
+  window.addEventListener(PUSH_CHANGE_EVENT, handler);
+  return () => window.removeEventListener(PUSH_CHANGE_EVENT, handler);
+}
+
 function supported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
@@ -83,7 +99,7 @@ export async function enablePush(): Promise<PushState> {
   if (!supported()) return "unsupported";
 
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") return permission === "denied" ? "blocked" : "off";
+  if (permission !== "granted") return announce(permission === "denied" ? "blocked" : "off");
 
   const { enabled, public_key } = await api.push.key();
   if (!enabled || !public_key) return "unavailable";
@@ -104,7 +120,7 @@ export async function enablePush(): Promise<PushState> {
   subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: serverKey });
   await send(subscription);
 
-  return "on";
+  return announce("on");
 }
 
 /** Stops pushes to this device for whoever is signed in. */
@@ -117,7 +133,7 @@ export async function disablePush(): Promise<PushState> {
     await subscription.unsubscribe().catch(() => {});
   }
 
-  return "off";
+  return announce("off");
 }
 
 /**
