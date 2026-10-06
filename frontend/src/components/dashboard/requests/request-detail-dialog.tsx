@@ -126,18 +126,32 @@ export function RequestDetailDialog({
 
               {r.reason && <p className="rounded-md bg-muted/50 px-3 py-2">{r.reason}</p>}
 
-              {r.attachments.map((file) => (
-                <a
-                  key={file.id}
-                  href={photoSrc(file.url) ?? "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 font-medium text-primary hover:underline"
-                >
-                  <FileText className="size-4" />
-                  {file.name}
-                </a>
-              ))}
+              {r.attachments.map((file) =>
+                file.mime.startsWith("image/") ? (
+                  <figure key={file.id} className="flex flex-col gap-1.5">
+                    <a href={photoSrc(file.url) ?? "#"} target="_blank" rel="noopener noreferrer" title="Open full size">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- signed backend URL, next/image can't optimize it */}
+                      <img
+                        src={photoSrc(file.url) ?? undefined}
+                        alt={file.name}
+                        className="max-h-80 w-full rounded-md border border-border bg-muted/30 object-contain transition-opacity hover:opacity-90"
+                      />
+                    </a>
+                    <figcaption className="truncate text-xs text-muted-foreground">{file.name}</figcaption>
+                  </figure>
+                ) : (
+                  <a
+                    key={file.id}
+                    href={photoSrc(file.url) ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 font-medium text-primary hover:underline"
+                  >
+                    <FileText className="size-4" />
+                    {file.name}
+                  </a>
+                ),
+              )}
 
               <ul className="flex flex-col gap-1 border-l-2 border-border pl-3 text-xs text-muted-foreground">
                 <li>

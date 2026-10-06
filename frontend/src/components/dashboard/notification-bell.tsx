@@ -116,7 +116,8 @@ export function NotificationBell() {
     setPushBusy(true);
     try {
       setPush(pushOn ? await disablePush() : await enablePush());
-    } catch {
+    } catch (error) {
+      console.error("Turning push on/off failed:", error);
       setPush(await pushState().catch(() => "unsupported" as const));
     } finally {
       setPushBusy(false);

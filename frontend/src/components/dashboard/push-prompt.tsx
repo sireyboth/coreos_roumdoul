@@ -70,7 +70,8 @@ export function PushPrompt() {
     let result: PushState;
     try {
       result = await enablePush();
-    } catch {
+    } catch (error) {
+      console.error("Turning on push failed:", error);
       result = "unavailable";
     }
     setBusy(false);
