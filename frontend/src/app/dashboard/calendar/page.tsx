@@ -222,7 +222,10 @@ export default function CalendarPage() {
                         )}
                       >
                         <span className="flex w-full items-center justify-between">
-                          <span className={cn("font-medium", isToday && "text-primary")}>{Number(day.date.slice(8))}</span>
+                          {/* Red number for any Cambodian holiday, as in the team view; only a company holiday colours the whole cell. */}
+                          <span className={cn("font-medium", khmerHoliday && "text-destructive", isToday && "text-primary")}>
+                            {Number(day.date.slice(8))}
+                          </span>
                           <span className="flex items-center gap-1">
                             {khmer.isSil && <Moon className="size-3 text-muted-foreground" aria-label="Sil day" />}
                             {day.attendance && (
