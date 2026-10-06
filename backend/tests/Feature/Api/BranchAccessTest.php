@@ -98,7 +98,11 @@ class BranchAccessTest extends TestCase
             ->postJson('/api/employees', ['name' => 'Fine', 'branch_id' => $branchA->id])
             ->assertCreated();
 
-        $this->assertSame(0, Employee::query()->withoutBranchAccessScope()->where('company_id', $company->id)->where('branch_id', $branchB->id)->count());
+        // An employee's branch is on their current assignment, not the employee row.
+        $this->assertSame(0, Employee::query()->withoutBranchAccessScope()->where('company_id', $company->id)
+            ->whereHas('currentAssignment', fn ($q) => $q->where('branch_id', $branchB->id))->count());
+        $this->assertSame(1, Employee::query()->withoutBranchAccessScope()->where('company_id', $company->id)
+            ->whereHas('currentAssignment', fn ($q) => $q->where('branch_id', $branchA->id))->count());
     }
 
     public function test_admin_can_set_and_clear_a_users_branch_access_via_the_api(): void

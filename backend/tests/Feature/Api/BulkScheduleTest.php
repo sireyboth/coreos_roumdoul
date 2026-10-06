@@ -64,7 +64,8 @@ class BulkScheduleTest extends TestCase
 
         // 3 people x 10 weekdays, and no weekends.
         $this->assertSame(30, Schedule::query()->count());
-        $this->assertSame(0, Schedule::query()->whereIn(\DB::raw("strftime('%w', date)"), ['0', '6'])->count());
+        // Weekday worked out in PHP, so this runs the same on every database.
+        $this->assertSame(0, Schedule::query()->get()->filter(fn (Schedule $s) => $s->date->isWeekend())->count());
         $this->assertSame(10, Schedule::query()->where('employee_id', $this->staff['A']->id)->count());
         $this->assertSame($this->shift->id, Schedule::query()->first()->work_schedule_id);
     }

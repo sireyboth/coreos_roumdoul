@@ -64,7 +64,8 @@ class DashboardController extends Controller
 
         $recent = $days()->with('employee')
             ->where('scan_count', '>', 0)
-            ->orderByDesc('date')->orderByDesc('last_scan_at')->limit(6)->get()
+            // id last: same-minute scans still come out in one fixed order (newest first) on every database.
+            ->orderByDesc('date')->orderByDesc('last_scan_at')->orderByDesc('id')->limit(6)->get()
             ->map(fn (AttendanceDay $d) => [
                 'id' => $d->id,
                 'date' => $d->date->toDateString(),
