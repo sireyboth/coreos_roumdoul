@@ -230,6 +230,77 @@ class AttendanceService
         return $this->recorder->recalculateRange($employee, $dates->first(), $dates->last())->get($date);
     }
 
+    /**
+     * Adds a scan at the scheduled time of every slot the person missed, as
+     * one admin adjustment — for days they worked but didn't scan. Real scans
+     * stay as they are. Returns null when nothing was missing.
+     *
+     * @param  array<int, string>  $times  "HH:MM" by slot sequence, used instead of the scheduled time on that slot's own date
+     */
+    public function fillMissedScans(AttendanceDay $day, string $reason, int $adminId, array $times = []): ?AttendanceDay
+    {
+        $timezone = $day->employee->company->timezone ?: config('attendance.default_timezone');
+        // The stored slots may predate the end of the day (an OUT still "pending"), so judge from a fresh calculation.
+        $day = $this->recorder->recalculate($day->employee, $day->date->toDateString());
+        if (! $day) {
+            return null;
+        }
+
+        $missing = collect($day->slots ?? [])
+            ->filter(fn (array $slot) => $slot['status'] === 'missing' && $slot['scan_id'] === null)
+            ->map(function (array $slot) use ($times, $timezone) {
+                $expected = CarbonImmutable::parse($slot['expected_at'])->setTimezone($timezone);
+                $time = $times[$slot['sequence']] ?? null;
+
+                return ($time ? CarbonImmutable::parse($expected->toDateString().' '.$time, $timezone) : $expected)->utc();
+            })
+            ->values()->all();
+
+        if ($missing === [] || collect($day->scans ?? [])->contains('method', 'auto')) {
+            return null;
+        }
+
+        return $this->adjustDay($day->employee, $day->date->toDateString(), $missing, [], $reason, $adminId);
+    }
+
+    /**
+     * Wipes one person's day for good — every scan matched to it (voided ones
+     * too), its corrections and adjustments — then recalculates it. Meant for
+     * clearing test data; real mistakes go through adjustDay, which keeps a trail.
+     * A past work day comes back as absent, because with no scans that's what it is.
+     */
+    public function deleteDay(AttendanceDay $day): ?AttendanceDay
+    {
+        $employee = $day->employee;
+        $date = $day->date->toDateString();
+        $this->recorder->assertUnlocked($employee->company_id, $date);
+
+        // Same window the recorder searches; workDateFor decides which scans are this day's (a night shift's OUT lands after midnight).
+        $timezone = $employee->company->timezone ?: config('attendance.default_timezone');
+        $start = CarbonImmutable::parse($date, $timezone)->startOfDay();
+        $eventIds = AttendanceEvent::query()->withoutGlobalScopes()->withTrashed()
+            ->where('company_id', $employee->company_id)
+            ->where('employee_id', $employee->id)
+            ->where('event_time', '>=', $start->subDay()->utc())
+            ->where('event_time', '<', $start->addDays(2)->utc())
+            ->get()
+            ->filter(fn (AttendanceEvent $event) => $this->recorder->workDateFor($employee, $event->event_time) === $date)
+            ->modelKeys();
+
+        DB::transaction(function () use ($employee, $date, $eventIds) {
+            $sameDay = fn ($query) => $query->where('company_id', $employee->company_id)
+                ->where('employee_id', $employee->id)->whereDate('date', $date);
+
+            AttendanceCorrection::query()->withoutGlobalScopes()->tap($sameDay)->delete();
+            AttendanceAdjustment::query()->withoutGlobalScopes()->tap($sameDay)->delete();
+            DB::table('attendance_sessions')->tap($sameDay)->delete();
+            AttendanceEvent::query()->withoutGlobalScopes()->withTrashed()->whereKey($eventIds)->forceDelete();
+            AttendanceDay::query()->withoutGlobalScopes()->tap($sameDay)->delete();
+        });
+
+        return $this->recorder->recalculate($employee, $date);
+    }
+
     private function assertEmployeeMayScan(Employee $employee): void
     {
         if (in_array($employee->employment_status, Employee::NO_CHECK_IN_STATUSES, true)) {

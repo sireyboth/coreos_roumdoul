@@ -2,15 +2,19 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Sigma } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Sigma, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { AttendanceCorrections } from "@/components/dashboard/attendance-corrections";
-import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
+import { AttendanceDayDialog, DELETE_DAYS_WARNING } from "@/components/dashboard/attendance-day-dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
+import { AttendanceFillMissedDialog } from "@/components/dashboard/attendance-fill-missed-dialog";
+import { MissedScansDialog } from "@/components/dashboard/missed-scans-dialog";
 import { AttendanceSummary } from "@/components/dashboard/attendance-summary";
 import { AttendanceTodayCard } from "@/components/dashboard/attendance-today-card";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
@@ -129,15 +133,38 @@ function AttendancePageContent() {
   // The signed-in person's own days that are missing a scan, so they can ask for a correction.
   const [myIncomplete, setMyIncomplete] = useState<AttendanceDay[]>([]);
   const [preview, setPreview] = useState<AttendanceDay | null>(null);
+  // The days chosen for "Fill missed scans", and how to clear the table's selection once done.
+  const [filling, setFilling] = useState<{ days: AttendanceDay[]; clear: () => void } | null>(null);
+  const [missedOpen, setMissedOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingOvertime, setPendingOvertime] = useState(0);
   const [pendingCorrections, setPendingCorrections] = useState(0);
 
   const key = `${month}|${reloads}`;
   const days = result?.key === key ? result.data : null;
+  const missedCount = days?.filter((d) => d.slots.some((s) => s.scan_id === null && s.status === "missing")).length ?? 0;
   const truncated = result?.key === key && result.total > result.data.length;
   const employeeId = me?.employee?.id;
   const load = () => setReloads((n) => n + 1);
+  const confirm = useConfirm();
+
+  async function deleteDays(selected: AttendanceDay[], clearSelection: () => void) {
+    const ok = await confirm({
+      title: selected.length === 1 ? "Delete this day's attendance?" : `Delete ${selected.length} days of attendance?`,
+      description: DELETE_DAYS_WARNING,
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      const { deleted } = await api.attendance.deleteDays(selected.map((d) => d.id));
+      notifySuccess(`${deleted} ${deleted === 1 ? "day" : "days"} deleted`);
+      clearSelection();
+    } catch (err) {
+      notifyError(err);
+    }
+    load();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -323,6 +350,15 @@ function AttendancePageContent() {
           action={
             <div className="flex flex-wrap gap-2">
               {/* Export has its own dialog (date range, employee), so only Import comes from here. */}
+              {canManage && (
+                <Button variant="outline" onClick={() => setMissedOpen(true)}>
+                  <ScanLine className="size-4" />
+                  Missed scans
+                  {missedCount > 0 && (
+                    <span className="rounded-full bg-warning/15 px-1.5 text-xs font-semibold tabular-nums text-warning">{missedCount}</span>
+                  )}
+                </Button>
+              )}
               <ExcelActions importSpec={canManage ? attendanceImport : undefined} onImported={load} />
               <Button variant="outline" onClick={() => setExportOpen(true)}>
                 <FileDown className="size-4" />
@@ -430,6 +466,22 @@ function AttendancePageContent() {
                 title: "No attendance this month",
                 description: "Scans and work days show up here once people have a work schedule.",
               }}
+              bulkActions={
+                canManage
+                  ? (selected, clearSelection) => (
+                      <>
+                        <Button size="sm" onClick={() => setFilling({ days: selected, clear: clearSelection })}>
+                          <CalendarCheck className="size-3.5" />
+                          Fill missed scans
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => deleteDays(selected, clearSelection)}>
+                          <Trash2 className="size-3.5" />
+                          Delete {selected.length}
+                        </Button>
+                      </>
+                    )
+                  : undefined
+              }
               rowActions={(d) => (
                 <Button variant="outline" size="sm" onClick={() => setPreview(d)}>
                   <Eye className="size-3.5" />
@@ -448,6 +500,15 @@ function AttendancePageContent() {
       </div>
 
       <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
+      {canManage && <MissedScansDialog open={missedOpen} onOpenChange={setMissedOpen} initialMonth={month} onChanged={load} />}
+      <AttendanceFillMissedDialog
+        days={filling?.days ?? null}
+        onOpenChange={(open) => !open && setFilling(null)}
+        onDone={() => {
+          filling?.clear();
+          load();
+        }}
+      />
       <AttendanceDayDialog
         day={preview}
         onOpenChange={(open) => !open && setPreview(null)}

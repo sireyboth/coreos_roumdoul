@@ -857,7 +857,7 @@ export type EmployeeRequest = {
   cancelled_by: { id: number; name: string } | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
-  can: { decide: boolean; cancel: boolean };
+  can: { decide: boolean; cancel: boolean; delete: boolean };
 };
 
 export type LeaveRequestInput = {
@@ -1169,6 +1169,8 @@ export const api = {
       per_page?: number;
       status?: AttendanceDayStatus;
       exception?: AttendanceException;
+      // Only days with a scan the schedule expected and never got.
+      missed?: boolean;
     }) => {
       const query = new URLSearchParams(
         Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]),
@@ -1183,6 +1185,10 @@ export const api = {
     // day is null when nothing is left to keep (e.g. every scan on a day off removed).
     adjust: (data: { employee_id: number; date: string; reason: string; add: string[]; void: number[] }) =>
       request<{ day: AttendanceDay | null }>("/api/attendance/adjustments", { method: "POST", body: JSON.stringify(data) }),
+    deleteDays: (ids: number[]) =>
+      request<{ deleted: number }>("/api/attendance/days/delete", { method: "POST", body: JSON.stringify({ ids }) }),
+    fillMissed: (ids: number[], reason: string, times?: Record<number, string>) =>
+      request<{ filled: number; skipped: number }>("/api/attendance/days/fill-missed", { method: "POST", body: JSON.stringify({ ids, reason, times }) }),
     overtime:(params: { status?: "pending" | "approved" | "rejected"; from?: string; to?: string } = {}) => {
       const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);
       return request<OvertimeEntry[]>(`/api/attendance/overtime${query.size ? `?${query}` : ""}`);
@@ -1284,6 +1290,8 @@ export const api = {
       request<EmployeeRequest>(`/api/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
     cancel: (id: number, reason?: string) =>
       request<EmployeeRequest>(`/api/requests/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason: reason || null }) }),
+    deleteMany: (ids: number[]) =>
+      request<{ deleted: number }>("/api/requests/delete", { method: "POST", body: JSON.stringify({ ids }) }),
   },
   attendanceCorrections: {
     list: () => request<Paginated<AttendanceCorrection>>("/api/attendance/corrections"),

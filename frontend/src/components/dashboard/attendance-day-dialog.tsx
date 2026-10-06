@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, PencilLine } from "lucide-react";
+import { ExternalLink, PencilLine, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { AttendanceDay, DaySlot, ScanDetail } from "@/lib/api";
+import { api, type AttendanceDay, type DaySlot, type ScanDetail } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceAdjustScans } from "@/components/dashboard/attendance-adjust-scans";
 import { parseDate } from "@/components/dashboard/calendar-shared";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes, OVERTIME_TYPE } from "@/lib/schedule";
@@ -130,6 +132,9 @@ function ScanCard({ title, scan }: { title: string; scan: ScanDetail }) {
   );
 }
 
+export const DELETE_DAYS_WARNING =
+  "All scans, corrections and adjustments for the day are removed for good. A past work day will then show as absent. Use this to clear test data; to fix a real record, use Adjust scans.";
+
 /**
  * One employee's day in full: expected next to actual, every scan, and what
  * follows from them. Someone who manages attendance can adjust the scans here.
@@ -152,6 +157,25 @@ export function AttendanceDayDialog({
   const editing = day !== null && editingId === day.id;
   // On an automatic-attendance schedule the times come from the schedule, not scans.
   const automatic = day?.scans.some((entry) => entry.method === "auto") ?? false;
+  const confirm = useConfirm();
+  const [deleting, setDeleting] = useState(false);
+
+  async function remove() {
+    if (!day) return;
+    const ok = await confirm({ title: day.employee ? `Delete ${day.employee.name}'s attendance for this day?` : "Delete attendance for this day?", description: DELETE_DAYS_WARNING, destructive: true });
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      await api.attendance.deleteDays([day.id]);
+      notifySuccess("Attendance deleted");
+      onAdjusted?.(null);
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <Dialog open={day !== null} onOpenChange={onOpenChange}>
@@ -301,6 +325,12 @@ export function AttendanceDayDialog({
         )}
 
         <DialogFooter>
+          {canManage && day && !editing && (
+            <Button type="button" variant="destructive" onClick={remove} disabled={deleting} className="sm:mr-auto">
+              <Trash2 className="size-4" />
+              Delete
+            </Button>
+          )}
           {canManage && day?.employee && !editing && !automatic && (
             <Button type="button" variant="outline" onClick={() => setEditingId(day.id)}>
               <PencilLine className="size-4" />

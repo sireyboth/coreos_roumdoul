@@ -268,7 +268,7 @@ class LeaveRequestTest extends TestCase
             ->assertJsonPath('requires_balance', true)
             ->assertJsonPath('accrual', 'yearly');
 
-        $this->assertEquals(7, $this->balance($this->staff, 'sick')['available']);
+        $this->assertEquals(13.5, $this->balance($this->staff, 'annual')['available']);
         $this->ask($this->staff, 'sick', '2026-10-12', '2026-10-21', ['attachment' => UploadedFile::fake()->create('note.pdf', 10, 'application/pdf')])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['balance' => 'Not enough Sick leave: 8 days asked, 7 left for 2026.']);
@@ -624,5 +624,48 @@ class LeaveRequestTest extends TestCase
         Subscription::query()->create(['company_id' => $other->id, 'plan_id' => Plan::query()->where('code', 'starter')->firstOrFail()->id, 'status' => 'active']);
         $this->as($other->users()->first())->getJson("/api/requests/{$id}")->assertNotFound();
         $this->as($other->users()->first())->postJson("/api/requests/{$id}/approve")->assertNotFound();
+    }
+
+    // ───────────────────────────── deleting test data ─────────────────────────────
+
+    public function test_deleting_approved_leave_removes_it_everywhere_and_gives_the_days_back(): void
+    {
+        Storage::fake('local');
+        $id = $this->ask($this->staff, 'annual', '2026-10-01', null, ['attachment' => UploadedFile::fake()->create('note.pdf', 10, 'application/pdf')])->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve")->assertOk();
+        $file = EmployeeRequest::query()->withoutGlobalScopes()->findOrFail($id)->attachments()->firstOrFail()->path;
+        $this->assertEquals(12.5, $this->balance($this->staff, 'annual')['available']);
+        $this->assertTrue(Notification::query()->withoutGlobalScopes()->where('subject_id', $id)->exists());
+
+        $this->as($this->admin)->postJson('/api/requests/delete', ['ids' => [$id]])->assertOk()->assertJsonPath('deleted', 1);
+
+        $this->assertNull(EmployeeRequest::query()->withoutGlobalScopes()->find($id));
+        $this->assertFalse(Notification::query()->withoutGlobalScopes()->where('subject_type', (new EmployeeRequest)->getMorphClass())->where('subject_id', $id)->exists());
+        Storage::disk('local')->assertMissing($file);
+        $this->assertEquals(13.5, $this->balance($this->staff, 'annual')['available']);
+        $this->assertSame('absent', $this->attendanceDay($this->dara, '2026-10-01')->status);
+    }
+
+    public function test_only_people_who_manage_requests_for_that_branch_can_delete(): void
+    {
+        $id = $this->ask($this->staff, 'annual', '2026-10-08')->assertCreated()->json('id');
+
+        $this->as($this->staff)->postJson('/api/requests/delete', ['ids' => [$id]])->assertForbidden();
+        $this->as($this->approverOf($this->branchB, 'Other branch'))->postJson('/api/requests/delete', ['ids' => [$id]])
+            ->assertJsonValidationErrors('ids');
+
+        $this->assertNotNull(EmployeeRequest::query()->withoutGlobalScopes()->find($id));
+    }
+
+    public function test_approved_leave_in_a_locked_month_cannot_be_deleted(): void
+    {
+        $id = $this->ask($this->staff, 'annual', '2026-09-28')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve")->assertOk();
+        $this->as($this->admin)->postJson('/api/attendance/periods', ['month' => '2026-09', 'ignore_pending_overtime' => true])->assertSuccessful();
+        app(AttendanceRecorder::class)->forgetLocks();
+
+        $this->as($this->admin)->postJson('/api/requests/delete', ['ids' => [$id]])
+            ->assertJsonValidationErrors(['ids' => 'September 2026 is locked']);
+        $this->assertNotNull(EmployeeRequest::query()->withoutGlobalScopes()->find($id));
     }
 }

@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlarmClock, CalendarHeart, ChevronDown, Inbox, Plus } from "lucide-react";
+import { AlarmClock, CalendarHeart, ChevronDown, Inbox, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,10 +11,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PageHeader } from "@/components/dashboard/page-header";
 import { LateEarlyRequestDialog } from "@/components/dashboard/requests/late-early-request-dialog";
 import { LeaveRequestDialog } from "@/components/dashboard/requests/leave-request-dialog";
-import { RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
+import { DELETE_REQUESTS_WARNING, RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useMe } from "@/contexts/me-context";
 import { api, type EmployeeRequest, type LeaveBalance } from "@/lib/api";
-import { notifyError } from "@/lib/notify";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { REQUEST_STATUS, requestAmount, requestDates } from "@/lib/requests";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +101,26 @@ function RequestsPage() {
     setResult((r) => (r ? { ...r, data: r.data.map((x) => (x.id === updated.id ? updated : x)) } : r));
     setReloads((n) => n + 1);
   }, []);
+
+  const confirm = useConfirm();
+
+  async function deleteRequests(selected: EmployeeRequest[], clearSelection: () => void) {
+    const ok = await confirm({
+      title: selected.length === 1 ? `Delete this ${selected[0].label.toLowerCase()}?` : `Delete ${selected.length} requests?`,
+      description: DELETE_REQUESTS_WARNING,
+      destructive: true,
+    });
+    if (!ok) return;
+
+    try {
+      const { deleted } = await api.requests.deleteMany(selected.map((r) => r.id));
+      notifySuccess(`${deleted} ${deleted === 1 ? "request" : "requests"} deleted`);
+      clearSelection();
+    } catch (err) {
+      notifyError(err);
+    }
+    setReloads((n) => n + 1);
+  }
 
   // After sending one: show it in a list that has it.
   function created() {
@@ -267,6 +288,19 @@ function RequestsPage() {
                 ? "Tap “New request” to ask for leave, or to arrive late or leave early."
                 : "Requests from the branches you cover show up here.",
         }}
+        bulkActions={
+          canManage
+            ? (selected, clearSelection) => {
+                const deletable = selected.filter((r) => r.can.delete);
+                return deletable.length > 0 ? (
+                  <Button variant="destructive" size="sm" onClick={() => deleteRequests(deletable, clearSelection)}>
+                    <Trash2 className="size-3.5" />
+                    Delete {deletable.length}
+                  </Button>
+                ) : null;
+              }
+            : undefined
+        }
         rowActions={(r) =>
           r.can.decide ? (
             <Button size="sm" onClick={() => setOpen(r)}>
@@ -290,7 +324,12 @@ function RequestsPage() {
         selfEmployeeId={selfEmployeeId}
         people={people}
       />
-      <RequestDetailDialog request={open} onOpenChange={(o) => !o && setOpen(null)} onChanged={changed} />
+      <RequestDetailDialog
+        request={open}
+        onOpenChange={(o) => !o && setOpen(null)}
+        onChanged={changed}
+        onDeleted={() => setReloads((n) => n + 1)}
+      />
     </div>
   );
 }

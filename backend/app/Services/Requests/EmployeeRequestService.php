@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\EmployeeRequest;
 use App\Models\EmployeeRequestDay;
 use App\Models\LeaveType;
+use App\Models\Notification;
 use App\Models\RequestTypeSetting;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
@@ -243,6 +244,42 @@ final class EmployeeRequestService
 
             return $request;
         });
+    }
+
+    /**
+     * Removes a request for good — its days, approval trail, files and
+     * notifications — for clearing test data. Real requests are cancelled,
+     * which keeps the history. Approved leave gives its days back to the
+     * balance and its attendance is worked out again.
+     */
+    public function delete(EmployeeRequest $request): void
+    {
+        $request->loadMissing(['employee', 'attachments', 'approval']);
+        $wasApproved = $request->status === 'approved';
+
+        if ($wasApproved) {
+            $this->assertMonthsOpen($request->employee, $request->start_date->toDateString(), $request->end_date->toDateString());
+        }
+
+        $files = $request->attachments->map(fn (Attachment $a) => [$a->disk, $a->path])->all();
+
+        DB::transaction(function () use ($request) {
+            $request->attachments()->delete();
+            $request->approval?->delete();
+            Notification::query()->withoutGlobalScopes()
+                ->where('subject_type', $request->getMorphClass())->where('subject_id', $request->id)
+                ->delete();
+            $request->delete();
+        });
+
+        // Only once the rows are gone for sure: a rollback must not leave a request pointing at missing files.
+        foreach ($files as [$disk, $path]) {
+            Storage::disk($disk)->delete($path);
+        }
+
+        if ($wasApproved) {
+            $this->recalculate($request);
+        }
     }
 
     /**
@@ -567,7 +604,7 @@ final class EmployeeRequestService
         return $type->attachment_from_days !== null && $total >= $type->attachment_from_days;
     }
 
-    private function lockedMonth(Employee $employee, string $start, string $end): ?string
+    public function lockedMonth(Employee $employee, string $start, string $end): ?string
     {
         for ($month = CarbonImmutable::parse($start)->startOfMonth(); $month->toDateString() <= $end; $month = $month->addMonth()) {
             if ($this->recorder->isLocked($employee->company_id, $month->toDateString())) {

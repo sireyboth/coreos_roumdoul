@@ -185,4 +185,82 @@ class AttendanceAdjustmentTest extends TestCase
 
         $this->adjust(['add' => ['2026-09-21T17:00']], $this->user)->assertForbidden();
     }
+
+    private function fillMissed(array $ids, ?User $as = null, string $reason = 'Forgot to scan')
+    {
+        $this->travelTo(Carbon::parse('2026-09-22 09:00', 'Asia/Phnom_Penh'));
+
+        return $this->actingAs($as ?? $this->admin)->postJson('/api/attendance/days/fill-missed', ['ids' => $ids, 'reason' => $reason]);
+    }
+
+    public function test_a_day_with_no_scans_is_filled_from_the_schedule(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-22 09:00', 'Asia/Phnom_Penh'));
+        $day = app(AttendanceRecorder::class)->recalculate($this->employee, '2026-09-21');
+        $this->assertSame('absent', $day->status);
+
+        $this->fillMissed([$day->id])->assertOk()->assertJsonPath('filled', 1)->assertJsonPath('skipped', 0);
+
+        $day = $this->attendanceDay($this->employee, '2026-09-21');
+        $this->assertSame('complete', $day->status);
+        $this->assertSame(480, $day->worked_minutes);
+        $this->assertSame(2, AttendanceEvent::query()->where('method', 'adjustment')->count());
+    }
+
+    public function test_only_the_missed_scan_is_added_and_real_scans_keep_their_lateness(): void
+    {
+        $this->scanAt('08:30');
+        $id = $this->attendanceDay($this->employee, '2026-09-21')->id;
+
+        $this->fillMissed([$id])->assertOk()->assertJsonPath('filled', 1);
+
+        $day = $this->attendanceDay($this->employee, '2026-09-21');
+        $this->assertSame(1, AttendanceEvent::query()->where('method', 'adjustment')->count());
+        $this->assertSame('17:00', Carbon::parse($day->slots[1]['actual_at'])->setTimezone('Asia/Phnom_Penh')->format('H:i'));
+        $this->assertSame(20, $day->late_minutes);
+    }
+
+    public function test_complete_days_are_skipped_and_a_reason_is_required(): void
+    {
+        $this->scanAt('08:00');
+        $this->scanAt('17:00');
+        $id = $this->attendanceDay($this->employee, '2026-09-21')->id;
+
+        $this->fillMissed([$id], reason: '')->assertJsonValidationErrors('reason');
+        $this->fillMissed([$id], $this->user)->assertForbidden();
+        $this->fillMissed([$id])->assertOk()->assertJsonPath('filled', 0)->assertJsonPath('skipped', 1);
+        $this->assertSame(0, AttendanceEvent::query()->where('method', 'adjustment')->count());
+    }
+
+    public function test_missed_scans_can_be_filled_with_times_you_choose(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-22 09:00', 'Asia/Phnom_Penh'));
+        $day = app(AttendanceRecorder::class)->recalculate($this->employee, '2026-09-21');
+        [$in, $out] = array_column($day->slots, 'sequence');
+
+        $this->actingAs($this->admin)->postJson('/api/attendance/days/fill-missed', [
+            'ids' => [$day->id], 'reason' => 'Half day at a client', 'times' => [$in => '08:30', $out => '16:00'],
+        ])->assertOk()->assertJsonPath('filled', 1);
+
+        $day = $this->attendanceDay($this->employee, '2026-09-21');
+        $this->assertSame(20, $day->late_minutes);
+        $this->assertSame(60, $day->early_leave_minutes);
+        $this->assertSame('16:00', Carbon::parse($day->slots[1]['actual_at'])->setTimezone('Asia/Phnom_Penh')->format('H:i'));
+
+        $this->actingAs($this->admin)->postJson('/api/attendance/days/fill-missed', ['ids' => [$day->id], 'reason' => 'x', 'times' => [$in => '8am']])
+            ->assertJsonValidationErrors('times.'.$in);
+    }
+
+    public function test_the_missed_list_shows_only_days_with_a_missing_scan(): void
+    {
+        $this->scanAt('08:00');
+        $this->travelTo(Carbon::parse('2026-09-23 09:00', 'Asia/Phnom_Penh'));
+        app(AttendanceRecorder::class)->recalculateRange($this->employee, '2026-09-21', '2026-09-22');
+
+        $dates = collect($this->actingAs($this->admin)->getJson('/api/attendance?from=2026-09-21&to=2026-09-22&missed=1')->assertOk()->json('data'))->pluck('date')->sort()->values()->all();
+        $this->assertSame(['2026-09-21', '2026-09-22'], $dates); // a missing OUT, and a day with no scans
+
+        $this->actingAs($this->admin)->postJson('/api/attendance/days/fill-missed', ['ids' => [$this->attendanceDay($this->employee, '2026-09-21')->id], 'reason' => 'Forgot'])->assertOk();
+        $this->assertSame(['2026-09-22'], collect($this->actingAs($this->admin)->getJson('/api/attendance?from=2026-09-21&to=2026-09-22&missed=1')->json('data'))->pluck('date')->all());
+    }
 }

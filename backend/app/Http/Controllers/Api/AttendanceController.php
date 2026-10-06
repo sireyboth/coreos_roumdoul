@@ -7,7 +7,9 @@ use App\Models\AttendanceAdjustment;
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
 use App\Models\Employee;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AttendanceService;
+use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -121,6 +123,71 @@ class AttendanceController extends Controller
         return response()->json([
             'day' => $day ? $this->present($day->load(['employee.branch', 'employee.currentAssignment']), $this->eventsFor(collect([$day])), $timezone, $this->adjustmentsFor(collect([$day]))) : null,
         ]);
+    }
+
+    /** Fills every missed scan of the chosen days from their schedule. Days with nothing missing are skipped. */
+    public function fillMissed(Request $request, AttendanceService $attendance)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+            'reason' => ['required', 'string', 'max:255'],
+            // Optional: your own time per slot (by sequence) instead of the scheduled one.
+            'times' => ['nullable', 'array', 'max:12'],
+            'times.*' => ['required', 'date_format:H:i'],
+        ]);
+
+        // Through the employee, so a branch-limited manager only reaches their branch.
+        $days = AttendanceDay::query()->whereHas('employee')->with('employee.company')->whereKey($data['ids'])->get();
+        if ($days->count() !== count($data['ids'])) {
+            throw ValidationException::withMessages(['ids' => ['Some of those days no longer exist or are outside your branches. Reload and try again.']]);
+        }
+
+        $recorder = app(AttendanceRecorder::class);
+        foreach ($days as $day) {
+            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids');
+        }
+
+        $filled = 0;
+        foreach ($days as $day) {
+            if ($attendance->fillMissedScans($day, $data['reason'], $request->user()->id, $data['times'] ?? [])) {
+                $filled++;
+            }
+        }
+
+        return response()->json(['filled' => $filled, 'skipped' => $days->count() - $filled]);
+    }
+
+    /** Permanently clears the chosen days (e.g. test scans). Each day is checked first, so nothing is deleted if any is locked. */
+    public function destroyDays(Request $request, AttendanceService $attendance)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        // Through the employee, so a branch-limited manager only reaches their branch.
+        $days = AttendanceDay::query()->whereHas('employee')->with('employee.company')->whereKey($data['ids'])->get();
+        if ($days->count() !== count($data['ids'])) {
+            throw ValidationException::withMessages(['ids' => ['Some of those days no longer exist or are outside your branches. Reload and try again.']]);
+        }
+
+        $recorder = app(AttendanceRecorder::class);
+        foreach ($days as $day) {
+            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids');
+        }
+
+        foreach ($days as $day) {
+            AuditLogger::record('attendance.day_deleted', $day, [], $day->company_id, [
+                'employee_id' => $day->employee_id,
+                'employee' => $day->employee->name,
+                'date' => $day->date->toDateString(),
+                'scans' => $day->scans,
+            ]);
+            $attendance->deleteDay($day);
+        }
+
+        return response()->json(['deleted' => $days->count()]);
     }
 
     /** The signed-in person's day: expected slots, what's done, what's next. */
@@ -256,6 +323,12 @@ class AttendanceController extends Controller
         if ($request->filled('exception')) {
             // A JSON list of codes; matching the quoted code works on every database.
             $query->where('exceptions', 'like', '%"'.$request->input('exception').'"%');
+        }
+        if ($request->boolean('missed')) {
+            // Any scan the schedule expected and never got: a missing IN or OUT, or none at all.
+            $query->where(fn (Builder $q) => $q->where('exceptions', 'like', '%"missing_in"%')
+                ->orWhere('exceptions', 'like', '%"missing_out"%')
+                ->orWhere('exceptions', 'like', '%"absent"%'));
         }
 
         return $query;

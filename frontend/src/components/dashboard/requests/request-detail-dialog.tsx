@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Check, FileText, X } from "lucide-react";
+import { Ban, Check, FileText, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -12,10 +12,14 @@ import { useMe } from "@/contexts/me-context";
 import { api, photoSrc, type EmployeeRequest } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { REQUEST_STATUS, dateList, requestAmount, requestDates } from "@/lib/requests";
+import { cn } from "@/lib/utils";
 
 function when(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
 }
+
+export const DELETE_REQUESTS_WARNING =
+  "Removes the request, its file and its notifications for good. Approved leave goes back to the balance and attendance is worked out again. Use this to clear test data; to undo a real request, cancel it so the history stays.";
 
 /**
  * One request in full — what, when, why, the file, and its history — with
@@ -26,10 +30,12 @@ export function RequestDetailDialog({
   request,
   onOpenChange,
   onChanged,
+  onDeleted,
 }: {
   request: EmployeeRequest | null;
   onOpenChange: (open: boolean) => void;
   onChanged: (request: EmployeeRequest) => void;
+  onDeleted?: (id: number) => void;
 }) {
   const confirm = useConfirm();
   const { me } = useMe();
@@ -85,6 +91,24 @@ export function RequestDetailDialog({
         `${updated.employee.name} · ${requestDates(updated)}`,
       );
       onChanged(updated);
+      close(false);
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!request) return;
+    const ok = await confirm({ title: `Delete this ${request.label.toLowerCase()}?`, description: DELETE_REQUESTS_WARNING, destructive: true });
+    if (!ok) return;
+
+    setBusy(true);
+    try {
+      await api.requests.deleteMany([request.id]);
+      notifySuccess(`${request.label} deleted`, `${request.employee.name} · ${requestDates(request)}`);
+      onDeleted?.(request.id);
       close(false);
     } catch (err) {
       notifyError(err);
@@ -192,10 +216,16 @@ export function RequestDetailDialog({
               )}
             </div>
 
-            {(r.can.decide || r.can.cancel) && (
+            {(r.can.decide || r.can.cancel || r.can.delete) && (
               <DialogFooter>
+                {r.can.delete && (
+                  <Button variant="destructive" onClick={remove} disabled={busy} className="sm:mr-auto">
+                    <Trash2 className="size-3.5" />
+                    Delete
+                  </Button>
+                )}
                 {r.can.cancel && (
-                  <Button variant="outline" onClick={() => act("cancel")} disabled={busy} className="sm:mr-auto">
+                  <Button variant="outline" onClick={() => act("cancel")} disabled={busy} className={cn(!r.can.delete && "sm:mr-auto")}>
                     <Ban className="size-3.5" />
                     Cancel request
                   </Button>

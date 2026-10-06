@@ -9,6 +9,7 @@ use App\Models\EmployeeRequest;
 use App\Models\EmployeeRequestDay;
 use App\Models\LeaveType;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\Requests\ApprovalChain;
 use App\Services\Requests\EmployeeRequestService;
 use Illuminate\Database\Eloquent\Builder;
@@ -137,6 +138,41 @@ class EmployeeRequestController extends Controller
         $done = $this->requests->cancel($request->user(), $employeeRequest, $data['reason'] ?? null);
 
         return $this->present($done->load($this->relations()), $request->user());
+    }
+
+    /** Permanently removes the chosen requests (e.g. test data). All are checked first, so either all go or none do. */
+    public function destroyMany(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:200'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $requests = EmployeeRequest::query()->with($this->relations())->whereKey($data['ids'])->get()
+            ->filter(fn (EmployeeRequest $r) => $this->chain->covers($request->user(), $r->employee));
+        if ($requests->count() !== count($data['ids'])) {
+            throw ValidationException::withMessages(['ids' => ['Some of those requests no longer exist or are outside your branches. Reload and try again.']]);
+        }
+
+        $locked = $requests->where('status', 'approved')
+            ->map(fn (EmployeeRequest $r) => $this->requests->lockedMonth($r->employee, $r->start_date->toDateString(), $r->end_date->toDateString()))
+            ->filter()->first();
+        if ($locked) {
+            throw ValidationException::withMessages(['ids' => [$locked]]);
+        }
+
+        foreach ($requests as $employeeRequest) {
+            AuditLogger::record('request.deleted', $employeeRequest, [], $employeeRequest->company_id, [
+                'employee' => $employeeRequest->employee?->name,
+                'type' => $employeeRequest->label(),
+                'status' => $employeeRequest->status,
+                'start_date' => $employeeRequest->start_date->toDateString(),
+                'end_date' => $employeeRequest->end_date->toDateString(),
+            ]);
+            $this->requests->delete($employeeRequest);
+        }
+
+        return response()->json(['deleted' => $requests->count()]);
     }
 
     /** A request's file, through the short-lived signed link in its `url`. */
@@ -277,6 +313,7 @@ class EmployeeRequestController extends Controller
                 'cancel' => in_array($r->status, EmployeeRequest::ACTIVE_STATUSES, true)
                     && ($this->chain->covers($viewer, $r->employee)
                         || ($isOwn && ($r->isPending() || $r->start_date->toDateString() > $today))),
+                'delete' => $this->chain->covers($viewer, $r->employee),
             ],
         ];
     }

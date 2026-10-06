@@ -190,6 +190,8 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
             Route::post('/attendance/corrections/{correction}/approve', [AttendanceCorrectionController::class, 'approve']);
             Route::post('/attendance/corrections/{correction}/reject', [AttendanceCorrectionController::class, 'reject']);
             Route::post('/attendance/adjustments', [AttendanceController::class, 'adjust']);
+            Route::post('/attendance/days/delete', [AttendanceController::class, 'destroyDays']);
+            Route::post('/attendance/days/fill-missed', [AttendanceController::class, 'fillMissed']);
             Route::get('/attendance/overtime', [AttendanceReviewController::class, 'overtime']);
             Route::post('/attendance/days/{day}/overtime/approve', [AttendanceReviewController::class, 'approveOvertime']);
             Route::post('/attendance/days/{day}/overtime/reject', [AttendanceReviewController::class, 'rejectOvertime']);
@@ -208,6 +210,7 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(functio
             Route::get('/requests/waiting-count', [EmployeeRequestController::class, 'waitingCount']);
             Route::post('/requests/preview', [EmployeeRequestController::class, 'preview']);
             Route::post('/requests', [EmployeeRequestController::class, 'store']);
+            Route::post('/requests/delete', [EmployeeRequestController::class, 'destroyMany'])->middleware('company_permission:requests.manage');
             Route::get('/requests/{employeeRequest}', [EmployeeRequestController::class, 'show'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/approve', [EmployeeRequestController::class, 'approve'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/reject', [EmployeeRequestController::class, 'reject'])->whereNumber('employeeRequest');
