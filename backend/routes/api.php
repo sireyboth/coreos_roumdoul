@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WorkLocationController;
 use App\Http\Controllers\Api\WorkScheduleController;
+use App\Http\Middleware\CatchUpAttendance;
 use App\Http\Middleware\EnsureCompanyIsActive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -65,7 +66,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
 
-Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class])->group(function () {
+Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendance::class])->group(function () {
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 

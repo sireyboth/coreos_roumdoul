@@ -96,6 +96,39 @@ class AttendanceAutoTest extends TestCase
         $this->assertSame(0, AttendanceEvent::query()->count());
     }
 
+    public function test_without_cron_any_request_fills_the_day_in(): void
+    {
+        config(['attendance.catch_up_on_requests' => true]);
+        $this->travelTo(Carbon::parse('2026-09-21 18:00', 'Asia/Phnom_Penh'));
+
+        $this->actingAs($this->user)->getJson('/api/notifications/unread-count')->assertOk();
+
+        $day = $this->attendanceDay($this->director, '2026-09-21');
+        $this->assertSame('complete', $day->status);
+        $this->assertSame(['auto', 'auto'], array_column($day->slots, 'method'));
+    }
+
+    public function test_request_catch_up_runs_at_most_every_few_minutes_and_reaches_back_over_a_gap(): void
+    {
+        config(['attendance.catch_up_on_requests' => true]);
+
+        $this->travelTo(Carbon::parse('2026-09-21 18:00', 'Asia/Phnom_Penh'));
+        $this->actingAs($this->user)->getJson('/api/notifications/unread-count')->assertOk();
+
+        // Too soon: nothing new yet.
+        $this->travelTo(Carbon::parse('2026-09-21 18:05', 'Asia/Phnom_Penh'));
+        $this->attendanceDay($this->director, '2026-09-21')->delete();
+        $this->actingAs($this->user)->getJson('/api/notifications/unread-count')->assertOk();
+        $this->assertNull($this->attendanceDay($this->director, '2026-09-21'));
+
+        // Nobody used the app for days: the next request fills in every day since.
+        $this->travelTo(Carbon::parse('2026-09-25 18:00', 'Asia/Phnom_Penh'));
+        $this->actingAs($this->user)->getJson('/api/notifications/unread-count')->assertOk();
+        foreach (['2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25'] as $date) {
+            $this->assertSame('complete', $this->attendanceDay($this->director, $date)?->status, $date);
+        }
+    }
+
     public function test_weekly_days_off_stay_off(): void
     {
         EmployeeScheduleAssignment::query()->withoutGlobalScopes()->where('employee_id', $this->director->id)->update(['days_off' => [0]]);

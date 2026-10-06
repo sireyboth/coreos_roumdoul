@@ -52,6 +52,21 @@ return [
     'missing_after_minutes' => (int) env('ATTENDANCE_MISSING_AFTER_MINUTES', 120),
     'close_after_minutes' => (int) env('ATTENDANCE_CLOSE_AFTER_MINUTES', 240),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Catch up from API traffic
+    |--------------------------------------------------------------------------
+    |
+    | Absences, missing scans and automatic-attendance slots only appear when
+    | a day is recalculated, and nothing scans on those days. The hourly
+    | attendance:close-days command does it where cron exists; with this on,
+    | ordinary requests also do it (at most every 15 minutes per company,
+    | after the response is sent), so hosts without cron stay current.
+    |
+    */
+
+    'catch_up_on_requests' => (bool) env('ATTENDANCE_CATCH_UP_ON_REQUESTS', true),
+
     // Hours counted as night work (for payroll), on the company's clock.
     'night_start' => env('ATTENDANCE_NIGHT_START', '22:00'),
     'night_end' => env('ATTENDANCE_NIGHT_END', '05:00'),
