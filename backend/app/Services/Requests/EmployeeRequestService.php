@@ -29,8 +29,6 @@ use Illuminate\Validation\ValidationException;
  */
 final class EmployeeRequestService
 {
-    public const DISK = 'local';
-
     /** Longest single request: a year (maternity is 90 days, anything longer is a mistake). */
     private const MAX_SPAN_DAYS = 366;
 
@@ -127,10 +125,11 @@ final class EmployeeRequestService
     private function send(User $by, Employee $employee, ?UploadedFile $file, bool $approveNow, \Closure $build): EmployeeRequest
     {
         // Saved first, outside the transaction: if anything below fails, the file is removed again.
-        $stored = $file ? $file->storeAs("request-attachments/{$employee->company_id}", Str::random(32).'.'.$file->guessExtension(), self::DISK) : null;
+        $disk = config('filesystems.uploads');
+        $stored = $file ? $file->storeAs("request-attachments/{$employee->company_id}", Str::random(32).'.'.$file->guessExtension(), $disk) : null;
 
         try {
-            $request = DB::transaction(function () use ($by, $employee, $file, $stored, $approveNow, $build) {
+            $request = DB::transaction(function () use ($by, $employee, $file, $stored, $disk, $approveNow, $build) {
                 // One request at a time per person, so two sent at once can't both take the same days or balance.
                 Employee::query()->withoutGlobalScopes()->whereKey($employee->id)->lockForUpdate()->first();
 
@@ -156,7 +155,7 @@ final class EmployeeRequestService
                         'company_id' => $employee->company_id,
                         'attachable_type' => $request->getMorphClass(),
                         'attachable_id' => $request->id,
-                        'disk' => self::DISK,
+                        'disk' => $disk,
                         'path' => $stored,
                         'original_name' => Str::limit($file->getClientOriginalName(), 200, ''),
                         'mime' => $file->getMimeType() ?? 'application/octet-stream',
@@ -179,7 +178,7 @@ final class EmployeeRequestService
             });
         } catch (\Throwable $e) {
             if ($stored) {
-                Storage::disk(self::DISK)->delete($stored);
+                Storage::disk($disk)->delete($stored);
             }
             throw $e;
         }

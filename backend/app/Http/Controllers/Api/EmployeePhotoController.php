@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Employee profile photos. They are personal data, so they live on the
- * private disk and are only reachable through short-lived signed links that
+ * private uploads disk (S3 in production) and are only reachable through short-lived signed links that
  * the API hands to people who can already see the employee (see
  * Employee::getPhotoUrlAttribute).
  */
@@ -26,7 +26,7 @@ class EmployeePhotoController extends Controller
 
     private function disk()
     {
-        return Storage::disk('local');
+        return Storage::disk(config('filesystems.uploads'));
     }
 
     public function store(Request $request, Employee $employee)

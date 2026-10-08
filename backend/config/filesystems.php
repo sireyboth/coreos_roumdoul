@@ -17,6 +17,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Uploads Disk
+    |--------------------------------------------------------------------------
+    |
+    | Where people's files go: employee photos and request attachments. "s3" in
+    | production; "local" in development and tests. Both are private — files are
+    | only served through the app's short-lived signed links.
+    |
+    */
+
+    'uploads' => env('UPLOADS_DISK', 'local'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
@@ -56,7 +69,7 @@ return [
             'url' => env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'throw' => true, // a wrong key or bucket must fail the upload, not "succeed" with no file
             'report' => false,
         ],
 

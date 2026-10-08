@@ -21,12 +21,13 @@ class EmployeeCardController extends Controller
         $employee->loadMissing(['department', 'branch']);
         $company = $request->user()->company;
 
-        // Read straight off the private disk EmployeePhotoController writes to —
+        // Read straight off the uploads disk EmployeePhotoController writes to —
         // no signed link needed here, since this always runs as the company's
         // own authenticated user (the route is permission + module gated).
         $photoData = null;
-        if ($employee->photo_path && Storage::disk('local')->exists($employee->photo_path)) {
-            $photoData = 'data:image/jpeg;base64,'.base64_encode(Storage::disk('local')->get($employee->photo_path));
+        $disk = Storage::disk(config('filesystems.uploads'));
+        if ($employee->photo_path && $disk->exists($employee->photo_path)) {
+            $photoData = 'data:image/jpeg;base64,'.base64_encode($disk->get($employee->photo_path));
         }
 
         // The QR opens this employee's record in the dashboard — it identifies

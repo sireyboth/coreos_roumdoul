@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Attachment;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Schedule;
@@ -188,5 +189,42 @@ class EmployeePhotoTest extends TestCase
 
         $this->assertCount(1, $rows);
         $this->assertSame($this->employeeId, $rows[0]['employee_id']);
+    }
+
+    public function test_photos_go_to_the_uploads_disk_and_still_open_through_the_signed_link(): void
+    {
+        Storage::fake('s3');
+        config(['filesystems.uploads' => 's3']);
+
+        $url = $this->upload()->assertOk()->json('photo_url');
+        $path = Employee::query()->findOrFail($this->employeeId)->photo_path;
+
+        Storage::disk('s3')->assertExists($path);
+        Storage::disk('local')->assertMissing($path);
+        $this->get($url)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    }
+
+    public function test_old_uploads_are_copied_to_the_new_disk_and_keep_working(): void
+    {
+        Storage::fake('s3');
+        $this->upload()->assertOk();
+        $photo = Employee::query()->findOrFail($this->employeeId)->photo_path;
+        Storage::disk('local')->put('request-attachments/1/note.pdf', '%PDF');
+        $attachment = Attachment::query()->withoutGlobalScopes()->create([
+            'company_id' => $this->company->id, 'attachable_type' => 'employee_request', 'attachable_id' => 1,
+            'disk' => 'local', 'path' => 'request-attachments/1/note.pdf', 'original_name' => 'note.pdf', 'mime' => 'application/pdf', 'size' => 4,
+        ]);
+
+        config(['filesystems.uploads' => 's3']);
+        $this->artisan('uploads:move')->assertSuccessful();
+
+        Storage::disk('s3')->assertExists([$photo, 'request-attachments/1/note.pdf']);
+        Storage::disk('local')->assertExists($photo); // kept until --delete
+        $this->assertSame('s3', $attachment->fresh()->disk);
+        $this->get($this->photoUrl())->assertOk();
+
+        $this->artisan('uploads:move --delete')->assertSuccessful();
+        Storage::disk('local')->assertMissing($photo);
+        $this->get($this->photoUrl())->assertOk();
     }
 }
