@@ -34,6 +34,23 @@ export const TYPE_STYLES: Record<CalendarDayType, { cell: string; label: string;
   none: { cell: "border-border bg-background", label: "Nothing planned", swatch: "bg-background border border-border" },
 };
 
+/** Morning or afternoon leave on a day that is still a work day; null for none or a full day. */
+export function halfDayLeave(day: Pick<CalendarDay, "leave">): { type: string; part: "am" | "pm" } | null {
+  return day.leave && day.leave.part !== "full" ? { type: day.leave.type, part: day.leave.part } : null;
+}
+
+export const halfDayLabel = (leave: { type: string; part: "am" | "pm" }) => `½ ${leave.type} · ${leave.part === "am" ? "morning" : "afternoon"}`;
+
+/** Shades the half of a cell taken as leave: left for the morning, right for the afternoon. */
+export function HalfDayShade({ part, className }: { part: "am" | "pm"; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute inset-y-0 w-1/2 bg-violet-500/25 ${part === "am" ? "left-0 rounded-l-[inherit]" : "right-0 rounded-r-[inherit]"} ${className ?? ""}`}
+    />
+  );
+}
+
 export const ATTENDANCE: Record<CalendarAttendance, { label: string; dot: string; variant: "success" | "warning" | "destructive" }> = {
   present: { label: "Present", dot: "bg-success", variant: "success" },
   late: { label: "Late", dot: "bg-warning", variant: "warning" },

@@ -601,7 +601,8 @@ final class EmployeeRequestService
 
     private function needsAttachment(LeaveType $type, float $total): bool
     {
-        return $type->attachment_from_days !== null && $total >= $type->attachment_from_days;
+        // 1 means "always", as the policy screen says — a half day (0.5) included.
+        return $type->attachment_from_days !== null && ($type->attachment_from_days <= 1 || $total >= $type->attachment_from_days);
     }
 
     public function lockedMonth(Employee $employee, string $start, string $end): ?string
