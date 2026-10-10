@@ -7,7 +7,7 @@ use App\Models\AttendanceDay;
 use App\Models\AttendancePeriod;
 use App\Models\Employee;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\Attendance\ScheduleResolver;
+use App\Services\Attendance\MonthlyAttendance;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -126,35 +126,10 @@ class AttendanceReviewController extends Controller
             ->limit(1000)
             ->get();
 
-        $days = AttendanceDay::query()->whereIn('employee_id', $employees->pluck('id'))
-            ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $end->toDateString())
-            ->get()->groupBy('employee_id');
+        $totals = MonthlyAttendance::for($company, $employees, $start);
 
-        $resolver = new ScheduleResolver($company, $employees->pluck('id'), $start->toDateString(), $end->toDateString());
-
-        $rows = $employees->map(function (Employee $employee) use ($days, $resolver, $start, $end, $today) {
-            $planned = ['work' => 0, 'weekly_off' => 0, 'day_off' => 0, 'holiday' => 0, 'leave' => 0, 'unscheduled' => 0];
-            // Leave in days (a half day is 0.5), split by whether it is paid, and by type.
-            $leave = ['paid' => 0.0, 'unpaid' => 0.0, 'by_type' => []];
-            $excused = ['all' => 0, 'unpaid' => 0];
-            for ($day = $start; $day->lte($end); $day = $day->addDay()) {
-                $expected = $resolver->resolve($employee->id, $day->toDateString());
-                $planned[$expected->kind]++;
-
-                if ($expected->leave) {
-                    $leave[$expected->leave['pay_percent'] > 0 ? 'paid' : 'unpaid'] += $expected->leave['portion'];
-                    $leave['by_type'][$expected->leave['type']] = ($leave['by_type'][$expected->leave['type']] ?? 0) + $expected->leave['portion'];
-                }
-                // Approved late arrival / early leave: minutes excused, paid or not.
-                foreach ($expected->permission ?? [] as $permit) {
-                    $excused['all'] += $permit['minutes'];
-                    $excused['unpaid'] += $permit['pay_percent'] > 0 ? 0 : $permit['minutes'];
-                }
-            }
-
-            $mine = $days->get($employee->id, collect());
-            $worked = $mine->filter(fn (AttendanceDay $d) => $d->scan_count > 0);
-            $approvedOt = fn (string $type) => (int) $mine->where('overtime_status', 'approved')->where('overtime_type', $type)->sum('overtime_minutes');
+        $rows = $employees->map(function (Employee $employee) use ($totals, $end, $today) {
+            $t = $totals->get($employee->id);
 
             return [
                 'employee' => [
@@ -164,31 +139,31 @@ class AttendanceReviewController extends Controller
                     'sort_order' => $employee->sort_order,
                     'branch' => $employee->branch?->name,
                 ],
-                'scheduled_days' => $planned['work'],
-                'weekly_days_off' => $planned['weekly_off'],
-                'days_off' => $planned['day_off'],
-                'holidays' => $planned['holiday'],
-                'leave_days' => $leave['paid'] + $leave['unpaid'],
-                'paid_leave_days' => $leave['paid'],
-                'unpaid_leave_days' => $leave['unpaid'],
-                'excused_minutes' => $excused['all'],
-                'unpaid_excused_minutes' => $excused['unpaid'],
-                'leave_by_type' => collect($leave['by_type'])->map(fn (float $days, string $type) => ['type' => $type, 'days' => $days])->values(),
-                'present_days' => $worked->where('kind', 'work')->count(),
-                'absent_days' => $mine->where('status', 'absent')->count(),
-                'incomplete_days' => $mine->where('status', 'incomplete')->count(),
-                'late_days' => $mine->where('late_minutes', '>', 0)->count(),
-                'late_minutes' => (int) $mine->sum('late_minutes'),
-                'early_leave_minutes' => (int) $mine->sum('early_leave_minutes'),
-                'scheduled_minutes' => (int) $mine->sum('scheduled_minutes'),
-                'worked_minutes' => (int) $mine->sum('worked_minutes'),
-                'night_minutes' => (int) $mine->sum('night_minutes'),
-                'worked_days_off' => $worked->whereIn('kind', ['day_off', 'weekly_off'])->count(),
-                'worked_holidays' => $worked->filter(fn (AttendanceDay $d) => ($d->expected['holiday'] ?? null) !== null)->count(),
-                'overtime_workday_minutes' => $approvedOt('workday'),
-                'overtime_day_off_minutes' => $approvedOt('day_off'),
-                'overtime_holiday_minutes' => $approvedOt('holiday'),
-                'overtime_pending_minutes' => (int) $mine->where('overtime_status', 'pending')->sum('overtime_minutes'),
+                'scheduled_days' => $t['planned']['work'],
+                'weekly_days_off' => $t['planned']['weekly_off'],
+                'days_off' => $t['planned']['day_off'],
+                'holidays' => $t['planned']['holiday'],
+                'leave_days' => $t['leave']['paid'] + $t['leave']['unpaid'],
+                'paid_leave_days' => $t['leave']['paid'],
+                'unpaid_leave_days' => $t['leave']['unpaid'],
+                'excused_minutes' => $t['excused']['all'],
+                'unpaid_excused_minutes' => $t['excused']['unpaid'],
+                'leave_by_type' => collect($t['leave']['by_type'])->map(fn (float $days, string $type) => ['type' => $type, 'days' => $days])->values(),
+                'present_days' => $t['present_days'],
+                'absent_days' => $t['absent_days'],
+                'incomplete_days' => $t['incomplete_days'],
+                'late_days' => $t['late_days'],
+                'late_minutes' => $t['late_minutes'],
+                'early_leave_minutes' => $t['early_leave_minutes'],
+                'scheduled_minutes' => $t['scheduled_minutes'],
+                'worked_minutes' => $t['worked_minutes'],
+                'night_minutes' => $t['night_minutes'],
+                'worked_days_off' => $t['worked_days_off'],
+                'worked_holidays' => $t['worked_holidays'],
+                'overtime_workday_minutes' => $t['overtime_workday_minutes'],
+                'overtime_day_off_minutes' => $t['overtime_day_off_minutes'],
+                'overtime_holiday_minutes' => $t['overtime_holiday_minutes'],
+                'overtime_pending_minutes' => $t['overtime_pending_minutes'],
                 // The month isn't over yet: absences for days still to come can't be counted.
                 'is_partial' => $end->toDateString() >= $today,
             ];

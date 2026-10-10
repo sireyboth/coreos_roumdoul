@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\EmployeeAssignment;
 use App\Models\Team;
 use App\Services\CompanyUserService;
+use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\EmployeeAssignmentService;
 use App\Services\EmployeeRemover;
 use Illuminate\Http\Request;
@@ -276,6 +277,9 @@ class EmployeeController extends Controller
                 $this->linkNewLogin($request, $employee, $method, $data['password']);
             }
 
+            // A salary typed on the form starts the salary history.
+            app(EmployeeSalaryService::class)->followProfile($employee, $request->user());
+
             return $employee;
         });
 
@@ -454,6 +458,10 @@ class EmployeeController extends Controller
         $employee->update(
             collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id'])->all()
         );
+
+        if ($employee->wasChanged(['base_salary', 'salary_currency'])) {
+            app(EmployeeSalaryService::class)->followProfile($employee, $request->user());
+        }
 
         $branchBefore = $employee->currentAssignment()->value('branch_id');
 

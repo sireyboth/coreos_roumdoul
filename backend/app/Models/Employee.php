@@ -277,4 +277,20 @@ class Employee extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    /** Salary history, oldest first. See EmployeeSalaryService. */
+    public function salaries(): HasMany
+    {
+        return $this->hasMany(EmployeeSalary::class)->orderBy('effective_from')->orderBy('id');
+    }
+
+    public function payProfile(): HasOne
+    {
+        return $this->hasOne(EmployeePayProfile::class);
+    }
+
+    public function payItems(): HasMany
+    {
+        return $this->hasMany(EmployeePayItem::class);
+    }
 }

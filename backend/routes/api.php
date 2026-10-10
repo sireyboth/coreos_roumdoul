@@ -11,11 +11,15 @@ use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\EmployeeCardController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeePayController;
 use App\Http\Controllers\Api\EmployeePhotoController;
 use App\Http\Controllers\Api\EmployeeRequestController;
 use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PayrollAdjustmentController;
+use App\Http\Controllers\Api\PayrollSettingsController;
+use App\Http\Controllers\Api\PayRunController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RoleController;
@@ -169,6 +173,48 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
         Route::post('/roles', [RoleController::class, 'store']);
         Route::put('/roles/{role}', [RoleController::class, 'update']);
         Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+    });
+
+    Route::middleware('module:payroll')->group(function () {
+        // One person's pay setup: salary history, tax/NSSF profile, recurring items.
+        Route::get('/employees/{employee}/pay', [EmployeePayController::class, 'show'])->middleware('company_permission:salary.view');
+        Route::middleware('company_permission:salary.manage')->group(function () {
+            Route::post('/employees/{employee}/salaries', [EmployeePayController::class, 'storeSalary']);
+            Route::delete('/employees/{employee}/salaries/{salary}', [EmployeePayController::class, 'destroySalary']);
+            Route::put('/employees/{employee}/pay-profile', [EmployeePayController::class, 'updateProfile']);
+            Route::post('/employees/{employee}/pay-items', [EmployeePayController::class, 'storeItem']);
+            Route::put('/employees/{employee}/pay-items/{item}', [EmployeePayController::class, 'updateItem']);
+            Route::delete('/employees/{employee}/pay-items/{item}', [EmployeePayController::class, 'destroyItem']);
+        });
+
+        Route::middleware('company_permission:payroll.view')->group(function () {
+            Route::get('/payroll/settings', [PayrollSettingsController::class, 'show']);
+            Route::get('/payroll/runs', [PayRunController::class, 'index']);
+            Route::get('/payroll/runs/{run}', [PayRunController::class, 'show']);
+            Route::get('/payroll/runs/{run}/export', [PayRunController::class, 'export']);
+            Route::get('/payroll/payslips/{payslip}', [PayRunController::class, 'payslip']);
+            Route::get('/payroll/adjustments', [PayrollAdjustmentController::class, 'index']);
+        });
+
+        Route::middleware('company_permission:payroll.manage')->group(function () {
+            Route::put('/payroll/policy', [PayrollSettingsController::class, 'updatePolicy']);
+            Route::post('/payroll/presets', [PayrollSettingsController::class, 'applyPreset']);
+            Route::post('/payroll/components', [PayrollSettingsController::class, 'storeComponent']);
+            Route::put('/payroll/components/{component}', [PayrollSettingsController::class, 'updateComponent']);
+            Route::delete('/payroll/components/{component}', [PayrollSettingsController::class, 'destroyComponent']);
+            Route::post('/payroll/preview', [PayrollSettingsController::class, 'preview']);
+
+            Route::post('/payroll/runs', [PayRunController::class, 'store']);
+            Route::post('/payroll/runs/{run}/calculate', [PayRunController::class, 'calculate']);
+            Route::post('/payroll/runs/{run}/approve', [PayRunController::class, 'approve']);
+            Route::post('/payroll/runs/{run}/paid', [PayRunController::class, 'markPaid']);
+            Route::delete('/payroll/runs/{run}', [PayRunController::class, 'destroy']);
+
+            Route::post('/payroll/adjustments', [PayrollAdjustmentController::class, 'store']);
+            Route::post('/payroll/adjustments/import', [PayrollAdjustmentController::class, 'import']);
+            Route::put('/payroll/adjustments/{adjustment}', [PayrollAdjustmentController::class, 'update']);
+            Route::delete('/payroll/adjustments/{adjustment}', [PayrollAdjustmentController::class, 'destroy']);
+        });
     });
 
     Route::middleware('module:attendance')->group(function () {

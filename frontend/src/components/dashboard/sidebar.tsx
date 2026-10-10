@@ -43,6 +43,13 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     items: group.items.filter((item) => me && canSee(item, me)),
   })).filter((group) => group.items.length > 0);
 
+  // Only the closest match is lit: on /payroll/settings that's Payroll Settings, not Pay Runs too.
+  const matches = (href: string) => (href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(href + "/"));
+  const activeHref = groups
+    .flatMap((g) => g.items)
+    .filter((item) => matches(item.href))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   return (
     <nav className="relative flex flex-col gap-5" onMouseLeave={() => setPill((p) => p && { ...p, visible: false })}>
       <div
@@ -60,10 +67,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           </p>
           {group.items.map((item) => {
             // Corrections etc. live under a nav item's URL — keep the parent lit.
-            const active =
-              item.href === "/dashboard"
-                ? pathname === item.href
-                : pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = item.href === activeHref;
             const Icon = item.icon;
 
             return (

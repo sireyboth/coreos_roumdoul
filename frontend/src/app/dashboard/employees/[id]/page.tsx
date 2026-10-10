@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CalendarRange, Download, Eye, IdCard, KeyRound, Trash2, User, UserX } from "lucide-react";
+import { ArrowLeft, CalendarRange, Download, Eye, IdCard, KeyRound, Trash2, User, UserX, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
 } from "@/components/dashboard/employee-form";
 import { PhotoPicker } from "@/components/dashboard/photo-picker";
 import { EmployeeScheduleAssignments } from "@/components/dashboard/employee-schedule-assignments";
+import { EmployeePayPanel } from "@/components/dashboard/payroll/employee-pay-panel";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
@@ -36,7 +37,7 @@ import { saveBlob } from "@/lib/download";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "schedule";
+type Tab = "profile" | "schedule" | "pay";
 
 function dateLabel(value: string | null | undefined): string {
   if (!value) return "—";
@@ -68,6 +69,8 @@ export default function EmployeePage() {
       : "none";
   const canExportAttendance = (me?.permissions.includes("attendance.manage") ?? false) && Boolean(me?.modules.attendance);
   const canPrintCard = (me?.permissions.includes("employees.view") ?? false) && Boolean(me?.modules.id_cards);
+  // Salary history, tax profile and allowances live with payroll.
+  const canPay = salaryAccess !== "none" && Boolean(me?.modules.payroll);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [missing, setMissing] = useState(false);
@@ -79,7 +82,7 @@ export default function EmployeePage() {
   // Who can be picked as line manager; null until loaded (the picker waits for it).
   const [managers, setManagers] = useState<{ id: number; name: string }[] | null>(null);
   const [tab, setTab] = useState<Tab>(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "schedule" ? "schedule" : "profile",
+    typeof window !== "undefined" ? ((["schedule", "pay"] as const).find((t) => t === new URLSearchParams(window.location.search).get("tab")) ?? "profile") : "profile",
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,8 +261,9 @@ export default function EmployeePage() {
   const tabs = [
     { id: "profile" as const, label: "Profile", icon: User, visible: true },
     { id: "schedule" as const, label: "Schedule", icon: CalendarRange, visible: canRoster },
+    { id: "pay" as const, label: "Pay", icon: Wallet, visible: canPay },
   ].filter((t) => t.visible);
-  const activeTab: Tab = tab === "schedule" && canRoster ? "schedule" : "profile";
+  const activeTab: Tab = tab === "schedule" && canRoster ? "schedule" : tab === "pay" && canPay ? "pay" : "profile";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -459,6 +463,8 @@ export default function EmployeePage() {
                 </CardContent>
               </Card>
             )}
+
+            {activeTab === "pay" && <EmployeePayPanel employeeId={employee.id} canEdit={salaryAccess === "edit"} />}
 
             {activeTab === "schedule" && (
               <div className="flex flex-col gap-6">
