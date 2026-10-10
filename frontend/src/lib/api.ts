@@ -423,7 +423,7 @@ export type DashboardSummary = {
 
 export type Notification = {
   id: number;
-  // e.g. "attendance.correction_requested", "attendance.correction_decided", "welcome".
+  // e.g. "attendance.correction_requested", "attendance.correction_decided", "welcome", "birthday".
   type: string;
   data: { title: string; body?: string; [key: string]: unknown };
   // Where clicking it goes (a dashboard path), if anywhere.

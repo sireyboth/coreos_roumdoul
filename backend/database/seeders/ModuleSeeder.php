@@ -18,6 +18,7 @@ class ModuleSeeder extends Seeder
             ['code' => 'crm', 'name' => 'CRM', 'description' => 'Customers and sales pipeline.'],
             ['code' => 'accounting', 'name' => 'Accounting', 'description' => 'Bookkeeping and financial reports.'],
             ['code' => 'id_cards', 'name' => 'ID Cards', 'description' => 'Printable employee ID card PDFs.'],
+            ['code' => 'birthdays', 'name' => 'Birthdays', 'description' => 'Birthday alerts and celebration for each branch.'],
         ];
 
         foreach ($modules as $module) {
