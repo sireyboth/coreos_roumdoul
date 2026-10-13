@@ -115,6 +115,8 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
     });
 
     Route::get('/calendar', [CalendarController::class, 'index'])->middleware('company_permission:schedules.view');
+    // Just the days something happens (holidays, days off, leave, absences) over up to a year.
+    Route::get('/calendar/events', [CalendarController::class, 'events'])->middleware('company_permission:schedules.view');
 
     // Who follows which work schedule, and from when. Part of the roster, so the same permissions.
     Route::get('/schedule-assignments', [ScheduleAssignmentController::class, 'index'])->middleware('company_permission:schedules.view');

@@ -393,6 +393,30 @@ export type TeamCalendar = {
   employees: TeamCalendarEmployee[];
 };
 
+export type CalendarEventType = "holiday" | "day_off" | "leave" | "absent";
+
+// One thing that happens over one or more consecutive days. Holidays have no employee (they're everyone's).
+export type CalendarEvent = {
+  type: CalendarEventType;
+  start: string;
+  end: string;
+  // A half day counts 0.5.
+  days: number;
+  label: string;
+  employee: { id: number; name: string } | null;
+  // Leave only.
+  part?: DayPart;
+  status?: "pending" | "approved";
+  request_id?: number;
+};
+
+export type CalendarEvents = {
+  from: string;
+  to: string;
+  today: string;
+  events: CalendarEvent[];
+};
+
 // One small answer for the whole dashboard, counted by the server. Sections the
 // caller can't see are null.
 export type DashboardSummary = {
@@ -1123,6 +1147,12 @@ export const api = {
       request<TeamCalendar>(`/api/calendar/team?month=${month}${branchId ? `&branch_id=${branchId}` : ""}`),
     month: (month: string, employeeId?: number) =>
       request<CalendarMonth>(`/api/calendar?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
+    events: (from: string, to: string, employeeId?: number, types?: CalendarEventType[]) => {
+      const params = new URLSearchParams({ from, to });
+      if (employeeId) params.set("employee_id", String(employeeId));
+      types?.forEach((type) => params.append("types[]", type));
+      return request<CalendarEvents>(`/api/calendar/events?${params}`);
+    },
   },
 
   daysOff: {

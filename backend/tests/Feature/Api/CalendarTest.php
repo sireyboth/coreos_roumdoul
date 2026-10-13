@@ -6,7 +6,9 @@ use App\Models\AttendanceEvent;
 use App\Models\Branch;
 use App\Models\DayOff;
 use App\Models\Employee;
+use App\Models\EmployeeRequest;
 use App\Models\Holiday;
+use App\Models\LeaveType;
 use App\Models\MembershipBranchAccess;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -361,5 +363,67 @@ class CalendarTest extends TestCase
         $this->actingAs($this->admin)->deleteJson("/api/holidays/{$id}")->assertNoContent();
 
         $this->assertSame('absent', $this->day($this->month(), '2026-09-10')['attendance']);
+    }
+
+    private function events(?User $as = null, string $query = '')
+    {
+        $this->app['auth']->forgetGuards();
+
+        return $this->actingAs($as ?? $this->admin)->getJson('/api/calendar/events?from=2026-09-01&to=2026-12-31'.$query);
+    }
+
+    public function test_the_agenda_lists_only_the_days_something_happens_with_runs_folded_together(): void
+    {
+        $this->assignSchedule($this->employee, $this->schedule, '2026-09-01', daysOff: [0]);
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Pchum Ben', 'date' => '2026-09-22']);
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Independence Day', 'date' => '2020-11-09', 'is_recurring_yearly' => true]);
+        foreach (['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-09'] as $date) {
+            DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'date' => $date, 'reason' => 'Family']);
+        }
+        $unpaid = LeaveType::query()->withoutGlobalScopes()->where('company_id', $this->company->id)->where('code', 'unpaid')->firstOrFail();
+        EmployeeRequest::query()->create([
+            'company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'requested_by' => $this->user->id,
+            'type' => 'leave', 'leave_type_id' => $unpaid->id, 'start_date' => '2026-11-16', 'end_date' => '2026-11-17',
+            'day_part' => 'full', 'days' => 2, 'status' => 'approved',
+        ]);
+        app(AttendanceRecorder::class)->recalculateRange($this->employee, '2026-09-10', '2026-09-11');
+
+        $events = collect($this->events()->assertOk()->json('events'));
+
+        $this->assertSame(
+            [
+                ['absent', '2026-09-10', '2026-09-11', 2],
+                ['holiday', '2026-09-22', '2026-09-22', 1],
+                ['day_off', '2026-10-05', '2026-10-07', 3],
+                ['day_off', '2026-10-09', '2026-10-09', 1],
+                ['holiday', '2026-11-09', '2026-11-09', 1],
+                ['leave', '2026-11-16', '2026-11-17', 2],
+            ],
+            $events->map(fn ($e) => [$e['type'], $e['start'], $e['end'], (int) $e['days']])->all(),
+        );
+        $this->assertNull($events[1]['employee']);
+        $this->assertSame('Worker', $events[2]['employee']['name']);
+        $this->assertSame('approved', $events[5]['status']);
+
+        $this->assertSame(['holiday', 'holiday'], collect($this->events(query: '&types[]=holiday')->json('events'))->pluck('type')->all());
+    }
+
+    public function test_an_employee_only_sees_their_own_agenda(): void
+    {
+        $otherEmployee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Other']);
+        DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $otherEmployee->id, 'date' => '2026-10-05']);
+        DayOff::query()->create(['company_id' => $this->company->id, 'employee_id' => $this->employee->id, 'date' => '2026-10-06']);
+
+        // Asking for someone else's as a regular employee is ignored.
+        $mine = collect($this->events($this->user, "&employee_id={$otherEmployee->id}")->assertOk()->json('events'));
+        $this->assertSame(['Worker'], $mine->pluck('employee.name')->all());
+
+        $everyone = collect($this->events($this->admin)->json('events'));
+        $this->assertSame(['Other', 'Worker'], $everyone->pluck('employee.name')->all());
+    }
+
+    public function test_the_agenda_range_is_at_most_a_year(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/calendar/events?from=2026-01-01&to=2027-06-01')->assertStatus(422);
     }
 }

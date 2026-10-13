@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ChevronLeft, ChevronRight, Moon, Settings2, Users } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, Moon, Settings2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { CalendarAgenda } from "@/components/dashboard/calendar-agenda";
 import { TeamCalendar } from "@/components/dashboard/team-calendar";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
@@ -34,8 +35,10 @@ export default function CalendarPage() {
   const canManage = me?.permissions.includes("schedules.manage") ?? false;
 
   const [month, setMonth] = useState(currentMonth);
-  // Managers land on the whole-team roster; everyone else only has their own month.
-  const [view, setView] = useState<"team" | "individual">("team");
+  // Managers land on the whole-team roster; everyone else on their own month.
+  // The agenda (only the days something happens) is open to everyone.
+  const [view, setView] = useState<"team" | "individual" | "agenda">("team");
+  const activeView = !canManage && view === "team" ? "individual" : view;
   // "" = my own calendar; managers can pick anyone else.
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -57,7 +60,7 @@ export default function CalendarPage() {
   }, [canManage]);
 
   useEffect(() => {
-    if (view !== "individual" && canManage) return;
+    if (activeView !== "individual") return;
     if (needsPick && !effectiveEmployeeId) return;
 
     let cancelled = false;
@@ -73,7 +76,7 @@ export default function CalendarPage() {
     return () => {
       cancelled = true;
     };
-  }, [month, effectiveEmployeeId, requestKey, view, canManage, needsPick]);
+  }, [month, effectiveEmployeeId, requestKey, activeView, needsPick]);
 
   const loading = result?.key !== requestKey && !(needsPick && employees.length === 0);
   const data = result?.data ?? null;
@@ -81,7 +84,12 @@ export default function CalendarPage() {
 
   const leadingBlanks = data ? parseDate(data.days[0].date).getDay() : 0;
   const monthLabel = parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-  const showTeam = canManage && view === "team";
+  const showTeam = activeView === "team";
+  const tabs = [
+    ...(canManage ? [{ id: "team", label: "Team", icon: Users }] as const : []),
+    { id: "individual", label: canManage ? "Individual" : "My month", icon: CalendarDays },
+    { id: "agenda", label: "Agenda", icon: ListChecks },
+  ] as const;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -91,47 +99,46 @@ export default function CalendarPage() {
           description={
             showTeam
               ? "Everyone's month at a glance — schedules, days off and attendance."
-              : "Work days, holidays and days off — and how each day actually went."
+              : activeView === "agenda"
+                ? "Only the days something happens — holidays, leave, days off and absences — for the whole range."
+                : "Work days, holidays and days off — and how each day actually went."
           }
           action={
-            canManage && (
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
-                  {(
-                    [
-                      { id: "team", label: "Team", icon: Users },
-                      { id: "individual", label: "Individual", icon: CalendarDays },
-                    ] as const
-                  ).map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={view === tab.id}
-                      onClick={() => setView(tab.id)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                        view === tab.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <tab.icon className="size-4" />
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-                {/* Hours and each person's weekly days off are set on their work schedule. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeView === tab.id}
+                    onClick={() => setView(tab.id)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      activeView === tab.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <tab.icon className="size-4" />
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              {/* Hours and each person's weekly days off are set on their work schedule. */}
+              {canManage && (
                 <Button variant="outline" render={<Link href="/dashboard/work-schedules" />} nativeButton={false}>
                   <Settings2 className="size-4" />
                   Work schedules
                 </Button>
-              </div>
-            )
+              )}
+            </div>
           }
         />
 
         {showTeam && <TeamCalendar canManage={canManage} refreshKey={reloads} />}
 
-        {!showTeam && (
+        {activeView === "agenda" && <CalendarAgenda canManage={canManage} employees={employees} />}
+
+        {activeView === "individual" && (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
