@@ -48,7 +48,8 @@ function excelDate(value: string): Date | string {
   return m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : value;
 }
 
-function styleHeader(sheet: Worksheet, required: Set<number> = new Set()) {
+/** Styles row 1 as a header and freezes it — plus the first `xSplit` columns, when given. */
+export function styleHeader(sheet: Worksheet, required: Set<number> = new Set(), xSplit = 0) {
   const header = sheet.getRow(1);
   header.height = 22;
   header.eachCell((cell, col) => {
@@ -58,7 +59,17 @@ function styleHeader(sheet: Worksheet, required: Set<number> = new Set()) {
     cell.border = { bottom: BORDER };
   });
   // The header stays in view while scrolling.
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
+  sheet.views = [{ state: "frozen", ySplit: 1, xSplit }];
+}
+
+/** A column's value as Excel should store it: real dates and numbers, blanks left empty. */
+function cellValue<T>(column: SheetColumn<T>, value: SheetValue): Date | string | number | boolean | null {
+  if (value == null || value === "") return null;
+  if (column.type === "date" && typeof value === "string") return excelDate(value);
+  if (column.type === "number" && typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) {
+    return Number(value);
+  }
+  return value;
 }
 
 function addSheet<T>(workbook: Workbook, spec: SheetSpec<T>) {
@@ -70,15 +81,8 @@ function addSheet<T>(workbook: Workbook, spec: SheetSpec<T>) {
   for (const row of spec.rows) {
     const values = spec.columns.map((column, i) => {
       const value = column.value(row);
-      const shown = value == null ? "" : String(value);
-      widths[i] = Math.max(widths[i], shown.length);
-
-      if (value == null || value === "") return null;
-      if (column.type === "date" && typeof value === "string") return excelDate(value);
-      if (column.type === "number" && typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) {
-        return Number(value);
-      }
-      return value;
+      widths[i] = Math.max(widths[i], value == null ? 0 : String(value).length);
+      return cellValue(column, value);
     });
     const added = sheet.addRow(values);
     added.eachCell((cell) => (cell.border = { bottom: BORDER }));
@@ -119,6 +123,92 @@ async function newWorkbook(): Promise<Workbook> {
 export async function downloadSheet<T>(filename: string, spec: SheetSpec<T>) {
   const workbook = await newWorkbook();
   addSheet(workbook, spec);
+  await download(workbook, filename);
+}
+
+/** A chart drawn to a PNG (see chart-image.ts), placed on a sheet at its natural size. */
+export type SheetChart = { png: string; width: number; height: number };
+
+/** One titled table on a chart sheet, with an optional chart to its right. */
+export type ChartBlock<T> = {
+  title: string;
+  columns: SheetColumn<T>[];
+  rows: T[];
+  chart?: SheetChart;
+};
+
+export type WorkbookBuilder = {
+  sheet<T>(spec: SheetSpec<T>): void;
+  /** A sheet of summary tables stacked top to bottom, each with its chart beside it. */
+  chartSheet(name: string): { block<T>(block: ChartBlock<T>): void };
+  /** A blank sheet the caller lays out cell by cell, for grids the specs above can't describe. */
+  worksheet(name: string, build: (sheet: Worksheet) => void): void;
+};
+
+// Excel's default row height, in pixels — used to leave room under a chart image.
+const ROW_PX = 20;
+
+function addChartSheet(workbook: Workbook, name: string) {
+  const sheet = workbook.addWorksheet(sheetName(name), { views: [{ showGridLines: false }] });
+  let top = 1;
+
+  return {
+    block<T>(block: ChartBlock<T>) {
+      const title = sheet.getRow(top).getCell(1);
+      title.value = block.title;
+      title.font = { bold: true, size: 13 };
+
+      const header = sheet.getRow(top + 1);
+      block.columns.forEach((column, i) => {
+        const cell = header.getCell(i + 1);
+        cell.value = column.header;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+        cell.border = { bottom: BORDER };
+      });
+
+      block.rows.forEach((row, r) => {
+        const line = sheet.getRow(top + 2 + r);
+        block.columns.forEach((column, i) => {
+          const cell = line.getCell(i + 1);
+          cell.value = cellValue(column, column.value(row));
+          cell.border = { bottom: BORDER };
+          if (column.format) cell.numFmt = column.format;
+        });
+      });
+
+      // Blocks share columns, so each column is as wide as its widest block needs.
+      block.columns.forEach((column, i) => {
+        const col = sheet.getColumn(i + 1);
+        const longest = Math.max(column.header.length, ...block.rows.map((row) => String(column.value(row) ?? "").length));
+        col.width = Math.max(col.width ?? 0, column.width ?? Math.min(Math.max(longest + 2, 10), 40));
+      });
+
+      let used = block.rows.length + 2;
+      if (block.chart) {
+        const image = workbook.addImage({ base64: block.chart.png, extension: "png" });
+        // One empty column between the table and the chart.
+        sheet.addImage(image, {
+          tl: { col: block.columns.length + 1, row: top - 1 },
+          ext: { width: block.chart.width, height: block.chart.height },
+        });
+        used = Math.max(used, Math.ceil(block.chart.height / ROW_PX));
+      }
+      top += used + 2;
+    },
+  };
+}
+
+/** Builds a workbook of several sheets and hands it to the browser's download bar. */
+export async function downloadWorkbook(filename: string, build: (book: WorkbookBuilder) => void) {
+  const workbook = await newWorkbook();
+  // ExcelJS doesn't save a formula's cached result of 0, so Excel works every formula out on open.
+  workbook.calcProperties.fullCalcOnLoad = true;
+  build({
+    sheet: (spec) => void addSheet(workbook, spec),
+    chartSheet: (name) => addChartSheet(workbook, name),
+    worksheet: (name, fill) => fill(workbook.addWorksheet(sheetName(name))),
+  });
   await download(workbook, filename);
 }
 
