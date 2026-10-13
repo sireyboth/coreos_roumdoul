@@ -16,6 +16,9 @@ class CompanyPermissions
         // An employee's pay. Separate from employees.* on purpose: someone can
         // run the staff list without seeing what anyone earns.
         'salary',
+        // Pay runs, payslips and the company's payroll rules. Kept apart from
+        // salary.*: salary is one person's pay, payroll is everyone's.
+        'payroll',
         // Leave and other requests: .view to send your own, .manage to approve
         // for the branches you cover. leave_policies: leave types and balances.
         'requests', 'leave_policies',

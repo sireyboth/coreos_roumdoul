@@ -5,6 +5,7 @@ import {
   CalendarHeart,
   Clock,
   FileClock,
+  HandCoins,
   IdCard,
   KeyRound,
   LayoutDashboard,
@@ -13,9 +14,11 @@ import {
   PartyPopper,
   Scale,
   ShieldCheck,
+  SlidersHorizontal,
   User,
   Users,
   UsersRound,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +52,14 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/dashboard/work-schedules", label: "Work Schedules", icon: CalendarClock, tone: "from-amber-500 to-orange-500", permission: "work_schedules.view" },
       { href: "/dashboard/holidays", label: "Holidays", icon: PartyPopper, tone: "from-pink-500 to-rose-500", permission: "holidays.view" },
       { href: "/dashboard/leave-policy", label: "Leave Policy", icon: Scale, tone: "from-purple-500 to-indigo-500", permission: "leave_policies.manage", module: "attendance" },
+    ],
+  },
+  {
+    label: "Payroll",
+    items: [
+      { href: "/dashboard/payroll", label: "Pay Runs", icon: Wallet, tone: "from-emerald-500 to-green-600", permission: "payroll.view", module: "payroll" },
+      { href: "/dashboard/payroll/adjustments", label: "Adjustments", icon: HandCoins, tone: "from-amber-500 to-yellow-500", permission: "payroll.view", module: "payroll" },
+      { href: "/dashboard/payroll/settings", label: "Payroll Settings", icon: SlidersHorizontal, tone: "from-slate-500 to-slate-700", permission: "payroll.manage", module: "payroll" },
     ],
   },
   {

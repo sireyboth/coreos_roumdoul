@@ -945,6 +945,184 @@ export type AttendanceCorrection = {
   reviewed_by: { id: number; name: string } | null;
 };
 
+
+// ───────────────────────────── Payroll ─────────────────────────────
+
+export type PayCurrency = "USD" | "KHR";
+// earning · deduction (before tax, reduces gross) · net_deduction (after tax: advance, loan).
+export type PayKind = "earning" | "deduction" | "net_deduction";
+export type PayLineKind = PayKind | "statutory" | "employer";
+export type PayTemplate = "overtime" | "attendance_bonus" | "absence" | "unpaid_leave" | "late" | "early_leave" | "unpaid_permission";
+export type LatenessMode = "per_minute" | "per_time" | "count_based" | "tiers" | "none";
+export type LatenessTier = { up_to_minutes: number | null; amount: number; day_fraction: number };
+export type LatenessParams = { mode: LatenessMode; grace_minutes: number; amount: number; free_count: number; every_n: number; tiers: LatenessTier[] };
+
+export type PayComponent = {
+  id: number;
+  code: string;
+  name: string;
+  kind: PayKind;
+  // base = the salary · employee_item = an amount set per person · template = worked out from attendance.
+  method: "base" | "employee_item" | "template";
+  template: PayTemplate | null;
+  params: Record<string, unknown> | null;
+  taxable: boolean;
+  nssf_insurable: boolean;
+  is_system: boolean;
+  is_active: boolean;
+  sort_order: number;
+  employee_items_count?: number;
+};
+
+export type PayrollPolicy = {
+  rate_basis: "fixed" | "calendar" | "scheduled";
+  rate_basis_days: number;
+  hours_per_day: number;
+  missing_scan_policy: "review" | "present" | "absent";
+  daily_paid_holidays: boolean;
+  khr_rounding: number;
+  fallback_exchange_rate: number | null;
+};
+
+export type PayrollSettings = {
+  policy: PayrollPolicy;
+  components: PayComponent[];
+  presets: { key: string; name: string; description: string }[];
+  templates: PayTemplate[];
+};
+
+export type PayWarning = { code: string; message: string; blocking: boolean; employee_ids?: number[] };
+export type PayRunStatus = "draft" | "calculated" | "approved" | "paid";
+// Per currency: USD and KHR salaries are never added together.
+export type PayTotals = Record<string, { employees: number; gross: number; nssf_employee: number; tax: number; net: number; employer_cost: number }>;
+
+export type PayRun = {
+  id: number;
+  month: string;
+  status: PayRunStatus;
+  totals: PayTotals | null;
+  warnings: PayWarning[] | null;
+  calculated_at: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  approved_by: { id: number; name: string } | null;
+  paid_by: { id: number; name: string } | null;
+};
+
+type PayEmployee = { id: number; name: string; employee_code: string | null; branch?: string | null } | null;
+
+// Money arrives as strings ("520.00") from saved payslips and as numbers from a preview: always Number() it.
+type Amount = number | string;
+
+export type PayslipRow = {
+  id: number;
+  currency: PayCurrency;
+  pay_type: "monthly" | "daily";
+  base_salary: Amount;
+  gross: Amount;
+  nssf_employee: Amount;
+  tax: Amount;
+  net: Amount;
+  employer_cost: Amount;
+  warnings: PayWarning[] | null;
+  employee: PayEmployee;
+};
+
+// is_stale: something that feeds pay changed since the last calculation — recalculate to include it.
+export type PayRunDetail = PayRun & { payslips: PayslipRow[]; is_stale: boolean };
+
+export type PayslipLine = { id?: number; code: string; name: string; kind: PayLineKind; amount: Amount; explanation: string | null };
+
+export type PayslipInputs = {
+  attendance: Record<string, unknown> & { present_days?: number; absent_days?: number; incomplete_days?: number; late_days?: number; late_minutes?: number };
+  variables: Record<string, number | string>;
+  rate_basis: { method: string; days: number; hours_per_day: number };
+  employed: { from: string; to: string };
+  salaries: { amount: number; currency: PayCurrency; pay_type: string; from: string; to: string }[];
+  profile: EmployeePayProfile;
+  exchange_rate_source: "official" | "company_fallback" | null;
+  taxable: number;
+  insurable: number;
+};
+
+export type PayslipBody = {
+  currency: PayCurrency;
+  pay_type: "monthly" | "daily";
+  base_salary: Amount;
+  daily_rate: Amount;
+  hourly_rate: Amount;
+  exchange_rate: number | null;
+  gross: Amount;
+  nssf_employee: Amount;
+  tax: Amount;
+  net: Amount;
+  employer_cost: Amount;
+  inputs: PayslipInputs;
+  warnings: PayWarning[] | null;
+  employee: PayEmployee;
+  lines: PayslipLine[];
+};
+
+export type Payslip = PayslipBody & { id: number; pay_run_id: number; month: string; status: PayRunStatus };
+
+export type PayrollAdjustment = {
+  id: number;
+  month: string;
+  kind: PayKind;
+  name: string;
+  amount: Amount;
+  taxable: boolean;
+  reason: string | null;
+  source: "manual" | "import" | "correction";
+  created_at: string;
+  employee: PayEmployee;
+  created_by: { id: number; name: string } | null;
+};
+
+export type PayrollAdjustmentInput = { employee_id: number; month: string; kind: PayKind; name: string; amount: number; taxable: boolean; reason: string | null };
+
+export type SalaryReason = "hired" | "probation_passed" | "promotion" | "annual_increase" | "change" | "correction";
+
+export type EmployeeSalary = {
+  id: number;
+  employee_id: number;
+  amount: Amount;
+  currency: PayCurrency;
+  pay_type: "monthly" | "daily";
+  effective_from: string;
+  effective_to: string | null;
+  reason: SalaryReason;
+  note: string | null;
+  created_by: { id: number; name: string } | null;
+  created_at: string;
+};
+
+export type EmployeePayProfile = {
+  tax_resident: boolean;
+  spouse_dependent: boolean;
+  child_dependents: number;
+  nssf_enrolled: boolean;
+  payment_method: "bank" | "cash";
+  bank_account_name: string | null;
+};
+
+export type EmployeePayItem = {
+  id: number;
+  pay_component_id: number;
+  amount: Amount;
+  effective_from: string;
+  effective_to: string | null;
+  note: string | null;
+  component: { id: number; code: string; name: string; kind: PayKind } | null;
+};
+
+export type EmployeePay = {
+  salaries: EmployeeSalary[];
+  profile: EmployeePayProfile;
+  items: EmployeePayItem[];
+  item_components: { id: number; code: string; name: string; kind: PayKind; is_active: boolean }[];
+};
+
 export const api = {
   // Either an email, or a company code + employee ID — never both.
   login: (credentials: { email: string; password: string } | { company: string; employee_id: string; password: string }) =>
@@ -1365,6 +1543,70 @@ export const api = {
     subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string }; content_encoding?: string }) =>
       request<void>("/api/push/subscriptions", { method: "POST", body: JSON.stringify(subscription) }),
     unsubscribe: (endpoint: string) => request<void>("/api/push/subscriptions", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
+  },
+
+  payroll: {
+    settings: () => request<PayrollSettings>("/api/payroll/settings"),
+    updatePolicy: (data: Partial<PayrollPolicy>) =>
+      request<PayrollPolicy>("/api/payroll/policy", { method: "PUT", body: JSON.stringify(data) }),
+    applyPreset: (preset: string) =>
+      request<PayrollSettings>("/api/payroll/presets", { method: "POST", body: JSON.stringify({ preset }) }),
+    createComponent: (data: Partial<PayComponent>) =>
+      request<PayComponent>("/api/payroll/components", { method: "POST", body: JSON.stringify(data) }),
+    updateComponent: (id: number, data: Partial<PayComponent>) =>
+      request<PayComponent>(`/api/payroll/components/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    removeComponent: (id: number) => request<void>(`/api/payroll/components/${id}`, { method: "DELETE" }),
+    // One employee's month with the current rules — or with one component's unsaved params tried out.
+    preview: (data: { employee_id: number; month: string; component_id?: number; params?: Record<string, unknown>; is_active?: boolean }) =>
+      request<PayslipBody>("/api/payroll/preview", { method: "POST", body: JSON.stringify(data) }),
+
+    runs: () => request<PayRun[]>("/api/payroll/runs"),
+    run: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}`),
+    createRun: (month: string) => request<PayRunDetail>("/api/payroll/runs", { method: "POST", body: JSON.stringify({ month }) }),
+    calculate: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/calculate`, { method: "POST", body: "{}" }),
+    approve: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/approve`, { method: "POST", body: "{}" }),
+    markPaid: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/paid`, { method: "POST", body: "{}" }),
+    removeRun: (id: number) => request<void>(`/api/payroll/runs/${id}`, { method: "DELETE" }),
+    payslip: (id: number) => request<Payslip>(`/api/payroll/payslips/${id}`),
+    // A file, not JSON — fetched with the login header like the attendance export.
+    exportRun: async (id: number, month: string): Promise<{ blob: Blob; filename: string }> => {
+      const token = getToken();
+      const res = await fetch(`${API_URL}/api/payroll/runs/${id}/export`, {
+        headers: { Accept: "text/csv, application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, body.message ?? `Export failed (${res.status})`, body.errors, body.code);
+      }
+      return { blob: await res.blob(), filename: `payroll-${month}.csv` };
+    },
+
+    adjustments: (month: string) => request<PayrollAdjustment[]>(`/api/payroll/adjustments?month=${month}`),
+    createAdjustment: (data: PayrollAdjustmentInput) =>
+      request<PayrollAdjustment>("/api/payroll/adjustments", { method: "POST", body: JSON.stringify(data) }),
+    // The same amount for many people (everyone, or one branch): one adjustment each.
+    createAdjustments: (data: Omit<PayrollAdjustmentInput, "employee_id"> & { employee_ids: number[] }) =>
+      request<{ created: number }>("/api/payroll/adjustments/bulk", { method: "POST", body: JSON.stringify(data) }),
+    removeAdjustment: (id: number) => request<void>(`/api/payroll/adjustments/${id}`, { method: "DELETE" }),
+    importAdjustments: (month: string, rows: { employee_code: string; kind: PayKind; name: string; amount: number; taxable?: boolean; reason?: string | null }[]) =>
+      request<{ created: number; errors: { row: number; message: string }[] }>("/api/payroll/adjustments/import", {
+        method: "POST",
+        body: JSON.stringify({ month, rows }),
+      }),
+  },
+
+  employeePay: {
+    get: (employeeId: number) => request<EmployeePay>(`/api/employees/${employeeId}/pay`),
+    addSalary: (employeeId: number, data: { amount: number; currency: PayCurrency; pay_type: "monthly" | "daily"; effective_from: string; reason: SalaryReason; note: string | null }) =>
+      request<EmployeeSalary>(`/api/employees/${employeeId}/salaries`, { method: "POST", body: JSON.stringify(data) }),
+    removeSalary: (employeeId: number, salaryId: number) =>
+      request<void>(`/api/employees/${employeeId}/salaries/${salaryId}`, { method: "DELETE" }),
+    updateProfile: (employeeId: number, data: Partial<EmployeePayProfile>) =>
+      request<EmployeePayProfile>(`/api/employees/${employeeId}/pay-profile`, { method: "PUT", body: JSON.stringify(data) }),
+    addItem: (employeeId: number, data: { pay_component_id: number; amount: number; effective_from: string; effective_to: string | null; note: string | null }) =>
+      request<EmployeePayItem>(`/api/employees/${employeeId}/pay-items`, { method: "POST", body: JSON.stringify(data) }),
+    removeItem: (employeeId: number, itemId: number) =>
+      request<void>(`/api/employees/${employeeId}/pay-items/${itemId}`, { method: "DELETE" }),
   },
 
   profile: {
