@@ -15,6 +15,9 @@ import {
   shiftMonth,
   TYPE_STYLES,
   WEEKDAYS,
+  HalfDayShade,
+  halfDayLabel,
+  halfDayLeave,
 } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -209,6 +212,7 @@ export default function CalendarPage() {
                     const isToday = day.date === data.today;
                     const khmer = khmerDay(day.date);
                     const khmerHoliday = khmer.holidays[0];
+                    const halfDay = halfDayLeave(day);
 
                     return (
                       <button
@@ -216,11 +220,12 @@ export default function CalendarPage() {
                         type="button"
                         onClick={() => setSelected(day)}
                         className={cn(
-                          "flex min-h-16 flex-col items-start gap-0.5 rounded-md border p-1 text-left text-xs transition-colors hover:brightness-95 sm:min-h-28 sm:p-2",
+                          "relative isolate flex min-h-16 flex-col items-start gap-0.5 rounded-md border p-1 text-left text-xs transition-colors hover:brightness-95 sm:min-h-28 sm:p-2",
                           style.cell,
                           isToday && "ring-2 ring-primary",
                         )}
                       >
+                        {halfDay && <HalfDayShade part={halfDay.part} className="-z-10" />}
                         <span className="flex w-full items-center justify-between">
                           {/* Red number for any Cambodian holiday, as in the team view; only a company holiday colours the whole cell. */}
                           <span className={cn("font-medium", khmerHoliday && "text-destructive", isToday && "text-primary")}>
@@ -238,6 +243,11 @@ export default function CalendarPage() {
                         </span>
                         <span className="text-[10px] leading-tight text-muted-foreground">{khmer.short}</span>
                         {day.label && <span className="hidden w-full truncate sm:block">{day.label}</span>}
+                        {halfDay && (
+                          <span className="hidden w-full truncate font-medium text-violet-700 sm:block dark:text-violet-300" title={halfDayLabel(halfDay)}>
+                            {halfDayLabel(halfDay)}
+                          </span>
+                        )}
                         {/* A Khmer holiday the company hasn't added yet: shown for reference, not as a day off. */}
                         {khmerHoliday && day.type !== "holiday" && (
                           <span className="hidden w-full truncate text-[10px] font-medium text-destructive sm:block" title={khmerHoliday.nameKm}>
@@ -264,6 +274,12 @@ export default function CalendarPage() {
                       {TYPE_STYLES[type].label}
                     </span>
                   ))}
+                    <span className="flex items-center gap-1.5">
+                      <span className="relative size-3 overflow-hidden rounded-sm bg-info/40">
+                        <span className="absolute inset-y-0 left-0 w-1/2 bg-violet-500/60" />
+                      </span>
+                      Half-day leave
+                    </span>
                   {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
                     <span key={status} className="flex items-center gap-1.5">
                       <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />

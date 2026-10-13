@@ -446,6 +446,21 @@ class LeaveRequestTest extends TestCase
         $this->get(preg_replace('/signature=\w+/', 'signature=forged', $url))->assertForbidden();
     }
 
+    public function test_a_document_set_to_always_is_needed_for_half_days_too(): void
+    {
+        Storage::fake('local');
+
+        $this->ask($this->staff, 'sick', '2026-10-02', null, ['day_part' => 'am'])
+            ->assertStatus(422)->assertJsonValidationErrors('attachment');
+        $this->ask($this->staff, 'sick', '2026-10-02', null, ['day_part' => 'am', 'attachment' => UploadedFile::fake()->create('note.pdf', 10, 'application/pdf')])
+            ->assertCreated()->assertJsonPath('days', 0.5);
+
+        // "From 3 days" still lets shorter requests through without one.
+        $this->type('sick')->update(['attachment_from_days' => 3]);
+        $this->ask($this->staff, 'sick', '2026-10-05', '2026-10-06')->assertCreated();
+        $this->ask($this->staff, 'sick', '2026-10-07', '2026-10-09')->assertStatus(422)->assertJsonValidationErrors('attachment');
+    }
+
     public function test_maternity_leave_is_for_women_and_counts_every_calendar_day(): void
     {
         $this->ask($this->staff, 'maternity', '2026-10-05', '2026-10-18')->assertCreated()->assertJsonPath('days', 14);

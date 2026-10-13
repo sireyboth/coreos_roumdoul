@@ -50,7 +50,7 @@ class EmployeeRemover
 
         // Only once the rows are really gone, so a rollback never leaves a record without its photo.
         if ($photos !== []) {
-            Storage::disk('local')->delete($photos);
+            Storage::disk(config('filesystems.uploads'))->delete($photos);
         }
     }
 

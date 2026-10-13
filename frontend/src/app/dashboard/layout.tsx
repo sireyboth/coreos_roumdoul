@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountBanner } from "@/components/dashboard/account-banner";
+import { BirthdayCelebration } from "@/components/dashboard/birthday-celebration";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
@@ -167,6 +168,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <PushPrompt />
+      <BirthdayCelebration />
     </div>
   );
 }

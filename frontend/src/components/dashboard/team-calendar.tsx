@@ -13,6 +13,9 @@ import {
   parseDate,
   shiftMonth,
   TYPE_STYLES,
+  HalfDayShade,
+  halfDayLabel,
+  halfDayLeave,
   WEEKDAYS,
 } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
@@ -233,9 +236,11 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                   {employee.days.map((day) => {
                     const style = TYPE_STYLES[day.type as CalendarDayType];
                     const attendance = day.attendance as CalendarAttendance | null;
+                    const halfDay = halfDayLeave(day);
                     const tip = [
                       `${employee.name} · ${day.date}`,
                       day.label ?? style.label,
+                      halfDay ? halfDayLabel(halfDay) : null,
                       day.schedule ? `${day.schedule.name} ${slotsSummary(day.schedule.slots)}` : null,
                       day.scans?.length ? `Scans ${day.scans.join(", ")}` : null,
                       attendance ? ATTENDANCE[attendance].label : null,
@@ -257,10 +262,11 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                           aria-label={tip}
                           onClick={() => setSelected({ employee: { id: employee.id, name: employee.name }, day })}
                           className={cn(
-                            "relative mx-auto block size-7 rounded-md border transition-transform hover:scale-110",
+                            "relative isolate mx-auto block size-7 rounded-md border transition-transform hover:scale-110",
                             style.cell,
                           )}
                         >
+                          {halfDay && <HalfDayShade part={halfDay.part} className="-z-10" />}
                           {attendance && (
                             <span
                               className={cn("absolute right-0.5 top-0.5 size-1.5 rounded-full", ATTENDANCE[attendance].dot)}
@@ -287,6 +293,12 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
             {TYPE_STYLES[type].label}
           </span>
         ))}
+        <span className="flex items-center gap-1.5">
+          <span className="relative size-3 overflow-hidden rounded-sm bg-info/40">
+            <span className="absolute inset-y-0 left-0 w-1/2 bg-violet-500/60" />
+          </span>
+          Half-day leave
+        </span>
         {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
           <span key={status} className="flex items-center gap-1.5">
             <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />
