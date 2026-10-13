@@ -8,6 +8,7 @@ use App\Models\PayComponent;
 use App\Models\PayrollAdjustment;
 use App\Models\PayRun;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,36 @@ class PayrollAdjustmentController extends Controller
         $adjustment = PayrollAdjustment::query()->create([...$data, 'source' => 'manual', 'created_by' => $request->user()->id]);
 
         return response()->json($this->present($adjustment->load(['employee', 'createdBy:id,name'])), 201);
+    }
+
+    /**
+     * The same amount for many people at once (a festival bonus for everyone,
+     * an allowance for one branch): one adjustment row per person, so each
+     * can still be removed on its own.
+     */
+    public function bulk(Request $request)
+    {
+        $data = $request->validate([
+            ...collect($this->rules())->except('employee_id')->all(),
+            'employee_ids' => ['required', 'array', 'min:1', 'max:2000'],
+            'employee_ids.*' => ['integer', 'distinct'],
+        ]);
+        $this->assertMonthOpen($data['month']);
+
+        // Only people the caller can see; anyone else in the list is an error, not silently skipped.
+        $ids = Employee::query()->whereIn('id', $data['employee_ids'])->pluck('id');
+        if ($ids->count() !== count($data['employee_ids'])) {
+            throw ValidationException::withMessages(['employee_ids' => ['Some of these employees no longer exist or are outside your branches.']]);
+        }
+
+        DB::transaction(fn () => $ids->each(fn (int $id) => PayrollAdjustment::query()->create([
+            ...collect($data)->except('employee_ids')->all(),
+            'employee_id' => $id,
+            'source' => 'manual',
+            'created_by' => $request->user()->id,
+        ])));
+
+        return response()->json(['created' => $ids->count()], 201);
     }
 
     public function update(Request $request, PayrollAdjustment $adjustment)

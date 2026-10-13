@@ -18,12 +18,21 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, type PayKind, type PayrollAdjustment } from "@/lib/api";
 import { adjustmentImport } from "@/lib/excel-specs/payroll";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { cn } from "@/lib/utils";
+import { LEFT_STATUSES } from "@/components/dashboard/employee-form";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
+type Person = { value: string; label: string; currency: string | null; branchId: number | null; branch: string | null };
+
+/** Who an adjustment goes to: one person, everyone in a branch, or everyone. */
+type Target = "one" | "branch" | "all";
+
 function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
-  const [people, setPeople] = useState<{ value: string; label: string; currency: string | null }[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [target, setTarget] = useState<Target>("one");
   const [employeeId, setEmployeeId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [kind, setKind] = useState<PayKind>("earning");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -31,22 +40,38 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const currency = people.find((p) => p.value === employeeId)?.currency;
 
   useEffect(() => {
     api.employees
       .all()
-      .then((list) => setPeople(list.map((e) => ({ value: String(e.id), label: e.name, currency: e.salary_currency ?? null }))))
+      .then((list) =>
+        setPeople(
+          list
+            // People who have left aren't paid any more.
+            .filter((e) => !LEFT_STATUSES.includes(e.employment_status ?? ""))
+            .map((e) => ({ value: String(e.id), label: e.name, currency: e.salary_currency ?? null, branchId: e.branch?.id ?? null, branch: e.branch?.name ?? null })),
+        ),
+      )
       .catch(() => setPeople([]));
   }, []);
+
+  const branches = [...new Map(people.filter((p) => p.branchId).map((p) => [String(p.branchId), p.branch ?? ""])).entries()].map(([value, label]) => ({ value, label }));
+  const recipients = target === "all" ? people : target === "branch" ? people.filter((p) => String(p.branchId) === branchId) : people.filter((p) => p.value === employeeId);
+  const currencies = [...new Set(recipients.map((p) => p.currency).filter(Boolean))];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const base = { month, kind, name: name.trim(), amount: Number(amount), taxable, reason: reason.trim() || null };
     try {
-      await api.payroll.createAdjustment({ employee_id: Number(employeeId), month, kind, name: name.trim(), amount: Number(amount), taxable, reason: reason.trim() || null });
-      notifySuccess("Adjustment added", name.trim());
+      if (target === "one") {
+        await api.payroll.createAdjustment({ ...base, employee_id: Number(employeeId) });
+        notifySuccess("Adjustment added", name.trim());
+      } else {
+        const { created } = await api.payroll.createAdjustments({ ...base, employee_ids: recipients.map((p) => Number(p.value)) });
+        notifySuccess("Adjustments added", `${name.trim()} for ${created} ${created === 1 ? "person" : "people"}`);
+      }
       onSaved();
       onOpenChange(false);
     } catch (err) {
@@ -62,12 +87,48 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Add adjustment</DialogTitle>
-            <DialogDescription>A one-off amount on {monthLabel(month)}&apos;s payslip: a bonus, commission, penalty or back pay.</DialogDescription>
+            <DialogDescription>A one-off amount on {monthLabel(month)}&apos;s payslips: a bonus, commission, penalty or back pay.</DialogDescription>
           </DialogHeader>
+
           <div className="flex flex-col gap-1.5">
-            <Label>Employee</Label>
-            <SearchableSelect options={people} value={employeeId} onChange={setEmployeeId} placeholder="Choose an employee" className="h-9 w-full rounded-md" />
+            <Label>Apply to</Label>
+            <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5" role="radiogroup">
+              {(
+                [
+                  ["one", "One employee"],
+                  ["branch", "A branch"],
+                  ["all", "Everyone"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={target === value}
+                  onClick={() => setTarget(value)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    target === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {target === "one" && (
+            <SearchableSelect options={people} value={employeeId} onChange={setEmployeeId} placeholder="Choose an employee" className="h-9 w-full rounded-md" />
+          )}
+          {target === "branch" && (
+            <SearchableSelect options={branches} value={branchId} onChange={setBranchId} placeholder="Choose a branch" className="h-9 w-full rounded-md" />
+          )}
+          {target !== "one" && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              {recipients.length} {recipients.length === 1 ? "person" : "people"} will each get this amount. Each one can still be removed on its own.
+            </p>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="adj-kind">Type</Label>
@@ -81,13 +142,14 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
               <p className="text-xs text-muted-foreground">{KIND_HINTS[kind]}</p>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="adj-amount">Amount{currency ? ` (${currency})` : ""}</Label>
+              <Label htmlFor="adj-amount">Amount{currencies.length === 1 ? ` (${currencies[0]})` : ""}</Label>
               <Input id="adj-amount" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+              {currencies.length > 1 && <p className="text-xs text-warning">Some are paid in USD and some in KHR: each gets this number in their own currency.</p>}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="adj-name">Name on payslip</Label>
-            <Input id="adj-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Sales commission" required />
+            <Input id="adj-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Khmer New Year bonus" required />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="adj-reason">Reason</Label>
@@ -102,8 +164,8 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={saving || !employeeId || !name.trim() || !(Number(amount) > 0)}>
-              {saving ? "Saving…" : "Add"}
+            <Button type="submit" disabled={saving || recipients.length === 0 || !name.trim() || !(Number(amount) > 0)}>
+              {saving ? "Saving…" : target === "one" ? "Add" : `Add for ${recipients.length}`}
             </Button>
           </DialogFooter>
         </form>
@@ -184,7 +246,7 @@ export default function PayrollAdjustmentsPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Adjustments"
-        description="One-off amounts for a month — anything your rules don't cover. They're added the next time the month is calculated."
+        description="One-off amounts for a month — anything your rules don't cover. Recalculate the month's pay run to include them."
         action={
           canManage && (
             <div className="flex flex-wrap gap-2">

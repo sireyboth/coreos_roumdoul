@@ -106,6 +106,8 @@ class PayRunController extends Controller
 
         return [
             ...$this->summary($run),
+            // Something that feeds pay changed after the last calculation: recalculate to include it.
+            'is_stale' => $this->runs->isStale($run),
             'policy_snapshot' => $run->policy_snapshot,
             'payslips' => $run->payslips
                 ->sortBy(fn (Payslip $p) => [$p->employee?->sort_order ?? PHP_INT_MAX, $p->employee?->name])

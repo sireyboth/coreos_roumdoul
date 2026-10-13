@@ -1028,7 +1028,8 @@ export type PayslipRow = {
   employee: PayEmployee;
 };
 
-export type PayRunDetail = PayRun & { payslips: PayslipRow[] };
+// is_stale: something that feeds pay changed since the last calculation — recalculate to include it.
+export type PayRunDetail = PayRun & { payslips: PayslipRow[]; is_stale: boolean };
 
 export type PayslipLine = { id?: number; code: string; name: string; kind: PayLineKind; amount: Amount; explanation: string | null };
 
@@ -1581,6 +1582,9 @@ export const api = {
     adjustments: (month: string) => request<PayrollAdjustment[]>(`/api/payroll/adjustments?month=${month}`),
     createAdjustment: (data: PayrollAdjustmentInput) =>
       request<PayrollAdjustment>("/api/payroll/adjustments", { method: "POST", body: JSON.stringify(data) }),
+    // The same amount for many people (everyone, or one branch): one adjustment each.
+    createAdjustments: (data: Omit<PayrollAdjustmentInput, "employee_id"> & { employee_ids: number[] }) =>
+      request<{ created: number }>("/api/payroll/adjustments/bulk", { method: "POST", body: JSON.stringify(data) }),
     removeAdjustment: (id: number) => request<void>(`/api/payroll/adjustments/${id}`, { method: "DELETE" }),
     importAdjustments: (month: string, rows: { employee_code: string; kind: PayKind; name: string; amount: number; taxable?: boolean; reason?: string | null }[]) =>
       request<{ created: number; errors: { row: number; message: string }[] }>("/api/payroll/adjustments/import", {

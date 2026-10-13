@@ -337,6 +337,35 @@ class PayrollTest extends TestCase
         $this->assertEquals(555, $slip['gross']);
     }
 
+    public function test_one_adjustment_can_go_to_many_people_and_the_run_asks_to_recalculate(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $dara = $this->employee('Dara');
+        $this->salary($sokha, 520);
+        $this->salary($dara, 400);
+        $run = $this->createRun()->json();
+        $this->assertFalse($run['is_stale']);
+
+        $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/bulk', [
+            'employee_ids' => [$sokha->id, $dara->id], 'month' => '2026-09', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20, 'taxable' => true,
+        ])->assertCreated()->assertJson(['created' => 2]);
+
+        // Added after the calculation: the run says so until it is recalculated.
+        $this->assertTrue($this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}")->json('is_stale'));
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->json();
+        $this->assertFalse($run['is_stale']);
+        $this->assertEquals([540, 420], collect($run['payslips'])->sortBy('employee.name')->pluck('gross')->map(fn ($g) => (float) $g)->reverse()->values()->all());
+
+        // Removing one is a change too.
+        $this->actingAs($this->admin)->deleteJson('/api/payroll/adjustments/'.\App\Models\PayrollAdjustment::query()->first()->id)->assertNoContent();
+        $this->assertTrue($this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}")->json('is_stale'));
+
+        $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/bulk', [
+            'employee_ids' => [$sokha->id, 999999], 'month' => '2026-09', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20,
+        ])->assertJsonValidationErrors('employee_ids');
+    }
+
     public function test_employees_without_salary_are_listed_not_paid(): void
     {
         $this->employee('Nosalary');

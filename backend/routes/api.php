@@ -212,6 +212,7 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
 
             Route::post('/payroll/adjustments', [PayrollAdjustmentController::class, 'store']);
             Route::post('/payroll/adjustments/import', [PayrollAdjustmentController::class, 'import']);
+            Route::post('/payroll/adjustments/bulk', [PayrollAdjustmentController::class, 'bulk']);
             Route::put('/payroll/adjustments/{adjustment}', [PayrollAdjustmentController::class, 'update']);
             Route::delete('/payroll/adjustments/{adjustment}', [PayrollAdjustmentController::class, 'destroy']);
         });

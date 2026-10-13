@@ -82,7 +82,7 @@ class PayRunService
             $warnings[] = ['code' => 'attendance_unlocked', 'blocking' => true, 'message' => 'Attendance for this month isn\'t locked yet. Lock it in Attendance before approving, so the numbers can\'t change.'];
         }
 
-        DB::transaction(function () use ($run, $payslips, $warnings, $ctx, $by) {
+        DB::transaction(function () use ($run, $company, $payslips, $warnings, $ctx, $by) {
             $run->payslips()->delete();
 
             foreach ($payslips as $result) {
@@ -110,6 +110,7 @@ class PayRunService
                     'exchange_rate_source' => $ctx['exchange_rate_source'],
                     'tax' => $ctx['tax'],
                     'nssf' => $ctx['nssf'],
+                    'fingerprint' => $this->fingerprint($company, $run->month),
                 ],
                 'calculated_at' => now(),
                 'calculated_by' => $by->id,
@@ -159,6 +160,51 @@ class PayRunService
     {
         $this->assertEditable($run);
         $run->delete();
+    }
+
+    /**
+     * Whether anything that feeds this run changed after it was calculated
+     * (an adjustment, a salary, a rule, attendance…), so the page can ask for
+     * a recalculation instead of showing stale pay.
+     */
+    public function isStale(PayRun $run): bool
+    {
+        if ($run->isLocked()) {
+            return false;
+        }
+
+        // Calculated before fingerprints existed: there's no telling, so ask for one recalculation.
+        $stored = $run->policy_snapshot['fingerprint'] ?? null;
+
+        return $stored === null || $stored !== $this->fingerprint($run->company, $run->month);
+    }
+
+    /**
+     * Row count + latest change of every input to a month's pay. Counts
+     * catch deletions; timestamps catch edits.
+     */
+    public function fingerprint(Company $company, string $month): string
+    {
+        $start = "{$month}-01";
+        $end = CarbonImmutable::parse($start)->endOfMonth()->toDateString();
+        $state = fn (string $table, ?callable $scope = null) => (array) DB::table($table)
+            ->when($scope, $scope)
+            ->selectRaw('count(*) as n, max(updated_at) as at')
+            ->first();
+        $own = fn ($q) => $q->where('company_id', $company->id);
+
+        return md5(json_encode([
+            $state('payroll_adjustments', fn ($q) => $own($q)->where('month', $month)),
+            $state('employee_salaries', $own),
+            $state('employee_pay_items', $own),
+            $state('employee_pay_profiles', $own),
+            $state('pay_components', $own),
+            $state('payroll_policies', $own),
+            $state('employees', $own),
+            $state('attendance_days', fn ($q) => $own($q)->whereDate('date', '>=', $start)->whereDate('date', '<=', $end)),
+            $state('statutory_rates'),
+            $state('tax_exchange_rates', fn ($q) => $q->where('month', $month)),
+        ]));
     }
 
     private function assertEditable(PayRun $run): void

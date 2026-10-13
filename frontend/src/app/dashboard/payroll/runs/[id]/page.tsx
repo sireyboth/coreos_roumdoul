@@ -116,7 +116,7 @@ export default function PayRunPage() {
 
   const editable = run.status === "draft" || run.status === "calculated";
   const withProblems = run.payslips.filter((p) => p.warnings?.some((w) => w.blocking)).length;
-  const blocked = withProblems > 0 || (run.warnings ?? []).some((w) => w.blocking);
+  const blocked = run.is_stale || withProblems > 0 || (run.warnings ?? []).some((w) => w.blocking);
 
   const columns: DataTableColumn<PayslipRow>[] = [
     {
@@ -193,6 +193,22 @@ export default function PayRunPage() {
         }
       />
 
+      {run.is_stale && (
+        <Alert
+          variant="warning"
+          title="Something changed since this was calculated"
+          action={
+            canManage && (
+              <Button size="sm" onClick={() => act("calculate", () => api.payroll.calculate(run.id), "Recalculated")} disabled={busy !== null}>
+                <RefreshCw className={busy === "calculate" ? "size-4 animate-spin" : "size-4"} />
+                Recalculate now
+              </Button>
+            )
+          }
+        >
+          An adjustment, salary, rule or attendance was added or changed. The numbers below don&apos;t include it yet.
+        </Alert>
+      )}
       <WarningList warnings={run.warnings} />
       {withProblems > 0 && (
         <Alert variant="warning" title={`${withProblems} ${withProblems === 1 ? "payslip needs" : "payslips need"} fixing`}>
