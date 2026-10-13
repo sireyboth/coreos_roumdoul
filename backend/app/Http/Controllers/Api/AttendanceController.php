@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceAdjustment;
+use App\Models\AttendanceCorrection;
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
 use App\Models\Employee;
 use App\Services\Attendance\AttendanceRecorder;
+use App\Services\Attendance\ScheduleResolver;
 use App\Services\AttendanceService;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
@@ -204,8 +206,10 @@ class AttendanceController extends Controller
 
     /**
      * The attendance report as a CSV file — everyone in the company, or one
-     * employee. It reads through the same scope as index(), so a person who
-     * can't manage attendance only ever exports their own rows.
+     * employee. Every person gets a row for every date in the range: a stored
+     * day as it was worked out, and a day nothing is stored for (leave, a
+     * holiday, a day off, a day still to come) as the schedule describes it.
+     * A person who can't manage attendance only ever exports their own rows.
      */
     public function export(Request $request): StreamedResponse
     {
@@ -213,6 +217,8 @@ class AttendanceController extends Controller
             'from' => ['required', 'date_format:Y-m-d'],
             'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
             'employee_id' => ['nullable', 'integer'],
+            // Adds the employee's internal id as a last column, so the app's report can open a day.
+            'with_ids' => ['nullable', 'boolean'],
         ]);
 
         // A year is plenty for a report; an unbounded range would hold the connection open for minutes.
@@ -220,27 +226,41 @@ class AttendanceController extends Controller
             throw ValidationException::withMessages(['to' => ['Pick a range of one year or less.']]);
         }
 
+        $withIds = $request->boolean('with_ids');
         $timezone = $this->timezone($request);
-        $query = $this->visibleDays($request)
-            ->with(['employee.branch', 'employee.department', 'employee.team'])
-            // Grouped by person (in the company's display order), then by day, so each employee reads top to bottom.
-            ->tap(fn ($q) => Employee::orderRowsByEmployee($q, 'attendance_days.employee_id'))
-            ->orderBy('employee_id')->orderBy('date')->orderBy('id');
+        $company = $request->user()->company;
+        $from = $request->input('from');
+        $to = $request->input('to');
+        $today = CarbonImmutable::now($timezone)->toDateString();
 
-        $filename = 'attendance-'.$request->input('from').'-to-'.$request->input('to').'.csv';
+        // The same people index() would show, in the company's display order.
+        $employees = Employee::query()
+            ->with(['branch', 'department', 'team'])
+            ->when(! $request->user()->hasCompanyPermission('attendance.manage'), fn ($q) => $q->where('user_id', $request->user()->id))
+            ->when($request->filled('employee_id'), fn ($q) => $q->whereKey($request->integer('employee_id')))
+            // People who left before the range have nothing in it (as on the team calendar).
+            ->where(fn ($q) => $q->whereNotIn('employment_status', Employee::LEFT_STATUSES)->orWhere('termination_date', '>=', $from))
+            ->inDisplayOrder();
 
-        return response()->streamDownload(function () use ($query, $timezone) {
+        $filename = 'attendance-'.$from.'-to-'.$to.'.csv';
+
+        return response()->streamDownload(function () use ($employees, $company, $from, $to, $today, $timezone, $withIds) {
             $out = fopen('php://output', 'w');
 
             // The BOM makes Excel read the file as UTF-8, so Khmer names don't turn into gibberish.
             fwrite($out, "\xEF\xBB\xBF");
 
             fputcsv($out, [
-                'Employee ID', 'Employee', 'Branch', 'Department', 'Team', 'Date', 'Day type', 'Schedule',
+                'Employee ID', 'Employee', 'Branch', 'Department', 'Team', 'Date', 'Day type', 'Leave / holiday', 'Schedule',
                 'Expected', 'Scans', 'Late (min)', 'Early leave (min)', 'Worked (hours)', 'Overtime (hours)',
-                'Overtime type', 'Overtime status', 'Night (hours)', 'Status', 'Exceptions',
+                'Overtime type', 'Overtime status', 'Night (hours)', 'Status', 'Exceptions', 'Note',
                 'Adjusted by', 'Adjusted at', 'Adjustment reason', 'Adjustment changes',
+                ...($withIds ? ['Employee key'] : []),
             ]);
+
+            // Approved permission to come late / leave early, as the day expected it.
+            $permits = fn (?array $permission) => collect($permission ?? [])
+                ->map(fn (array $p) => ($p['kind'] === 'late' ? 'Approved late arrival ' : 'Approved early leave ').$p['time']);
 
             $hours = fn (int $minutes) => number_format($minutes / 60, 2, '.', '');
             $time = fn (?string $iso) => $iso ? CarbonImmutable::parse($iso)->setTimezone($timezone)->format('H:i') : null;
@@ -253,40 +273,108 @@ class AttendanceController extends Controller
                 default => '',
             };
 
-            $query->chunk(500, function ($days) use ($out, $hours, $time, $how, $timezone) {
-                $adjustments = $this->adjustmentsFor($days);
+            // Leave on the day ("Annual leave", "Sick leave (morning)"), else the holiday's name.
+            $leaveOrHoliday = fn (?array $leave, ?string $holiday) => $leave
+                ? $leave['type'].(($leave['part'] ?? 'full') === 'full' ? '' : ' ('.$leave['part'].')')
+                : $holiday;
 
-                foreach ($days as $day) {
-                    $employee = $day->employee;
-                    $slots = collect($day->slots ?? []);
-                    // A day adjusted more than once lists each, oldest first, split by " | ".
-                    $adjusted = $adjustments->get($day->employee_id.'|'.$day->date->toDateString(), collect());
+            $employees->chunk(100, function ($people) use ($out, $hours, $time, $how, $timezone, $company, $from, $to, $today, $leaveOrHoliday, $permits, $withIds) {
+                $ids = $people->modelKeys();
+                // Schedules, holidays, days off and approved leave for everyone in the chunk, loaded once.
+                $resolver = new ScheduleResolver($company, $ids, $from, $to);
+                $stored = AttendanceDay::query()->whereIn('employee_id', $ids)
+                    ->whereDate('date', '>=', $from)->whereDate('date', '<=', $to)
+                    ->get()->keyBy(fn (AttendanceDay $day) => $day->employee_id.'|'.$day->date->toDateString());
+                $adjustments = $this->adjustmentsFor($stored);
+                // Why a day's scans were corrected, in the employee's words.
+                $corrections = AttendanceCorrection::query()->whereIn('employee_id', $ids)->where('status', 'approved')
+                    ->whereDate('date', '>=', $from)->whereDate('date', '<=', $to)
+                    ->orderBy('id')->get()
+                    ->groupBy(fn (AttendanceCorrection $c) => $c->employee_id.'|'.$c->date->toDateString());
+                // Notes typed on a scan, by scan id.
+                $scanNotes = AttendanceEvent::query()
+                    ->whereIn('id', $stored->flatMap(fn (AttendanceDay $day) => collect($day->scans ?? [])->pluck('scan_id'))->filter()->values())
+                    ->whereNotNull('notes')->where('notes', '!=', '')
+                    ->pluck('notes', 'id');
 
-                    fputcsv($out, array_map($this->safeCell(...), [
-                        $employee?->employee_code,
-                        $employee?->name,
-                        $employee?->branch?->name,
-                        $employee?->department?->name,
-                        $employee?->team?->name,
-                        $day->date->toDateString(),
-                        $this->label($day->kind),
-                        $day->expected['schedule_name'] ?? null,
-                        $slots->map(fn ($s) => strtoupper($s['type']).' '.$time($s['expected_at']))->join(', '),
-                        collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']).$how($scan['method'] ?? null))->join(', '),
-                        $day->late_minutes,
-                        $day->early_leave_minutes,
-                        $hours($day->worked_minutes),
-                        $hours($day->overtime_minutes),
-                        $day->overtime_type ? $this->label($day->overtime_type) : null,
-                        $day->overtime_status ? ucfirst($day->overtime_status) : null,
-                        $hours($day->night_minutes),
-                        $this->label($day->status),
-                        collect($day->exceptions ?? [])->map(fn ($e) => $this->label($e))->join(', '),
-                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->adjustedBy?->name ?? 'Deleted user')->join(' | '),
-                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->created_at->setTimezone($timezone)->format('Y-m-d H:i'))->join(' | '),
-                        $adjusted->map(fn (AttendanceAdjustment $a) => $a->reason)->join(' | '),
-                        $adjusted->map(fn (AttendanceAdjustment $a) => $this->describeAdjustment($a, $timezone))->join(' | '),
-                    ]));
+                $note = fn (string $key, ?array $permission, array $scans = []) => $permits($permission)
+                    ->merge(($corrections->get($key) ?? collect())->map(fn (AttendanceCorrection $c) => 'Correction: '.$c->reason))
+                    ->merge(collect($scans)->map(fn ($scan) => $scanNotes->get($scan['scan_id'] ?? null))->filter())
+                    ->join(' | ');
+
+                foreach ($people as $employee) {
+                    $person = [
+                        $employee->employee_code,
+                        $employee->name,
+                        $employee->branch?->name,
+                        $employee->department?->name,
+                        $employee->team?->name,
+                    ];
+                    // Before they started or after they left, there's no day to report.
+                    $first = max($from, $employee->hire_date?->toDateString() ?? $from);
+                    $last = min($to, $employee->termination_date?->toDateString() ?? $to);
+
+                    for ($date = CarbonImmutable::parse($first); $date->toDateString() <= $last; $date = $date->addDay()) {
+                        $key = $employee->id.'|'.$date->toDateString();
+                        $day = $stored->get($key);
+
+                        if (! $day) {
+                            $expected = $resolver->resolve($employee->id, $date->toDateString());
+                            $status = match (true) {
+                                $expected->isOff() => 'off',
+                                $expected->kind === 'unscheduled' => 'unscheduled',
+                                $expected->date > $today => 'upcoming',
+                                // A past work day nothing was worked out for (e.g. before attendance was switched on).
+                                default => 'not_recorded',
+                            };
+
+                            fputcsv($out, array_map($this->safeCell(...), [
+                                ...$person,
+                                $expected->date,
+                                $this->label($expected->kind),
+                                $leaveOrHoliday($expected->leave, $expected->holidayName),
+                                $expected->isWork() ? $expected->scheduleName : null,
+                                collect($expected->slots)->map(fn ($s) => strtoupper($s['type']).' '.$s['at']->setTimezone($timezone)->format('H:i'))->join(', '),
+                                null, null, null, null, null, null, null, null,
+                                $this->label($status),
+                                null,
+                                $note($key, $expected->permission),
+                                null, null, null, null,
+                                ...($withIds ? [$employee->id] : []),
+                            ]));
+
+                            continue;
+                        }
+
+                        $slots = collect($day->slots ?? []);
+                        // A day adjusted more than once lists each, oldest first, split by " | ".
+                        $adjusted = $adjustments->get($key, collect());
+
+                        fputcsv($out, array_map($this->safeCell(...), [
+                            ...$person,
+                            $day->date->toDateString(),
+                            $this->label($day->kind),
+                            $leaveOrHoliday($day->expected['leave'] ?? null, $day->expected['holiday'] ?? null),
+                            $day->expected['schedule_name'] ?? null,
+                            $slots->map(fn ($s) => strtoupper($s['type']).' '.$time($s['expected_at']))->join(', '),
+                            collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']).$how($scan['method'] ?? null))->join(', '),
+                            $day->late_minutes,
+                            $day->early_leave_minutes,
+                            $hours($day->worked_minutes),
+                            $hours($day->overtime_minutes),
+                            $day->overtime_type ? $this->label($day->overtime_type) : null,
+                            $day->overtime_status ? ucfirst($day->overtime_status) : null,
+                            $hours($day->night_minutes),
+                            $this->label($day->status),
+                            collect($day->exceptions ?? [])->map(fn ($e) => $this->label($e))->join(', '),
+                            $note($key, $day->expected['permission'] ?? null, $day->scans ?? []),
+                            $adjusted->map(fn (AttendanceAdjustment $a) => $a->adjustedBy?->name ?? 'Deleted user')->join(' | '),
+                            $adjusted->map(fn (AttendanceAdjustment $a) => $a->created_at->setTimezone($timezone)->format('Y-m-d H:i'))->join(' | '),
+                            $adjusted->map(fn (AttendanceAdjustment $a) => $a->reason)->join(' | '),
+                            $adjusted->map(fn (AttendanceAdjustment $a) => $this->describeAdjustment($a, $timezone))->join(' | '),
+                            ...($withIds ? [$employee->id] : []),
+                        ]));
+                    }
                 }
             });
 

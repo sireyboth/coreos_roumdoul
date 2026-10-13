@@ -1239,9 +1239,11 @@ export const api = {
     unlockMonth: (month: string) => request<void>(`/api/attendance/periods/${month}`, { method: "DELETE" }),
     // The report is a file, not JSON, so it can't go through request(). It still
     // needs the login header, which is why a plain <a href> can't be used either.
-    export: async (params: { from: string; to: string; employee_id?: number }): Promise<{ blob: Blob; filename: string }> => {
+    // with_ids adds an "Employee key" column (the internal id), for the in-app report to open a day.
+    export: async (params: { from: string; to: string; employee_id?: number; with_ids?: boolean }): Promise<{ blob: Blob; filename: string }> => {
       const query = new URLSearchParams({ from: params.from, to: params.to });
       if (params.employee_id) query.set("employee_id", String(params.employee_id));
+      if (params.with_ids) query.set("with_ids", "1");
 
       const token = getToken();
       const res = await fetch(`${API_URL}/api/attendance/export?${query}`, {

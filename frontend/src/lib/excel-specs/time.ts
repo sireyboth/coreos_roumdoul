@@ -1,7 +1,6 @@
 import {
   api,
   ApiError,
-  type AttendanceSummary,
   type CalendarDay,
   type Employee,
   type Holiday,
@@ -14,6 +13,7 @@ import {
   type WorkScheduleInput,
 } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
+import { daysWith, ISSUES, type IssueKind, type PersonInsight } from "@/lib/attendance-insights";
 import { barChartImage, type Bar } from "@/lib/chart-image";
 import type { Worksheet } from "exceljs";
 import { downloadSheet, downloadWorkbook, styleHeader, today, type SheetColumn } from "@/lib/excel";
@@ -535,9 +535,9 @@ function parseCsv(text: string): string[][] {
 
 /** Every column of the server's attendance report, in the order it sends them. */
 export const ATTENDANCE_REPORT_COLUMNS = [
-  "Employee ID", "Employee", "Branch", "Department", "Team", "Date", "Day type", "Schedule",
+  "Employee ID", "Employee", "Branch", "Department", "Team", "Date", "Day type", "Leave / holiday", "Schedule",
   "Expected", "Scans", "Late (min)", "Early leave (min)", "Worked (hours)", "Overtime (hours)",
-  "Overtime type", "Overtime status", "Night (hours)", "Status", "Exceptions",
+  "Overtime type", "Overtime status", "Night (hours)", "Status", "Exceptions", "Note",
   "Adjusted by", "Adjusted at", "Adjustment reason", "Adjustment changes",
 ];
 
@@ -554,8 +554,20 @@ export type AttendanceReportOptions = {
 
 // ───────────────────────── Attendance calendar ───────────────────────
 
+/** The report as it came from the server: its header, and every row as text. */
+export type AttendanceReport = { header: string[]; rows: string[][] };
+
+/** The CSV the export endpoint sends, as rows. */
+export async function readAttendanceReport(csv: Blob): Promise<AttendanceReport> {
+  const [header = [], ...body] = parseCsv((await csv.text()).replace(/^﻿/, ""));
+  // The server escapes text that looks like a formula with a leading ' for CSV;
+  // neither a workbook cell nor the screen runs formulas, so the escape is taken off again.
+  const unescape = (value: string) => (/^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value);
+  return { header, rows: body.map((row) => row.map(unescape)) };
+}
+
 /** The codes a Calendar cell can show — one list for the cells, the totals and the legend. */
-const CALENDAR_CODES = [
+export const CALENDAR_CODES = [
   { code: "P", total: "Present", legend: "Present, on time", fill: "FFDCFCE7" }, // green-100
   { code: "L", total: "Late", legend: "Present, late", fill: "FFFEF3C7" }, // amber-100
   { code: "I", total: "Incomplete", legend: "Incomplete (a scan is missing)", fill: "FFFFEDD5" }, // orange-100
@@ -567,7 +579,7 @@ const CALENDAR_CODES = [
 ];
 
 // The day totals under the grid; the rest are only counted per employee.
-const DAILY_TOTALS = ["P", "L", "I", "A"];
+export const DAILY_TOTALS = ["P", "L", "I", "A"];
 
 /** A report row's status as one Calendar code; null for days not yet due or with no schedule. */
 function calendarCode(status: string, dayType: string, lateMinutes: number): string | null {
@@ -588,6 +600,79 @@ function datesBetween(from: string, to: string): string[] {
   return dates;
 }
 
+/** One date for one person: its code, and the detail behind it (one fact per line). */
+export type CalendarCell = { code: string; note: string };
+
+export type CalendarPerson = {
+  key: string;
+  code: string;
+  name: string;
+  branch: string;
+  /** One per date, in date order; null when there is nothing to mark. */
+  cells: (CalendarCell | null)[];
+  /** How many cells carry each code. */
+  totals: Record<string, number>;
+};
+
+export type AttendanceCalendar = {
+  dates: string[];
+  people: CalendarPerson[];
+  /** Per code, how many people carry it on each date. */
+  daily: Record<string, number[]>;
+  /** Per code, across everyone and every date. */
+  totals: Record<string, number>;
+};
+
+/**
+ * The report as a grid: a person per row, a date per column. The Report tab
+ * and the Calendar sheet are both drawn from this, so the screen and the
+ * workbook always agree.
+ */
+export function buildAttendanceCalendar(report: AttendanceReport, range: { from: string; to: string }): AttendanceCalendar {
+  const { header, rows } = report;
+  const at = (row: string[], title: string) => row[header.indexOf(title)] ?? "";
+  const dates = datesBetween(range.from, range.to);
+  const column = new Map(dates.map((date, i) => [date, i]));
+  const zero = () => Object.fromEntries(CALENDAR_CODES.map((c) => [c.code, 0]));
+
+  const daily: Record<string, number[]> = Object.fromEntries(CALENDAR_CODES.map((c) => [c.code, dates.map(() => 0)]));
+  const totals = zero();
+  // People in the order the server sent them (the company's employee order).
+  const people = new Map<string, CalendarPerson>();
+
+  for (const row of rows) {
+    const key = at(row, "Employee ID") || at(row, "Employee");
+    let person = people.get(key);
+    if (!person) {
+      person = { key, code: at(row, "Employee ID"), name: at(row, "Employee"), branch: at(row, "Branch"), cells: dates.map(() => null), totals: zero() };
+      people.set(key, person);
+    }
+
+    const d = column.get(at(row, "Date"));
+    const late = Number(at(row, "Late (min)")) || 0;
+    const code = calendarCode(at(row, "Status"), at(row, "Day type"), late);
+    if (d === undefined || !code) continue;
+
+    person.cells[d] = {
+      code,
+      note: [
+        at(row, "Status"),
+        at(row, "Leave / holiday"),
+        late > 0 ? `Late ${late} min` : "",
+        at(row, "Scans") ? `Scans: ${at(row, "Scans")}` : "",
+        at(row, "Schedule") ? `Schedule: ${at(row, "Schedule")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    };
+    person.totals[code]++;
+    daily[code][d]++;
+    totals[code]++;
+  }
+
+  return { dates, people: [...people.values()], daily, totals };
+}
+
 const GRID_BORDER = { style: "thin" as const, color: { argb: "FFE2E8F0" } };
 const GRID_BORDERS = { top: GRID_BORDER, left: GRID_BORDER, bottom: GRID_BORDER, right: GRID_BORDER };
 
@@ -596,21 +681,9 @@ const GRID_BORDERS = { top: GRID_BORDER, left: GRID_BORDER, bottom: GRID_BORDER,
  * status code. Totals are COUNTIF formulas, so correcting a cell by hand
  * updates them.
  */
-function attendanceCalendar(sheet: Worksheet, header: string[], body: string[][], range: { from: string; to: string }) {
-  const at = (row: string[], title: string) => row[header.indexOf(title)] ?? "";
-  const codeOf = (row: string[]) => calendarCode(at(row, "Status"), at(row, "Day type"), Number(at(row, "Late (min)")) || 0);
-  const dates = datesBetween(range.from, range.to);
-  const oneMonth = range.from.slice(0, 7) === range.to.slice(0, 7);
-
-  // People in the order the server sent them (the company's employee order).
-  const people = new Map<string, { code: string; name: string; days: Map<string, string[]> }>();
-  for (const row of body) {
-    const key = at(row, "Employee ID") || at(row, "Employee");
-    const person = people.get(key) ?? { code: at(row, "Employee ID"), name: at(row, "Employee"), days: new Map() };
-    person.days.set(at(row, "Date"), row);
-    people.set(key, person);
-  }
-  const everyone = [...people.values()];
+function attendanceCalendar(sheet: Worksheet, calendar: AttendanceCalendar) {
+  const { dates, people: everyone } = calendar;
+  const oneMonth = dates.length > 0 && dates[0].slice(0, 7) === dates[dates.length - 1].slice(0, 7);
 
   const first = 3; // the first date column; A and B hold the employee
   const last = first + dates.length - 1;
@@ -633,34 +706,22 @@ function attendanceCalendar(sheet: Worksheet, header: string[], body: string[][]
     const line = sheet.getRow(r);
     line.getCell(1).value = person.code || null;
     line.getCell(2).value = person.name;
-    const counts = new Map<string, number>();
 
-    dates.forEach((date, d) => {
+    person.cells.forEach((day, d) => {
       const cell = line.getCell(first + d);
       cell.border = GRID_BORDERS;
       cell.alignment = center;
-      const row = person.days.get(date);
-      const code = row ? codeOf(row) : null;
-      if (!row || !code) return;
+      if (!day) return;
 
-      counts.set(code, (counts.get(code) ?? 0) + 1);
-      cell.value = code;
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CALENDAR_CODES.find((c) => c.code === code)!.fill } };
+      cell.value = day.code;
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CALENDAR_CODES.find((c) => c.code === day.code)!.fill } };
       // Hovering a cell shows why it got its code.
-      const late = Number(at(row, "Late (min)")) || 0;
-      cell.note = [
-        at(row, "Status"),
-        late > 0 ? `Late ${late} min` : "",
-        at(row, "Scans") ? `Scans: ${at(row, "Scans")}` : "",
-        at(row, "Schedule") ? `Schedule: ${at(row, "Schedule")}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+      cell.note = day.note;
     });
 
     CALENDAR_CODES.forEach((c, t) => {
       const cell = line.getCell(last + 1 + t);
-      cell.value = { formula: `COUNTIF(${letter(first)}${r}:${letter(last)}${r},"${c.code}")`, result: counts.get(c.code) ?? 0 };
+      cell.value = { formula: `COUNTIF(${letter(first)}${r}:${letter(last)}${r},"${c.code}")`, result: person.totals[c.code] };
       cell.alignment = center;
       cell.border = GRID_BORDERS;
     });
@@ -671,14 +732,10 @@ function attendanceCalendar(sheet: Worksheet, header: string[], body: string[][]
     const line = sheet.getRow(lastRow + 2 + t);
     line.getCell(2).value = CALENDAR_CODES.find((c) => c.code === code)!.total;
     line.getCell(2).font = { bold: true };
-    dates.forEach((date, d) => {
+    dates.forEach((_, d) => {
       const col = first + d;
-      const count = everyone.filter((p) => {
-        const row = p.days.get(date);
-        return row !== undefined && codeOf(row) === code;
-      }).length;
       const cell = line.getCell(col);
-      cell.value = { formula: `COUNTIF(${letter(col)}2:${letter(col)}${lastRow},"${code}")`, result: count };
+      cell.value = { formula: `COUNTIF(${letter(col)}2:${letter(col)}${lastRow},"${code}")`, result: calendar.daily[code][d] };
       cell.alignment = center;
     });
   });
@@ -778,10 +835,8 @@ function attendanceCharts(header: string[], body: string[][]) {
  * columns asked for, in the order asked for, plus optional Calendar and Charts sheets.
  */
 export async function attendanceReportToExcel(csv: Blob, filename: string, options: AttendanceReportOptions = {}): Promise<string> {
-  const [header = [], ...body] = parseCsv((await csv.text()).replace(/^﻿/, ""));
-  // The server escapes text that looks like a formula with a leading ' for CSV;
-  // a workbook cell is never run as a formula, so the escape is taken off again.
-  const unescape = (value: string) => (/^'[=+\-@\t\r]/.test(value) ? value.slice(1) : value);
+  const report = await readAttendanceReport(csv);
+  const { header, rows } = report;
   const minutes = new Set(["Late (min)", "Early leave (min)"]);
   const hours = new Set(["Worked (hours)", "Overtime (hours)", "Night (hours)"]);
 
@@ -792,7 +847,7 @@ export async function attendanceReportToExcel(csv: Blob, filename: string, optio
     const i = header.indexOf(title);
     return {
       header: title,
-      value: (row) => unescape(row[i] ?? ""),
+      value: (row) => row[i] ?? "",
       type: title === "Date" ? "date" : minutes.has(title) || hours.has(title) ? "number" : "text",
       format: hours.has(title) ? "0.00" : undefined,
       width: title === "Expected" || title === "Scans" || title === "Exceptions" ? 32 : undefined,
@@ -801,12 +856,11 @@ export async function attendanceReportToExcel(csv: Blob, filename: string, optio
 
   const xlsxName = filename.replace(/\.csv$/i, "") + ".xlsx";
 
-  if ((!options.charts && !options.calendar) || body.length === 0) {
-    await downloadSheet(xlsxName, { name: "Attendance", rows: body, columns });
+  if ((!options.charts && !options.calendar) || rows.length === 0) {
+    await downloadSheet(xlsxName, { name: "Attendance", rows, columns });
     return xlsxName;
   }
 
-  const rows = body.map((row) => row.map(unescape));
   const summary = attendanceCharts(header, rows);
   const reportDates = rows.map((row) => row[header.indexOf("Date")]).filter(Boolean).sort();
   const range = options.range ?? { from: reportDates[0], to: reportDates[reportDates.length - 1] };
@@ -814,9 +868,9 @@ export async function attendanceReportToExcel(csv: Blob, filename: string, optio
   const minutesText = (n: number) => `${n} min`;
 
   await downloadWorkbook(xlsxName, (book) => {
-    book.sheet({ name: "Attendance", rows: body, columns });
+    book.sheet({ name: "Attendance", rows, columns });
 
-    if (options.calendar) book.worksheet("Calendar", (sheet) => attendanceCalendar(sheet, header, rows, range));
+    if (options.calendar) book.worksheet("Calendar", (sheet) => attendanceCalendar(sheet, buildAttendanceCalendar(report, range)));
     if (!options.charts) return;
 
     const charts = book.chartSheet("Charts");
@@ -859,6 +913,73 @@ export async function attendanceReportToExcel(csv: Blob, filename: string, optio
   });
   return xlsxName;
 }
+
+/**
+ * The Late detail view as a workbook: an Overview sheet (one row per
+ * person, worst first as shown) and a Detail sheet with every day that
+ * matched the chosen issues, flat so it filters and sorts in Excel.
+ */
+export async function exportLateDetail(
+  people: PersonInsight[],
+  options: { kinds: IssueKind[]; minLate: number; from: string; to: string },
+): Promise<string> {
+  const issueLabel = (kind: IssueKind) => ISSUES.find((i) => i.kind === kind)!.label;
+  const rows = people.flatMap((person) => daysWith(person, options.kinds, options.minLate).map((day) => ({ person, day })));
+  type Line = (typeof rows)[number];
+
+  const filename = `attendance-detail-${options.from}-to-${options.to}.xlsx`;
+  await downloadWorkbook(filename, (book) => {
+    book.sheet<PersonInsight>({
+      name: "Overview",
+      rows: people,
+      columns: [
+        { header: "Employee ID", value: (p) => p.code },
+        { header: "Employee", value: (p) => p.name },
+        { header: "Branch", value: (p) => p.branch },
+        { header: "Department", value: (p) => p.department },
+        { header: "Work days", value: (p) => p.workDays, type: "number" },
+        { header: `Late days (≥ ${options.minLate} min)`, value: (p) => p.lateDays, type: "number" },
+        { header: "Late %", value: (p) => p.latePct, type: "number", format: "0.0" },
+        { header: "Total late (min)", value: (p) => p.lateMinutes, type: "number" },
+        { header: "Average late (min)", value: (p) => (p.lateDays ? Math.round(p.lateMinutes / p.lateDays) : 0), type: "number" },
+        { header: "Longest late (min)", value: (p) => p.longestLate, type: "number" },
+        { header: "Early leaves", value: (p) => p.earlyDays, type: "number" },
+        { header: "Early leave (min)", value: (p) => p.earlyMinutes, type: "number" },
+        { header: "Missed scans", value: (p) => p.missedDays, type: "number" },
+        { header: "Absent", value: (p) => p.absentDays, type: "number" },
+        { header: "Absence %", value: (p) => p.absencePct, type: "number", format: "0.0" },
+        { header: "Leave days", value: (p) => p.leaveDays, type: "number" },
+        { header: "Bradford score", value: (p) => p.bradford, type: "number" },
+        { header: "Late pattern", value: (p) => (p.lateWeekday ? `${WEEKDAY_NAMES[p.lateWeekday.weekday]} (${p.lateWeekday.count}×)` : "") },
+      ],
+    });
+
+    book.sheet<Line>({
+      name: "Detail",
+      rows,
+      columns: [
+        { header: "Employee ID", value: (l) => l.person.code },
+        { header: "Employee", value: (l) => l.person.name },
+        { header: "Branch", value: (l) => l.person.branch },
+        { header: "Date", value: (l) => l.day.date, type: "date" },
+        { header: "Day", value: (l) => WEEKDAY_NAMES[l.day.weekday] },
+        { header: "Schedule", value: (l) => l.day.schedule },
+        { header: "Expected in", value: (l) => l.day.expectedIn },
+        { header: "Expected out", value: (l) => l.day.expectedOut },
+        { header: "In", value: (l) => l.day.in },
+        { header: "Out", value: (l) => l.day.out },
+        { header: "Late (min)", value: (l) => l.day.late || null, type: "number" },
+        { header: "Early leave (min)", value: (l) => l.day.early || null, type: "number" },
+        { header: "Issue", value: (l) => l.day.issues.filter((k) => options.kinds.includes(k)).map(issueLabel).join(", ") },
+        { header: "Edited", value: (l) => (l.day.edited ? "Yes" : "") },
+        { header: "Note", value: (l) => l.day.note, width: 40 },
+      ],
+    });
+  });
+  return filename;
+}
+
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /**
  * HH:MM times on `date` as wall-clock datetimes, in order. A time earlier
@@ -1045,48 +1166,6 @@ export async function exportMonthCalendar(month: string, employeeId?: number): P
       { header: "Late (min)", value: (d) => d.late_minutes, type: "number" },
       { header: "Worked", value: (d) => (d.worked_minutes ? formatMinutes(d.worked_minutes) : null) },
       { header: "Overtime", value: (d) => (d.overtime_minutes ? formatMinutes(d.overtime_minutes) : null) },
-    ],
-  });
-  return filename;
-}
-
-// ─────────────────────────── Monthly summary ─────────────────────────
-
-const hours = (minutes: number) => Math.round((minutes / 60) * 100) / 100;
-
-/** The month per employee — what payroll reads. Hours as decimals so they can be multiplied by a rate. */
-export async function exportAttendanceSummary(summary: AttendanceSummary): Promise<string> {
-  const filename = `attendance-summary-${summary.month}${summary.locked ? "-locked" : ""}.xlsx`;
-  await downloadSheet(filename, {
-    name: `Summary ${summary.month}`,
-    rows: summary.rows,
-    columns: [
-      { header: "Employee ID", value: (r) => r.employee.employee_code },
-      { header: "Employee", value: (r) => r.employee.name },
-      { header: "Branch", value: (r) => r.employee.branch },
-      { header: "Work days", value: (r) => r.scheduled_days, type: "number" },
-      { header: "Present", value: (r) => r.present_days, type: "number" },
-      { header: "Absent", value: (r) => r.absent_days, type: "number" },
-      { header: "Paid leave (days)", value: (r) => r.paid_leave_days ?? 0, type: "number" },
-      { header: "Unpaid leave (days)", value: (r) => r.unpaid_leave_days ?? 0, type: "number" },
-      { header: "Approved late/early (min)", value: (r) => r.excused_minutes ?? 0, type: "number" },
-      { header: "Unpaid late/early (min)", value: (r) => r.unpaid_excused_minutes ?? 0, type: "number" },
-      { header: "Missing a scan", value: (r) => r.incomplete_days, type: "number" },
-      { header: "Late days", value: (r) => r.late_days, type: "number" },
-      { header: "Late (min)", value: (r) => r.late_minutes, type: "number" },
-      { header: "Early leave (min)", value: (r) => r.early_leave_minutes, type: "number" },
-      { header: "Scheduled (h)", value: (r) => hours(r.scheduled_minutes), type: "number", format: "0.00" },
-      { header: "Worked (h)", value: (r) => hours(r.worked_minutes), type: "number", format: "0.00" },
-      { header: "Night (h)", value: (r) => hours(r.night_minutes), type: "number", format: "0.00" },
-      { header: "Overtime work day (h)", value: (r) => hours(r.overtime_workday_minutes), type: "number", format: "0.00" },
-      { header: "Overtime day off (h)", value: (r) => hours(r.overtime_day_off_minutes), type: "number", format: "0.00" },
-      { header: "Overtime holiday (h)", value: (r) => hours(r.overtime_holiday_minutes), type: "number", format: "0.00" },
-      { header: "Overtime not approved (h)", value: (r) => hours(r.overtime_pending_minutes), type: "number", format: "0.00" },
-      { header: "Days off worked", value: (r) => r.worked_days_off, type: "number" },
-      { header: "Holidays worked", value: (r) => r.worked_holidays, type: "number" },
-      { header: "Holidays", value: (r) => r.holidays, type: "number" },
-      { header: "Weekly days off", value: (r) => r.weekly_days_off, type: "number" },
-      { header: "Other days off", value: (r) => r.days_off, type: "number" },
     ],
   });
   return filename;

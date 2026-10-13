@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarCheck, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Sigma, Trash2 } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
 import { AttendanceFillMissedDialog } from "@/components/dashboard/attendance-fill-missed-dialog";
 import { MissedScansDialog } from "@/components/dashboard/missed-scans-dialog";
-import { AttendanceSummary } from "@/components/dashboard/attendance-summary";
+import { AttendanceReport } from "@/components/dashboard/attendance-report";
 import { AttendanceTodayCard } from "@/components/dashboard/attendance-today-card";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
@@ -28,9 +28,9 @@ import { attendanceImport } from "@/lib/excel-specs/time";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
-type Tab = "records" | "overtime" | "corrections" | "summary";
+type Tab = "records" | "overtime" | "corrections" | "report";
 
-const TABS: Tab[] = ["records", "overtime", "corrections", "summary"];
+const TABS: Tab[] = ["records", "overtime", "corrections", "report"];
 
 type Punch = {
   at: string | null;
@@ -119,7 +119,8 @@ function AttendancePageContent() {
   // The tab lives in the address (?tab=corrections), so links — e.g. from a notification — open the right one,
   // even when you're already on this page.
   const params = useSearchParams();
-  const wanted = params.get("tab");
+  // The old Monthly summary tab became part of Report; its links still land somewhere useful.
+  const wanted = params.get("tab") === "summary" ? "report" : params.get("tab");
   // Filters a link can preset, e.g. from the dashboard: ?tab=corrections&status=pending, or ?date=2026-10-04.
   const linkedStatus = params.get("status") ?? undefined;
   const linkedDate = /^\d{4}-\d{2}-\d{2}$/.test(params.get("date") ?? "") ? params.get("date")! : null;
@@ -339,7 +340,8 @@ function AttendancePageContent() {
     { id: "overtime", label: "Overtime", icon: Hourglass, visible: canManage, count: pendingOvertime },
     // Everyone: employees request their own corrections here, managers review them.
     { id: "corrections", label: "Corrections", icon: FileClock, visible: true, count: canManage ? pendingCorrections : 0 },
-    { id: "summary", label: "Monthly summary", icon: Sigma, visible: true },
+    // Reviewing a period, exporting it, and closing a finished month.
+    { id: "report", label: "Report", icon: Table2, visible: true },
   ];
 
   return (
@@ -496,11 +498,25 @@ function AttendancePageContent() {
 
         {tab === "corrections" && <AttendanceCorrections key={linkedStatus ?? "all"} onChanged={load} initialStatus={linkedStatus} />}
 
-        {tab === "summary" && <AttendanceSummary canManage={canManage} />}
+        {tab === "report" && (
+          <AttendanceReport
+            canManage={canManage}
+            onExport={(reportMonth) => {
+              setMonth(reportMonth);
+              setExportOpen(true);
+            }}
+            onResolve={(target, reportMonth) => {
+              setMonth(reportMonth);
+              if (target === "missed") setMissedOpen(true);
+              else switchTab(target === "absences" ? "records" : target);
+            }}
+          />
+        )}
       </div>
 
       <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
-      {canManage && <MissedScansDialog open={missedOpen} onOpenChange={setMissedOpen} initialMonth={month} onChanged={load} />}
+      {/* Keyed by month, so opening it for another month (e.g. from the report's close-month checklist) starts on that month. */}
+      {canManage && <MissedScansDialog key={month} open={missedOpen} onOpenChange={setMissedOpen} initialMonth={month} onChanged={load} />}
       <AttendanceFillMissedDialog
         days={filling?.days ?? null}
         onOpenChange={(open) => !open && setFilling(null)}

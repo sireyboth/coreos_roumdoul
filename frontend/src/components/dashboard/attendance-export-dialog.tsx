@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, FileDown, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, FileDown, FileSpreadsheet, FileText, GripVertical } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,20 +16,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee } from "@/lib/api";
-import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel } from "@/lib/excel-specs/time";
+import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights";
+import { PDF_CALENDAR_MAX_DAYS, printAttendancePdf } from "@/lib/attendance-pdf";
+import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel, buildAttendanceCalendar, readAttendanceReport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
-// The columns picked last time, kept in this browser so the next export starts from them.
+// The choices made last time, kept in this browser so the next export starts from them.
 const LAYOUT_KEY = "attendance-export-layout";
 
-type Layout = { order: string[]; hidden: string[]; charts: boolean; calendar: boolean };
+type Format = "excel" | "pdf";
+
+type PdfChoices = { calendar: boolean; detail: boolean; kinds: IssueKind[]; minLate: number };
+
+type Layout = { format: Format; order: string[]; hidden: string[]; charts: boolean; calendar: boolean; pdf: PdfChoices };
+
+const DEFAULT_PDF: PdfChoices = { calendar: true, detail: true, kinds: ["late", "missed", "absent"], minLate: 1 };
 
 function defaultLayout(): Layout {
-  return { order: [...ATTENDANCE_REPORT_COLUMNS], hidden: [], charts: true, calendar: true };
+  return { format: "excel", order: [...ATTENDANCE_REPORT_COLUMNS], hidden: [], charts: true, calendar: true, pdf: DEFAULT_PDF };
 }
 
 function loadLayout(): Layout {
@@ -39,10 +48,12 @@ function loadLayout(): Layout {
     // Columns added to the report since the layout was saved go at the end, ticked.
     const known = saved.order.filter((c) => ATTENDANCE_REPORT_COLUMNS.includes(c));
     return {
+      format: saved.format === "pdf" ? "pdf" : "excel",
       order: [...known, ...ATTENDANCE_REPORT_COLUMNS.filter((c) => !known.includes(c))],
       hidden: (saved.hidden ?? []).filter((c) => known.includes(c)),
       charts: saved.charts ?? true,
       calendar: saved.calendar ?? true,
+      pdf: { ...DEFAULT_PDF, ...saved.pdf },
     };
   } catch {
     return defaultLayout();
@@ -78,9 +89,10 @@ function daysBetween(from: string, to: string): number {
 }
 
 /**
- * Downloads the attendance report as an Excel workbook. Managers can pick one employee
- * or everyone; with `employee` set, the report is locked to that person; with
- * neither, it's the signed-in person's own records (the server enforces that).
+ * Exports the attendance report as an Excel workbook or a PDF report. Managers
+ * can pick one employee or everyone; with `employee` set, the report is locked
+ * to that person; with neither, it's the signed-in person's own records (the
+ * server enforces that).
  */
 export function AttendanceExportDialog({
   open,
@@ -119,6 +131,7 @@ function ExportForm({
   canPickEmployee: boolean;
   onDone: () => void;
 }) {
+  const { me } = useMe();
   const initial = monthRange(month);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -162,20 +175,46 @@ function ExportForm({
     setTo(range.to);
   }
 
+  const pdf = layout.format === "pdf";
+  // A month and a bit fits the calendar grid on one landscape page.
+  const calendarFits = span !== null && span + 1 <= PDF_CALENDAR_MAX_DAYS;
+  const pdfProblem = pdf && layout.pdf.detail && layout.pdf.kinds.length === 0 ? "Pick at least one thing for the daily detail." : null;
+  const setPdf = (choices: Partial<PdfChoices>) => setLayout({ ...layout, pdf: { ...layout.pdf, ...choices } });
+  const blocked = rangeProblem !== null || (pdf ? pdfProblem !== null : picked.length === 0);
+
   async function handleDownload(e: React.FormEvent) {
     e.preventDefault();
-    if (rangeProblem || picked.length === 0) return;
+    if (blocked) return;
 
     setError(null);
     setDownloading(true);
     saveLayout(layout);
 
     try {
-      const { blob, filename } = await api.attendance.export({
-        from,
-        to,
-        employee_id: employee?.id ?? (employeeId ? Number(employeeId) : undefined),
-      });
+      const chosenId = employee?.id ?? (employeeId ? Number(employeeId) : undefined);
+      const { blob, filename } = await api.attendance.export({ from, to, employee_id: chosenId });
+
+      if (pdf) {
+        const report = await readAttendanceReport(blob);
+        const chosen = employee?.name ?? employees?.find((e) => e.id === chosenId)?.name;
+        const sameMonth = from.slice(0, 7) === to.slice(0, 7) && from.endsWith("-01") && to === monthRange(from.slice(0, 7)).to;
+        await printAttendancePdf({
+          company: me?.company?.name ?? "Business OS",
+          generatedBy: me?.user.name,
+          periodLabel: sameMonth
+            ? parseDate(from).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+            : `${parseDate(from).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${parseDate(to).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`,
+          range: { from, to },
+          scope: chosen ?? (canPickEmployee ? "All employees" : "My attendance"),
+          people: buildInsights(report, layout.pdf.minLate),
+          calendar: layout.pdf.calendar && calendarFits ? buildAttendanceCalendar(report, { from, to }) : null,
+          detail: layout.pdf.detail ? { kinds: layout.pdf.kinds, minLate: layout.pdf.minLate } : null,
+          minLate: layout.pdf.minLate,
+        });
+        onDone();
+        return;
+      }
+
       const saved = await attendanceReportToExcel(blob, filename, {
         columns: picked,
         charts: layout.charts,
@@ -196,11 +235,38 @@ function ExportForm({
     <>
       <DialogHeader>
         <DialogTitle>{employee ? `Export attendance — ${employee.name}` : "Export attendance report"}</DialogTitle>
-        <DialogDescription>Download an Excel workbook (.xlsx) — it also opens in Google Sheets and Numbers.</DialogDescription>
+        <DialogDescription>Choose a format, the dates and what to include.</DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleDownload} className="flex flex-col gap-4">
-        {/* Side by side on wide screens: what to export on the left, the columns on the right. */}
+        <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Format">
+          {(
+            [
+              { id: "excel", icon: FileSpreadsheet, title: "Excel workbook", text: "Every column you choose, to sort, filter and calculate. Opens in Google Sheets too." },
+              { id: "pdf", icon: FileText, title: "PDF report", text: "A finished, printable report — summary, ranking, month calendar and daily detail." },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={layout.format === option.id}
+              onClick={() => setLayout({ ...layout, format: option.id })}
+              className={cn(
+                "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                layout.format === option.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-accent/40",
+              )}
+            >
+              <option.icon className={cn("mt-0.5 size-5 shrink-0", layout.format === option.id ? "text-primary" : "text-muted-foreground")} />
+              <span>
+                <span className="block text-sm font-semibold">{option.title}</span>
+                <span className="block text-xs text-muted-foreground">{option.text}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Side by side on wide screens: what to export on the left, the format's choices on the right. */}
         <div className="grid gap-6 md:grid-cols-[18rem_1fr]">
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
@@ -239,47 +305,140 @@ function ExportForm({
               </div>
             )}
 
-            <label className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={layout.calendar}
-                onChange={(e) => setLayout({ ...layout, calendar: e.target.checked })}
-                className="mt-0.5 size-4 rounded border-input"
-              />
-              <span>
-                Add a Calendar sheet
-                <span className="block text-xs text-muted-foreground">Employees down the side, dates across the top, with status totals.</span>
-              </span>
-            </label>
+            {!pdf && (
+              <>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={layout.calendar}
+                    onChange={(e) => setLayout({ ...layout, calendar: e.target.checked })}
+                    className="mt-0.5 size-4 rounded border-input"
+                  />
+                  <span>
+                    Add a Calendar sheet
+                    <span className="block text-xs text-muted-foreground">Employees down the side, dates across the top, with status totals.</span>
+                  </span>
+                </label>
 
-            <label className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                checked={layout.charts}
-                onChange={(e) => setLayout({ ...layout, charts: e.target.checked })}
-                className="mt-0.5 size-4 rounded border-input"
-              />
-              <span>
-                Add a Charts sheet
-                <span className="block text-xs text-muted-foreground">Days by status, worked hours and late minutes per employee.</span>
-              </span>
-            </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={layout.charts}
+                    onChange={(e) => setLayout({ ...layout, charts: e.target.checked })}
+                    className="mt-0.5 size-4 rounded border-input"
+                  />
+                  <span>
+                    Add a Charts sheet
+                    <span className="block text-xs text-muted-foreground">Days by status, worked hours and late minutes per employee.</span>
+                  </span>
+                </label>
+              </>
+            )}
           </div>
 
-          <ColumnPicker layout={layout} onChange={setLayout} />
+          {pdf ? <PdfChoicesPanel choices={layout.pdf} onChange={setPdf} calendarFits={calendarFits} problem={pdfProblem} /> : <ColumnPicker layout={layout} onChange={setLayout} />}
         </div>
 
         {error && <Alert variant="destructive">{error}</Alert>}
 
         <DialogFooter>
           <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" disabled={downloading || rangeProblem !== null || picked.length === 0}>
-            <FileDown className="size-4" />
-            {downloading ? "Preparing…" : "Download Excel"}
+          <Button type="submit" disabled={downloading || blocked}>
+            {pdf ? <FileText className="size-4" /> : <FileDown className="size-4" />}
+            {downloading ? "Preparing…" : pdf ? "Create PDF" : "Download Excel"}
           </Button>
         </DialogFooter>
       </form>
     </>
+  );
+}
+
+/** What goes into the PDF report, beyond the summary and ranking it always has. */
+function PdfChoicesPanel({
+  choices,
+  onChange,
+  calendarFits,
+  problem,
+}: {
+  choices: PdfChoices;
+  onChange: (choices: Partial<PdfChoices>) => void;
+  calendarFits: boolean;
+  problem: string | null;
+}) {
+  const toggleKind = (kind: IssueKind) =>
+    onChange({ kinds: choices.kinds.includes(kind) ? choices.kinds.filter((k) => k !== kind) : [...choices.kinds, kind] });
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Label>The report contains</Label>
+      <ol className="flex flex-col divide-y divide-border rounded-md border border-input text-sm">
+        <li className="flex items-start gap-2 px-3 py-2.5">
+          <input type="checkbox" checked disabled className="mt-0.5 size-4 rounded border-input" />
+          <span>
+            Summary and ranking
+            <span className="block text-xs text-muted-foreground">Late and absence rates, time lost, missed scans, leave — and every employee ranked, most late days first.</span>
+          </span>
+        </li>
+        <li>
+          <label className={cn("flex items-start gap-2 px-3 py-2.5", !calendarFits && "opacity-60")}>
+            <input
+              type="checkbox"
+              checked={choices.calendar && calendarFits}
+              disabled={!calendarFits}
+              onChange={(e) => onChange({ calendar: e.target.checked })}
+              className="mt-0.5 size-4 rounded border-input"
+            />
+            <span>
+              Month at a glance
+              <span className="block text-xs text-muted-foreground">
+                {calendarFits
+                  ? "Everyone's month as a colour-coded grid, on a landscape page."
+                  : `Only for ${PDF_CALENDAR_MAX_DAYS} days or less — longer ranges don't fit on a page.`}
+              </span>
+            </span>
+          </label>
+        </li>
+        <li className="px-3 py-2.5">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" checked={choices.detail} onChange={(e) => onChange({ detail: e.target.checked })} className="mt-0.5 size-4 rounded border-input" />
+            <span>
+              Daily detail
+              <span className="block text-xs text-muted-foreground">Each person&apos;s days, grouped by month, with times and notes.</span>
+            </span>
+          </label>
+          {choices.detail && (
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 pl-6">
+              {ISSUES.map((issue) => (
+                <label key={issue.kind} className="flex items-center gap-1.5 text-sm">
+                  <input type="checkbox" checked={choices.kinds.includes(issue.kind)} onChange={() => toggleKind(issue.kind)} className="size-4 rounded border-input" />
+                  {issue.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </li>
+        <li className="flex items-center gap-2 px-3 py-2.5">
+          <span className="flex-1">
+            Count lateness from
+            <span className="block text-xs text-muted-foreground">Ignore a few minutes&apos; drift, everywhere in the report.</span>
+          </span>
+          <Input
+            type="number"
+            min={1}
+            max={600}
+            value={choices.minLate}
+            onChange={(e) => onChange({ minLate: Math.max(1, Number(e.target.value) || 1) })}
+            className="h-8 w-16"
+            aria-label="Count lateness from this many minutes"
+          />
+          <span className="text-muted-foreground">min</span>
+        </li>
+      </ol>
+      {problem && <p className="text-xs text-destructive">{problem}</p>}
+      <p className="text-xs text-muted-foreground">
+        The PDF opens in your browser&apos;s print window — choose <strong>Save as PDF</strong>. Khmer names and notes come out exactly as on screen.
+      </p>
+    </div>
   );
 }
 
