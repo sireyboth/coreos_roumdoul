@@ -9,21 +9,27 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
- * A month of attendance per employee, as one set of totals: the shared source
- * for the monthly summary screen and for payroll, so the two can never
- * disagree. Days off and holidays come from the schedule, since a day nobody
- * worked on keeps no record.
+ * A month (or any date range, such as a pay period) of attendance per
+ * employee, as one set of totals: the shared source for the monthly summary
+ * screen and for payroll, so the two can never disagree. Days off and
+ * holidays come from the schedule, since a day nobody worked on keeps no record.
  */
 class MonthlyAttendance
 {
     /**
      * @param  Collection<int, Employee>  $employees
+     * @param  CarbonImmutable|null  $end  null = the whole month $start is in
      * @return Collection<int, array<string, mixed>> keyed by employee id
      */
-    public static function for(Company $company, Collection $employees, CarbonImmutable $start): Collection
+    public static function for(Company $company, Collection $employees, CarbonImmutable $start, ?CarbonImmutable $end = null): Collection
     {
-        $start = $start->startOfMonth()->startOfDay();
-        $end = $start->endOfMonth()->startOfDay();
+        if ($end === null) {
+            $start = $start->startOfMonth()->startOfDay();
+            $end = $start->endOfMonth()->startOfDay();
+        } else {
+            $start = $start->startOfDay();
+            $end = $end->startOfDay();
+        }
 
         $days = AttendanceDay::query()->withoutGlobalScopes()
             ->where('company_id', $company->id)

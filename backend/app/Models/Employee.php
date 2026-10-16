@@ -293,4 +293,10 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeePayItem::class);
     }
+
+    /** Pay group history, oldest first. Before the first row: the default group. See PayGroupService. */
+    public function payGroups(): HasMany
+    {
+        return $this->hasMany(EmployeePayGroup::class)->orderBy('effective_from')->orderBy('id');
+    }
 }

@@ -2,11 +2,21 @@
 
 import { Alert } from "@/components/ui/alert";
 import { formatSalary } from "@/components/dashboard/employee-form";
-import type { LatenessParams, PayComponent, PayKind, PayLineKind, PayRunStatus, PayWarning, SalaryReason } from "@/lib/api";
+import type { LatenessParams, PayComponent, PayGroup, PayKind, PayLineKind, PayRunStatus, PaySchedule, PayWarning, SalaryReason } from "@/lib/api";
 
 /** Money in its own currency: "$1,234.50" or "1,234,500 ៛". */
 export function money(amount: number | string | null | undefined, currency: string | null | undefined): string {
   return formatSalary(amount, currency);
+}
+
+/** Short money for chart axes and tight spots: "$1.2K", "4.5M ៛". */
+export function compactMoney(amount: number, currency: string | null | undefined): string {
+  // Under a thousand there's nothing to shorten.
+  if (Math.abs(amount) < 1000) return money(amount, currency);
+  const short = amount.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+  if (currency === "KHR") return `${short} ៛`;
+  if (currency === "USD") return `${amount < 0 ? "-" : ""}$${short.replace("-", "")}`;
+  return short;
 }
 
 /** "2026-09" → "September 2026". */
@@ -31,6 +41,51 @@ export function currentMonth(): string {
 export function dateLabel(value: string | null | undefined): string {
   if (!value) return "—";
   return new Date(value.slice(0, 10) + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** Today as YYYY-MM-DD, on this device's clock. */
+export function today(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** A date to file something under in a month: today for this month, else the month's last day. */
+export function dateInMonth(month: string): string {
+  if (month === currentMonth()) return today();
+  const [y, m] = month.split("-").map(Number);
+  return `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`;
+}
+
+export const SCHEDULE_LABELS: Record<PaySchedule, string> = {
+  monthly: "Once a month",
+  semi_monthly: "Twice a month",
+  weekly: "Every week",
+  biweekly: "Every 2 weeks",
+  custom: "Dates picked each time",
+};
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** "1st → end of month", "26th → 25th", "Weeks from Monday"… */
+export function scheduleSummary(g: Pick<PayGroup, "schedule" | "cutoff_days" | "anchor_date">): string {
+  const day = (n: number) => (n >= 31 ? "end of month" : ordinal(n));
+  const cut = g.cutoff_days ?? [31];
+  switch (g.schedule) {
+    case "monthly":
+      return cut[0] >= 31 ? "1st → end of month" : `${ordinal(cut[0] + 1)} → ${day(cut[0])}`;
+    case "semi_monthly":
+      return `Periods end on the ${day(cut[0])} and ${day(cut[1] ?? 31)}`;
+    case "weekly":
+    case "biweekly":
+      return g.anchor_date ? `${g.schedule === "weekly" ? "Weeks" : "2 weeks"} starting ${WEEKDAYS[new Date(g.anchor_date + "T00:00:00").getDay()]}` : SCHEDULE_LABELS[g.schedule];
+    default:
+      return "HR picks each run's dates";
+  }
+}
+
+function ordinal(n: number): string {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${s}`;
 }
 
 export const RUN_STATUS: Record<PayRunStatus, { label: string; variant: "secondary" | "info" | "warning" | "success" }> = {

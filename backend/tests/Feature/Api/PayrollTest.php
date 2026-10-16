@@ -3,16 +3,21 @@
 namespace Tests\Feature\Api;
 
 use App\Models\AttendanceDay;
-use App\Models\AttendancePeriod;
 use App\Models\Company;
+use App\Models\CompanyPermission;
+use App\Models\CompanyRole;
 use App\Models\Employee;
 use App\Models\EmployeeSalary;
 use App\Models\PayComponent;
+use App\Models\PayrollAdjustment;
+use App\Models\PayRun;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TaxExchangeRate;
 use App\Models\User;
+use App\Services\Attendance\AttendanceRecorder;
 use App\Services\CompanyProvisioner;
+use App\Services\Payroll\PayRunService;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -97,9 +102,19 @@ class PayrollTest extends TestCase
         return collect($payslip['lines'])->firstWhere('code', $code);
     }
 
-    private function lockSeptember(): void
+    private function group(array $attributes): array
     {
-        AttendancePeriod::query()->create(['company_id' => $this->company->id, 'month' => '2026-09', 'locked_at' => now(), 'locked_by' => $this->admin->id]);
+        return $this->actingAs($this->admin)->postJson('/api/payroll/groups', ['name' => 'Factory', ...$attributes])->assertCreated()->json();
+    }
+
+    private function moveTo(Employee $employee, array $group, string $from = '2026-01-01')
+    {
+        return $this->actingAs($this->admin)->postJson("/api/employees/{$employee->id}/pay-groups", ['pay_group_id' => $group['id'], 'effective_from' => $from]);
+    }
+
+    private function createGroupRun(array $group, string $start, ?string $end = null)
+    {
+        return $this->actingAs($this->admin)->postJson('/api/payroll/runs', ['pay_group_id' => $group['id'], 'period_start' => $start, 'period_end' => $end]);
     }
 
     // ───────────────────────────── Tests ─────────────────────────────
@@ -152,19 +167,16 @@ class PayrollTest extends TestCase
         $this->assertSame(['USD'], array_keys($run['totals']));
     }
 
-    public function test_approval_needs_locked_attendance_and_no_blocking_problems_then_freezes(): void
+    public function test_approval_needs_no_blocking_problems_then_freezes_and_locks_only_those_days(): void
     {
         TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
         $dara = $this->employee('Dara');
+        $other = $this->employee('Other');
         $this->salary($dara, 400);
         $this->day($dara, '2026-09-02', ['status' => 'incomplete', 'scan_count' => 1]);
 
         $run = $this->createRun()->json();
 
-        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")
-            ->assertJsonValidationErrors(['status' => 'isn\'t locked']);
-
-        $this->lockSeptember();
         $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")
             ->assertJsonValidationErrors(['status' => 'payslip has a problem']);
 
@@ -173,12 +185,21 @@ class PayrollTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")
             ->assertOk()->assertJsonPath('status', 'approved');
 
-        // Frozen: no recalculation, no adjustments, no salary change in that month, no delete.
+        // Approving locked the attendance it used: Dara's September, nobody else's, nothing after.
+        $recorder = app(AttendanceRecorder::class);
+        $this->assertTrue($recorder->isLocked($this->company->id, '2026-09-10', $dara->id));
+        $this->assertFalse($recorder->isLocked($this->company->id, '2026-09-10', $other->id));
+        $this->assertFalse($recorder->isLocked($this->company->id, '2026-10-01', $dara->id));
+
+        // Frozen: no recalculation, no adjustments, no salary change in that period, no delete.
         $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertStatus(422);
         $this->actingAs($this->admin)->deleteJson("/api/payroll/runs/{$run['id']}")->assertStatus(422);
         $this->actingAs($this->admin)->postJson('/api/payroll/adjustments', [
-            'employee_id' => $dara->id, 'month' => '2026-09', 'kind' => 'earning', 'name' => 'Bonus', 'amount' => 10,
-        ])->assertJsonValidationErrors('month');
+            'employee_id' => $dara->id, 'date' => '2026-09-20', 'kind' => 'earning', 'name' => 'Bonus', 'amount' => 10,
+        ])->assertJsonValidationErrors('date');
+        $this->actingAs($this->admin)->postJson('/api/payroll/adjustments', [
+            'employee_id' => $dara->id, 'date' => '2026-10-05', 'kind' => 'earning', 'name' => 'Bonus', 'amount' => 10,
+        ])->assertCreated();
         $this->salary($dara, 450, from: '2026-09-15', reason: 'promotion')->assertJsonValidationErrors('effective_from');
 
         $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/paid")->assertOk()->assertJsonPath('status', 'paid');
@@ -327,7 +348,7 @@ class PayrollTest extends TestCase
         $sokha = $this->employee('Sokha');
         $this->salary($sokha, 520);
 
-        $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/import', ['month' => '2026-09', 'rows' => [
+        $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/import', ['date' => '2026-09-15', 'rows' => [
             ['employee_code' => 'SOKHA', 'kind' => 'earning', 'name' => 'Sales commission', 'amount' => 35],
             ['employee_code' => 'NOBODY', 'kind' => 'earning', 'name' => 'Bonus', 'amount' => 10],
         ]])->assertOk()->assertJson(['created' => 1, 'errors' => [['row' => 2]]]);
@@ -348,7 +369,7 @@ class PayrollTest extends TestCase
         $this->assertFalse($run['is_stale']);
 
         $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/bulk', [
-            'employee_ids' => [$sokha->id, $dara->id], 'month' => '2026-09', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20, 'taxable' => true,
+            'employee_ids' => [$sokha->id, $dara->id], 'date' => '2026-09-15', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20, 'taxable' => true,
         ])->assertCreated()->assertJson(['created' => 2]);
 
         // Added after the calculation: the run says so until it is recalculated.
@@ -358,11 +379,11 @@ class PayrollTest extends TestCase
         $this->assertEquals([540, 420], collect($run['payslips'])->sortBy('employee.name')->pluck('gross')->map(fn ($g) => (float) $g)->reverse()->values()->all());
 
         // Removing one is a change too.
-        $this->actingAs($this->admin)->deleteJson('/api/payroll/adjustments/'.\App\Models\PayrollAdjustment::query()->first()->id)->assertNoContent();
+        $this->actingAs($this->admin)->deleteJson('/api/payroll/adjustments/'.PayrollAdjustment::query()->first()->id)->assertNoContent();
         $this->assertTrue($this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}")->json('is_stale'));
 
         $this->actingAs($this->admin)->postJson('/api/payroll/adjustments/bulk', [
-            'employee_ids' => [$sokha->id, 999999], 'month' => '2026-09', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20,
+            'employee_ids' => [$sokha->id, 999999], 'date' => '2026-09-15', 'kind' => 'earning', 'name' => 'Mission', 'amount' => 20,
         ])->assertJsonValidationErrors('employee_ids');
     }
 
@@ -395,7 +416,279 @@ class PayrollTest extends TestCase
 
         $csv = $this->actingAs($this->admin)->get("/api/payroll/runs/{$run['id']}/export")->assertOk()->streamedContent();
 
-        $this->assertStringContainsString('SOKHA,Sokha,USD', $csv);
+        $this->assertStringContainsString('SOKHA,Sokha,2026-09-01,2026-09-30,USD', $csv);
         $this->assertStringContainsString('ABA,000123', $csv);
+    }
+
+    public function test_report_lists_each_payslip_with_its_lines(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $this->salary($this->employee('Sokha', ['bank_name' => 'ABA', 'bank_account_number' => '000123']), 520);
+        $run = $this->createRun()->json();
+
+        $report = $this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}/report")->assertOk()->json();
+
+        $slip = $report['payslips'][0];
+        $this->assertSame(['Sokha', 'ABA', '000123', 'bank'], [$slip['employee']['name'], $slip['employee']['bank_name'], $slip['employee']['bank_account_number'], $slip['employee']['payment_method']]);
+        $base = collect($slip['lines'])->firstWhere('is_base', true);
+        $this->assertSame(['earning', 520.0], [$base['kind'], (float) $base['amount']]);
+        $this->assertNotNull(collect($slip['lines'])->firstWhere('code', 'TAX'));
+    }
+
+    // ───────────────────────────── Pay groups and periods ─────────────────────────────
+
+    public function test_a_cut_off_period_crosses_months_and_pays_the_full_salary_without_tax(): void
+    {
+        $factory = $this->group(['schedule' => 'monthly', 'cutoff_days' => [25]]);
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520);
+        $this->moveTo($sokha, $factory)->assertCreated();
+        $this->day($sokha, '2026-08-28', ['status' => 'absent', 'scan_count' => 0]);
+        // Dated inside the period: paid. Dated after it: waits for the next period.
+        foreach (['2026-09-20' => 'Mission', '2026-09-27' => 'Later bonus'] as $date => $name) {
+            $this->actingAs($this->admin)->postJson('/api/payroll/adjustments', [
+                'employee_id' => $sokha->id, 'date' => $date, 'kind' => 'earning', 'name' => $name, 'amount' => 30,
+            ])->assertCreated();
+        }
+
+        $run = $this->createGroupRun($factory, '2026-08-26')->assertCreated()->json();
+
+        $this->assertSame(['2026-08-26', '2026-09-25', '2026-09'], [$run['period_start'], $run['period_end'], $run['month']]);
+        $this->assertSame('26 Aug – 25 Sep 2026', $run['period_label']);
+        $this->assertContains('no_tax_nssf', collect($run['warnings'])->pluck('code'));
+        $slip = $this->payslip($run['payslips'][0]['id']);
+        $this->assertSame('Full month', $this->line($slip, 'BASE')['explanation']);
+        $this->assertEquals(520, $this->line($slip, 'BASE')['amount']);
+        $this->assertEquals(20, $this->line($slip, 'ABSENCE')['amount']);
+        $this->assertNotNull(collect($slip['lines'])->firstWhere('name', 'Mission'));
+        $this->assertNull(collect($slip['lines'])->firstWhere('name', 'Later bonus'));
+        $this->assertEquals([530, 0, 0, 530], [$slip['gross'], $slip['tax'], $slip['nssf_employee'], $slip['net']]);
+        // Gross shared out by day: 6 days of August, 25 of September.
+        $this->assertEquals([['month' => '2026-08', 'days' => 6, 'gross' => 102.58], ['month' => '2026-09', 'days' => 25, 'gross' => 427.42]], $slip['inputs']['months']);
+
+        // The default group's September run leaves Sokha out: they are paid with Factory.
+        $this->assertSame([], $this->createRun()->json('payslips'));
+    }
+
+    public function test_twice_a_month_pays_half_each_period_and_periods_never_overlap(): void
+    {
+        $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [31, 15]]);
+        $this->assertSame([15, 31], $half['cutoff_days']);
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520);
+        $this->moveTo($sokha, $half);
+        $transport = $this->actingAs($this->admin)->postJson('/api/payroll/components', ['name' => 'Transport', 'kind' => 'earning', 'method' => 'employee_item'])->json();
+        $this->actingAs($this->admin)->postJson("/api/employees/{$sokha->id}/pay-items", ['pay_component_id' => $transport['id'], 'amount' => 20, 'effective_from' => '2026-01-01'])->assertCreated();
+
+        $first = $this->createGroupRun($half, '2026-09-01')->assertCreated()->json();
+        $slip = $this->payslip($first['payslips'][0]['id']);
+        $this->assertSame('2026-09-15', $first['period_end']);
+        $this->assertEquals(260, $this->line($slip, 'BASE')['amount']);
+        $this->assertSame('520.00 × 1/2', $this->line($slip, 'BASE')['explanation']);
+        $this->assertEquals(10, $this->line($slip, 'TRANSPORT')['amount']);
+
+        $this->createGroupRun($half, '2026-09-01')->assertJsonValidationErrors('period_start');
+        $this->createGroupRun($half, '2026-09-03')->assertJsonValidationErrors('period_start');
+        $this->createGroupRun($half, '2026-09-16')->assertCreated()->assertJsonPath('period_end', '2026-09-30');
+
+        // The periods to pick from, newest first, with their runs.
+        $periods = $this->actingAs($this->admin)->getJson("/api/payroll/groups/{$half['id']}/periods")->assertOk()->json();
+        $this->assertSame(['1 – 15 Oct 2026', '16 – 30 Sep 2026', '1 – 15 Sep 2026'], array_slice(array_column($periods, 'label'), 0, 3));
+        $this->assertNull($periods[0]['run']);
+        $this->assertSame($first['id'], $periods[2]['run']['id']);
+    }
+
+    public function test_a_weekly_period_can_cross_months_for_daily_workers(): void
+    {
+        $weekly = $this->group(['name' => 'Weekly', 'schedule' => 'weekly', 'anchor_date' => '2026-09-07']);
+        $rith = $this->employee('Rith');
+        $this->salary($rith, 15, payType: 'daily');
+        $this->moveTo($rith, $weekly);
+        foreach (['2026-09-27', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-05'] as $date) {
+            $this->day($rith, $date);
+        }
+
+        $run = $this->createGroupRun($weekly, '2026-09-28')->assertCreated()->json();
+
+        $this->assertSame('28 Sep – 4 Oct 2026', $run['period_label']);
+        $this->assertSame('3 worked = 3 days × 15', $this->line($this->payslip($run['payslips'][0]['id']), 'BASE')['explanation']);
+    }
+
+    public function test_a_custom_group_takes_any_range_and_pays_the_share_of_each_month(): void
+    {
+        $custom = $this->group(['name' => 'Projects', 'schedule' => 'custom']);
+        $nita = $this->employee('Nita');
+        $this->salary($nita, 310);
+        $this->moveTo($nita, $custom);
+
+        $this->createGroupRun($custom, '2026-07-01', '2026-09-30')->assertJsonValidationErrors('period_end');
+        $run = $this->createGroupRun($custom, '2026-09-10', '2026-10-05')->assertCreated()->json();
+
+        // 21/30 of September + 5/31 of October.
+        $base = $this->line($this->payslip($run['payslips'][0]['id']), 'BASE');
+        $this->assertEquals(267, $base['amount']);
+        $this->assertSame('310.00 × 0.8613 month', $base['explanation']);
+        $this->createGroupRun($custom, '2026-10-01', '2026-10-08')->assertJsonValidationErrors('period_start');
+    }
+
+    public function test_moving_group_mid_period_splits_the_salary_between_both_runs(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [15, 31]]);
+        $dara = $this->employee('Dara');
+        $this->salary($dara, 520);
+        $this->moveTo($dara, $half, '2026-09-16')->assertCreated();
+
+        $monthly = $this->payslip($this->createRun()->json('payslips.0.id'));
+        $this->assertEquals(260, $this->line($monthly, 'BASE')['amount']);
+        $this->assertSame('520.00 × 15/30 days', $this->line($monthly, 'BASE')['explanation']);
+
+        $second = $this->payslip($this->createGroupRun($half, '2026-09-16')->json('payslips.0.id'));
+        $this->assertEquals(260, $this->line($second, 'BASE')['amount']);
+
+        // Nobody is in Twice a month for 1–15 September.
+        $this->assertSame([], $this->createGroupRun($half, '2026-09-01')->json('payslips'));
+    }
+
+    public function test_a_group_can_use_its_own_rates_and_rules(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')->assertOk();
+        $absence = PayComponent::query()->where('code', 'ABSENCE')->first();
+        $late = PayComponent::query()->where('code', 'LATE')->first();
+        $strict = $this->group(['name' => 'Strict', 'schedule' => 'monthly', 'cutoff_days' => [31], 'rate_basis_days' => 20, 'component_rules' => [
+            $absence->id => ['is_active' => false],
+            $late->id => ['params' => ['mode' => 'per_time', 'grace_minutes' => 0, 'amount' => 2, 'free_count' => 0, 'every_n' => 3, 'tiers' => []]],
+        ]]);
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520);
+        $this->moveTo($sokha, $strict);
+        $this->day($sokha, '2026-09-01', ['status' => 'absent', 'scan_count' => 0]);
+        $this->day($sokha, '2026-09-02', ['late_minutes' => 5]);
+
+        $slip = $this->payslip($this->createGroupRun($strict, '2026-09-01')->json('payslips.0.id'));
+
+        $this->assertEquals(26, $slip['daily_rate']);
+        $this->assertNull($this->line($slip, 'ABSENCE'));
+        $this->assertSame('1 times × 2.00', $this->line($slip, 'LATE')['explanation']);
+        // The company's own rules are untouched.
+        $this->assertTrue($absence->fresh()->is_active);
+        $this->assertSame('per_minute', $late->fresh()->params['mode']);
+    }
+
+    public function test_one_person_can_be_recalculated_alone_and_the_run_says_whose_pay_is_stale(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $dara = $this->employee('Dara');
+        $this->salary($sokha, 520);
+        $this->salary($dara, 400);
+        $run = $this->createRun()->json();
+        $daraSlip = collect($run['payslips'])->firstWhere('employee.id', $dara->id)['id'];
+
+        $this->day($sokha, '2026-09-03', ['status' => 'absent', 'scan_count' => 0]);
+
+        $run = $this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}")->json();
+        $this->assertSame([true, false, [$sokha->id]], [$run['is_stale'], $run['stale_everyone'], $run['stale_employee_ids']]);
+
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/employees/{$sokha->id}/calculate")->assertOk()->json();
+
+        $this->assertFalse($run['is_stale']);
+        $this->assertEquals(20, $this->line($this->payslip(collect($run['payslips'])->firstWhere('employee.id', $sokha->id)['id']), 'ABSENCE')['amount']);
+        // Dara's payslip was left alone.
+        $this->assertSame($daraSlip, collect($run['payslips'])->firstWhere('employee.id', $dara->id)['id']);
+        $this->assertEquals(500 + 400, $run['totals']['USD']['gross']);
+    }
+
+    public function test_an_automatic_group_prepares_the_period_that_just_ended(): void
+    {
+        $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [15, 31], 'auto_calculate' => true]);
+        $this->salary($sokha = $this->employee('Sokha'), 520);
+        $this->moveTo($sokha, $half);
+
+        $this->assertCount(1, app(PayRunService::class)->prepareDue());
+        $this->assertCount(0, app(PayRunService::class)->prepareDue());
+
+        $run = PayRun::query()->sole();
+        $this->assertSame(['2026-09-16', '2026-09-30', 'calculated', null], [$run->period_start->toDateString(), $run->period_end->toDateString(), $run->status, $run->calculated_by]);
+    }
+
+    public function test_a_paid_period_cant_be_moved_to_another_group(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [15, 31]]);
+        $dara = $this->employee('Dara');
+        $this->salary($dara, 400);
+        $run = $this->createRun()->json();
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk();
+
+        $this->moveTo($dara, $half, '2026-09-20')->assertJsonValidationErrors(['effective_from' => 'already paid through 30 Sep 2026']);
+        $this->moveTo($dara, $half, '2026-10-01')->assertCreated();
+
+        $pay = $this->actingAs($this->admin)->getJson("/api/employees/{$dara->id}/pay")->assertOk()->json();
+        $this->assertSame(['Twice a month', '2026-09-30'], [$pay['pay_group']['name'], $pay['paid_through']]);
+        // The default group can't be deleted; a group with people in it neither.
+        $default = collect($this->actingAs($this->admin)->getJson('/api/payroll/groups')->json())->firstWhere('is_default', true);
+        $this->actingAs($this->admin)->deleteJson("/api/payroll/groups/{$default['id']}")->assertJsonValidationErrors('group');
+        $this->actingAs($this->admin)->deleteJson("/api/payroll/groups/{$half['id']}")->assertJsonValidationErrors('group');
+    }
+
+    public function test_everyones_pay_setup_today_for_the_employee_export(): void
+    {
+        $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [15, 31]]);
+        $transport = $this->actingAs($this->admin)->postJson('/api/payroll/components', ['name' => 'Transport', 'kind' => 'earning', 'method' => 'employee_item'])->json();
+        $dara = $this->employee('Dara');
+        $this->salary($dara, 400);
+        $this->salary($dara, 450, 'USD', '2026-10-01', 'monthly', 'promotion');
+        $this->moveTo($dara, $half);
+        $this->actingAs($this->admin)->putJson("/api/employees/{$dara->id}/pay-profile", ['nssf_enrolled' => false, 'child_dependents' => 2])->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/employees/{$dara->id}/pay-items", ['pay_component_id' => $transport['id'], 'amount' => 20, 'effective_from' => '2026-01-01', 'effective_to' => '2026-06-30'])->assertCreated();
+        $this->actingAs($this->admin)->postJson("/api/employees/{$dara->id}/pay-items", ['pay_component_id' => $transport['id'], 'amount' => 25, 'effective_from' => '2026-07-01'])->assertCreated();
+        $vy = $this->employee('Vy');
+
+        $pay = $this->actingAs($this->admin)->getJson('/api/payroll/employee-pay')->assertOk()->json();
+
+        $this->assertContains('Transport', array_column($pay['item_components'], 'name'));
+        $this->assertContains('Transport', $this->actingAs($this->admin)->getJson('/api/payroll/item-options')->assertOk()->json('*.name'));
+        $rows = collect($pay['employees'])->keyBy('employee_id');
+        $this->assertSame(['amount' => '450.00', 'currency' => 'USD', 'pay_type' => 'monthly', 'effective_from' => '2026-10-01'], $rows[$dara->id]['salary']);
+        $this->assertSame('Twice a month', $rows[$dara->id]['pay_group']['name']);
+        $this->assertSame([false, 2], [$rows[$dara->id]['profile']['nssf_enrolled'], $rows[$dara->id]['profile']['child_dependents']]);
+        // Only the item in force today.
+        $this->assertSame(['25.00'], array_column($rows[$dara->id]['items'], 'amount'));
+        // No setup yet: default group, default profile, no salary.
+        $this->assertNull($rows[$vy->id]['salary']);
+        $this->assertTrue($rows[$vy->id]['profile']['tax_resident']);
+        $this->assertNotSame('Twice a month', $rows[$vy->id]['pay_group']['name']);
+
+        $staff = $this->createUserWithRole($this->company, 'employee');
+        $this->actingAs($staff)->getJson('/api/payroll/employee-pay')->assertForbidden();
+    }
+
+    public function test_hr_prepares_the_run_and_only_an_approver_can_approve_it(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $this->salary($this->employee('Sokha'), 520);
+        $role = function (string $code, array $permissions) {
+            $role = CompanyRole::query()->create(['company_id' => $this->company->id, 'name' => $code, 'code' => $code]);
+            $role->permissions()->attach(CompanyPermission::query()->whereIn('code', $permissions)->pluck('id'));
+
+            return $this->createUserWithRole($this->company, $code);
+        };
+        $hr = $role('hr-office', ['payroll.view', 'payroll.manage']);
+        $boss = $role('approver', ['payroll.view', 'payroll.approve']);
+
+        // HR calculates, but can't sign it off.
+        $run = $this->actingAs($hr)->postJson('/api/payroll/runs', ['month' => '2026-09'])->assertCreated()->json();
+        $this->actingAs($hr)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertForbidden();
+
+        // The approver can't prepare runs, only approve them.
+        $this->actingAs($boss)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertForbidden();
+        $this->actingAs($boss)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk()->assertJsonPath('status', 'approved');
+        $this->assertSame($boss->id, PayRun::query()->find($run['id'])->approved_by);
+
+        // Then HR records the payment. The company admin still has every right.
+        $this->actingAs($hr)->postJson("/api/payroll/runs/{$run['id']}/paid")->assertOk()->assertJsonPath('status', 'paid');
+        $this->assertTrue($this->admin->fresh()->hasCompanyPermission('payroll.approve'));
     }
 }

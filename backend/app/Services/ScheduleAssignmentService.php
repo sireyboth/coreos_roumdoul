@@ -175,6 +175,9 @@ class ScheduleAssignmentService
         for ($month = CarbonImmutable::parse($from)->startOfMonth(); $month->lte($end); $month = $month->addMonth()) {
             $this->recorder->assertUnlocked($employee->company_id, $month->toDateString(), 'effective_from');
         }
+        if ($from <= $today) {
+            $this->recorder->assertNotPaid($employee->id, $from, $to === null || $to > $today ? $today : $to, 'effective_from');
+        }
     }
 
     private function normaliseDays(array $days): array

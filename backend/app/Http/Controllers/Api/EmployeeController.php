@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
+use App\Models\PayGroup;
 use App\Models\Team;
 use App\Services\CompanyUserService;
-use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\EmployeeAssignmentService;
 use App\Services\EmployeeRemover;
+use App\Services\Payroll\EmployeeSalaryService;
+use App\Services\Payroll\PayGroupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -260,16 +262,26 @@ class EmployeeController extends Controller
             'department_id' => ['nullable', $this->ownDepartment($request)],
             'team_id' => ['nullable', $this->ownTeam($request)],
             'manager_employee_id' => ['nullable', 'integer', $this->ownEmployee($request)],
+            // Payroll: the pay group they are paid with from their first day (empty = the default group).
+            'pay_group_id' => ['nullable', 'integer', Rule::exists('pay_groups', 'id')->where('company_id', $request->user()->company_id)],
         ]);
 
         $this->assertTeamFitsDepartment($data, null);
-        $this->assertMayChangeSalary($request, array_filter($data, fn ($value) => $value !== null));
+        $this->assertMayChangeSalary($request, array_filter(collect($data)->except('pay_group_id')->all(), fn ($value) => $value !== null));
+        if (! empty($data['pay_group_id']) && ! $request->user()->hasCompanyPermission('salary.manage')) {
+            throw ValidationException::withMessages(['pay_group_id' => ['You don\'t have permission to set pay.']]);
+        }
         $data = $this->withName($data);
 
         $employee = DB::transaction(function () use ($request, $data, $withLogin, $method) {
             $employee = Employee::query()->create(
-                collect($data)->except(['password', 'login_method', 'job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id'])->all()
+                collect($data)->except(['password', 'login_method', 'job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id', 'pay_group_id'])->all()
             );
+
+            if (! empty($data['pay_group_id'])) {
+                $from = $employee->hire_date?->toDateString() ?? now($request->user()->company->timezone ?: config('attendance.default_timezone'))->toDateString();
+                app(PayGroupService::class)->assign($employee, PayGroup::query()->findOrFail($data['pay_group_id']), $from, $request->user());
+            }
 
             $this->assignments->open($employee, $data);
 

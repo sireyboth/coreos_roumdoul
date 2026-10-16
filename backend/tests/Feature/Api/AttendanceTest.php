@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\AttendanceEvent;
 use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -147,6 +148,27 @@ class AttendanceTest extends TestCase
         $this->assertCount(1, $days);
         $this->assertEquals(2, $days[0]['scan_count']);
         $this->assertEquals(540, $days[0]['worked_minutes']);
+    }
+
+    public function test_approving_a_correction_skips_scans_already_on_record(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Zeta', 'Boss', 'boss@zeta.test', 'password123');
+        $this->subscribeToGrowth($company->id);
+        $admin = $company->users()->first();
+        $employee = Employee::query()->create(['company_id' => $company->id, 'name' => 'Imported']);
+
+        $correct = function (array $scans) use ($admin, $employee) {
+            $id = $this->actingAs($admin)->postJson('/api/attendance/corrections', [
+                'employee_id' => $employee->id, 'date' => '2026-09-15', 'reason' => 'Imported', 'scans' => $scans,
+            ])->assertCreated()->json('id');
+            $this->actingAs($admin)->postJson("/api/attendance/corrections/{$id}/approve")->assertOk();
+        };
+
+        $correct(['2026-09-15T08:00', '2026-09-15T17:00']);
+        // The same file imported again, plus one new scan.
+        $correct(['2026-09-15T08:00', '2026-09-15T12:00', '2026-09-15T17:00']);
+
+        $this->assertSame(3, AttendanceEvent::query()->where('employee_id', $employee->id)->count());
     }
 
     public function test_employee_cannot_request_correction_for_another_employee(): void

@@ -1,5 +1,6 @@
 import { daysWith, duration, ISSUES, totalsOf, type IssueKind, type PersonInsight, type ReportDay } from "@/lib/attendance-insights";
 import { CALENDAR_CODES, type AttendanceCalendar } from "@/lib/excel-specs/time";
+import { escapeHtml, printHtmlDocument, REPORT_FONTS } from "@/lib/print-pdf";
 
 /**
  * The attendance report as a printed document, saved as PDF by the browser.
@@ -29,12 +30,7 @@ export type AttendancePdfOptions = {
 // The calendar grid fits one landscape page up to a month and a bit.
 export const PDF_CALENDAR_MAX_DAYS = 31;
 
-const esc = (value: unknown) =>
-  String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+const esc = escapeHtml;
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const utc = (date: string) => new Date(`${date}T00:00:00Z`);
@@ -308,8 +304,7 @@ export function attendancePdfHtml(o: AttendancePdfOptions): string {
   const title = `Attendance report ${o.range.from} to ${o.range.to}`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Khmer:wght@400;600;700&display=swap" rel="stylesheet">
+${REPORT_FONTS}
 <style>${styles(footer)}</style></head>
 <body>
   ${header(o)}
@@ -321,41 +316,7 @@ export function attendancePdfHtml(o: AttendancePdfOptions): string {
 </body></html>`;
 }
 
-/**
- * Lays the report out in a hidden frame and opens the print dialog on it,
- * where "Save as PDF" makes the file. The frame goes away afterwards.
- */
-export async function printAttendancePdf(o: AttendancePdfOptions): Promise<void> {
-  const frame = document.createElement("iframe");
-  frame.setAttribute("aria-hidden", "true");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
-  document.body.appendChild(frame);
-
-  const doc = frame.contentDocument!;
-  doc.open();
-  doc.write(attendancePdfHtml(o));
-  doc.close();
-
-  // Fonts (Khmer especially) must be in before printing, or the PDF falls back to whatever is installed.
-  await new Promise<void>((resolve) => {
-    const done = () => resolve();
-    if (doc.readyState === "complete") done();
-    else frame.addEventListener("load", done, { once: true });
-    setTimeout(done, 4000);
-  });
-  await Promise.race([doc.fonts?.ready, new Promise((r) => setTimeout(r, 3000))]);
-
-  // Browsers suggest the page title as the file name.
-  const previousTitle = document.title;
-  document.title = doc.title;
-  const cleanup = () => {
-    document.title = previousTitle;
-    frame.remove();
-  };
-  frame.contentWindow!.addEventListener("afterprint", () => setTimeout(cleanup, 100), { once: true });
-  // Some browsers don't fire afterprint; never leave the frame behind for long.
-  setTimeout(() => frame.isConnected && cleanup(), 120_000);
-
-  frame.contentWindow!.focus();
-  frame.contentWindow!.print();
+/** Lays the report out and opens the print dialog, where "Save as PDF" makes the file. */
+export function printAttendancePdf(o: AttendancePdfOptions): Promise<void> {
+  return printHtmlDocument(attendancePdfHtml(o));
 }

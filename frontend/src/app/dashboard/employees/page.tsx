@@ -17,7 +17,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
-import { api, Branch, Department, Employee, Team } from "@/lib/api";
+import { api, Branch, Department, Employee, PayItemComponent, Team } from "@/lib/api";
 import { employeeImport, exportEmployees } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
@@ -35,10 +35,19 @@ function EmployeesPageContent() {
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canManageRoster = me?.permissions.includes("schedules.manage") ?? false;
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
-  // Pay columns appear in the Excel files only for people allowed to see / change pay.
+  // Pay and schedule columns appear in the Excel files only for people allowed to see / change them.
   const canSeeSalary = me?.permissions.includes("salary.view") ?? false;
   const canEditSalary = me?.permissions.includes("salary.manage") ?? false;
-  const importSpec = useMemo(() => employeeImport({ salary: canEditSalary }), [canEditSalary]);
+  const payroll = Boolean(me?.modules.payroll);
+  // The import has one column per allowance or deduction, so it needs them before reading a file.
+  const [payItems, setPayItems] = useState<PayItemComponent[]>([]);
+  useEffect(() => {
+    if (canEditSalary && payroll) api.employeePay.itemOptions().then(setPayItems).catch(() => setPayItems([]));
+  }, [canEditSalary, payroll]);
+  const importSpec = useMemo(
+    () => employeeImport({ salary: canEditSalary, pay: canEditSalary && payroll, schedule: canManageRoster, items: payItems }),
+    [canEditSalary, payroll, canManageRoster, payItems],
+  );
 
   // ?tab=roster deep-links to the roster (the old Schedule page redirects here).
   // The tab lives in the address, so links open the right one even from another page.
@@ -335,7 +344,7 @@ function EmployeesPageContent() {
             activeTab === "people" && (
               <div className="flex flex-wrap gap-2">
                 <ExcelActions
-                  onExport={() => exportEmployees({ salary: canSeeSalary })}
+                  onExport={() => exportEmployees({ salary: canSeeSalary, pay: canSeeSalary && payroll, schedule: canRoster })}
                   importSpec={canManage ? importSpec : undefined}
                   onImported={() => {
                     load();

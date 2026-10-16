@@ -29,7 +29,7 @@ const TEMPLATE_LABELS: Record<PayTemplate, string> = {
 
 const LATENESS_MODES: { value: LatenessMode; label: string; hint: string }[] = [
   { value: "per_minute", label: "Per minute", hint: "Each minute costs the minute rate (salary ÷ days ÷ hours ÷ 60)." },
-  { value: "per_time", label: "Fixed amount each time", hint: "The same amount every time, with some free each month." },
+  { value: "per_time", label: "Fixed amount each time", hint: "The same amount every time, with some free each pay period." },
   { value: "count_based", label: "Every few times = one day", hint: "e.g. every 3 times costs one day's pay." },
   { value: "tiers", label: "Tiers by minutes", hint: "Each day is charged by how late it was." },
   { value: "none", label: "Not charged", hint: "Recorded in attendance, never deducted." },
@@ -65,7 +65,7 @@ function NumberField({ id, label, value, onChange, hint, step = "1", min = 0, su
 }
 
 /** The fields for one template's parameters. */
-function TemplateFields({ template, params, onChange }: { template: PayTemplate; params: Params; onChange: (p: Params) => void }) {
+export function TemplateFields({ template, params, onChange }: { template: PayTemplate; params: Params; onChange: (p: Params) => void }) {
   const set = (patch: Params) => onChange({ ...params, ...patch });
 
   if (template === "overtime") {
@@ -131,7 +131,7 @@ function TemplateFields({ template, params, onChange }: { template: PayTemplate;
         {p.mode === "per_time" && (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <NumberField id="lt-amount" label="Amount each time" step="0.01" value={p.amount} onChange={(n) => set({ amount: n })} hint="In each employee's salary currency." />
-            <NumberField id="lt-free" label="Free each month" value={p.free_count} onChange={(n) => set({ free_count: n })} />
+            <NumberField id="lt-free" label="Free each pay period" value={p.free_count} onChange={(n) => set({ free_count: n })} />
           </div>
         )}
         {p.mode === "count_based" && (

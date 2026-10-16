@@ -3,20 +3,23 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, Download, RefreshCw, Trash2, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, ChartColumnBig, ChevronDown, Download, FileText, Landmark, RefreshCw, Sheet, Trash2, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { PayslipDialog } from "@/components/dashboard/payroll/payslip-view";
-import { RUN_STATUS, WarningList, money, monthLabel } from "@/components/dashboard/payroll/shared";
+import { RUN_STATUS, WarningList, money } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { api, type PayRunDetail, type PayslipRow } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
+import { printPayrollPdf } from "@/lib/payroll-pdf";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 /** What happens next, in one sentence, for each stage of the run. */
@@ -24,7 +27,7 @@ const NEXT_STEP: Record<PayRunDetail["status"], string> = {
   draft: "Calculating…",
   calculated: "Check each payslip. Fix attendance or rules and recalculate as often as needed, then approve.",
   approved: "Approved and frozen. Pay your staff, then mark the run as paid.",
-  paid: "Paid. Any later fix goes into a future month as an adjustment.",
+  paid: "Paid. Any later fix goes into a future period as an adjustment.",
 };
 
 export default function PayRunPage() {
@@ -34,6 +37,8 @@ export default function PayRunPage() {
   const confirm = useConfirm();
   const { me } = useMe();
   const canManage = me?.permissions.includes("payroll.manage") ?? false;
+  // Its own permission: HR can prepare runs while only a manager approves them.
+  const canApprove = me?.permissions.includes("payroll.approve") ?? false;
 
   const [run, setRun] = useState<PayRunDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -58,8 +63,8 @@ export default function PayRunPage() {
   async function approve() {
     if (!run) return;
     const ok = await confirm({
-      title: `Approve payroll for ${monthLabel(run.month)}?`,
-      description: "Pay is recalculated one last time from the locked attendance, then frozen. It can't be changed afterwards — later fixes go into a future month as adjustments.",
+      title: `Approve ${run.pay_group?.name ?? "payroll"} for ${run.period_label}?`,
+      description: "Pay is recalculated one last time, then frozen, and the attendance it used is locked for these people and days. It can't be changed afterwards — later fixes go into a future period as adjustments.",
       confirmLabel: "Approve",
     });
     if (ok) await act("approve", () => api.payroll.approve(run.id), "Payroll approved");
@@ -67,13 +72,13 @@ export default function PayRunPage() {
 
   async function markPaid() {
     if (!run) return;
-    const ok = await confirm({ title: "Mark as paid?", description: "Records that staff have been paid for this month.", confirmLabel: "Mark as paid" });
+    const ok = await confirm({ title: "Mark as paid?", description: "Records that staff have been paid for this period.", confirmLabel: "Mark as paid" });
     if (ok) await act("paid", () => api.payroll.markPaid(run.id), "Marked as paid");
   }
 
   async function remove() {
     if (!run) return;
-    const ok = await confirm({ title: "Delete this pay run?", description: "Its payslips are removed. You can start the month again at any time.", confirmLabel: "Delete", destructive: true });
+    const ok = await confirm({ title: "Delete this pay run?", description: "Its payslips are removed. You can start the period again at any time.", confirmLabel: "Delete", destructive: true });
     if (!ok) return;
     try {
       await api.payroll.removeRun(run.id);
@@ -87,8 +92,22 @@ export default function PayRunPage() {
     if (!run) return;
     setBusy("export");
     try {
-      const { blob, filename } = await api.payroll.exportRun(run.id, run.month);
+      const { blob, filename } = await api.payroll.exportRun(run.id, run.filename);
       saveBlob(blob, filename);
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** The printed report; "Save as PDF" in the print dialog makes the file. */
+  async function exportPdf(includePayments: boolean) {
+    if (!run) return;
+    setBusy("export");
+    try {
+      const report = await api.payroll.runReport(run.id);
+      await printPayrollPdf({ company: me?.company?.name ?? "Business OS", generatedBy: me?.user.name, report, includePayments });
     } catch (err) {
       notifyError(err);
     } finally {
@@ -117,6 +136,31 @@ export default function PayRunPage() {
   const editable = run.status === "draft" || run.status === "calculated";
   const withProblems = run.payslips.filter((p) => p.warnings?.some((w) => w.blocking)).length;
   const blocked = run.is_stale || withProblems > 0 || (run.warnings ?? []).some((w) => w.blocking);
+  const staleNames = run.payslips.filter((p) => run.stale_employee_ids.includes(p.employee?.id ?? -1)).map((p) => p.employee?.name ?? "Someone");
+
+  /** Only the people whose inputs changed — or everyone, when something shared changed. */
+  async function recalculateStale() {
+    if (!run) return;
+    if (run.stale_everyone || run.stale_employee_ids.length > 20) {
+      await act("calculate", () => api.payroll.calculate(run.id), "Recalculated");
+      return;
+    }
+    await act(
+      "calculate",
+      async () => {
+        let latest = run;
+        for (const employeeId of run.stale_employee_ids) latest = await api.payroll.calculateEmployee(run.id, employeeId);
+        return latest;
+      },
+      "Recalculated",
+    );
+  }
+
+  function recalculateOne(p: PayslipRow) {
+    if (!run || !p.employee) return;
+    const employeeId = p.employee.id;
+    void act(`one-${p.id}`, () => api.payroll.calculateEmployee(run.id, employeeId), `${p.employee.name} recalculated`);
+  }
 
   const columns: DataTableColumn<PayslipRow>[] = [
     {
@@ -140,7 +184,24 @@ export default function PayRunPage() {
       id: "check",
       header: "Check",
       cell: (p) =>
-        p.warnings?.some((w) => w.blocking) ? (
+        p.is_stale && !run.stale_everyone ? (
+          canManage && editable ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                recalculateOne(p);
+              }}
+              disabled={busy !== null}
+            >
+              <RefreshCw className={busy === `one-${p.id}` ? "size-3.5 animate-spin" : "size-3.5"} />
+              Recalculate
+            </Button>
+          ) : (
+            <Badge variant="warning">Changed</Badge>
+          )
+        ) : p.warnings?.some((w) => w.blocking) ? (
           <Badge variant="warning">
             <AlertTriangle className="size-3" />
             Needs fixing
@@ -150,7 +211,7 @@ export default function PayRunPage() {
         ) : (
           <Badge variant="success">OK</Badge>
         ),
-      sortValue: (p) => (p.warnings?.some((w) => w.blocking) ? 0 : p.warnings?.length ? 1 : 2),
+      sortValue: (p) => (p.is_stale ? -1 : p.warnings?.some((w) => w.blocking) ? 0 : p.warnings?.length ? 1 : 2),
     },
   ];
 
@@ -158,30 +219,67 @@ export default function PayRunPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {back}
       <PageHeader
-        title={`Payroll · ${monthLabel(run.month)}`}
+        title={`${run.pay_group?.name ?? "Payroll"} · ${run.period_label}`}
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             <Badge variant={RUN_STATUS[run.status].variant}>{RUN_STATUS[run.status].label}</Badge>
-            {NEXT_STEP[run.status]}
+            {run.status === "calculated" && canManage && !canApprove
+              ? "Check each payslip and recalculate as needed. When it's ready, a person who can approve payroll approves it."
+              : run.status === "calculated" && canApprove && !canManage
+                ? "Check each payslip, then approve. If something needs fixing or recalculating, ask the person who prepared the run."
+                : NEXT_STEP[run.status]}
           </span>
         }
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={exportCsv} disabled={busy !== null || run.payslips.length === 0}>
-              <Download className="size-4" />
-              Export CSV
-            </Button>
+            <PayrollGuideButton topic={editable ? "run" : "locks"} />
+            {run.payslips.length > 0 && (
+              <Button variant="outline" render={<Link href={`/dashboard/payroll/runs/${run.id}/dashboard`} />} nativeButton={false}>
+                <ChartColumnBig className="size-4" />
+                Dashboard
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="outline" disabled={busy !== null || run.payslips.length === 0} />}>
+                <Download className="size-4" />
+                {busy === "export" ? "Preparing…" : "Export"}
+                <ChevronDown className="size-3.5 opacity-70" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuItem onClick={() => exportPdf(false)}>
+                  <FileText className="size-4" />
+                  <div className="flex flex-col">
+                    <span>Payroll report (PDF)</span>
+                    <span className="text-xs text-muted-foreground">Summary, register, components, cost by branch</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportPdf(true)}>
+                  <Landmark className="size-4" />
+                  <div className="flex flex-col">
+                    <span>Report with payment list (PDF)</span>
+                    <span className="text-xs text-muted-foreground">Adds bank accounts and a cash signature sheet</span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <Sheet className="size-4" />
+                  <div className="flex flex-col">
+                    <span>Spreadsheet (CSV)</span>
+                    <span className="text-xs text-muted-foreground">One row per payslip, for the bank or accountant</span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {canManage && editable && (
-              <>
-                <Button variant="outline" onClick={() => act("calculate", () => api.payroll.calculate(run.id), "Recalculated")} disabled={busy !== null}>
-                  <RefreshCw className={busy === "calculate" ? "size-4 animate-spin" : "size-4"} />
-                  Recalculate
-                </Button>
-                <Button onClick={approve} disabled={busy !== null || blocked || run.payslips.length === 0}>
-                  <BadgeCheck className="size-4" />
-                  {busy === "approve" ? "Approving…" : "Approve"}
-                </Button>
-              </>
+              <Button variant="outline" onClick={() => act("calculate", () => api.payroll.calculate(run.id), "Recalculated")} disabled={busy !== null}>
+                <RefreshCw className={busy === "calculate" ? "size-4 animate-spin" : "size-4"} />
+                Recalculate
+              </Button>
+            )}
+            {canApprove && editable && (
+              <Button onClick={approve} disabled={busy !== null || blocked || run.payslips.length === 0}>
+                <BadgeCheck className="size-4" />
+                {busy === "approve" ? "Approving…" : "Approve"}
+              </Button>
             )}
             {canManage && run.status === "approved" && (
               <Button onClick={markPaid} disabled={busy !== null}>
@@ -196,17 +294,19 @@ export default function PayRunPage() {
       {run.is_stale && (
         <Alert
           variant="warning"
-          title="Something changed since this was calculated"
+          title={run.stale_everyone ? "Something changed since this was calculated" : `${run.stale_employee_ids.length} ${run.stale_employee_ids.length === 1 ? "person's" : "people's"} pay changed since this was calculated`}
           action={
             canManage && (
-              <Button size="sm" onClick={() => act("calculate", () => api.payroll.calculate(run.id), "Recalculated")} disabled={busy !== null}>
+              <Button size="sm" onClick={recalculateStale} disabled={busy !== null}>
                 <RefreshCw className={busy === "calculate" ? "size-4 animate-spin" : "size-4"} />
-                Recalculate now
+                {run.stale_everyone ? "Recalculate now" : run.stale_employee_ids.length === 1 ? "Recalculate them" : `Recalculate these ${run.stale_employee_ids.length}`}
               </Button>
             )
           }
         >
-          An adjustment, salary, rule or attendance was added or changed. The numbers below don&apos;t include it yet.
+          {run.stale_everyone
+            ? "A rule, the pay group or who is in it changed. The numbers below don't include it yet."
+            : `${staleNames.slice(0, 5).join(", ") || "Some people"}${staleNames.length > 5 ? "…" : ""}: their attendance, salary or adjustments changed. Everyone else is up to date.`}
         </Alert>
       )}
       <WarningList warnings={run.warnings} />
@@ -251,7 +351,7 @@ export default function PayRunPage() {
         columns={columns}
         onRowClick={(p) => setOpenSlip(p.id)}
         searchPlaceholder="Search employees…"
-        emptyState={{ icon: Wallet, title: "No payslips", description: "Nobody has a salary for this month yet. Add salaries on each employee's Pay tab, then recalculate." }}
+        emptyState={{ icon: Wallet, title: "No payslips", description: "Nobody in this pay group has a salary for this period yet. Add salaries on each employee's Pay tab, then recalculate." }}
       />
 
       {canManage && editable && (

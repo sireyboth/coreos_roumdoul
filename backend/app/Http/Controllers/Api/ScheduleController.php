@@ -69,7 +69,7 @@ class ScheduleController extends Controller
 
         $employee = $this->employee($data['employee_id']);
         $this->assertActiveSchedule($data['work_schedule_id']);
-        $this->recorder->assertUnlocked($employee->company_id, $data['date']);
+        $this->recorder->assertUnlocked($employee->company_id, $data['date'], employeeId: $employee->id);
         $this->assertNotDoubleBooked($employee->id, $data['date']);
         $this->assertNotOnDayOff($employee->id, $data['date']);
 
@@ -125,6 +125,9 @@ class ScheduleController extends Controller
         $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
         if ($employees->count() !== count($data['employee_ids'])) {
             throw ValidationException::withMessages(['employee_ids' => ['Some of those employees couldn\'t be found.']]);
+        }
+        foreach ($employees as $employee) {
+            $this->recorder->assertNotPaid($employee->id, $from->toDateString(), $to->toDateString(), 'from');
         }
 
         $weekdays = $data['weekdays'] ?? [0, 1, 2, 3, 4, 5, 6];
@@ -250,8 +253,8 @@ class ScheduleController extends Controller
         if (isset($data['work_schedule_id']) && (int) $data['work_schedule_id'] !== $schedule->work_schedule_id) {
             $this->assertActiveSchedule($data['work_schedule_id']);
         }
-        $this->recorder->assertUnlocked($employee->company_id, $before['date']);
-        $this->recorder->assertUnlocked($employee->company_id, $date);
+        $this->recorder->assertUnlocked($employee->company_id, $before['date'], employeeId: $before['employee']->id);
+        $this->recorder->assertUnlocked($employee->company_id, $date, employeeId: $employee->id);
         $this->assertNotDoubleBooked($employee->id, $date, ignoreScheduleId: $schedule->id);
         $this->assertNotOnDayOff($employee->id, $date);
 
@@ -266,7 +269,7 @@ class ScheduleController extends Controller
     public function destroy(Schedule $schedule)
     {
         $date = $schedule->date->toDateString();
-        $this->recorder->assertUnlocked($schedule->company_id, $date);
+        $this->recorder->assertUnlocked($schedule->company_id, $date, employeeId: $schedule->employee_id);
 
         $employee = $schedule->employee;
         $schedule->delete();

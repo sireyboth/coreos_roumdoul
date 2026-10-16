@@ -2,26 +2,31 @@
 
 namespace App\Services\Payroll;
 
+use App\Models\AttendanceLock;
 use App\Models\Company;
+use App\Models\Employee;
+use App\Models\EmployeePayGroup;
+use App\Models\PayGroup;
 use App\Models\PayrollAdjustment;
 use App\Models\PayRun;
 use App\Models\Payslip;
 use App\Models\PayslipLine;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\Attendance\MonthlyAttendance;
 use App\Services\AuditLogger;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A month's pay run: draft → calculated → approved → paid.
+ * One pay group's pay run for one period: draft → calculated → approved → paid.
  *
- * Calculating replaces every payslip, as often as needed. Approving needs
- * the month's attendance locked (so the numbers can't move underneath it),
- * recalculates one last time, and refuses while any payslip has a blocking
- * warning. After that nothing changes: fixes go into a later month as adjustments.
+ * Calculating replaces every payslip, as often as needed; one person can be
+ * recalculated alone after a fix. Approving needs the period to be over,
+ * recalculates one last time, refuses while any payslip has a blocking
+ * warning, then locks the attendance it used — for those people and those
+ * days only. After that nothing changes: fixes go into a later period as adjustments.
  */
 class PayRunService
 {
@@ -30,90 +35,119 @@ class PayRunService
         private readonly AttendanceRecorder $recorder,
     ) {}
 
-    public function create(Company $company, string $month, User $by): PayRun
+    /**
+     * A run for the group's period starting on $start. Fixed schedules work
+     * the end out themselves; a custom group needs $end.
+     */
+    public function create(Company $company, PayGroup $group, string $start, ?string $end, ?User $by): PayRun
     {
-        $timezone = $company->timezone ?: config('attendance.default_timezone');
-        if ($month > now($timezone)->format('Y-m')) {
-            throw ValidationException::withMessages(['month' => ['Payroll can\'t be run for a month that hasn\'t started.']]);
-        }
-        if (PayRun::query()->withoutGlobalScopes()->where('company_id', $company->id)->where('month', $month)->exists()) {
-            throw ValidationException::withMessages(['month' => ['There is already a pay run for '.CarbonImmutable::parse("{$month}-01")->format('F Y').'.']]);
+        [$start, $end] = $this->period($group, $start, $end);
+        $today = $this->today($company);
+
+        if ($start->toDateString() > $today) {
+            throw ValidationException::withMessages(['period_start' => ['Payroll can\'t be run for a period that hasn\'t started.']]);
         }
 
-        $run = PayRun::query()->create(['company_id' => $company->id, 'month' => $month, 'status' => 'draft']);
+        $overlap = PayRun::query()->withoutGlobalScopes()->where('pay_group_id', $group->id)
+            ->whereDate('period_start', '<=', $end->toDateString())->whereDate('period_end', '>=', $start->toDateString())
+            ->first();
+        if ($overlap) {
+            throw ValidationException::withMessages(['period_start' => [
+                "{$group->name} already has a pay run for ".self::periodLabel($overlap->period_start, $overlap->period_end).'.',
+            ]]);
+        }
+
+        $run = PayRun::query()->create([
+            'company_id' => $company->id, 'pay_group_id' => $group->id, 'month' => $end->format('Y-m'),
+            'period_start' => $start->toDateString(), 'period_end' => $end->toDateString(), 'status' => 'draft',
+        ]);
 
         return $this->calculate($run, $by);
     }
 
-    public function calculate(PayRun $run, User $by): PayRun
+    public function calculate(PayRun $run, ?User $by): PayRun
     {
         $this->assertEditable($run);
 
-        $company = $run->company;
-        $ctx = $this->calculator->context($company, $run->month);
-        $employees = $this->calculator->employees($company, $run->month);
-        $attendance = MonthlyAttendance::for($company, $employees, $ctx['start']);
-        $adjustments = PayrollAdjustment::query()->withoutGlobalScopes()
-            ->where('company_id', $company->id)->where('month', $run->month)
-            ->orderBy('id')->get()->groupBy('employee_id');
+        $ctx = $this->context($run);
+        $employees = $this->calculator->employees($ctx);
+        $attendance = $this->calculator->attendance($ctx, $employees);
+        $adjustments = $this->adjustments($run, $employees->pluck('id'));
 
-        $results = $employees->map(fn ($employee) => [
+        $results = $employees->map(fn (Employee $employee) => [
             'employee' => $employee,
             'result' => $this->calculator->calculate($ctx, $employee, $attendance->get($employee->id), $adjustments->get($employee->id, collect())),
         ]);
 
-        $skipped = $results->filter(fn ($r) => isset($r['result']['skipped']));
+        $skipped = $results->filter(fn ($r) => isset($r['result']['skipped']))->pluck('employee');
         $payslips = $results->reject(fn ($r) => isset($r['result']['skipped']))->pluck('result');
 
-        $warnings = [];
-        if ($skipped->isNotEmpty()) {
-            $warnings[] = [
-                'code' => 'no_salary', 'blocking' => false,
-                'message' => $skipped->count().' '.($skipped->count() === 1 ? 'employee has' : 'employees have').' no salary for this month and '.($skipped->count() === 1 ? 'is' : 'are').' left out: '
-                    .$skipped->take(10)->map(fn ($r) => $r['employee']->name)->join(', ').($skipped->count() > 10 ? '…' : '').'.',
-                'employee_ids' => $skipped->map(fn ($r) => $r['employee']->id)->values()->all(),
-            ];
-        }
-        $timezone = $company->timezone ?: config('attendance.default_timezone');
-        $this->recorder->forgetLocks();
-        if ($ctx['end']->toDateString() >= now($timezone)->toDateString()) {
-            $warnings[] = ['code' => 'month_not_over', 'blocking' => true, 'message' => 'The month isn\'t over yet, so these numbers are a preview.'];
-        } elseif (! $this->recorder->isLocked($company->id, $ctx['start']->toDateString())) {
-            $warnings[] = ['code' => 'attendance_unlocked', 'blocking' => true, 'message' => 'Attendance for this month isn\'t locked yet. Lock it in Attendance before approving, so the numbers can\'t change.'];
-        }
-
-        DB::transaction(function () use ($run, $company, $payslips, $warnings, $ctx, $by) {
+        DB::transaction(function () use ($run, $payslips, $skipped, $ctx, $by) {
             $run->payslips()->delete();
 
             foreach ($payslips as $result) {
-                $payslip = Payslip::query()->create([
-                    ...collect($result)->except('lines')->all(),
-                    'company_id' => $run->company_id,
-                    'pay_run_id' => $run->id,
-                ]);
-
-                PayslipLine::query()->insert(array_map(fn ($line) => [
-                    ...$line,
-                    'payslip_id' => $payslip->id,
-                    'details' => $line['details'] === null ? null : json_encode($line['details']),
-                ], $result['lines']));
+                $this->savePayslip($run, $result);
             }
 
             $run->update([
                 'status' => 'calculated',
-                'warnings' => $warnings,
+                'warnings' => $this->runWarnings($run, $ctx, $skipped),
                 'totals' => $this->totals($payslips->all()),
+                'policy_snapshot' => $this->snapshot($run, $ctx, $skipped),
+                'calculated_at' => now(),
+                'calculated_by' => $by?->id,
+            ]);
+        });
+
+        return $run->fresh();
+    }
+
+    /** Recalculates one person only (after fixing their attendance or pay), leaving everyone else as they were. */
+    public function calculateEmployee(PayRun $run, int $employeeId, ?User $by): PayRun
+    {
+        $this->assertEditable($run);
+
+        $ctx = $this->context($run);
+        $employee = $this->calculator->employees($ctx)->firstWhere('id', $employeeId);
+        if (! $employee) {
+            throw ValidationException::withMessages(['employee_id' => ['This person isn\'t in this pay run\'s group for its period. Recalculate the whole run instead.']]);
+        }
+
+        $attendance = $this->calculator->attendance($ctx, collect([$employee]))->get($employee->id);
+        $adjustments = $this->adjustments($run, collect([$employee->id]))->get($employee->id, collect());
+        $result = $this->calculator->calculate($ctx, $employee, $attendance, $adjustments);
+
+        DB::transaction(function () use ($run, $employee, $result, $ctx, $by) {
+            $run->payslips()->where('employee_id', $employee->id)->delete();
+            $skippedIds = collect($run->policy_snapshot['skipped_employee_ids'] ?? [])->reject(fn ($id) => $id === $employee->id);
+
+            if (isset($result['skipped'])) {
+                $skippedIds->push($employee->id);
+            } else {
+                $this->savePayslip($run, $result);
+            }
+
+            $skipped = Employee::query()->withoutGlobalScopes()->whereIn('id', $skippedIds)->inDisplayOrder()->get();
+            $snapshot = $run->policy_snapshot ?? [];
+            $fingerprint = $snapshot['fingerprint'] ?? [];
+            $mine = $this->employeeFingerprints($run, collect([$employee->id]));
+
+            $run->update([
+                'warnings' => $this->runWarnings($run, $ctx, $skipped),
+                'totals' => $this->totals($run->payslips()->get()->map(fn (Payslip $p) => [
+                    'currency' => $p->currency, 'gross' => (float) $p->gross, 'nssf_employee' => (float) $p->nssf_employee,
+                    'tax' => (float) $p->tax, 'net' => (float) $p->net, 'employer_cost' => (float) $p->employer_cost,
+                ])->all()),
                 'policy_snapshot' => [
-                    'policy' => $ctx['policy']->only(['rate_basis', 'rate_basis_days', 'hours_per_day', 'missing_scan_policy', 'daily_paid_holidays', 'khr_rounding', 'fallback_exchange_rate']),
-                    'components' => $ctx['components']->map->only(['code', 'name', 'kind', 'method', 'template', 'params', 'taxable', 'nssf_insurable'])->values()->all(),
-                    'exchange_rate' => $ctx['exchange_rate'],
-                    'exchange_rate_source' => $ctx['exchange_rate_source'],
-                    'tax' => $ctx['tax'],
-                    'nssf' => $ctx['nssf'],
-                    'fingerprint' => $this->fingerprint($company, $run->month),
+                    ...$snapshot,
+                    'skipped_employee_ids' => $skipped->pluck('id')->values()->all(),
+                    'fingerprint' => [
+                        'global' => $fingerprint['global'] ?? null,
+                        'employees' => array_replace($fingerprint['employees'] ?? [], [$employee->id => $mine[$employee->id]]),
+                    ],
                 ],
                 'calculated_at' => now(),
-                'calculated_by' => $by->id,
+                'calculated_by' => $by?->id,
             ]);
         });
 
@@ -126,7 +160,7 @@ class PayRunService
             throw ValidationException::withMessages(['status' => ['Only a calculated pay run can be approved.']]);
         }
 
-        // Once more against the final (locked) attendance, so what is approved is exactly what was checked.
+        // Once more against the final attendance, so what is approved is exactly what was checked.
         $run = $this->calculate($run, $by);
 
         $blocking = collect($run->warnings)->where('blocking', true);
@@ -139,8 +173,20 @@ class PayRunService
             ]]);
         }
 
-        $run->update(['status' => 'approved', 'approved_at' => now(), 'approved_by' => $by->id]);
-        AuditLogger::record('pay_run.approved', $run, ['month' => $run->month, 'totals' => $run->totals]);
+        DB::transaction(function () use ($run, $by) {
+            $run->update(['status' => 'approved', 'approved_at' => now(), 'approved_by' => $by->id]);
+
+            // The attendance these payslips used can't change any more — only these people's, only these days.
+            foreach ($run->payslips()->get() as $payslip) {
+                AttendanceLock::query()->create([
+                    'company_id' => $run->company_id, 'employee_id' => $payslip->employee_id, 'pay_run_id' => $run->id,
+                    'start_date' => $payslip->inputs['employed']['from'] ?? $run->period_start->toDateString(),
+                    'end_date' => $payslip->inputs['employed']['to'] ?? $run->period_end->toDateString(),
+                ]);
+            }
+        });
+        $this->recorder->forgetLocks();
+        AuditLogger::record('pay_run.approved', $run, ['period' => [$run->period_start->toDateString(), $run->period_end->toDateString()], 'totals' => $run->totals]);
 
         return $run->fresh();
     }
@@ -163,55 +209,297 @@ class PayRunService
     }
 
     /**
-     * Whether anything that feeds this run changed after it was calculated
-     * (an adjustment, a salary, a rule, attendance…), so the page can ask for
-     * a recalculation instead of showing stale pay.
+     * Runs a group prepares by itself: for each group set to calculate
+     * automatically, the period that ended most recently gets its run (never
+     * approved — a person still checks and approves it).
+     *
+     * @return Collection<int, PayRun> the runs created
      */
-    public function isStale(PayRun $run): bool
+    public function prepareDue(): Collection
     {
-        if ($run->isLocked()) {
-            return false;
-        }
+        return PayGroup::query()->withoutGlobalScopes()->where('auto_calculate', true)->where('schedule', '!=', 'custom')
+            ->with('company')->get()
+            ->map(function (PayGroup $group) {
+                $company = $group->company;
+                if (! $company || in_array($company->status, ['suspended', 'cancelled'], true) || ! $company->hasModule('payroll')) {
+                    return null;
+                }
+                $current = $group->periodFor($this->today($group->company));
+                $last = $group->periodFor($current[0]->subDay());
 
-        // Calculated before fingerprints existed: there's no telling, so ask for one recalculation.
-        $stored = $run->policy_snapshot['fingerprint'] ?? null;
+                $exists = PayRun::query()->withoutGlobalScopes()->where('pay_group_id', $group->id)
+                    ->whereDate('period_start', '<=', $last[1]->toDateString())->whereDate('period_end', '>=', $last[0]->toDateString())
+                    ->exists();
 
-        return $stored === null || $stored !== $this->fingerprint($run->company, $run->month);
+                return $exists ? null : $this->create($group->company, $group, $last[0]->toDateString(), null, null);
+            })
+            ->filter()->values();
     }
 
     /**
-     * Row count + latest change of every input to a month's pay. Counts
-     * catch deletions; timestamps catch edits.
+     * What changed since the run was calculated: everyone (a rule, a group,
+     * someone joining…) or only some people (their attendance, salary,
+     * adjustments…), so the page can ask for a recalculation instead of
+     * showing stale pay — and say whose.
+     *
+     * @return array{everyone: bool, employee_ids: array<int, int>}
      */
-    public function fingerprint(Company $company, string $month): string
+    public function staleness(PayRun $run): array
     {
-        $start = "{$month}-01";
-        $end = CarbonImmutable::parse($start)->endOfMonth()->toDateString();
+        if ($run->isLocked()) {
+            return ['everyone' => false, 'employee_ids' => []];
+        }
+
+        $stored = $run->policy_snapshot['fingerprint'] ?? null;
+        // Calculated before per-person fingerprints existed: there's no telling, so ask for one recalculation.
+        if (! is_array($stored)) {
+            return ['everyone' => true, 'employee_ids' => []];
+        }
+        if ($stored['global'] !== $this->globalFingerprint($run)) {
+            return ['everyone' => true, 'employee_ids' => []];
+        }
+
+        $ids = collect(array_keys($stored['employees'] ?? []))->map(fn ($id) => (int) $id);
+        $current = $this->employeeFingerprints($run, $ids);
+
+        return [
+            'everyone' => false,
+            'employee_ids' => $ids->filter(fn (int $id) => ($stored['employees'][$id] ?? null) !== ($current[$id] ?? null))->values()->all(),
+        ];
+    }
+
+    public function isStale(PayRun $run): bool
+    {
+        $stale = $this->staleness($run);
+
+        return $stale['everyone'] || $stale['employee_ids'] !== [];
+    }
+
+    /** "1 – 30 Sep 2026", "26 Mar – 25 Apr 2026". */
+    public static function periodLabel($start, $end): string
+    {
+        $start = CarbonImmutable::parse($start);
+        $end = CarbonImmutable::parse($end);
+
+        if ($start->year !== $end->year) {
+            return $start->format('j M Y').' – '.$end->format('j M Y');
+        }
+
+        return ($start->month === $end->month ? $start->format('j') : $start->format('j M')).' – '.$end->format('j M Y');
+    }
+
+    // ───────────────────────────── Helpers ─────────────────────────────
+
+    /** @return array<string, mixed> */
+    private function context(PayRun $run): array
+    {
+        return $this->calculator->context(
+            $run->company,
+            $run->payGroup,
+            CarbonImmutable::parse($run->period_start->toDateString()),
+            CarbonImmutable::parse($run->period_end->toDateString()),
+        );
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function period(PayGroup $group, string $start, ?string $end): array
+    {
+        $startDay = CarbonImmutable::parse($start)->startOfDay();
+
+        if ($group->hasFixedPeriods()) {
+            $period = $group->periodFor($startDay);
+            // After a schedule change, a period can start the day after the group's last run instead.
+            $afterRun = PayRun::query()->withoutGlobalScopes()->where('pay_group_id', $group->id)
+                ->whereDate('period_end', $startDay->subDay()->toDateString())->exists();
+            if (! $period[0]->isSameDay($startDay) && ! $afterRun) {
+                throw ValidationException::withMessages(['period_start' => ["{$group->name}'s periods don't start on that day. The period holding it is ".self::periodLabel($period[0], $period[1]).'.']]);
+            }
+
+            return [$startDay, $period[1]];
+        }
+
+        if ($end === null) {
+            throw ValidationException::withMessages(['period_end' => ['Pick the last day of the period.']]);
+        }
+        $endDay = CarbonImmutable::parse($end)->startOfDay();
+        if ($endDay->lt($startDay)) {
+            throw ValidationException::withMessages(['period_end' => ['The period can\'t end before it starts.']]);
+        }
+        if ($startDay->diffInDays($endDay) + 1 > PayGroup::MAX_CUSTOM_DAYS) {
+            throw ValidationException::withMessages(['period_end' => ['A pay period can be at most '.PayGroup::MAX_CUSTOM_DAYS.' days.']]);
+        }
+
+        return [$startDay, $endDay];
+    }
+
+    /** @return Collection<int, Collection<int, PayrollAdjustment>> keyed by employee id */
+    private function adjustments(PayRun $run, Collection $employeeIds): Collection
+    {
+        return PayrollAdjustment::query()->withoutGlobalScopes()
+            ->where('company_id', $run->company_id)->whereIn('employee_id', $employeeIds)
+            ->whereDate('date', '>=', $run->period_start->toDateString())->whereDate('date', '<=', $run->period_end->toDateString())
+            ->orderBy('id')->get()->groupBy('employee_id');
+    }
+
+    private function savePayslip(PayRun $run, array $result): void
+    {
+        $payslip = Payslip::query()->create([
+            ...collect($result)->except('lines')->all(),
+            'company_id' => $run->company_id,
+            'pay_run_id' => $run->id,
+        ]);
+
+        PayslipLine::query()->insert(array_map(fn ($line) => [
+            ...$line,
+            'payslip_id' => $payslip->id,
+            'details' => $line['details'] === null ? null : json_encode($line['details']),
+        ], $result['lines']));
+    }
+
+    /**
+     * @param  Collection<int, Employee>  $skipped  people in the group with no salary for the period
+     * @return array<int, array<string, mixed>>
+     */
+    private function runWarnings(PayRun $run, array $ctx, Collection $skipped): array
+    {
+        $warnings = [];
+        if ($skipped->isEmpty() && ! $run->payslips()->exists()) {
+            // The usual cause: people were moved in, but from a date after this period.
+            $later = EmployeePayGroup::query()->withoutGlobalScopes()->where('pay_group_id', $ctx['group']->id)
+                ->whereDate('effective_from', '>', $ctx['end']->toDateString())->get();
+            $first = $later->min(fn (EmployeePayGroup $m) => $m->effective_from->toDateString());
+
+            $warnings[] = [
+                'code' => 'no_members', 'blocking' => true,
+                'message' => "Nobody is in {$ctx['group']->name} for these dates, so there is no one to pay."
+                    .($later->isNotEmpty()
+                        ? ' '.$later->count().' '.($later->count() === 1 ? 'person was' : 'people were').' moved into it only from '.CarbonImmutable::parse($first)->format('j M Y')
+                            .', after this period. On their Pay tab, undo that change and move them again from '.$ctx['start']->format('j M Y').' or earlier, then recalculate.'
+                        : ' Put employees in this group on their Pay tab (Change group) from '.$ctx['start']->format('j M Y').' or earlier, then recalculate'
+                            .($ctx['group']->is_default ? '.' : ' — or run the group they are in now.')),
+            ];
+        }
+        if ($skipped->isNotEmpty()) {
+            $n = $skipped->count();
+            $warnings[] = [
+                'code' => 'no_salary', 'blocking' => false,
+                'message' => $n.' '.($n === 1 ? 'employee has' : 'employees have').' no salary for this period and '.($n === 1 ? 'is' : 'are').' left out: '
+                    .$skipped->take(10)->map(fn ($e) => $e->name)->join(', ').($n > 10 ? '…' : '').'.',
+                'employee_ids' => $skipped->pluck('id')->values()->all(),
+            ];
+        }
+        if (! $ctx['statutory']) {
+            $warnings[] = [
+                'code' => 'no_tax_nssf', 'blocking' => false,
+                'message' => 'Tax on salary and NSSF are not worked out for this pay period yet (only for 1st → end-of-month periods). Handle them outside payroll for now.',
+            ];
+        }
+        if ($ctx['end']->toDateString() >= $this->today($run->company)) {
+            $warnings[] = ['code' => 'period_not_over', 'blocking' => true, 'message' => 'The period isn\'t over yet, so these numbers are a preview.'];
+        }
+
+        return $warnings;
+    }
+
+    /** @return array<string, mixed> */
+    private function snapshot(PayRun $run, array $ctx, Collection $skipped): array
+    {
+        $ids = $run->payslips()->pluck('employee_id')->merge($skipped->pluck('id'));
+
+        return [
+            'policy' => $ctx['policy']->only(['rate_basis', 'rate_basis_days', 'hours_per_day', 'missing_scan_policy', 'daily_paid_holidays', 'khr_rounding', 'fallback_exchange_rate']),
+            'group' => $ctx['group']->only(['id', 'name', 'schedule', 'cutoff_days', 'anchor_date']),
+            'period' => ['start' => $ctx['start']->toDateString(), 'end' => $ctx['end']->toDateString(), 'days' => $ctx['days_in_period'], 'salary_share' => $ctx['salary_share']],
+            'components' => $ctx['components']->map->only(['code', 'name', 'kind', 'method', 'template', 'params', 'taxable', 'nssf_insurable'])->values()->all(),
+            'statutory' => $ctx['statutory'],
+            'exchange_rate' => $ctx['exchange_rate'],
+            'exchange_rate_source' => $ctx['exchange_rate_source'],
+            'tax' => $ctx['tax'],
+            'nssf' => $ctx['nssf'],
+            'skipped_employee_ids' => $skipped->pluck('id')->values()->all(),
+            'fingerprint' => [
+                'global' => $this->globalFingerprint($run),
+                'employees' => $this->employeeFingerprints($run, $ids),
+            ],
+        ];
+    }
+
+    /**
+     * Inputs everyone shares — rules, the group, rates — plus who is in the
+     * group (pay group moves, hires, leavers). Row count + latest change:
+     * counts catch deletions, timestamps catch edits.
+     */
+    private function globalFingerprint(PayRun $run): string
+    {
+        $company = $run->company_id;
         $state = fn (string $table, ?callable $scope = null) => (array) DB::table($table)
             ->when($scope, $scope)
             ->selectRaw('count(*) as n, max(updated_at) as at')
             ->first();
-        $own = fn ($q) => $q->where('company_id', $company->id);
+        $own = fn ($q) => $q->where('company_id', $company);
 
         return md5(json_encode([
-            $state('payroll_adjustments', fn ($q) => $own($q)->where('month', $month)),
-            $state('employee_salaries', $own),
-            $state('employee_pay_items', $own),
-            $state('employee_pay_profiles', $own),
             $state('pay_components', $own),
             $state('payroll_policies', $own),
-            $state('employees', $own),
-            $state('attendance_days', fn ($q) => $own($q)->whereDate('date', '>=', $start)->whereDate('date', '<=', $end)),
+            $state('pay_groups', $own),
+            $state('employee_pay_groups', $own),
+            // Hires and leavers change who is in the run; other edits to people are per person, below.
+            (array) DB::table('employees')->where('company_id', $company)
+                ->selectRaw('count(*) as n, max(hire_date) as h, max(termination_date) as t, sum(case when employment_status in (?, ?, ?, ?) then 1 else 0 end) as gone', Employee::LEFT_STATUSES)
+                ->first(),
             $state('statutory_rates'),
-            $state('tax_exchange_rates', fn ($q) => $q->where('month', $month)),
+            $state('tax_exchange_rates', fn ($q) => $q->where('month', $run->month)),
         ]));
+    }
+
+    /**
+     * Each person's own inputs for the period: their attendance, salary,
+     * items, profile and adjustments. One grouped query per table.
+     *
+     * @return array<int, string> employee id => fingerprint
+     */
+    private function employeeFingerprints(PayRun $run, Collection $employeeIds): array
+    {
+        if ($employeeIds->isEmpty()) {
+            return [];
+        }
+
+        $start = $run->period_start->toDateString();
+        $end = $run->period_end->toDateString();
+        $state = fn (string $table, string $column, ?callable $scope = null) => DB::table($table)
+            ->whereIn($column, $employeeIds)
+            ->when($scope, $scope)
+            ->groupBy($column)
+            ->selectRaw("{$column} as id, count(*) as n, max(updated_at) as at")
+            ->get()->keyBy('id');
+        $inPeriod = fn (string $column) => fn ($q) => $q->whereDate($column, '>=', $start)->whereDate($column, '<=', $end);
+
+        $tables = [
+            $state('attendance_days', 'employee_id', $inPeriod('date')),
+            $state('payroll_adjustments', 'employee_id', $inPeriod('date')),
+            $state('employee_salaries', 'employee_id'),
+            $state('employee_pay_items', 'employee_id'),
+            $state('employee_pay_profiles', 'employee_id'),
+            $state('employees', 'id'),
+        ];
+
+        return $employeeIds->mapWithKeys(fn (int $id) => [
+            $id => md5(json_encode(array_map(fn (Collection $rows) => [(int) ($rows[$id]->n ?? 0), $rows[$id]->at ?? null], $tables))),
+        ])->all();
     }
 
     private function assertEditable(PayRun $run): void
     {
         if ($run->isLocked()) {
-            throw ValidationException::withMessages(['status' => ['This pay run is approved and can no longer change. Add an adjustment to a later month instead.']]);
+            throw ValidationException::withMessages(['status' => ['This pay run is approved and can no longer change. Add an adjustment to a later period instead.']]);
         }
+    }
+
+    private function today(Company $company): string
+    {
+        return now($company->timezone ?: config('attendance.default_timezone'))->toDateString();
     }
 
     /**

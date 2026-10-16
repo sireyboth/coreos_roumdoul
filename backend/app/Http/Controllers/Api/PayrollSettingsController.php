@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\PayComponent;
+use App\Models\PayGroup;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollPolicy;
-use App\Services\Attendance\MonthlyAttendance;
+use App\Services\Payroll\PayGroupService;
 use App\Services\Payroll\PayrollCalculator;
 use App\Services\Payroll\PayrollSetup;
+use App\Services\Payroll\PayRunService;
 use App\Services\Payroll\PayTemplates;
 use App\Support\PayrollDefaults;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -130,44 +133,63 @@ class PayrollSettingsController extends Controller
     }
 
     /**
-     * One employee's payslip for a month with the current rules — or with one
-     * component's unsaved params swapped in, so a rule can be tried before saving.
+     * One employee's payslip for the pay period that ends the month (or holds
+     * today, for this month) with the current rules — or with one component's
+     * unsaved params swapped in, so a rule can be tried before saving. With
+     * pay_group_id, the group's rules are used (to try a group's own rule).
      */
-    public function preview(Request $request, PayrollCalculator $calculator)
+    public function preview(Request $request, PayrollCalculator $calculator, PayGroupService $groups)
     {
         $data = $request->validate([
             'employee_id' => ['required', 'integer'],
             'month' => ['required', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'pay_group_id' => ['nullable', 'integer'],
             'component_id' => ['nullable', 'integer'],
             'params' => ['nullable', 'array'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $company = $request->user()->company;
-        $employee = Employee::query()->with(['salaries', 'payProfile', 'payItems'])->findOrFail($data['employee_id']);
-        $ctx = $calculator->context($company, $data['month']);
+        $this->setup->ensure($company);
+        $employee = Employee::query()->with(['salaries', 'payProfile', 'payItems', 'payGroups'])->findOrFail($data['employee_id']);
+
+        $monthEnd = CarbonImmutable::parse("{$data['month']}-01")->endOfMonth()->startOfDay();
+        $date = $monthEnd->min(CarbonImmutable::parse(now($company->timezone ?: config('attendance.default_timezone'))->toDateString()));
+        $group = ! empty($data['pay_group_id'])
+            ? PayGroup::query()->findOrFail($data['pay_group_id'])
+            : PayGroup::query()->findOrFail($groups->groupIdOn($employee, $date->toDateString(), $this->setup->defaultGroup($company)->id));
+        [$start, $end] = $group->periodFor($date) ?? [$monthEnd->startOfMonth(), $monthEnd];
+        $ctx = $calculator->context($company, $group, $start, $end);
 
         if (! empty($data['component_id'])) {
-            $draft = PayComponent::query()->findOrFail($data['component_id'])->replicate();
+            $draft = ($ctx['components']->firstWhere('id', $data['component_id']) ?? PayComponent::query()->findOrFail($data['component_id']))->replicate();
             $draft->id = $data['component_id'];
             if (isset($data['params']) && $draft->method === 'template') {
                 $draft->params = PayTemplates::normalise($draft->template, $data['params']);
             }
             $active = $data['is_active'] ?? true;
-            $ctx['components'] = PayComponent::query()->where('is_active', true)->whereKeyNot($draft->id)->get()
+            $ctx['components'] = $ctx['components']->reject(fn (PayComponent $c) => $c->id === $draft->id)
                 ->when($active, fn ($c) => $c->push($draft))
                 ->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values();
         }
 
-        $attendance = MonthlyAttendance::for($company, collect([$employee]), $ctx['start'])->get($employee->id);
-        $adjustments = PayrollAdjustment::query()->where('employee_id', $employee->id)->where('month', $data['month'])->get();
+        $attendance = $calculator->attendance($ctx, collect([$employee]))->get($employee->id);
+        $adjustments = PayrollAdjustment::query()->where('employee_id', $employee->id)
+            ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $end->toDateString())->get();
         $result = $calculator->calculate($ctx, $employee, $attendance, $adjustments);
 
         if (isset($result['skipped'])) {
-            throw ValidationException::withMessages(['employee_id' => ["{$employee->name} has no salary for this month."]]);
+            throw ValidationException::withMessages(['employee_id' => ["{$employee->name} has no salary for this period."]]);
         }
 
-        return [...$result, 'employee' => ['id' => $employee->id, 'name' => $employee->name, 'employee_code' => $employee->employee_code]];
+        return [
+            ...$result,
+            'employee' => ['id' => $employee->id, 'name' => $employee->name, 'employee_code' => $employee->employee_code],
+            'pay_group' => $group->only(['id', 'name']),
+            'period_start' => $start->toDateString(),
+            'period_end' => $end->toDateString(),
+            'period_label' => PayRunService::periodLabel($start, $end),
+        ];
     }
 
     private function uniqueCode(string $code): string

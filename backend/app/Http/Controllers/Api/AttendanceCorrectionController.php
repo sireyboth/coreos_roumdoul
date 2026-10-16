@@ -76,7 +76,7 @@ class AttendanceCorrectionController extends Controller
         // company's timezone, then store them as the same instant in UTC.
         $employee = Employee::query()->findOrFail($employeeId);
         $timezone = $employee->company?->timezone ?: config('attendance.default_timezone');
-        $recorder->assertUnlocked($employee->company_id, Carbon::parse($data['date'])->toDateString());
+        $recorder->assertUnlocked($employee->company_id, Carbon::parse($data['date'])->toDateString(), employeeId: $employee->id);
 
         $scans = collect($times)
             ->map(fn (string $value) => Carbon::parse($value, $timezone)->setTimezone(config('app.timezone')))

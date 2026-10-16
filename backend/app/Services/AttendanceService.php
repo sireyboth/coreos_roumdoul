@@ -68,7 +68,7 @@ class AttendanceService
             ]);
         }
 
-        $this->recorder->assertUnlocked($employee->company_id, $workDate);
+        $this->recorder->assertUnlocked($employee->company_id, $workDate, employeeId: $employee->id);
         $this->assertNotDoubleTap($employee, $now);
 
         $workLocation = $this->resolveWorkLocation($employee, $data, $expected);
@@ -140,7 +140,7 @@ class AttendanceService
     {
         $employee = $correction->employee;
         $date = Carbon::parse($correction->date)->toDateString();
-        $this->recorder->assertUnlocked($employee->company_id, $date, 'status');
+        $this->recorder->assertUnlocked($employee->company_id, $date, 'status', $employee->id);
 
         DB::transaction(function () use ($correction, $reviewerId, $notes) {
             // Claim it first: two managers approving at the same moment must not add the scans twice.
@@ -149,6 +149,14 @@ class AttendanceService
             }
 
             foreach ($correction->requestedTimes() as $time) {
+                // A scan already on record at that minute (e.g. an exported file imported back) isn't added twice.
+                $minute = $time->copy()->setTimezone(config('app.timezone'))->startOfMinute();
+                $exists = AttendanceEvent::query()->where('employee_id', $correction->employee_id)
+                    ->whereBetween('event_time', [$minute, $minute->copy()->endOfMinute()])->exists();
+                if ($exists) {
+                    continue;
+                }
+
                 AttendanceEvent::query()->create([
                     'company_id' => $correction->company_id,
                     'employee_id' => $correction->employee_id,
@@ -195,7 +203,7 @@ class AttendanceService
             ->unique()->sort()->values();
 
         foreach ($dates as $affected) {
-            $this->recorder->assertUnlocked($employee->company_id, $affected);
+            $this->recorder->assertUnlocked($employee->company_id, $affected, employeeId: $employee->id);
         }
 
         DB::transaction(function () use ($employee, $date, $add, $toVoid, $reason, $adminId) {
@@ -273,7 +281,7 @@ class AttendanceService
     {
         $employee = $day->employee;
         $date = $day->date->toDateString();
-        $this->recorder->assertUnlocked($employee->company_id, $date);
+        $this->recorder->assertUnlocked($employee->company_id, $date, employeeId: $employee->id);
 
         // Same window the recorder searches; workDateFor decides which scans are this day's (a night shift's OUT lands after midnight).
         $timezone = $employee->company->timezone ?: config('attendance.default_timezone');

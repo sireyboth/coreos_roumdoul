@@ -4,6 +4,7 @@ namespace App\Services\Attendance;
 
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
+use App\Models\AttendanceLock;
 use App\Models\AttendancePeriod;
 use App\Models\Company;
 use App\Models\Employee;
@@ -18,12 +19,15 @@ use Illuminate\Validation\ValidationException;
  * assignment, a holiday — the day is recalculated from scratch: resolve what
  * was expected, gather the day's scans, judge them, save the result.
  *
- * Days in a locked month are never recalculated.
+ * Days in a locked month, or already paid by an approved pay run, are never recalculated.
  */
 class AttendanceRecorder
 {
     /** @var array<string, bool> "companyId|YYYY-MM" => locked, for the life of the request */
     private array $lockCache = [];
+
+    /** @var array<int, array<int, array{0: string, 1: string}>> employee id => paid ranges, for the life of the request */
+    private array $employeeLockCache = [];
 
     /**
      * Which work date a scan belongs to. Normally its own calendar date — but
@@ -107,7 +111,7 @@ class AttendanceRecorder
         $existing = AttendanceDay::query()->withoutGlobalScopes()
             ->where('employee_id', $employee->id)->whereDate('date', $expected->date)->first();
 
-        if ($this->isLocked($employee->company_id, $expected->date)) {
+        if ($this->isLocked($employee->company_id, $expected->date, $employee->id)) {
             return $existing;
         }
 
@@ -223,7 +227,72 @@ class AttendanceRecorder
             });
     }
 
-    public function isLocked(int $companyId, string $date): bool
+    /**
+     * Whether attendance on $date is frozen: the company locked the whole
+     * month, or — with $employeeId — an approved pay run covers that person's day.
+     */
+    public function isLocked(int $companyId, string $date, ?int $employeeId = null): bool
+    {
+        return $this->monthLocked($companyId, $date) || ($employeeId !== null && $this->paidLock($employeeId, $date) !== null);
+    }
+
+    /** Forget cached lock answers (after a month is locked or reopened, or a pay run approved). */
+    public function forgetLocks(): void
+    {
+        $this->lockCache = [];
+        $this->employeeLockCache = [];
+    }
+
+    /** Refuses a change to attendance in a locked month, or on a day already paid for that person. */
+    public function assertUnlocked(int $companyId, string $date, string $field = 'date', ?int $employeeId = null): void
+    {
+        if ($this->monthLocked($companyId, $date)) {
+            $month = CarbonImmutable::parse($date)->format('F Y');
+
+            throw ValidationException::withMessages([
+                $field => ["{$month} is locked for payroll, so its attendance can't be changed. Ask an admin to reopen it."],
+            ]);
+        }
+
+        if ($employeeId !== null && ($lock = $this->paidLock($employeeId, $date))) {
+            throw ValidationException::withMessages([$field => [self::paidMessage($lock)]]);
+        }
+    }
+
+    /**
+     * The first approved pay run range that overlaps [$start, $end] for this
+     * person, for changes that span days (rosters, leave, assignments).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function paidRange(int $employeeId, string $start, string $end): ?array
+    {
+        $this->paidLock($employeeId, $start);
+
+        foreach ($this->employeeLockCache[$employeeId] as $range) {
+            if ($range[0] <= substr($end, 0, 10) && $range[1] >= substr($start, 0, 10)) {
+                return $range;
+            }
+        }
+
+        return null;
+    }
+
+    /** Refuses a change to days already paid for this person. */
+    public function assertNotPaid(int $employeeId, string $start, string $end, string $field = 'date'): void
+    {
+        if ($range = $this->paidRange($employeeId, $start, $end)) {
+            throw ValidationException::withMessages([$field => [self::paidMessage($range)]]);
+        }
+    }
+
+    /** @param  array{0: string, 1: string}  $range */
+    public static function paidMessage(array $range): string
+    {
+        return 'Some of these days are already paid (pay run '.CarbonImmutable::parse($range[0])->format('j M').' – '.CarbonImmutable::parse($range[1])->format('j M Y').'), so their attendance can\'t change. Add a payroll adjustment to a later period instead.';
+    }
+
+    private function monthLocked(int $companyId, string $date): bool
     {
         $key = $companyId.'|'.substr($date, 0, 7);
 
@@ -233,22 +302,23 @@ class AttendanceRecorder
             ->exists();
     }
 
-    /** Forget cached lock answers (after a month is locked or reopened). */
-    public function forgetLocks(): void
+    /** @return array{0: string, 1: string}|null the approved pay run range holding this person's day */
+    private function paidLock(int $employeeId, string $date): ?array
     {
-        $this->lockCache = [];
-    }
+        $ranges = $this->employeeLockCache[$employeeId] ??= AttendanceLock::query()->withoutGlobalScopes()
+            ->where('employee_id', $employeeId)
+            ->get(['start_date', 'end_date'])
+            ->map(fn (AttendanceLock $lock) => [$lock->start_date->toDateString(), $lock->end_date->toDateString()])
+            ->all();
+        $day = substr($date, 0, 10);
 
-    /** Refuses a change to attendance in a locked month. */
-    public function assertUnlocked(int $companyId, string $date, string $field = 'date'): void
-    {
-        if ($this->isLocked($companyId, $date)) {
-            $month = CarbonImmutable::parse($date)->format('F Y');
-
-            throw ValidationException::withMessages([
-                $field => ["{$month} is locked for payroll, so its attendance can't be changed. Ask an admin to reopen it."],
-            ]);
+        foreach ($ranges as $range) {
+            if ($range[0] <= $day && $range[1] >= $day) {
+                return $range;
+            }
         }
+
+        return null;
     }
 
     private function timezone(Employee $employee): string

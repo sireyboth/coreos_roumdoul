@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * A month's payroll for the whole company. Recalculated freely while draft
- * or calculated; once approved its payslips never change, and fixes go into
- * a later month as adjustments.
+ * One pay group's pay for one period (period_start → period_end, which can
+ * cross months); month is the month the period ends in. Recalculated freely
+ * while draft or calculated; once approved its payslips never change, the
+ * attendance it used is locked, and fixes go into a later period as adjustments.
  */
 class PayRun extends Model
 {
@@ -20,7 +21,7 @@ class PayRun extends Model
     public const STATUSES = ['draft', 'calculated', 'approved', 'paid'];
 
     protected $fillable = [
-        'company_id', 'month', 'status', 'policy_snapshot', 'warnings', 'totals',
+        'company_id', 'pay_group_id', 'month', 'period_start', 'period_end', 'status', 'policy_snapshot', 'warnings', 'totals',
         'calculated_at', 'calculated_by', 'approved_at', 'approved_by', 'paid_at', 'paid_by',
     ];
 
@@ -29,6 +30,8 @@ class PayRun extends Model
     protected function casts(): array
     {
         return [
+            'period_start' => 'date:Y-m-d',
+            'period_end' => 'date:Y-m-d',
             'policy_snapshot' => 'array',
             'warnings' => 'array',
             'totals' => 'array',
@@ -41,6 +44,11 @@ class PayRun extends Model
     public function isLocked(): bool
     {
         return in_array($this->status, ['approved', 'paid'], true);
+    }
+
+    public function payGroup(): BelongsTo
+    {
+        return $this->belongsTo(PayGroup::class);
     }
 
     public function payslips(): HasMany

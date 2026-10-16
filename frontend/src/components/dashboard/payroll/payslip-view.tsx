@@ -96,10 +96,22 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
           {fact("Tax rate (KHR)", slip.exchange_rate ? Number(slip.exchange_rate).toLocaleString() : c === "KHR" ? "—" : "Missing")}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Employed {dateLabel(slip.inputs.employed.from)} – {dateLabel(slip.inputs.employed.to)} · {slip.pay_type === "daily" ? "Paid per day" : "Monthly salary"}
+          Paid for {dateLabel(slip.inputs.employed.from)} – {dateLabel(slip.inputs.employed.to)} · {slip.pay_type === "daily" ? "Paid per day" : "Monthly salary"}
           {slip.inputs.exchange_rate_source === "company_fallback" && " · Using your fallback exchange rate"}
         </p>
       </section>
+
+      {(slip.inputs.months?.length ?? 0) > 1 && (
+        <section>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gross by month</h3>
+          <div className="rounded-lg border border-border px-3 py-1">
+            {slip.inputs.months!.map((m) => (
+              <Row key={m.month} label={`${monthLabel(m.month)} · ${m.days} ${m.days === 1 ? "day" : "days"}`} value={money(m.gross, c)} muted />
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">This period crosses months: its gross is shared out by day, for monthly reports.</p>
+        </section>
+      )}
     </div>
   );
 }
@@ -129,7 +141,9 @@ export function PayslipDialog({ payslipId, onOpenChange }: { payslipId: number |
             {slip?.employee?.name ?? "Payslip"}
             {slip?.employee?.employee_code && <Badge variant="secondary">{slip.employee.employee_code}</Badge>}
           </DialogTitle>
-          <DialogDescription>{slip ? `Payslip for ${monthLabel(slip.month)}` : "Loading…"}</DialogDescription>
+          <DialogDescription>
+            {slip ? `Payslip for ${slip.period_label ?? monthLabel(slip.month)}${slip.pay_group ? ` · ${slip.pay_group.name}` : ""}` : "Loading…"}
+          </DialogDescription>
         </DialogHeader>
         {slip ? (
           <PayslipView slip={slip} />

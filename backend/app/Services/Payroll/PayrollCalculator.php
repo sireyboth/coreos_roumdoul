@@ -8,18 +8,28 @@ use App\Models\EmployeePayItem;
 use App\Models\EmployeePayProfile;
 use App\Models\EmployeeSalary;
 use App\Models\PayComponent;
+use App\Models\PayGroup;
 use App\Models\PayrollAdjustment;
+use App\Models\PayrollPolicy;
 use App\Models\StatutoryRate;
 use App\Models\TaxExchangeRate;
+use App\Services\Attendance\MonthlyAttendance;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
- * Works out one employee's pay for one month, in a fixed order (tax needs
- * gross, gross needs the deductions):
+ * Works out one employee's pay for one pay period, in a fixed order (tax
+ * needs gross, gross needs the deductions):
  *
  *   rates → base → earnings and attendance deductions → gross
  *         → NSSF and tax on salary → after-tax deductions → net
+ *
+ * A period is one pay group's (see PayGroup): it can cross months and be
+ * shorter than one. A monthly salary pays the group's share of it per period
+ * (all of it monthly, half twice a month, 12/52 weekly), split by days only
+ * when someone joins, leaves, changes group or salary inside the period.
+ * Tax and NSSF are monthly by law, so for now they are worked out only for
+ * periods that are exactly one calendar month.
  *
  * Pure: it reads, never writes. PayRunService saves the result; the preview
  * endpoint shows it without saving. Every line carries the words and the
@@ -31,69 +41,161 @@ class PayrollCalculator
         private readonly PayTemplates $templates,
         private readonly StatutoryCalculator $statutory,
         private readonly PayrollSetup $setup,
+        private readonly PayGroupService $groups,
     ) {}
 
     /**
-     * Everything that is the same for every employee in the month, loaded once.
+     * Everything that is the same for every employee in the period, loaded once.
      *
      * @return array<string, mixed>
      */
-    public function context(Company $company, string $month): array
+    public function context(Company $company, PayGroup $group, CarbonImmutable $start, CarbonImmutable $end): array
     {
-        $policy = $this->setup->ensure($company);
-        $start = CarbonImmutable::parse("{$month}-01");
-        $end = $start->endOfMonth()->startOfDay();
+        $start = $start->startOfDay();
+        $end = $end->startOfDay();
+        $policy = $this->policyFor($this->setup->ensure($company), $group);
+        // Tax rates and the exchange rate are monthly: the month the period ends in.
+        $month = $end->format('Y-m');
         $official = TaxExchangeRate::query()->where('month', $month)->value('rate');
+        $statutory = PayGroup::isCalendarMonth($start, $end);
 
         return [
             'company' => $company,
+            'group' => $group,
+            'default_group_id' => $this->setup->defaultGroup($company)->id,
             'month' => $month,
             'start' => $start,
             'end' => $end,
-            'days_in_month' => $start->daysInMonth,
+            'days_in_period' => (int) $start->diffInDays($end) + 1,
+            'salary_share' => $group->salaryShare($start, $end),
+            'salary_share_label' => $group->salaryShareLabel($start, $end),
             'policy' => $policy,
-            'components' => PayComponent::query()->withoutGlobalScopes()
-                ->where('company_id', $company->id)->where('is_active', true)
-                ->orderBy('sort_order')->orderBy('id')->get(),
-            'tax' => StatutoryRate::inForce('tax_on_salary', $end->toDateString())?->params,
-            'nssf' => StatutoryRate::inForce('nssf', $end->toDateString())?->params,
+            'components' => $this->componentsFor($company, $group),
+            'statutory' => $statutory,
+            'tax' => $statutory ? StatutoryRate::inForce('tax_on_salary', $end->toDateString())?->params : null,
+            'nssf' => $statutory ? StatutoryRate::inForce('nssf', $end->toDateString())?->params : null,
             'exchange_rate' => $official ?? $policy->fallback_exchange_rate,
             'exchange_rate_source' => $official ? 'official' : ($policy->fallback_exchange_rate ? 'company_fallback' : null),
         ];
     }
 
+    /** The company's policy with the group's own settings on top (not saved). */
+    public function policyFor(PayrollPolicy $policy, PayGroup $group): PayrollPolicy
+    {
+        $effective = $policy->replicate();
+
+        foreach (PayGroup::POLICY_FIELDS as $field) {
+            if ($group->{$field} !== null) {
+                $effective->{$field} = $group->{$field};
+            }
+        }
+
+        return $effective;
+    }
+
     /**
-     * The employees a month's payroll covers: everyone employed for at least
-     * one day of it, regardless of the caller's branch access (payroll is company-wide).
+     * The company's components as this group uses them: a group can switch
+     * one on or off and give a rule other params, without touching anyone else.
      *
+     * @return Collection<int, PayComponent> active ones, in payslip order
+     */
+    public function componentsFor(Company $company, PayGroup $group): Collection
+    {
+        $rules = $group->component_rules ?? [];
+
+        return PayComponent::query()->withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->orderBy('sort_order')->orderBy('id')->get()
+            ->map(function (PayComponent $component) use ($rules) {
+                $rule = $rules[$component->id] ?? $rules[(string) $component->id] ?? null;
+                if ($rule === null) {
+                    return $component;
+                }
+                if (array_key_exists('is_active', $rule)) {
+                    $component->is_active = (bool) $rule['is_active'];
+                }
+                if (isset($rule['params']) && $component->method === 'template') {
+                    $component->params = $rule['params'];
+                }
+
+                return $component;
+            })
+            ->filter(fn (PayComponent $component) => $component->is_active)
+            ->values();
+    }
+
+    /**
+     * The employees a period's payroll covers: everyone in the group and
+     * employed for at least one day of it, regardless of the caller's branch
+     * access (payroll is company-wide).
+     *
+     * @param  array<string, mixed>  $ctx  from context()
      * @return Collection<int, Employee>
      */
-    public function employees(Company $company, string $month): Collection
+    public function employees(array $ctx): Collection
     {
-        $start = CarbonImmutable::parse("{$month}-01");
-        $end = $start->endOfMonth();
-
         return Employee::query()->withoutGlobalScopes()
-            ->where('company_id', $company->id)
-            ->where(fn ($q) => $q->whereNull('hire_date')->orWhereDate('hire_date', '<=', $end->toDateString()))
+            ->where('company_id', $ctx['company']->id)
+            ->where(fn ($q) => $q->whereNull('hire_date')->orWhereDate('hire_date', '<=', $ctx['end']->toDateString()))
             ->where(fn ($q) => $q->whereNotIn('employment_status', Employee::LEFT_STATUSES)
-                ->orWhereDate('termination_date', '>=', $start->toDateString()))
-            ->with(['salaries', 'payProfile', 'payItems'])
+                ->orWhereDate('termination_date', '>=', $ctx['start']->toDateString()))
+            ->with(['salaries', 'payProfile', 'payItems', 'payGroups'])
             ->inDisplayOrder()
-            ->get();
+            ->get()
+            ->filter(fn (Employee $employee) => $this->memberSpan($ctx, $employee) !== null)
+            ->values();
+    }
+
+    /**
+     * The days of the period the employee is in this run's group.
+     *
+     * @param  array<string, mixed>  $ctx
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    public function memberSpan(array $ctx, Employee $employee): ?array
+    {
+        return $this->groups->spanIn($employee, $ctx['group'], $ctx['start'], $ctx['end'], $ctx['default_group_id']);
+    }
+
+    /**
+     * Attendance totals for each employee over their days in the group —
+     * usually the whole period, fewer for someone who moved group in it.
+     *
+     * @param  array<string, mixed>  $ctx
+     * @param  Collection<int, Employee>  $employees
+     * @return Collection<int, array<string, mixed>> keyed by employee id
+     */
+    public function attendance(array $ctx, Collection $employees): Collection
+    {
+        $totals = collect();
+
+        $employees
+            ->groupBy(fn (Employee $employee) => implode('|', array_map(fn ($d) => $d->toDateString(), $this->memberSpan($ctx, $employee) ?? [$ctx['start'], $ctx['end']])))
+            ->each(function (Collection $group, string $span) use ($ctx, $totals) {
+                [$start, $end] = array_map(fn ($d) => CarbonImmutable::parse($d), explode('|', $span));
+
+                MonthlyAttendance::for($ctx['company'], $group->values(), $start, $end)
+                    ->each(fn (array $row, int $id) => $totals->put($id, $row));
+            });
+
+        return $totals;
     }
 
     /**
      * @param  array<string, mixed>  $ctx  from context()
-     * @param  array<string, mixed>  $attendance  this employee's MonthlyAttendance totals
-     * @param  Collection<int, PayrollAdjustment>  $adjustments  this employee's adjustments for the month
+     * @param  array<string, mixed>  $attendance  this employee's attendance totals for the period
+     * @param  Collection<int, PayrollAdjustment>  $adjustments  this employee's adjustments dated in the period
      * @return array<string, mixed> a payslip, or ['skipped' => reason]
      */
     public function calculate(array $ctx, Employee $employee, array $attendance, Collection $adjustments): array
     {
         $policy = $ctx['policy'];
-        [$from, $to] = $this->employedSpan($ctx, $employee);
+        $member = $this->memberSpan($ctx, $employee) ?? [$ctx['start'], $ctx['end']];
+        [$from, $to] = $this->employedSpan($employee, $member);
         $segments = $this->segments($employee, $from, $to);
+        // Adjustments dated while they were in another group belong to that group's run.
+        $adjustments = $adjustments->filter(fn (PayrollAdjustment $a) => $a->date->toDateString() >= $member[0]->toDateString()
+            && $a->date->toDateString() <= $member[1]->toDateString());
 
         if ($segments->isEmpty()) {
             return ['skipped' => 'no_salary'];
@@ -105,10 +207,10 @@ class PayrollCalculator
         $mixedCurrency = $segments->pluck('salary.currency')->unique()->count() > 1;
         $warnings = [];
 
-        // ── Rates ──
+        // ── Rates ── (calendar and scheduled: the period's salary over the period's days)
         $basis = match ($policy->rate_basis) {
-            'calendar' => $ctx['days_in_month'],
-            'scheduled' => max(1, $attendance['planned']['work']),
+            'calendar' => $ctx['days_in_period'] / $ctx['salary_share'],
+            'scheduled' => max(1, $attendance['planned']['work']) / $ctx['salary_share'],
             default => max(1, $policy->rate_basis_days),
         };
         $dailyRate = $payType === 'monthly' ? (float) $current->amount / $basis : (float) $current->amount;
@@ -172,16 +274,18 @@ class PayrollCalculator
         $deductions = $sum(fn ($l) => $l['kind'] === 'deduction');
         $gross = $sum(fn ($l) => $l['kind'] === 'earning') - $deductions;
         if ($gross < 0) {
-            $warnings[] = $this->warning('deductions_exceed_pay', 'Deductions are larger than the pay for the month. Check the attendance and the rules.', true);
+            $warnings[] = $this->warning('deductions_exceed_pay', 'Deductions are larger than the pay for the period. Check the attendance and the rules.', true);
             $gross = 0.0;
         }
         $taxable = max(0.0, $sum(fn ($l) => $l['kind'] === 'earning' && $l['taxable']) - $deductions);
         $insurable = max(0.0, $sum(fn ($l) => $l['kind'] === 'earning' && $l['nssf_insurable']) - $deductions);
 
-        // ── NSSF and tax ──
+        // ── NSSF and tax ── (monthly by law: only for a period that is one calendar month, for now)
         $rate = $currency === 'KHR' ? 1.0 : (float) $ctx['exchange_rate'];
         $statutory = ['nssf_employee' => 0.0, 'employer' => [], 'tax' => 0.0, 'lines' => []];
-        if ($rate <= 0) {
+        if (! $ctx['statutory']) {
+            // Not worked out; the run says so once for everyone.
+        } elseif ($rate <= 0) {
             $warnings[] = $this->warning('no_exchange_rate', "There is no tax exchange rate for {$ctx['month']} yet, so tax and NSSF can't be worked out. Set a fallback rate in payroll settings.", true);
         } else {
             if (! $ctx['tax']) {
@@ -205,7 +309,7 @@ class PayrollCalculator
             $warnings[] = $this->warning('pending_overtime', Money::quantity($attendance['overtime_pending_minutes'] / 60).' h of overtime is still waiting for approval and is not paid.', false);
         }
         if ($mixedCurrency) {
-            $warnings[] = $this->warning('mixed_currency', "The salary changed currency this month; the whole month is paid in {$currency} at the current salary.", false);
+            $warnings[] = $this->warning('mixed_currency', "The salary changed currency in this period; the whole period is paid in {$currency} at the current salary.", false);
         }
 
         return [
@@ -227,7 +331,10 @@ class PayrollCalculator
                 'variables' => collect($vars)->except(['late_by_day', 'early_leave_by_day'])->all(),
                 'rate_basis' => ['method' => $policy->rate_basis, 'days' => $basis, 'hours_per_day' => $policy->hours_per_day],
                 'missing_scan_policy' => $policy->missing_scan_policy,
+                'period' => ['start' => $ctx['start']->toDateString(), 'end' => $ctx['end']->toDateString(), 'days' => $ctx['days_in_period'], 'salary_share' => $ctx['salary_share']],
                 'employed' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+                // Gross split over the calendar months the paid days fall in, by day, for monthly reports and (later) tax.
+                'months' => $this->monthSplit($from, $to, $gross, $currency),
                 'salaries' => $segments->map(fn ($s) => [
                     'amount' => (float) $s['salary']->amount, 'currency' => $s['salary']->currency, 'pay_type' => $s['salary']->pay_type,
                     'from' => $s['from']->toDateString(), 'to' => $s['to']->toDateString(),
@@ -245,7 +352,7 @@ class PayrollCalculator
 
     private function baseLine(array $ctx, Collection $segments, string $payType, float $dailyRate, array $attendance, int $missingAsAbsent, string $currency, bool $mixedCurrency, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $days = $ctx['days_in_month'];
+        $days = $ctx['days_in_period'];
 
         if ($payType === 'daily') {
             $policy = $ctx['policy'];
@@ -271,18 +378,27 @@ class PayrollCalculator
             $segments = collect([['salary' => $current['salary'], 'from' => $from, 'to' => $to, 'days' => $employedDays]]);
         }
 
+        $share = $ctx['salary_share'];
+        $shareWords = $ctx['salary_share_label'] ? ' × '.$ctx['salary_share_label'] : '';
         $whole = $segments->count() === 1 && $segments->first()['days'] === $days;
-        $amount = $segments->sum(fn ($s) => (float) $s['salary']->amount * $s['days'] / $days);
+        $amount = $segments->sum(fn ($s) => (float) $s['salary']->amount * $share * $s['days'] / $days);
 
         return [
             'amount' => Money::round($amount, $currency),
-            'explanation' => $whole
-                ? 'Full month'
-                : $segments->map(fn ($s) => Money::format((float) $s['salary']->amount, $currency)." × {$s['days']}/{$days} days")->join(' + '),
-            'details' => ['segments' => $segments->map(fn ($s) => ['amount' => (float) $s['salary']->amount, 'days' => $s['days']])->values()->all(), 'days_in_month' => $days],
+            'explanation' => match (true) {
+                $whole && $shareWords === '' => 'Full month',
+                $whole => Money::format((float) $segments->first()['salary']->amount, $currency).$shareWords,
+                default => $segments->map(fn ($s) => Money::format((float) $s['salary']->amount, $currency)."{$shareWords} × {$s['days']}/{$days} days")->join(' + '),
+            },
+            'details' => [
+                'segments' => $segments->map(fn ($s) => ['amount' => (float) $s['salary']->amount, 'days' => $s['days']])->values()->all(),
+                'days_in_period' => $days,
+                'salary_share' => $share,
+            ],
         ];
     }
 
+    /** Recurring items are monthly amounts: a period pays the group's share of them, like the salary. */
     private function itemLine(array $ctx, Employee $employee, PayComponent $component, string $currency): ?array
     {
         $items = $employee->payItems->filter(fn (EmployeePayItem $item) => $item->pay_component_id === $component->id
@@ -293,10 +409,15 @@ class PayrollCalculator
             return null;
         }
 
+        $monthly = (float) $items->sum('amount');
+        $label = $ctx['salary_share_label'];
+
         return [
-            'amount' => Money::round((float) $items->sum('amount'), $currency),
-            'explanation' => $items->count() === 1 ? ($items->first()->note ?: 'Monthly amount') : $items->count().' items',
-            'details' => ['items' => $items->map(fn ($i) => ['id' => $i->id, 'amount' => (float) $i->amount])->values()->all()],
+            'amount' => Money::round($monthly * $ctx['salary_share'], $currency),
+            'explanation' => $label
+                ? Money::format($monthly, $currency)." a month × {$label}"
+                : ($items->count() === 1 ? ($items->first()->note ?: 'Monthly amount') : $items->count().' items'),
+            'details' => ['items' => $items->map(fn ($i) => ['id' => $i->id, 'amount' => (float) $i->amount])->values()->all(), 'salary_share' => $ctx['salary_share']],
         ];
     }
 
@@ -327,11 +448,13 @@ class PayrollCalculator
 
     // ───────────────────────────── Helpers ─────────────────────────────
 
-    /** @return array{0: CarbonImmutable, 1: CarbonImmutable} the days of the month this person was employed */
-    private function employedSpan(array $ctx, Employee $employee): array
+    /**
+     * @param  array{0: CarbonImmutable, 1: CarbonImmutable}  $member  their days in the group
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable} the days of the period this person was employed and in the group
+     */
+    private function employedSpan(Employee $employee, array $member): array
     {
-        $from = $ctx['start'];
-        $to = $ctx['end'];
+        [$from, $to] = $member;
 
         if ($employee->hire_date && $employee->hire_date->toDateString() > $from->toDateString()) {
             $from = CarbonImmutable::parse($employee->hire_date->toDateString());
@@ -341,6 +464,30 @@ class PayrollCalculator
         }
 
         return [$from, $to];
+    }
+
+    /**
+     * Gross shared out over the calendar months of [$from, $to] by day; the
+     * last month takes the rounding so the parts add up to gross exactly.
+     *
+     * @return array<int, array{month: string, days: int, gross: float}>
+     */
+    private function monthSplit(CarbonImmutable $from, CarbonImmutable $to, float $gross, string $currency): array
+    {
+        if ($from->gt($to)) {
+            return [];
+        }
+
+        $months = PayGroup::monthsIn($from, $to);
+        $total = array_sum(array_column($months, 'days'));
+        $left = Money::round($gross, $currency);
+
+        return array_map(function (array $m, int $i) use ($months, $total, $gross, $currency, &$left) {
+            $part = $i === count($months) - 1 ? $left : Money::round($gross * $m['days'] / $total, $currency);
+            $left = Money::round($left - $part, $currency);
+
+            return ['month' => $m['month'], 'days' => $m['days'], 'gross' => $part];
+        }, $months, array_keys($months));
     }
 
     /**

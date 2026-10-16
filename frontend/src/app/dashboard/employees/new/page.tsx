@@ -22,7 +22,8 @@ import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { LoginLink } from "@/components/dashboard/login-link";
 import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
 import { useMe } from "@/contexts/me-context";
-import { api, ApiError, Branch, Department, Team } from "@/lib/api";
+import { SCHEDULE_LABELS } from "@/components/dashboard/payroll/shared";
+import { api, ApiError, Branch, Department, Team, type PayGroupOption } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function NewEmployeePage() {
@@ -45,8 +46,22 @@ export default function NewEmployeePage() {
   const [method, setMethod] = useState<SignInMethod>("email");
   // Kept here until Save — the employee doesn't exist yet to upload it to.
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
+  // Pay groups to choose from — only with payroll on and the right to set pay; empty hides the picker.
+  const [payGroups, setPayGroups] = useState<PayGroupOption[]>([]);
+  const [payGroupId, setPayGroupId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!canEditSalary) return;
+    api.payroll
+      .groupOptions()
+      .then((list) => {
+        setPayGroups(list);
+        setPayGroupId(String(list.find((g) => g.is_default)?.id ?? ""));
+      })
+      .catch(() => setPayGroups([]));
+  }, [canEditSalary]);
 
   // People who can't add employees have no business on this page.
   useEffect(() => {
@@ -85,6 +100,8 @@ export default function NewEmployeePage() {
         ...toPayload(form, { org: departments.length > 0 || teams.length > 0, manager: managers !== null, salary: canEditSalary }),
         name: form.name.trim(),
         branch_id: Number(form.branch_id),
+        // The default group needs no row: anyone never put in a group is in it.
+        ...(payGroupId && !payGroups.find((g) => String(g.id) === payGroupId)?.is_default ? { pay_group_id: Number(payGroupId) } : {}),
         // Whichever way was chosen (their email, or their employee ID) is their sign-in.
         ...(loginPassword ? { password: loginPassword, login_method: method } : {}),
       });
@@ -177,6 +194,33 @@ export default function NewEmployeePage() {
                 />
               </CardContent>
             </Card>
+
+            {payGroups.length > 1 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pay group</CardTitle>
+                  <CardDescription>When and by which rules they are paid, from their first day. You can change it later on their Pay tab.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex max-w-sm flex-col gap-2">
+                    <Label htmlFor="new-pay-group">Pay group</Label>
+                    <select
+                      id="new-pay-group"
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none"
+                      value={payGroupId}
+                      onChange={(e) => setPayGroupId(e.target.value)}
+                    >
+                      {payGroups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} — {SCHEDULE_LABELS[g.schedule]}
+                          {g.is_default ? " (default)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

@@ -32,6 +32,13 @@ class CompanyPermissions
     public const STANDALONE = ['company.manage', 'dashboard.view'];
 
     /**
+     * Extra permissions of a resource, beyond .view and .manage.
+     * payroll.approve: approving a pay run is its own right, so HR can prepare
+     * runs (payroll.manage) while only a manager signs them off.
+     */
+    public const EXTRA = ['payroll' => ['payroll.approve']];
+
+    /**
      * All permission strings that exist, e.g. "branches.view", "branches.manage".
      *
      * @return array<int, string>
@@ -43,6 +50,7 @@ class CompanyPermissions
         foreach (self::RESOURCES as $resource) {
             $permissions[] = "{$resource}.view";
             $permissions[] = "{$resource}.manage";
+            array_push($permissions, ...(self::EXTRA[$resource] ?? []));
         }
 
         return $permissions;
@@ -64,7 +72,7 @@ class CompanyPermissions
         foreach (self::RESOURCES as $resource) {
             $groups[] = [
                 'resource' => $resource,
-                'permissions' => ["{$resource}.view", "{$resource}.manage"],
+                'permissions' => ["{$resource}.view", "{$resource}.manage", ...(self::EXTRA[$resource] ?? [])],
             ];
         }
 

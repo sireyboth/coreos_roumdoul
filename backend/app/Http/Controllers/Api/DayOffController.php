@@ -30,7 +30,7 @@ class DayOffController extends Controller
         // findOrFail goes through the company and branch-access scopes, so a
         // manager can only mark days off for people they can actually see.
         $employee = Employee::query()->findOrFail($data['employee_id']);
-        $this->recorder->assertUnlocked($employee->company_id, $data['date']);
+        $this->recorder->assertUnlocked($employee->company_id, $data['date'], employeeId: $employee->id);
 
         if (DayOff::query()->where('employee_id', $employee->id)->whereDate('date', $data['date'])->exists()) {
             throw ValidationException::withMessages(['date' => ['This day is already marked as a day off.']]);
@@ -55,7 +55,7 @@ class DayOffController extends Controller
     public function destroy(DayOff $dayOff)
     {
         $date = $dayOff->date->toDateString();
-        $this->recorder->assertUnlocked($dayOff->company_id, $date);
+        $this->recorder->assertUnlocked($dayOff->company_id, $date, employeeId: $dayOff->employee_id);
 
         $employee = $dayOff->employee;
         $dayOff->delete();

@@ -13,7 +13,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ExcelImportDialog } from "@/components/dashboard/excel-import-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { KIND_HINTS, KIND_LABELS, currentMonth, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
+import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
+import { KIND_HINTS, KIND_LABELS, currentMonth, dateInMonth, dateLabel, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, type PayKind, type PayrollAdjustment } from "@/lib/api";
 import { adjustmentImport } from "@/lib/excel-specs/payroll";
@@ -33,6 +34,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
   const [target, setTarget] = useState<Target>("one");
   const [employeeId, setEmployeeId] = useState("");
   const [branchId, setBranchId] = useState("");
+  const [date, setDate] = useState(() => dateInMonth(month));
   const [kind, setKind] = useState<PayKind>("earning");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
@@ -63,7 +65,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const base = { month, kind, name: name.trim(), amount: Number(amount), taxable, reason: reason.trim() || null };
+    const base = { date, kind, name: name.trim(), amount: Number(amount), taxable, reason: reason.trim() || null };
     try {
       if (target === "one") {
         await api.payroll.createAdjustment({ ...base, employee_id: Number(employeeId) });
@@ -87,7 +89,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Add adjustment</DialogTitle>
-            <DialogDescription>A one-off amount on {monthLabel(month)}&apos;s payslips: a bonus, commission, penalty or back pay.</DialogDescription>
+            <DialogDescription>A one-off amount — a bonus, commission, penalty or back pay. It goes on the payslip of the pay period that holds its date.</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-1.5">
@@ -148,6 +150,11 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="adj-date">Date</Label>
+            <Input id="adj-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="sm:max-w-48" />
+            <p className="text-xs text-muted-foreground">Paid with the pay run whose period holds this date, in each person&apos;s own pay group.</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
             <Label htmlFor="adj-name">Name on payslip</Label>
             <Input id="adj-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Khmer New Year bonus" required />
           </div>
@@ -164,7 +171,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" disabled={saving || recipients.length === 0 || !name.trim() || !(Number(amount) > 0)}>
+            <Button type="submit" disabled={saving || recipients.length === 0 || !date || !name.trim() || !(Number(amount) > 0)}>
               {saving ? "Saving…" : target === "one" ? "Add" : `Add for ${recipients.length}`}
             </Button>
           </DialogFooter>
@@ -183,7 +190,7 @@ export default function PayrollAdjustmentsPage() {
   const [reloads, setReloads] = useState(0);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
-  const spec = useMemo(() => adjustmentImport(month), [month]);
+  const spec = useMemo(() => adjustmentImport(dateInMonth(month)), [month]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +208,7 @@ export default function PayrollAdjustmentsPage() {
   }, [month, reloads]);
 
   async function remove(a: PayrollAdjustment) {
-    const ok = await confirm({ title: `Remove “${a.name}”?`, description: `For ${a.employee?.name ?? "this employee"}, ${monthLabel(a.month)}.`, confirmLabel: "Remove", destructive: true });
+    const ok = await confirm({ title: `Remove “${a.name}”?`, description: `For ${a.employee?.name ?? "this employee"}, ${dateLabel(a.date)}.`, confirmLabel: "Remove", destructive: true });
     if (!ok) return;
     try {
       await api.payroll.removeAdjustment(a.id);
@@ -225,6 +232,7 @@ export default function PayrollAdjustmentsPage() {
       searchValue: (a) => [a.employee?.name, a.employee?.employee_code, a.name].filter(Boolean).join(" "),
       sortValue: (a) => a.employee?.name ?? "",
     },
+    { id: "date", header: "Date", cell: (a) => <span className="tabular-nums">{dateLabel(a.date)}</span>, sortValue: (a) => a.date },
     { id: "name", header: "Item", cell: (a) => <div className="flex flex-col"><span>{a.name}</span>{a.reason && <span className="text-xs text-muted-foreground">{a.reason}</span>}</div> },
     { id: "kind", header: "Type", cell: (a) => <Badge variant={a.kind === "earning" ? "success" : "secondary"}>{KIND_LABELS[a.kind]}</Badge> },
     { id: "amount", header: "Amount", cell: (a) => <span className="tabular-nums">{a.kind === "earning" ? "+" : "−"} {Number(a.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>, sortValue: (a) => Number(a.amount) },
@@ -246,20 +254,23 @@ export default function PayrollAdjustmentsPage() {
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
         title="Adjustments"
-        description="One-off amounts for a month — anything your rules don't cover. Recalculate the month's pay run to include them."
+        description="One-off amounts — anything your rules don't cover. Each goes into the pay run whose period holds its date; recalculate that run to include it."
         action={
-          canManage && (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => setImporting(true)}>
-                <FileSpreadsheet className="size-4" />
-                Import from Excel
-              </Button>
-              <Button onClick={() => setAdding(true)}>
-                <Plus className="size-4" />
-                Add adjustment
-              </Button>
-            </div>
-          )
+          <div className="flex flex-wrap gap-2">
+            <PayrollGuideButton topic="adjustments" />
+            {canManage && (
+              <>
+                <Button variant="outline" onClick={() => setImporting(true)}>
+                  <FileSpreadsheet className="size-4" />
+                  Import from Excel
+                </Button>
+                <Button onClick={() => setAdding(true)}>
+                  <Plus className="size-4" />
+                  Add adjustment
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
       <div className="flex max-w-xs flex-col gap-1.5">

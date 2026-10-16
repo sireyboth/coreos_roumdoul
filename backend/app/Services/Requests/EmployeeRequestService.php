@@ -612,6 +612,10 @@ final class EmployeeRequestService
             }
         }
 
+        if ($paid = $this->recorder->paidRange($employee->id, $start, $end)) {
+            return AttendanceRecorder::paidMessage($paid);
+        }
+
         return null;
     }
 

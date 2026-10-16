@@ -4,7 +4,6 @@ namespace App\Services\Payroll;
 
 use App\Models\Employee;
 use App\Models\EmployeeSalary;
-use App\Models\PayRun;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -13,11 +12,13 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Keeps an employee's salary history consistent: one open-ended row, rows
- * never overlap, a paid month can't be rewritten, and employees.base_salary
+ * never overlap, days already paid can't be rewritten, and employees.base_salary
  * always mirrors the salary in force today (so existing screens keep working).
  */
 class EmployeeSalaryService
 {
+    public function __construct(private readonly PayGroupService $groups) {}
+
     public function record(
         Employee $employee,
         float $amount,
@@ -147,18 +148,17 @@ class EmployeeSalaryService
     {
         if ($this->monthPaid($employee, $date)) {
             throw ValidationException::withMessages([
-                'effective_from' => ['Payroll for '.CarbonImmutable::parse($date)->format('F Y').' is already approved. Choose a later date, or add an adjustment to the next pay run.'],
+                'effective_from' => ["{$employee->name} is already paid through ".CarbonImmutable::parse($this->groups->paidThrough($employee))->format('j M Y').'. Choose a later date, or add an adjustment to the next pay run.'],
             ]);
         }
     }
 
+    /** Whether an approved pay run already paid this person for $date (or a later day). */
     private function monthPaid(Employee $employee, string $date): bool
     {
-        return PayRun::query()->withoutGlobalScopes()
-            ->where('company_id', $employee->company_id)
-            ->where('month', '>=', substr($date, 0, 7))
-            ->whereIn('status', ['approved', 'paid'])
-            ->exists();
+        $paid = $this->groups->paidThrough($employee);
+
+        return $paid !== null && $date <= $paid;
     }
 
     private function today(Employee $employee): string

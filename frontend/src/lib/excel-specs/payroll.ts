@@ -2,8 +2,9 @@ import { api, type Employee, type PayKind } from "@/lib/api";
 import { Lookup, RowError, type ImportSpec, type Row } from "@/lib/excel-import";
 
 /*
- * Excel import for payroll adjustments: one-off amounts for a month
- * (commission, bonus, penalty) worked out in a spreadsheet.
+ * Excel import for payroll adjustments: one-off amounts (commission, bonus,
+ * penalty) worked out in a spreadsheet. Each lands in the pay run whose
+ * period holds its date.
  */
 
 const KIND_OPTIONS: { value: PayKind; label: string; aliases: string[] }[] = [
@@ -22,16 +23,21 @@ function findEmployee(row: Row, ctx: Ctx): Employee {
   throw new RowError("Fill in the Employee ID or the employee's name.");
 }
 
-/** Imports go into one month: the one open on the Adjustments page. */
-export function adjustmentImport(month: string): ImportSpec<Ctx> {
+/** Rows without a date of their own go in on `date` (from the month open on the Adjustments page). */
+export function adjustmentImport(date: string): ImportSpec<Ctx> {
   return {
     noun: { one: "adjustment", many: "adjustments" },
-    templateFile: `payroll-adjustments-${month}`,
-    matching: `Every row adds a new adjustment to ${month}. Importing the same file twice adds them twice.`,
-    notes: ["Amounts are in each employee's salary currency.", "Earnings are added to pay; deductions are taken off before tax; after-tax deductions (advances, loans) after it."],
+    templateFile: `payroll-adjustments-${date.slice(0, 7)}`,
+    matching: `Every row adds a new adjustment, dated ${date} unless the row has its own date. Importing the same file twice adds them twice.`,
+    notes: [
+      "Amounts are in each employee's salary currency.",
+      "Earnings are added to pay; deductions are taken off before tax; after-tax deductions (advances, loans) after it.",
+      "Each adjustment goes into the pay run whose period holds its date.",
+    ],
     fields: [
       { key: "employee_code", header: "Employee ID", hint: "Employee ID. Fill this in, or Employee (the name), or both.", example: "E-0001" },
       { key: "employee", header: "Employee", hint: "The employee's full name — used when there is no Employee ID.", example: "Sok Dara" },
+      { key: "date", header: "Date", type: "date", hint: `Optional. Empty = ${date}.`, example: date },
       { key: "kind", header: "Type", required: true, options: KIND_OPTIONS, hint: "Earning, Deduction or After-tax deduction.", example: "Earning" },
       { key: "name", header: "Name on payslip", required: true, hint: "e.g. Sales commission.", example: "Sales commission" },
       { key: "amount", header: "Amount", type: "number", required: true, hint: "A positive amount.", example: "35" },
@@ -52,7 +58,7 @@ export function adjustmentImport(month: string): ImportSpec<Ctx> {
 
       await api.payroll.createAdjustment({
         employee_id: findEmployee(row, ctx).id,
-        month,
+        date: row.text("date") ?? date,
         kind: row.text("kind") as PayKind,
         name: row.text("name")!,
         amount,

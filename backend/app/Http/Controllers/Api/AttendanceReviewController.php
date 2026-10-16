@@ -79,7 +79,7 @@ class AttendanceReviewController extends Controller
         if ($day->overtime_minutes <= 0) {
             throw ValidationException::withMessages(['overtime' => ['This day has no overtime to review.']]);
         }
-        $this->recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'overtime');
+        $this->recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'overtime', $day->employee_id);
 
         $day->update([
             'overtime_status' => $decision,

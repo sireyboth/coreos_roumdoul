@@ -147,7 +147,7 @@ class AttendanceController extends Controller
 
         $recorder = app(AttendanceRecorder::class);
         foreach ($days as $day) {
-            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids');
+            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids', $day->employee_id);
         }
 
         $filled = 0;
@@ -176,7 +176,7 @@ class AttendanceController extends Controller
 
         $recorder = app(AttendanceRecorder::class);
         foreach ($days as $day) {
-            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids');
+            $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids', $day->employee_id);
         }
 
         foreach ($days as $day) {

@@ -12,8 +12,10 @@ import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ComponentDialog } from "@/components/dashboard/payroll/component-dialog";
+import { PayGroupsCard } from "@/components/dashboard/payroll/pay-groups";
+import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { KIND_LABELS, ruleSummary } from "@/components/dashboard/payroll/shared";
-import { api, type PayComponent, type PayrollPolicy, type PayrollSettings } from "@/lib/api";
+import { api, type PayComponent, type PayGroup, type PayrollPolicy, type PayrollSettings } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -40,7 +42,7 @@ function PolicyCard({ policy, onSaved }: { policy: PayrollPolicy; onSaved: (p: P
     <Card>
       <CardHeader>
         <CardTitle>How pay is worked out</CardTitle>
-        <CardDescription>Day and hour rates, missing scans and rounding. Changes apply the next time a pay run is calculated.</CardDescription>
+        <CardDescription>Day and hour rates, missing scans and rounding, for every pay group that doesn&apos;t set its own. Changes apply the next time a pay run is calculated.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -114,11 +116,13 @@ function PolicyCard({ policy, onSaved }: { policy: PayrollPolicy; onSaved: (p: P
 export default function PayrollSettingsPage() {
   const confirm = useConfirm();
   const [settings, setSettings] = useState<PayrollSettings | null>(null);
+  const [groups, setGroups] = useState<PayGroup[] | null>(null);
   const [reloads, setReloads] = useState(0);
   const [editing, setEditing] = useState<{ component: PayComponent | null } | null>(null);
 
   useEffect(() => {
     api.payroll.settings().then(setSettings).catch(notifyError);
+    api.payroll.groups().then(setGroups).catch(notifyError);
   }, [reloads]);
 
   async function applyPreset(key: string, name: string) {
@@ -196,10 +200,13 @@ export default function PayrollSettingsPage() {
         title="Payroll settings"
         description="Your company's pay rules. Every rule can be tried on a real employee before you save it."
         action={
-          <Button onClick={() => setEditing({ component: null })}>
-            <Plus className="size-4" />
-            Add component
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <PayrollGuideButton topic="groups" />
+            <Button onClick={() => setEditing({ component: null })}>
+              <Plus className="size-4" />
+              Add component
+            </Button>
+          </div>
         }
       />
 
@@ -230,6 +237,8 @@ export default function PayrollSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {settings && groups && <PayGroupsCard groups={groups} components={settings.components} policy={settings.policy} onChanged={() => setReloads((n) => n + 1)} />}
 
       {settings && <PolicyCard key={JSON.stringify(settings.policy)} policy={settings.policy} onSaved={(policy) => setSettings((s) => (s ? { ...s, policy } : s))} />}
 

@@ -2,8 +2,10 @@ import {
   api,
   ApiError,
   type CalendarDay,
+  type DayPart,
   type Employee,
   type Holiday,
+  type LeaveType,
   type OvertimeMode,
   type Schedule,
   type ScheduleAssignment,
@@ -112,7 +114,7 @@ function parseHours(text: string, weekday: string): ScheduleSlot[] {
 }
 
 /** "Sat, Sun" (or "Saturday, Sunday") → [6, 0]. "None" → no days off. */
-function parseDaysOff(text: string, column: string): number[] {
+export function parseDaysOff(text: string, column: string): number[] {
   if (/^(none|no|-)$/i.test(text.trim())) return [];
   return text
     .split(/[,;\s]+/)
@@ -125,7 +127,7 @@ function parseDaysOff(text: string, column: string): number[] {
 }
 
 /** For the import review: the problem with a days-off cell, or null. */
-function daysOffProblem(text: string, column: string): string | null {
+export function daysOffProblem(text: string, column: string): string | null {
   try {
     parseDaysOff(text, column);
     return null;
@@ -999,49 +1001,144 @@ function scansOn(date: string, times: string[]): string[] {
   });
 }
 
-export const attendanceImport: ImportSpec<EmployeeLookups> = {
+/** The usual short codes on paper timesheets, by leave type code. */
+const LEAVE_SHORT_CODES: Record<string, string[]> = {
+  annual: ["AL"],
+  sick: ["SL"],
+  special: ["SPL"],
+  maternity: ["ML"],
+  paternity: ["PL"],
+  unpaid: ["UL", "UPL", "LWP"],
+};
+
+/** Statuses that need nothing recorded: the row is skipped. */
+const NOTHING_TO_RECORD = ["absent", "a", "off", "day off", "weekly off", "holiday", "ph", "upcoming", "unscheduled", "not recorded"];
+const PRESENT = ["present", "p", "late", "worked"];
+/** The attendance export's statuses for a day with scans. Its rows without scans are skipped. */
+const EXPORT_WORKED = ["complete", "incomplete", "in progress", "worked off"];
+
+type AttendanceImportCtx = EmployeeLookups & { leaveTypes: Lookup<LeaveType>; leaveList: string };
+
+/** "AL (Annual leave)": what to write in Status for each leave type. */
+const leaveLabel = (t: LeaveType) => (LEAVE_SHORT_CODES[t.code] ? `${LEAVE_SHORT_CODES[t.code][0]} (${t.name})` : t.name);
+
+/**
+ * The times in a Scans cell. Also reads the export's own format
+ * ("IN 08:00, OUT 17:00 (adjusted)"): the labels are dropped, since the
+ * schedule decides which scan is an IN and which an OUT.
+ */
+function scanTimes(text: string): string[] {
+  return text
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(in|out|extra)\b/gi, " ")
+    .split(/[,;\s]+/)
+    .filter(Boolean)
+    .map((t) => {
+      const match = /^(\d{1,2})[:.](\d{2})$/.exec(t);
+      if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) throw new RowError(`"${t}" in Scans isn't a time like 08:00.`);
+      return `${match[1].padStart(2, "0")}:${match[2]}`;
+    });
+}
+
+/** "AL", "Annual leave", "AL AM", "SL (afternoon)" → the leave type and which part of the day. */
+function leaveOn(status: string, ctx: AttendanceImportCtx): { type: LeaveType; part: DayPart } {
+  const half = /[\s(]*(am|pm|morning|afternoon)\)?$/i.exec(status);
+  const part: DayPart = !half ? "full" : /^(am|morning)$/i.test(half[1]) ? "am" : "pm";
+  const name = half ? status.slice(0, half.index).trim() : status;
+  const type = ctx.leaveTypes.find(name);
+  if (!type) {
+    throw new RowError(`"${status}" in Status isn't Present or a leave type. Use Present, Absent, Off, or one of: ${ctx.leaveList}.`);
+  }
+  if (part !== "full" && !type.allow_half_day) throw new RowError(`${type.name} can't be taken for half a day.`);
+  return { type, part };
+}
+
+export const attendanceImport: ImportSpec<AttendanceImportCtx> = {
   noun: { one: "attendance record", many: "attendance records" },
   templateFile: "attendance",
   matching:
-    "Each row adds that day's scans as a correction request, so it is reviewed and logged like any other correction. The person's work schedule decides which scan is an IN and which an OUT.",
-  notes: [
-    'Scans: every scan of the day, in order — e.g. "08:00, 12:00, 13:00, 17:00" for a split shift. Times are on the company\'s clock.',
+    "A present row adds that day's scans as a correction request, so it is reviewed and logged like any other correction; the person's work schedule decides which scan is an IN and which an OUT. A leave row (AL, SL…) records that day as leave and needs no scans.",
+  notes: (ctx) => [
+    'Scans: every scan of the day, in order — e.g. "08:00, 12:00, 13:00, 17:00" for a split shift. Times are on the company\'s clock. The export\'s "IN 08:00, OUT 17:00" works too.',
     "A time earlier than the one before it is read as the next morning (night shifts).",
+    `Status: leave it empty or write Present for a worked day. For leave, write the leave type — ${ctx.leaveList} — and leave Scans empty. Add AM or PM for half a day, e.g. "AL PM" (scans for the half worked can go in Scans).`,
+    "Absent, Off and Holiday rows are skipped: nothing needs recording for them.",
+    "A file from the attendance export can be imported as it is: Complete, Incomplete, In progress and Worked off rows bring in their scans; Upcoming, Unscheduled and Not recorded rows are skipped.",
+    "Reason is optional.",
   ],
   settings: [
     {
       key: "approve",
       label: "Approve imported records right away",
-      description: "Turns each row straight into attendance. Untick to leave them as pending requests for review.",
+      description: "Turns each row straight into attendance or approved leave. Untick to leave them as pending requests for review.",
       default: true,
     },
   ],
   fields: [
     ...EMPLOYEE_FIELDS,
     { key: "date", header: "Date", type: "date", required: true, hint: "The work day, YYYY-MM-DD.", example: "2026-09-10" },
-    { key: "scans", header: "Scans", required: true, hint: "The day's scan times, comma-separated, 24-hour HH:MM.", example: "08:00, 12:00, 13:00, 17:00" },
-    { key: "reason", header: "Reason", required: true, hint: "Why it is being added, e.g. where it came from.", example: "Imported from paper timesheet" },
+    {
+      key: "status",
+      header: "Status",
+      hint: "Empty or Present for a worked day; a leave type such as AL or SL for leave (no scans needed).",
+      example: "Present",
+      aliases: ["Leave type"],
+    },
+    { key: "scans", header: "Scans", hint: "The day's scan times, comma-separated, 24-hour HH:MM. Not needed for leave.", example: "08:00, 12:00, 13:00, 17:00" },
+    { key: "reason", header: "Reason", hint: "Optional: why it is being added, e.g. where it came from.", example: "Imported from paper timesheet" },
   ],
-  load: employeeLookups,
+  load: async () => {
+    const [lookups, types] = await Promise.all([employeeLookups(), api.leave.types()]);
+    return {
+      ...lookups,
+      leaveList: types.map(leaveLabel).join(", "),
+      leaveTypes: new Lookup(types, [(t) => t.code, (t) => t.name, (t) => t.name_km, ...[0, 1, 2].map((i) => (t: LeaveType) => LEAVE_SHORT_CODES[t.code]?.[i])], "leave type"),
+    };
+  },
   choices: (ctx) => ({ employee: ctx.byName.names() }),
   save: async (row, ctx, settings) => {
     const employee = findEmployee(row, ctx);
     const date = row.text("date")!;
-    const times = row
-      .text("scans")!
-      .split(/[,;\s]+/)
-      .filter(Boolean)
-      .map((t) => {
-        const match = /^(\d{1,2})[:.](\d{2})$/.exec(t);
-        if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) throw new RowError(`"${t}" in Scans isn't a time like 08:00.`);
-        return `${match[1].padStart(2, "0")}:${match[2]}`;
-      });
-    if (times.length === 0) throw new RowError("Fill in at least one scan time.");
+    const status = row.text("status")?.trim() ?? "";
+    const reason = row.text("reason")?.trim() || undefined;
+    const times = scanTimes(row.text("scans") ?? "");
+    const statusKey = status.toLowerCase().replace(/[_\s]+/g, " ");
+    if (NOTHING_TO_RECORD.includes(statusKey)) return "skipped";
+    if (EXPORT_WORKED.includes(statusKey) && times.length === 0) return "skipped";
+    const isPresent = status === "" || PRESENT.includes(statusKey) || EXPORT_WORKED.includes(statusKey);
+
+    let leave: { type: LeaveType; part: DayPart } | null = null;
+    if (!isPresent) {
+      leave = leaveOn(status, ctx);
+      if (leave.part === "full" && times.length > 0) throw new RowError(`A full day of ${leave.type.name} can't have scans. Clear Scans, or add AM / PM for half a day.`);
+    } else if (times.length === 0) {
+      throw new RowError("Fill in the scan times, or put a leave type (e.g. AL) in Status.");
+    }
+
+    if (leave) {
+      try {
+        await api.requests.create({
+          employee_id: employee.id,
+          leave_type_id: leave.type.id,
+          start_date: date,
+          end_date: date,
+          day_part: leave.part,
+          reason,
+          approve: settings.approve,
+        });
+      } catch (err) {
+        // The same leave imported twice is already there.
+        if (err instanceof ApiError && Object.values(err.errors ?? {}).flat().some((m) => m.startsWith("Already "))) {
+          if (times.length === 0) return "skipped";
+        } else throw err;
+      }
+      if (times.length === 0) return "created";
+    }
 
     const correction = await api.attendanceCorrections.create({
       employee_id: employee.id,
       date,
-      reason: row.text("reason")!,
+      reason: reason ?? (leave ? `Imported with ${leave.type.name} (${leave.part.toUpperCase()})` : "Imported from Excel"),
       scans: scansOn(date, times),
     });
 
@@ -1049,8 +1146,8 @@ export const attendanceImport: ImportSpec<EmployeeLookups> = {
       try {
         await api.attendanceCorrections.approve(correction.id);
       } catch (err) {
-        const reason = err instanceof ApiError ? err.message : "it couldn't be approved";
-        throw new RowError(`Saved as a pending correction, but not approved: ${reason}`);
+        const message = err instanceof ApiError ? err.message : "it couldn't be approved";
+        throw new RowError(`Saved as a pending correction, but not approved: ${message}`);
       }
     }
     return "created";

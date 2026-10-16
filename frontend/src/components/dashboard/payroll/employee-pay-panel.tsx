@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, TrendingUp, Trash2 } from "lucide-react";
+import { Plus, TrendingUp, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { api, ApiError, type EmployeePay, type EmployeePayProfile, type PayCurrency, type SalaryReason } from "@/lib/api";
+import { api, ApiError, type EmployeePay, type EmployeePayProfile, type PayCurrency, type PayGroupOption, type SalaryReason } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { KIND_LABELS, SALARY_REASONS, dateLabel, money } from "./shared";
+import { KIND_LABELS, SALARY_REASONS, SCHEDULE_LABELS, dateLabel, money } from "./shared";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
@@ -258,12 +258,93 @@ function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; pro
   );
 }
 
-/** The Pay tab: salary history, tax and NSSF details, and recurring allowances and deductions. */
+function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId: number; pay: EmployeePay; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const [groups, setGroups] = useState<PayGroupOption[] | null>(null);
+  const [groupId, setGroupId] = useState("");
+  // The first day after anything already paid.
+  const earliest = pay.paid_through ? new Date(new Date(pay.paid_through + "T00:00:00").getTime() + 86400000).toLocaleDateString("en-CA") : undefined;
+  const [from, setFrom] = useState(() => (earliest && earliest > today() ? earliest : today()));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.payroll
+      .groupOptions()
+      .then((list) => {
+        setGroups(list);
+        setGroupId(String(list.find((g) => g.id !== pay.pay_group?.id)?.id ?? ""));
+      })
+      .catch((err) => {
+        notifyError(err);
+        setGroups([]);
+      });
+  }, [pay.pay_group?.id]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api.employeePay.setPayGroup(employeeId, { pay_group_id: Number(groupId), effective_from: from });
+      notifySuccess("Pay group changed", `${groups?.find((g) => String(g.id) === groupId)?.name ?? ""} from ${dateLabel(from)}`);
+      onSaved();
+      onOpenChange(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>Change pay group</DialogTitle>
+            <DialogDescription>
+              From the date you choose, this person is paid on the new group&apos;s schedule and rules. A period they were only partly in pays its share of days.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pg-group">Pay group</Label>
+            <select id="pg-group" className={SELECT_CLASS} value={groupId} onChange={(e) => setGroupId(e.target.value)} disabled={groups === null}>
+              {groups?.map((g) => (
+                <option key={g.id} value={g.id} disabled={g.id === pay.pay_group?.id}>
+                  {g.name} — {SCHEDULE_LABELS[g.schedule]}
+                  {g.id === pay.pay_group?.id ? " (now)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pg-from">From</Label>
+            <Input id="pg-from" type="date" min={earliest} value={from} onChange={(e) => setFrom(e.target.value)} required />
+            <p className="text-xs text-muted-foreground">
+              The first day they are paid with the new group. To include them in a pay run that has already started, pick that run&apos;s first day (or earlier).
+            </p>
+            {pay.paid_through && <p className="text-xs text-muted-foreground">Already paid through {dateLabel(pay.paid_through)}, so the change can start the day after at the earliest.</p>}
+            {from > today() && <p className="text-xs text-warning">This date is in the future: until then they stay in {pay.pay_group?.name ?? "their current group"}.</p>}
+          </div>
+          {error && <Alert variant="destructive">{error}</Alert>}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit" disabled={saving || !groupId || !from}>
+              {saving ? "Saving…" : "Change group"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The Pay tab: pay group, salary history, tax and NSSF details, and recurring allowances and deductions. */
 export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; canEdit: boolean }) {
   const confirm = useConfirm();
   const [pay, setPay] = useState<EmployeePay | null>(null);
   const [reloads, setReloads] = useState(0);
-  const [dialog, setDialog] = useState<"salary" | "item" | null>(null);
+  const [dialog, setDialog] = useState<"salary" | "item" | "group" | null>(null);
   const reload = () => setReloads((n) => n + 1);
 
   useEffect(() => {
@@ -295,6 +376,25 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
     }
   }
 
+  const latestGroup = pay.pay_groups[0];
+
+  async function removeGroupChange() {
+    if (!latestGroup) return;
+    const ok = await confirm({
+      title: "Undo the latest pay group change?",
+      description: `${latestGroup.pay_group?.name ?? "The group"} from ${dateLabel(latestGroup.effective_from)}. The group before it applies again.`,
+      confirmLabel: "Undo",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await api.employeePay.removePayGroup(employeeId, latestGroup.id);
+      reload();
+    } catch (err) {
+      notifyError(err);
+    }
+  }
+
   async function removeItem(id: number, name: string) {
     const ok = await confirm({ title: `Remove ${name}?`, description: "It stops appearing on future payslips. Approved payslips keep it.", confirmLabel: "Remove", destructive: true });
     if (!ok) return;
@@ -311,8 +411,54 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
+            <CardTitle>Pay group</CardTitle>
+            <CardDescription>When this person is paid, and by which group&apos;s rules.</CardDescription>
+          </div>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => setDialog("group")}>
+              <Users className="size-4" />
+              Change group
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm">
+            <span className="font-medium">{pay.pay_group?.name ?? "—"}</span>
+            {pay.pay_group && <span className="text-muted-foreground"> · {SCHEDULE_LABELS[pay.pay_group.schedule]}</span>}
+            {pay.paid_through && <span className="text-muted-foreground"> · paid through {dateLabel(pay.paid_through)}</span>}
+          </p>
+          {pay.pay_groups.length === 0 && <p className="text-xs text-muted-foreground">Never moved — paid with the company&apos;s default group.</p>}
+          {pay.pay_groups.length > 0 && (
+            <ol className="flex flex-col divide-y divide-border">
+              {pay.pay_groups.map((g) => (
+                <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span>
+                    {g.pay_group?.name ?? "Group"}
+                    {g.effective_from > todayStr && <Badge variant="info" className="ml-2">Upcoming</Badge>}
+                    {g.created_by && <span className="text-xs text-muted-foreground"> · {g.created_by.name}</span>}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {dateLabel(g.effective_from)} – {g.effective_to ? dateLabel(g.effective_to) : "now"}
+                    </span>
+                    {canEdit && g.id === latestGroup?.id && (
+                      <Button variant="ghost" size="icon" aria-label="Undo this change" onClick={removeGroupChange}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+          <div>
             <CardTitle>Salary</CardTitle>
-            <CardDescription>Every change is kept, so each month is paid at the salary it had.</CardDescription>
+            <CardDescription>Every change is kept, so each pay period is paid at the salary it had.</CardDescription>
           </div>
           {canEdit && (
             <Button size="sm" onClick={() => setDialog("salary")}>
@@ -369,7 +515,7 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>Allowances and deductions</CardTitle>
-            <CardDescription>Fixed amounts every month: transport, phone, a loan repayment…</CardDescription>
+            <CardDescription>Fixed monthly amounts: transport, phone, a loan repayment… Paid twice a month or weekly, each period pays its share.</CardDescription>
           </div>
           {canEdit && pay.item_components.some((c) => c.is_active) && (
             <Button size="sm" variant="outline" onClick={() => setDialog("item")}>
@@ -418,6 +564,7 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
       <ProfileCard key={JSON.stringify(pay.profile)} employeeId={employeeId} profile={pay.profile} canEdit={canEdit} />
 
       {dialog === "salary" && <SalaryDialog employeeId={employeeId} current={current} onOpenChange={(o) => !o && setDialog(null)} onSaved={reload} />}
+      {dialog === "group" && <PayGroupDialog employeeId={employeeId} pay={pay} onOpenChange={(o) => !o && setDialog(null)} onSaved={reload} />}
       {dialog === "item" && <ItemDialog employeeId={employeeId} components={pay.item_components} onOpenChange={(o) => !o && setDialog(null)} onSaved={reload} />}
     </div>
   );
