@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\AttendanceDay;
 use App\Models\Employee;
 use App\Models\EmployeeScheduleAssignment;
+use App\Models\Holiday;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -127,6 +128,46 @@ class WorkScheduleTest extends TestCase
     public function test_only_people_who_manage_schedules_can_change_them(): void
     {
         $this->as($this->user)->postJson('/api/work_schedules', ['name' => 'X', 'days' => []])->assertForbidden();
+    }
+
+    public function test_a_schedule_with_no_hours_is_allowed_only_for_overtime(): void
+    {
+        $this->as($this->admin)->postJson('/api/work_schedules', ['name' => 'Empty', 'days' => []])
+            ->assertStatus(422)->assertJsonValidationErrors('days');
+
+        $id = $this->as($this->admin)->postJson('/api/work_schedules', [
+            'name' => 'Holiday work - OT', 'days' => [], 'overtime_mode' => 'after_last_out',
+        ])->assertCreated()->assertJsonPath('weekly_minutes', 0)->json('id');
+
+        // Turning its overtime off later would leave a schedule that does nothing.
+        $this->as($this->admin)->putJson("/api/work_schedules/{$id}", ['overtime_mode' => 'off'])
+            ->assertStatus(422)->assertJsonValidationErrors('days');
+    }
+
+    public function test_an_overtime_only_override_makes_every_hour_on_a_holiday_holiday_overtime(): void
+    {
+        // Sokea's usual schedule never counts overtime, and Oct 10 is a holiday.
+        $usual = $this->makeWorkSchedule($this->company, attributes: ['name' => 'On-Site - No OT', 'overtime_mode' => 'off']);
+        $this->assignSchedule($this->employee, $usual, '2026-10-01');
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Pchum Ben', 'date' => '2026-10-10']);
+
+        $otOnly = WorkSchedule::query()->findOrFail($this->as($this->admin)->postJson('/api/work_schedules', [
+            'name' => 'Holiday work - OT', 'days' => [], 'overtime_mode' => 'after_last_out',
+            'overtime_min_minutes' => 0, 'overtime_round_minutes' => 0, 'overtime_requires_approval' => false,
+        ])->assertCreated()->json('id'));
+        $this->overrideOn($this->employee, $otOnly, '2026-10-10');
+
+        $this->at('2026-10-18 09:00');
+        $this->as($this->admin)->postJson('/api/attendance/adjustments', [
+            'employee_id' => $this->employee->id, 'date' => '2026-10-10', 'reason' => 'OT - Holiday',
+            'add' => ['2026-10-10T05:30', '2026-10-10T17:00'],
+        ])->assertOk();
+
+        $day = $this->attendanceDay($this->employee, '2026-10-10');
+        $this->assertSame(690, $day->worked_minutes);
+        $this->assertSame(690, $day->overtime_minutes);
+        $this->assertSame('holiday', $day->overtime_type);
+        $this->assertSame('approved', $day->overtime_status);
     }
 
     // ───────────── Assignments over time ─────────────

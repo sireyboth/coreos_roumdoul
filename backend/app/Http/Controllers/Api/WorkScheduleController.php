@@ -122,7 +122,8 @@ class WorkScheduleController extends Controller
             'overtime_round_minutes' => ['sometimes', 'integer', Rule::in([0, 5, 10, 15, 30, 60])],
             'overtime_requires_approval' => ['boolean'],
 
-            'days' => [$creating ? 'required' : 'sometimes', 'array', 'max:7'],
+            // May be empty for an overtime-only schedule (checked below).
+            'days' => [$creating ? 'present' : 'sometimes', 'array', 'max:7'],
             'days.*.weekday' => ['required', 'integer', 'between:0,6', 'distinct'],
             'days.*.slots' => ['required', 'array', 'min:2', 'max:12'],
             'days.*.slots.*.type' => ['required', 'in:in,out'],
@@ -134,6 +135,17 @@ class WorkScheduleController extends Controller
 
         foreach ($data['days'] ?? [] as $i => $day) {
             $this->assertValidDay($day['slots'], "days.{$i}.slots");
+        }
+
+        // No hours on any day: every day under it is a non-working day, so all
+        // time worked is overtime — made for one-day holiday overrides. Without
+        // overtime such a schedule would do nothing, so it's refused.
+        $hasDays = array_key_exists('days', $data) ? $data['days'] !== [] : $schedule->days()->exists();
+        $overtimeMode = $data['overtime_mode'] ?? $schedule?->overtime_mode ?? 'off';
+        if (! $hasDays && $overtimeMode === 'off') {
+            throw ValidationException::withMessages(['days' => [
+                'Add hours to at least one day. A schedule with no hours is only for overtime — turn overtime on to save it without hours.',
+            ]]);
         }
 
         if (array_key_exists('default_days_off', $data)) {

@@ -119,6 +119,8 @@ export function WorkScheduleDialog({
     [week, breakMinutes, breakPaid],
   );
   const singleStretchDays = WEEK_ORDER.some((d) => week[d].length === 1);
+  // No hours on any day: an overtime-only schedule, for one-day holiday overrides.
+  const noHours = WEEK_ORDER.every((d) => week[d].length === 0);
 
   function setDay(weekday: number, stretches: Stretch[]) {
     setWeek((w) => ({ ...w, [weekday]: stretches }));
@@ -150,8 +152,8 @@ export function WorkScheduleDialog({
     e.preventDefault();
     setError(null);
 
-    if (WEEK_ORDER.every((d) => week[d].length === 0)) {
-      setError("Add hours to at least one day.");
+    if (noHours && overtimeMode === "off") {
+      setError("Add hours to at least one day, or turn overtime on to make an overtime-only schedule.");
       return;
     }
 
@@ -231,6 +233,14 @@ export function WorkScheduleDialog({
                 Copy Monday to every working day
               </Button>
             </div>
+
+            {noHours && (
+              <Alert variant={overtimeMode === "off" ? "warning" : "info"} title="Overtime-only schedule">
+                {overtimeMode === "off"
+                  ? "No day has hours. Turn overtime on below to save it as an overtime-only schedule, or add hours."
+                  : "No day has hours, so every hour worked under this schedule counts as overtime — as holiday overtime on a holiday. Use it as a one-day roster override, not as someone's usual schedule."}
+              </Alert>
+            )}
 
             <ul className="divide-y divide-border rounded-lg border border-border">
               {WEEK_ORDER.map((weekday) => {
