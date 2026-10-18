@@ -50,7 +50,8 @@ export function weekSummary(schedule: Pick<WorkSchedule, "days">): string {
     if (last && last.text === text && last.days[last.days.length - 1] === previous) last.days.push(weekday);
     else groups.push({ days: [weekday], text });
   }
-  if (groups.length === 0) return "No working days";
+  // Only an overtime-only schedule can have no hours at all.
+  if (groups.length === 0) return "Overtime only, no set hours";
   return groups
     .map((g) => {
       const label = g.days.length > 2 ? `${WEEKDAY_SHORT[g.days[0]]}–${WEEKDAY_SHORT[g.days[g.days.length - 1]]}` : g.days.map((d) => WEEKDAY_SHORT[d]).join(", ");

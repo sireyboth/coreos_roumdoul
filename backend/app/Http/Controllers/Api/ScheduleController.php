@@ -108,6 +108,7 @@ class ScheduleController extends Controller
         ]);
 
         $workSchedule = $this->assertActiveSchedule($data['work_schedule_id'])->load('days.slots');
+        $overtimeOnly = $workSchedule->days->isEmpty();
 
         $from = CarbonImmutable::createFromFormat('Y-m-d', $data['from'])->startOfDay();
         $to = CarbonImmutable::createFromFormat('Y-m-d', $data['to'])->startOfDay();
@@ -158,7 +159,8 @@ class ScheduleController extends Controller
             ->whereDate('date', '>=', $fromDate)->whereDate('date', '<=', $toDate)->get()
             ->mapWithKeys(fn (DayOff $d) => [$d->employee_id.'|'.$d->date->toDateString() => true]);
 
-        $holidays = ($data['skip_holidays'] ?? true)
+        // Holidays are what an overtime-only schedule is for, so it never skips them.
+        $holidays = ($data['skip_holidays'] ?? true) && ! $overtimeOnly
             ? Holiday::query()->where(fn ($q) => $q->whereDate('date', '>=', $fromDate)->whereDate('date', '<=', $toDate)->orWhere('is_recurring_yearly', true))->get()
             : collect();
         $isHoliday = fn (CarbonImmutable $day) => $holidays->contains(fn (Holiday $h) => $h->is_recurring_yearly
@@ -179,7 +181,9 @@ class ScheduleController extends Controller
             foreach ($dates as $day) {
                 $date = $day->toDateString();
 
-                if ($workSchedule->slotsFor($day->dayOfWeek) === []) {
+                // An overtime-only schedule (no hours on any day) is meant for
+                // exactly those days, so it's never skipped for having none.
+                if (! $overtimeOnly && $workSchedule->slotsFor($day->dayOfWeek) === []) {
                     $skipped['no_hours']++;
                 } elseif ($isHoliday($day)) {
                     $skipped['holiday']++;

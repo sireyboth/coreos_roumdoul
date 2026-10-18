@@ -112,6 +112,9 @@ export function BulkScheduleDialog({
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<{ key: string; data: ScheduleBulkResult | null; error: string | null } | null>(null);
 
+  // No hours on any day: made for holiday overrides, so holidays are never skipped for it.
+  const overtimeOnly = activeSchedules.find((s) => String(s.id) === scheduleId)?.days.length === 0;
+
   const term = search.trim().toLowerCase();
   const shown = roster.filter((e) => !term || [e.name, e.employee_code, e.job_title].some((v) => v?.toLowerCase().includes(term)));
   const allShownPicked = shown.length > 0 && shown.every((e) => picked.has(e.id));
@@ -137,7 +140,7 @@ export function BulkScheduleDialog({
           from: dates.from,
           to: dates.to,
           weekdays,
-          skip_holidays: skipHolidays,
+          skip_holidays: skipHolidays && !overtimeOnly,
         }
       : null;
   const previewKey = payload ? JSON.stringify(payload) : "";
@@ -354,10 +357,16 @@ export function BulkScheduleDialog({
                 )}
               </div>
 
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={skipHolidays} onChange={(e) => setSkipHolidays(e.target.checked)} className="size-4 rounded border-input" />
-                Skip public holidays
-              </label>
+              {overtimeOnly ? (
+                <Alert title="Overtime-only schedule">
+                  Every hour worked on these days counts as overtime — holiday overtime on a public holiday. Holidays are included.
+                </Alert>
+              ) : (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={skipHolidays} onChange={(e) => setSkipHolidays(e.target.checked)} className="size-4 rounded border-input" />
+                  Skip public holidays
+                </label>
+              )}
             </div>
           </div>
 

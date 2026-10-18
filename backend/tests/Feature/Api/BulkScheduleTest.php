@@ -111,6 +111,18 @@ class BulkScheduleTest extends TestCase
             ->assertOk()->assertJsonPath('created', 1)->assertJsonPath('skipped.holiday', 0);
     }
 
+    public function test_an_overtime_only_schedule_is_rostered_on_holidays_and_any_weekday(): void
+    {
+        Holiday::query()->create(['company_id' => $this->company->id, 'name' => 'Pchum Ben', 'date' => '2026-09-19']);
+        $otOnly = $this->makeWorkSchedule($this->company, attributes: ['name' => 'Holiday work - OT', 'overtime_mode' => 'after_last_out'], weekdays: []);
+
+        // Sat (the holiday), Sun, Mon — none has hours, and the holiday isn't skipped though skipping is asked.
+        $this->bulk([
+            'employee_ids' => [$this->staff['A']->id], 'work_schedule_id' => $otOnly->id,
+            'from' => '2026-09-19', 'to' => '2026-09-21', 'weekdays' => null, 'skip_holidays' => true,
+        ])->assertOk()->assertJsonPath('created', 3)->assertJsonPath('skipped.holiday', 0)->assertJsonPath('skipped.no_hours', 0);
+    }
+
     public function test_a_dry_run_reports_the_same_numbers_but_writes_nothing(): void
     {
         $this->bulk(['dry_run' => true])->assertOk()->assertJsonPath('dry_run', true)->assertJsonPath('created', 30);
