@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarCheck, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarPlus, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
+import { AttendanceAddDialog } from "@/components/dashboard/attendance-add-dialog";
 import { AttendanceCorrections } from "@/components/dashboard/attendance-corrections";
 import { AttendanceDayDialog, DELETE_DAYS_WARNING } from "@/components/dashboard/attendance-day-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -137,6 +138,7 @@ function AttendancePageContent() {
   // The days chosen for "Fill missed scans", and how to clear the table's selection once done.
   const [filling, setFilling] = useState<{ days: AttendanceDay[]; clear: () => void } | null>(null);
   const [missedOpen, setMissedOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingOvertime, setPendingOvertime] = useState(0);
   const [pendingCorrections, setPendingCorrections] = useState(0);
@@ -366,6 +368,13 @@ function AttendancePageContent() {
                 <FileDown className="size-4" />
                 Export
               </Button>
+              {/* The page's main action: solid, and last, where the eye lands. */}
+              {canManage && (
+                <Button onClick={() => setAddOpen(true)}>
+                  <CalendarPlus className="size-4" />
+                  Add attendance
+                </Button>
+              )}
             </div>
           }
         />
@@ -517,6 +526,21 @@ function AttendancePageContent() {
       <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
       {/* Keyed by month, so opening it for another month (e.g. from the report's close-month checklist) starts on that month. */}
       {canManage && <MissedScansDialog key={month} open={missedOpen} onOpenChange={setMissedOpen} initialMonth={month} onChanged={load} />}
+      {canManage && (
+        <AttendanceAddDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onSaved={(day) => {
+            setAddOpen(false);
+            setPreview(day);
+            load();
+          }}
+          onOpenDay={(day) => {
+            setAddOpen(false);
+            setPreview(day);
+          }}
+        />
+      )}
       <AttendanceFillMissedDialog
         days={filling?.days ?? null}
         onOpenChange={(open) => !open && setFilling(null)}

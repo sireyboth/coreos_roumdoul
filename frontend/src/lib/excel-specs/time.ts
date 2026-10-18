@@ -987,7 +987,7 @@ const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
  * HH:MM times on `date` as wall-clock datetimes, in order. A time earlier
  * than the one before it is the next morning (a night shift's OUT).
  */
-function scansOn(date: string, times: string[]): string[] {
+export function scansOn(date: string, times: string[]): string[] {
   let day = date;
   let previous = "";
   return times.map((time) => {
