@@ -313,7 +313,7 @@ export function PayGroupDialog({
                     </div>
                     {own && expanded === c.id && c.template && (
                       <div className="rounded-md bg-muted/40 p-3">
-                        <TemplateFields template={c.template} params={r.params ?? {}} onChange={(params) => setRule(c.id, { params })} />
+                        <TemplateFields template={c.template} params={r.params ?? {}} onChange={(params) => setRule(c.id, { params })} enforceOvertimeMinimums={policy.enforce_overtime_minimums} />
                       </div>
                     )}
                   </div>

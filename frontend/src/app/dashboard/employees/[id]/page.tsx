@@ -33,6 +33,7 @@ import { EmployeePayPanel } from "@/components/dashboard/payroll/employee-pay-pa
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
+import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/download";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
@@ -100,7 +101,7 @@ export default function EmployeePage() {
     if (!employee) return;
     setCardAction(action);
     try {
-      const blob = await api.employees.card(employee.id);
+      const blob = await withBusy(() => api.employees.card(employee.id));
       if (action === "view") {
         setCardBlob(blob);
         setCardPreviewOpen(true);

@@ -26,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  * recalculated alone after a fix. Approving needs the period to be over,
  * recalculates one last time, refuses while any payslip has a blocking
  * warning, then locks the attendance it used — for those people and those
- * days only. After that nothing changes: fixes go into a later period as adjustments.
+ * days only. After that nothing changes: fixes go into a later period as
+ * adjustments — or, for a mistake in the run itself, an approver reopens it.
  */
 class PayRunService
 {
@@ -198,6 +199,29 @@ class PayRunService
         }
 
         $run->update(['status' => 'paid', 'paid_at' => now(), 'paid_by' => $by->id]);
+
+        return $run->fresh();
+    }
+
+    /**
+     * Sends an approved or paid run back to calculated, for a mistake found
+     * after sign-off: the attendance it locked opens again, so it can be fixed,
+     * recalculated and approved anew. The reason is kept in the audit log.
+     */
+    public function reopen(PayRun $run, User $by, string $reason): PayRun
+    {
+        if (! $run->isLocked()) {
+            throw ValidationException::withMessages(['status' => ['Only an approved or paid pay run can be reopened.']]);
+        }
+
+        $before = $run->only(['status', 'approved_at', 'approved_by', 'paid_at', 'paid_by']);
+
+        DB::transaction(function () use ($run) {
+            AttendanceLock::query()->withoutGlobalScopes()->where('pay_run_id', $run->id)->delete();
+            $run->update(['status' => 'calculated', 'approved_at' => null, 'approved_by' => null, 'paid_at' => null, 'paid_by' => null]);
+        });
+        $this->recorder->forgetLocks();
+        AuditLogger::record('pay_run.reopened', $run, ['status' => 'calculated'], $run->company_id, $before, $reason);
 
         return $run->fresh();
     }
@@ -409,7 +433,7 @@ class PayRunService
         $ids = $run->payslips()->pluck('employee_id')->merge($skipped->pluck('id'));
 
         return [
-            'policy' => $ctx['policy']->only(['rate_basis', 'rate_basis_days', 'hours_per_day', 'missing_scan_policy', 'daily_paid_holidays', 'khr_rounding', 'fallback_exchange_rate']),
+            'policy' => $ctx['policy']->only(['rate_basis', 'rate_basis_days', 'hours_per_day', 'missing_scan_policy', 'daily_paid_holidays', 'enforce_overtime_minimums', 'khr_rounding', 'fallback_exchange_rate']),
             'group' => $ctx['group']->only(['id', 'name', 'schedule', 'cutoff_days', 'anchor_date']),
             'period' => ['start' => $ctx['start']->toDateString(), 'end' => $ctx['end']->toDateString(), 'days' => $ctx['days_in_period'], 'salary_share' => $ctx['salary_share']],
             'components' => $ctx['components']->map->only(['code', 'name', 'kind', 'method', 'template', 'params', 'taxable', 'nssf_insurable'])->values()->all(),

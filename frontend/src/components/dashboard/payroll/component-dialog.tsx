@@ -65,18 +65,38 @@ function NumberField({ id, label, value, onChange, hint, step = "1", min = 0, su
 }
 
 /** The fields for one template's parameters. */
-export function TemplateFields({ template, params, onChange }: { template: PayTemplate; params: Params; onChange: (p: Params) => void }) {
+export function TemplateFields({
+  template,
+  params,
+  onChange,
+  enforceOvertimeMinimums = true,
+}: {
+  template: PayTemplate;
+  params: Params;
+  onChange: (p: Params) => void;
+  /** The company's "Hold overtime to the Labor Law minimums" setting. */
+  enforceOvertimeMinimums?: boolean;
+}) {
   const set = (patch: Params) => onChange({ ...params, ...patch });
 
   if (template === "overtime") {
-    const field = (key: string, label: string, min: number) => (
-      <NumberField id={`ot-${key}`} label={label} suffix="%" min={min * 100} step="5" value={Math.round(Number(params[key]) * 100)} onChange={(n) => set({ [key]: n / 100 })} hint={`At least ${min * 100}% by law.`} />
-    );
+    const field = (key: string, label: string, legal: number) => {
+      const belowLaw = Number(params[key]) < legal;
+      const hint = enforceOvertimeMinimums ? `At least ${legal * 100}% by law.` : belowLaw ? `Below the ${legal * 100}% Labor Law minimum.` : `Labor Law minimum: ${legal * 100}%.`;
+      return (
+        <NumberField id={`ot-${key}`} label={label} suffix="%" min={enforceOvertimeMinimums ? legal * 100 : 0} step="5" value={Math.round(Number(params[key]) * 100)} onChange={(n) => set({ [key]: n / 100 })} hint={hint} />
+      );
+    };
     return (
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {field("workday", "Work day", 1.5)}
-        {field("day_off", "Day off", 2)}
-        {field("holiday", "Public holiday", 2)}
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {field("workday", "Work day", 1.5)}
+          {field("day_off", "Day off", 2)}
+          {field("holiday", "Public holiday", 2)}
+        </div>
+        {!enforceOvertimeMinimums && (
+          <p className="text-xs text-muted-foreground">Labor Law minimums are switched off in Payroll Settings, so any rate is accepted. The company is responsible for its overtime policy.</p>
+        )}
       </div>
     );
   }
@@ -224,7 +244,17 @@ function LivePreview({ component, params, isActive }: { component: PayComponent;
  * Adds or edits a pay component. Built-in ones keep their kind and rule type;
  * the salary itself (BASE) can only be renamed.
  */
-export function ComponentDialog({ component, onOpenChange, onSaved }: { component: PayComponent | null; onOpenChange: (open: boolean) => void; onSaved: () => void }) {
+export function ComponentDialog({
+  component,
+  enforceOvertimeMinimums = true,
+  onOpenChange,
+  onSaved,
+}: {
+  component: PayComponent | null;
+  enforceOvertimeMinimums?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
   const isNew = component === null;
   const [name, setName] = useState(component?.name ?? "");
   const [kind, setKind] = useState<PayKind>(component?.kind ?? "earning");
@@ -322,7 +352,7 @@ export function ComponentDialog({ component, onOpenChange, onSaved }: { componen
           {method === "template" && template && (
             <div className="flex flex-col gap-2 rounded-lg bg-muted/40 p-3">
               <p className="text-sm font-medium">Rule · {TEMPLATE_LABELS[template]}</p>
-              <TemplateFields template={template} params={params} onChange={setParams} />
+              <TemplateFields template={template} params={params} onChange={setParams} enforceOvertimeMinimums={enforceOvertimeMinimums} />
             </div>
           )}
 

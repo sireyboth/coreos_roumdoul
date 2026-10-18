@@ -10,6 +10,7 @@ import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, Employee } from "@/lib/api";
+import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/download";
 import { notifyError } from "@/lib/notify";
 
@@ -42,7 +43,7 @@ export default function IdCardsPage() {
   async function handleCard(employee: Employee, action: "view" | "download") {
     setBusy({ id: employee.id, action });
     try {
-      const blob = await api.employees.card(employee.id);
+      const blob = await withBusy(() => api.employees.card(employee.id));
       if (action === "view") {
         setPreview({ employee, blob });
         setPreviewOpen(true);

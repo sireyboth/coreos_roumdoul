@@ -102,6 +102,17 @@ function PolicyCard({ policy, onSaved }: { policy: PayrollPolicy; onSaved: (p: P
             <input type="checkbox" checked={form.daily_paid_holidays} onChange={(e) => set({ daily_paid_holidays: e.target.checked })} />
             Pay daily-paid staff for public holidays
           </label>
+          <div className="flex flex-col gap-2 sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.enforce_overtime_minimums} onChange={(e) => set({ enforce_overtime_minimums: e.target.checked })} />
+              Hold overtime to the Labor Law minimums (150% on work days, 200% on days off and holidays)
+            </label>
+            {!form.enforce_overtime_minimums && (
+              <Alert variant="warning">
+                Overtime rates can now be set to any value. Paying below the Labor Law minimums may expose the company to back-pay claims and fines; the company is responsible for its overtime policy.
+              </Alert>
+            )}
+          </div>
           <div className="flex justify-end sm:col-span-2">
             <Button type="submit" disabled={saving}>
               {saving ? "Saving…" : "Save settings"}
@@ -259,6 +270,7 @@ export default function PayrollSettingsPage() {
         <ComponentDialog
           key={editing.component?.id ?? "new"}
           component={editing.component}
+          enforceOvertimeMinimums={settings?.policy.enforce_overtime_minimums ?? true}
           onOpenChange={(o) => !o && setEditing(null)}
           onSaved={() => setReloads((n) => n + 1)}
         />

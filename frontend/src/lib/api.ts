@@ -1,3 +1,4 @@
+import { withBusy } from "@/lib/busy";
 import { createHttpCache } from "@/lib/http-cache";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -77,7 +78,11 @@ export function photoSrc(url?: string | null): string | null {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// background: a write the user didn't ask for and isn't waiting on (marking a
+// notification read, syncing push) — it must never freeze the screen.
+type RequestOptions = RequestInit & { background?: boolean };
+
+async function request<T>(path: string, { background = false, ...options }: RequestOptions = {}): Promise<T> {
   const method = (options.method ?? "GET").toUpperCase();
 
   if (method === "GET") {
@@ -85,12 +90,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     return CACHEABLE_GET.test(path) ? httpCache.get<T>(path, send) : send();
   }
 
-  try {
-    return await sendOnce<T>(path, options);
-  } finally {
-    // Any change (even a failed one) may have altered what the lists show.
-    httpCache.clear();
-  }
+  // Reads stay free (lists load and poll in the background); a write blocks
+  // the app until it finishes, so it can't be double-submitted or interrupted.
+  const send = async () => {
+    try {
+      return await sendOnce<T>(path, options);
+    } finally {
+      // Any change (even a failed one) may have altered what the lists show.
+      httpCache.clear();
+    }
+  };
+  return background ? send() : withBusy(send);
 }
 
 /** A dropped connection on a read is worth one more try; a write is never repeated automatically. */
@@ -982,6 +992,7 @@ export type PayrollPolicy = {
   hours_per_day: number;
   missing_scan_policy: "review" | "present" | "absent";
   daily_paid_holidays: boolean;
+  enforce_overtime_minimums: boolean;
   khr_rounding: number;
   fallback_exchange_rate: number | null;
 };
@@ -1629,8 +1640,8 @@ export const api = {
     // Cheap to poll: the unread count and the newest unread alert's id.
     unreadCount: () => request<{ count: number; latest_id: number | null }>("/api/notifications/unread-count"),
     markAsRead: (id: number) =>
-      request<void>(`/api/notifications/${id}/read`, { method: "POST" }),
-    markAllAsRead: () => request<void>("/api/notifications/read-all", { method: "POST" }),
+      request<void>(`/api/notifications/${id}/read`, { method: "POST", background: true }),
+    markAllAsRead: () => request<void>("/api/notifications/read-all", { method: "POST", background: true }),
   },
 
   // Push notifications to this device, even with the app closed.
@@ -1638,8 +1649,9 @@ export const api = {
     // enabled is false when the server has no push keys set up.
     key: () => request<{ enabled: boolean; public_key: string | null }>("/api/push/key"),
     subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string }; content_encoding?: string }) =>
-      request<void>("/api/push/subscriptions", { method: "POST", body: JSON.stringify(subscription) }),
-    unsubscribe: (endpoint: string) => request<void>("/api/push/subscriptions", { method: "DELETE", body: JSON.stringify({ endpoint }) }),
+      request<void>("/api/push/subscriptions", { method: "POST", body: JSON.stringify(subscription), background: true }),
+    unsubscribe: (endpoint: string) =>
+      request<void>("/api/push/subscriptions", { method: "DELETE", body: JSON.stringify({ endpoint }), background: true }),
   },
 
   payroll: {
@@ -1678,6 +1690,9 @@ export const api = {
       request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/calculate`, { method: "POST", body: "{}" }),
     approve: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/approve`, { method: "POST", body: "{}" }),
     markPaid: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/paid`, { method: "POST", body: "{}" }),
+    // Back to calculated, unlocking its attendance; the reason goes to the audit log.
+    reopen: (id: number, reason: string) =>
+      request<PayRunDetail>(`/api/payroll/runs/${id}/reopen`, { method: "POST", body: JSON.stringify({ reason }) }),
     removeRun: (id: number) => request<void>(`/api/payroll/runs/${id}`, { method: "DELETE" }),
     payslip: (id: number) => request<Payslip>(`/api/payroll/payslips/${id}`),
     runReport: (id: number) => request<PayRunReport>(`/api/payroll/runs/${id}/report`),

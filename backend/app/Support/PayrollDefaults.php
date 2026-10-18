@@ -54,6 +54,7 @@ class PayrollDefaults
             'hours_per_day' => 8,
             'missing_scan_policy' => 'review',
             'daily_paid_holidays' => true,
+            'enforce_overtime_minimums' => true,
             'khr_rounding' => 100,
             'fallback_exchange_rate' => null,
         ];

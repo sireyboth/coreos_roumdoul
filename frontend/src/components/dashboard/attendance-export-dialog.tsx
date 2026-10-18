@@ -19,6 +19,7 @@ import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/cale
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee } from "@/lib/api";
 import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights";
+import { withBusy } from "@/lib/busy";
 import { PDF_CALENDAR_MAX_DAYS, printAttendancePdf } from "@/lib/attendance-pdf";
 import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel, buildAttendanceCalendar, readAttendanceReport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -192,7 +193,7 @@ function ExportForm({
 
     try {
       const chosenId = employee?.id ?? (employeeId ? Number(employeeId) : undefined);
-      const { blob, filename } = await api.attendance.export({ from, to, employee_id: chosenId });
+      const { blob, filename } = await withBusy(() => api.attendance.export({ from, to, employee_id: chosenId }));
 
       if (pdf) {
         const report = await readAttendanceReport(blob);

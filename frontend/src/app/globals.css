@@ -161,6 +161,13 @@
   html {
     @apply font-sans;
   }
+  /* Native <select>s are bg-transparent, and Chrome on Windows paints the open
+     list from the option's own background — white — under light dark-mode text.
+     Give the options the popover colours so every dropdown follows the theme. */
+  select option,
+  select optgroup {
+    @apply bg-popover text-popover-foreground;
+  }
 }
 /* Birthday celebration confetti (components/dashboard/birthday-celebration.tsx). */
 @keyframes confetti-fall {

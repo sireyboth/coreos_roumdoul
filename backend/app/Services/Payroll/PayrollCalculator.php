@@ -238,6 +238,7 @@ class PayrollCalculator
             'ot_workday_hours' => round($attendance['overtime_workday_minutes'] / 60, 2),
             'ot_day_off_hours' => round($attendance['overtime_day_off_minutes'] / 60, 2),
             'ot_holiday_hours' => round($attendance['overtime_holiday_minutes'] / 60, 2),
+            'enforce_overtime_minimums' => (bool) ($policy->enforce_overtime_minimums ?? true),
         ];
 
         // ── Lines ──

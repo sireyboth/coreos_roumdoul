@@ -289,7 +289,7 @@ class AttendanceRecorder
     /** @param  array{0: string, 1: string}  $range */
     public static function paidMessage(array $range): string
     {
-        return 'Some of these days are already paid (pay run '.CarbonImmutable::parse($range[0])->format('j M').' – '.CarbonImmutable::parse($range[1])->format('j M Y').'), so their attendance can\'t change. Add a payroll adjustment to a later period instead.';
+        return 'Some of these days are already paid (pay run '.CarbonImmutable::parse($range[0])->format('j M').' – '.CarbonImmutable::parse($range[1])->format('j M Y').'), so their attendance can\'t change. Add a payroll adjustment to a later period, or ask a payroll approver to reopen that pay run.';
     }
 
     private function monthLocked(int $companyId, string $date): bool

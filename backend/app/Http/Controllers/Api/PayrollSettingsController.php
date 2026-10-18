@@ -50,6 +50,7 @@ class PayrollSettingsController extends Controller
             'hours_per_day' => ['sometimes', 'numeric', 'min:1', 'max:24'],
             'missing_scan_policy' => ['sometimes', Rule::in(PayrollPolicy::MISSING_SCAN_POLICIES)],
             'daily_paid_holidays' => ['sometimes', 'boolean'],
+            'enforce_overtime_minimums' => ['sometimes', 'boolean'],
             'khr_rounding' => ['sometimes', 'integer', Rule::in([1, 100, 500, 1000])],
             'fallback_exchange_rate' => ['sometimes', 'nullable', 'numeric', 'min:1000', 'max:10000'],
         ]);
@@ -70,7 +71,7 @@ class PayrollSettingsController extends Controller
 
     public function storeComponent(Request $request)
     {
-        $this->setup->ensure($request->user()->company);
+        $policy = $this->setup->ensure($request->user()->company);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
@@ -86,7 +87,7 @@ class PayrollSettingsController extends Controller
         ]);
 
         $data['code'] = $this->uniqueCode($data['code'] ?? Str::upper(Str::snake(Str::ascii($data['name']))));
-        $data['params'] = $data['method'] === 'template' ? PayTemplates::normalise($data['template'], $data['params'] ?? []) : null;
+        $data['params'] = $data['method'] === 'template' ? PayTemplates::normalise($data['template'], $data['params'] ?? [], $policy->enforce_overtime_minimums) : null;
         if ($data['method'] !== 'template') {
             $data['template'] = null;
         }
@@ -110,7 +111,8 @@ class PayrollSettingsController extends Controller
             $data = array_intersect_key($data, ['name' => true]);
         }
         if (array_key_exists('params', $data)) {
-            $data['params'] = $component->method === 'template' ? PayTemplates::normalise($component->template, $data['params']) : null;
+            $enforce = $this->setup->ensure($request->user()->company)->enforce_overtime_minimums;
+            $data['params'] = $component->method === 'template' ? PayTemplates::normalise($component->template, $data['params'], $enforce) : null;
         }
 
         $component->update($data);
@@ -165,7 +167,7 @@ class PayrollSettingsController extends Controller
             $draft = ($ctx['components']->firstWhere('id', $data['component_id']) ?? PayComponent::query()->findOrFail($data['component_id']))->replicate();
             $draft->id = $data['component_id'];
             if (isset($data['params']) && $draft->method === 'template') {
-                $draft->params = PayTemplates::normalise($draft->template, $data['params']);
+                $draft->params = PayTemplates::normalise($draft->template, $data['params'], $ctx['policy']->enforce_overtime_minimums);
             }
             $active = $data['is_active'] ?? true;
             $ctx['components'] = $ctx['components']->reject(fn (PayComponent $c) => $c->id === $draft->id)

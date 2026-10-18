@@ -234,6 +234,8 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
 
         // Its own right: HR prepares runs with payroll.manage, a manager signs them off.
         Route::post('/payroll/runs/{run}/approve', [PayRunController::class, 'approve'])->middleware('company_permission:payroll.approve');
+        // Undoing a sign-off is the approver's call too.
+        Route::post('/payroll/runs/{run}/reopen', [PayRunController::class, 'reopen'])->middleware('company_permission:payroll.approve');
     });
 
     Route::middleware('module:attendance')->group(function () {

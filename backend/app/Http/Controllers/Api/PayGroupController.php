@@ -183,7 +183,8 @@ class PayGroupController extends Controller
         }
 
         if (array_key_exists('component_rules', $data)) {
-            $data['component_rules'] = $this->componentRules($data['component_rules'] ?? []);
+            $enforce = $this->setup->ensure($request->user()->company)->enforce_overtime_minimums;
+            $data['component_rules'] = $this->componentRules($data['component_rules'] ?? [], $enforce);
         }
 
         return $data;
@@ -195,7 +196,7 @@ class PayGroupController extends Controller
      * @param  array<int|string, array<string, mixed>>  $rules
      * @return array<int, array<string, mixed>>|null
      */
-    private function componentRules(array $rules): ?array
+    private function componentRules(array $rules, bool $enforceOvertimeMinimums): ?array
     {
         $components = PayComponent::query()->whereIn('id', array_keys($rules))->get()->keyBy('id');
         $clean = [];
@@ -211,7 +212,7 @@ class PayGroupController extends Controller
                 $entry['is_active'] = (bool) $rule['is_active'];
             }
             if (! empty($rule['params']) && $component->method === 'template') {
-                $entry['params'] = PayTemplates::normalise($component->template, $rule['params']);
+                $entry['params'] = PayTemplates::normalise($component->template, $rule['params'], $enforceOvertimeMinimums);
             }
             if ($entry !== []) {
                 $clean[$component->id] = $entry;

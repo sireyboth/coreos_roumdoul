@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, ChartColumnBig, ChevronDown, Download, FileText, Landmark, RefreshCw, Sheet, Trash2, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, ChartColumnBig, ChevronDown, Download, FileText, Landmark, RefreshCw, Sheet, Trash2, Undo2, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -18,6 +21,7 @@ import { PayslipDialog } from "@/components/dashboard/payroll/payslip-view";
 import { RUN_STATUS, WarningList, money } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { api, type PayRunDetail, type PayslipRow } from "@/lib/api";
+import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/download";
 import { printPayrollPdf } from "@/lib/payroll-pdf";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -43,6 +47,7 @@ export default function PayRunPage() {
   const [run, setRun] = useState<PayRunDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [openSlip, setOpenSlip] = useState<number | null>(null);
+  const [reopening, setReopening] = useState(false);
 
   useEffect(() => {
     api.payroll.run(id).then(setRun).catch(notifyError);
@@ -53,8 +58,10 @@ export default function PayRunPage() {
     try {
       setRun(await action());
       notifySuccess(success);
+      return true;
     } catch (err) {
       notifyError(err);
+      return false;
     } finally {
       setBusy(null);
     }
@@ -76,6 +83,13 @@ export default function PayRunPage() {
     if (ok) await act("paid", () => api.payroll.markPaid(run.id), "Marked as paid");
   }
 
+  async function reopen(reason: string) {
+    if (!run) return false;
+    const ok = await act("reopen", () => api.payroll.reopen(run.id, reason), "Pay run reopened — its attendance can be changed again");
+    if (ok) setReopening(false);
+    return ok;
+  }
+
   async function remove() {
     if (!run) return;
     const ok = await confirm({ title: "Delete this pay run?", description: "Its payslips are removed. You can start the period again at any time.", confirmLabel: "Delete", destructive: true });
@@ -92,7 +106,7 @@ export default function PayRunPage() {
     if (!run) return;
     setBusy("export");
     try {
-      const { blob, filename } = await api.payroll.exportRun(run.id, run.filename);
+      const { blob, filename } = await withBusy(() => api.payroll.exportRun(run.id, run.filename));
       saveBlob(blob, filename);
     } catch (err) {
       notifyError(err);
@@ -106,7 +120,7 @@ export default function PayRunPage() {
     if (!run) return;
     setBusy("export");
     try {
-      const report = await api.payroll.runReport(run.id);
+      const report = await withBusy(() => api.payroll.runReport(run.id));
       await printPayrollPdf({ company: me?.company?.name ?? "Business OS", generatedBy: me?.user.name, report, includePayments });
     } catch (err) {
       notifyError(err);
@@ -281,6 +295,12 @@ export default function PayRunPage() {
                 {busy === "approve" ? "Approving…" : "Approve"}
               </Button>
             )}
+            {canApprove && !editable && (
+              <Button variant="outline" onClick={() => setReopening(true)} disabled={busy !== null}>
+                <Undo2 className="size-4" />
+                Reopen
+              </Button>
+            )}
             {canManage && run.status === "approved" && (
               <Button onClick={markPaid} disabled={busy !== null}>
                 <Banknote className="size-4" />
@@ -364,6 +384,70 @@ export default function PayRunPage() {
       )}
 
       <PayslipDialog payslipId={openSlip} onOpenChange={(o) => !o && setOpenSlip(null)} />
+      <ReopenDialog
+        open={reopening}
+        onOpenChange={setReopening}
+        label={`${run.pay_group?.name ?? "Payroll"} for ${run.period_label}`}
+        paid={run.status === "paid"}
+        onReopen={reopen}
+      />
     </div>
+  );
+}
+
+/** Undoing a sign-off always needs a reason: it goes to the audit log. */
+function ReopenDialog({
+  open,
+  onOpenChange,
+  label,
+  paid,
+  onReopen,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  label: string;
+  paid: boolean;
+  onReopen: (reason: string) => Promise<boolean>;
+}) {
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    setSaving(true);
+    try {
+      if (await onReopen(reason.trim())) setReason("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setReason("");
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reopen {label}?</DialogTitle>
+          <DialogDescription>
+            It goes back to calculated and the attendance it locked can be changed again. Fix what&apos;s wrong, recalculate, then approve it again.
+            {paid && " It was marked as paid — if staff were already paid, a fix in a later period as an adjustment is usually better."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="reopen-reason">Reason</Label>
+          <Textarea id="reopen-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="What needs fixing" />
+        </div>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <Button onClick={submit} disabled={saving || reason.trim() === ""}>
+            Reopen
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -18,8 +18,11 @@ final class PayTemplates
 
     public const LATENESS_MODES = ['per_minute', 'per_time', 'count_based', 'tiers', 'none'];
 
-    /** Labor Law floors: a company can pay more for overtime, never less. */
+    /** Labor Law floors: a company can pay more for overtime, never less — unless it switches enforce_overtime_minimums off. */
     public const OVERTIME_MINIMUMS = ['workday' => 1.5, 'day_off' => 2.0, 'holiday' => 2.0];
+
+    /** With the Labor Law floors off, the company sets any rate; the law is only shown as a warning. */
+    public const OVERTIME_FLOOR_WAIVED = 0.0;
 
     /** Templates that only make sense for monthly salaries (a daily worker is simply not paid for the day). */
     private const MONTHLY_ONLY = ['absence', 'unpaid_leave'];
@@ -64,13 +67,14 @@ final class PayTemplates
      * @param  array<string, mixed>  $params
      * @return array<string, mixed>
      */
-    public static function normalise(string $template, array $params): array
+    public static function normalise(string $template, array $params, bool $enforceOvertimeMinimums = true): array
     {
+        $floor = self::overtimeFloors($enforceOvertimeMinimums);
         $rules = match ($template) {
             'overtime' => [
-                'workday' => ['required', 'numeric', 'min:'.self::OVERTIME_MINIMUMS['workday'], 'max:10'],
-                'day_off' => ['required', 'numeric', 'min:'.self::OVERTIME_MINIMUMS['day_off'], 'max:10'],
-                'holiday' => ['required', 'numeric', 'min:'.self::OVERTIME_MINIMUMS['holiday'], 'max:10'],
+                'workday' => ['required', 'numeric', 'min:'.$floor['workday'], 'max:10'],
+                'day_off' => ['required', 'numeric', 'min:'.$floor['day_off'], 'max:10'],
+                'holiday' => ['required', 'numeric', 'min:'.$floor['holiday'], 'max:10'],
             ],
             'attendance_bonus' => [
                 'amount' => ['required', 'numeric', 'min:0'],
@@ -92,10 +96,14 @@ final class PayTemplates
             default => [],
         };
 
-        $validator = validator($params, $rules, [
+        $validator = validator($params, $rules, $enforceOvertimeMinimums ? [
             'workday.min' => 'Overtime on a work day can\'t be paid at less than 150% (Labor Law).',
             'day_off.min' => 'Overtime on a day off can\'t be paid at less than 200% (Labor Law).',
             'holiday.min' => 'Overtime on a holiday can\'t be paid at less than 200%.',
+        ] : [
+            'workday.min' => 'Overtime can\'t be a negative rate.',
+            'day_off.min' => 'Overtime can\'t be a negative rate.',
+            'holiday.min' => 'Overtime can\'t be a negative rate.',
         ]);
 
         if ($validator->fails()) {
@@ -115,6 +123,12 @@ final class PayTemplates
         return $clean;
     }
 
+    /** @return array{workday: float, day_off: float, holiday: float} */
+    public static function overtimeFloors(bool $enforce): array
+    {
+        return $enforce ? self::OVERTIME_MINIMUMS : array_fill_keys(array_keys(self::OVERTIME_MINIMUMS), self::OVERTIME_FLOOR_WAIVED);
+    }
+
     // ───────────────────────────── Templates ─────────────────────────────
 
     private function overtime(array $p, array $v, string $currency): ?array
@@ -122,12 +136,13 @@ final class PayTemplates
         $parts = [];
         $terms = [];
         $variables = ['hourly_rate' => $v['hourly_rate']];
+        $floor = self::overtimeFloors($v['enforce_overtime_minimums'] ?? true);
 
         foreach (['workday' => 'ot_workday_hours', 'day_off' => 'ot_day_off_hours', 'holiday' => 'ot_holiday_hours'] as $type => $hours) {
             if ($v[$hours] <= 0) {
                 continue;
             }
-            $multiplier = max((float) ($p[$type] ?? 0), self::OVERTIME_MINIMUMS[$type]);
+            $multiplier = max((float) ($p[$type] ?? 0), $floor[$type]);
             $variables[$hours] = $v[$hours];
             $variables["m_{$type}"] = $multiplier;
             $terms[] = "{$hours} * hourly_rate * m_{$type}";

@@ -78,6 +78,13 @@ class PayRunController extends Controller
         return $this->detail($this->runs->markPaid($run, $request->user()));
     }
 
+    public function reopen(Request $request, PayRun $run)
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+
+        return $this->detail($this->runs->reopen($run, $request->user(), $data['reason']));
+    }
+
     public function destroy(PayRun $run)
     {
         $this->runs->delete($run);

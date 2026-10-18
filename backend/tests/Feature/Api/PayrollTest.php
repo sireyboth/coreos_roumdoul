@@ -313,6 +313,38 @@ class PayrollTest extends TestCase
         $this->actingAs($this->admin)->deleteJson("/api/payroll/components/{$overtime->id}")->assertJsonValidationErrors('component');
     }
 
+    public function test_a_company_can_switch_off_the_overtime_minimums(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')->assertOk();
+        $overtime = PayComponent::query()->where('code', 'OVERTIME')->first();
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['enforce_overtime_minimums' => false])
+            ->assertOk()->assertJsonPath('enforce_overtime_minimums', false);
+
+        // Any rate the company chooses, just not a negative one.
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => ['workday' => -0.5, 'day_off' => 1, 'holiday' => 1]])
+            ->assertJsonValidationErrors('params.workday');
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => ['workday' => 0.5, 'day_off' => 0, 'holiday' => 1]])
+            ->assertOk();
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => ['workday' => 1, 'day_off' => 1.25, 'holiday' => 1.5]])
+            ->assertOk();
+
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520)->assertCreated();
+        $this->day($sokha, '2026-09-04', ['overtime_minutes' => 360, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+        $this->day($sokha, '2026-09-06', ['kind' => 'weekly_off', 'overtime_minutes' => 240, 'overtime_type' => 'day_off', 'overtime_status' => 'approved']);
+
+        $run = $this->createRun()->assertCreated()->json();
+        $slip = $this->payslip($run['payslips'][0]['id']);
+        $this->assertSame('6 h × 2.5 × 100% + 4 h × 2.5 × 125%', $this->line($slip, 'OVERTIME')['explanation']);
+        $this->assertEquals(27.5, $this->line($slip, 'OVERTIME')['amount']);
+
+        // Switched back on, the saved rates are lifted to the legal minimums again.
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['enforce_overtime_minimums' => true])->assertOk();
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk()->json();
+        $slip = $this->payslip($run['payslips'][0]['id']);
+        $this->assertSame('6 h × 2.5 × 150% + 4 h × 2.5 × 200%', $this->line($slip, 'OVERTIME')['explanation']);
+    }
+
     public function test_presets_tune_policy_and_rules(): void
     {
         $this->actingAs($this->admin)->postJson('/api/payroll/presets', ['preset' => 'factory'])->assertOk();
@@ -690,5 +722,35 @@ class PayrollTest extends TestCase
         // Then HR records the payment. The company admin still has every right.
         $this->actingAs($hr)->postJson("/api/payroll/runs/{$run['id']}/paid")->assertOk()->assertJsonPath('status', 'paid');
         $this->assertTrue($this->admin->fresh()->hasCompanyPermission('payroll.approve'));
+
+        // Only an approver can undo the sign-off.
+        $this->actingAs($hr)->postJson("/api/payroll/runs/{$run['id']}/reopen", ['reason' => 'Wrong scans'])->assertForbidden();
+        $this->actingAs($boss)->postJson("/api/payroll/runs/{$run['id']}/reopen", ['reason' => 'Wrong scans'])->assertOk();
+    }
+
+    public function test_reopening_a_paid_run_unlocks_its_attendance_for_fixing(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $dara = $this->employee('Dara');
+        $this->salary($dara, 400);
+        $run = $this->createRun()->json();
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/paid")->assertOk();
+
+        $recorder = app(AttendanceRecorder::class);
+        $this->assertTrue($recorder->isLocked($this->company->id, '2026-09-10', $dara->id));
+
+        // A reason is required, and only a signed-off run can be reopened.
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/reopen")->assertJsonValidationErrors('reason');
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/reopen", ['reason' => 'Test scans were paid'])
+            ->assertOk()->assertJsonPath('status', 'calculated');
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/reopen", ['reason' => 'Again'])
+            ->assertJsonValidationErrors(['status' => 'Only an approved or paid']);
+
+        // Attendance opens again, the run can be recalculated, and the reason is on record.
+        $this->assertFalse($recorder->isLocked($this->company->id, '2026-09-10', $dara->id));
+        $this->assertNull(PayRun::query()->find($run['id'])->paid_at);
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk();
+        $this->assertDatabaseHas('audit_logs', ['event' => 'pay_run.reopened', 'subject_id' => $run['id'], 'reason' => 'Test scans were paid']);
     }
 }
