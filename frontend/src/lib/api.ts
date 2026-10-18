@@ -1,4 +1,4 @@
-import { withBusy } from "@/lib/busy";
+import { trackPageRead, withBusy } from "@/lib/busy";
 import { createHttpCache } from "@/lib/http-cache";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -78,8 +78,9 @@ export function photoSrc(url?: string | null): string | null {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// background: a write the user didn't ask for and isn't waiting on (marking a
-// notification read, syncing push) — it must never freeze the screen.
+// background: work the user didn't ask for and isn't waiting on (marking a
+// notification read, syncing push, the bell's unread count) — it must never
+// freeze the screen. For a read, it means it never holds up a page opening.
 type RequestOptions = RequestInit & { background?: boolean };
 
 async function request<T>(path: string, { background = false, ...options }: RequestOptions = {}): Promise<T> {
@@ -87,7 +88,8 @@ async function request<T>(path: string, { background = false, ...options }: Requ
 
   if (method === "GET") {
     const send = () => sendWithRetry<T>(path, options);
-    return CACHEABLE_GET.test(path) ? httpCache.get<T>(path, send) : send();
+    const read = () => (CACHEABLE_GET.test(path) ? httpCache.get<T>(path, send) : send());
+    return background ? read() : trackPageRead(read);
   }
 
   // Reads stay free (lists load and poll in the background); a write blocks
@@ -330,6 +332,44 @@ export type Employee = {
 };
 
 type Paginated<T> = { data: T[]; total: number; last_page?: number };
+
+/** Areas of the app the activity log groups events into. */
+export type AuditModule = "people" | "attendance" | "schedules" | "requests" | "salary" | "payroll" | "access" | "company";
+
+/** One line of the activity log: who did what, when, and from where. */
+export type AuditEntry = {
+  id: number;
+  created_at: string;
+  // e.g. "employee.updated", "pay_run.approved".
+  event: string;
+  module: AuditModule | null;
+  // "support" = the platform's support team, acting through support access.
+  actor: { type: "user" | "support" | "system"; id: number | null; name: string };
+  subject: { type: string; id: number | null; label: string | null } | null;
+  // null = company-wide (a role, a pay rule…), not tied to one branch.
+  branch: { id: number; name: string } | null;
+  reason: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  method: string | null;
+  path: string | null;
+};
+
+export type AuditFilters = {
+  from?: string;
+  to?: string;
+  user_id?: string;
+  branch_id?: string;
+  module?: string;
+  action?: string;
+  search?: string;
+  page?: number;
+  per_page?: number;
+};
+
+export type AuditOptions = { users: { id: number; name: string }[]; branches: { id: number; name: string }[]; modules: AuditModule[] };
 
 export type CalendarDayType = "work" | "holiday" | "day_off" | "weekly_off" | "leave" | "none";
 // "worked" = scans on a day with nothing planned (a day off, or no schedule).
@@ -1245,7 +1285,7 @@ export const api = {
       body: JSON.stringify({ company_name: companyName, name, email, password }),
     }),
 
-  me: () => request<MeResponse>("/api/me"),
+  me: () => request<MeResponse>("/api/me", { background: true }),
 
   logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
 
@@ -1331,6 +1371,18 @@ export const api = {
     update: (id: number, data: { name?: string; permissions?: string[]; sort_order?: number | null }) =>
       request<Role>(`/api/roles/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/api/roles/${id}`, { method: "DELETE" }),
+  },
+
+  // Read-only; the server already limits it to the viewer's branches and pay access.
+  audit: {
+    list: (filters: AuditFilters = {}) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") query.set(key, String(value));
+      }
+      return request<Paginated<AuditEntry> & { current_page: number; per_page: number }>(`/api/audit-logs?${query}`);
+    },
+    options: () => request<AuditOptions>("/api/audit-logs/options"),
   },
 
   workLocations: {
@@ -1636,9 +1688,9 @@ export const api = {
   },
 
   notifications: {
-    list: () => request<Notification[]>("/api/notifications"),
+    list: () => request<Notification[]>("/api/notifications", { background: true }),
     // Cheap to poll: the unread count and the newest unread alert's id.
-    unreadCount: () => request<{ count: number; latest_id: number | null }>("/api/notifications/unread-count"),
+    unreadCount: () => request<{ count: number; latest_id: number | null }>("/api/notifications/unread-count", { background: true }),
     markAsRead: (id: number) =>
       request<void>(`/api/notifications/${id}/read`, { method: "POST", background: true }),
     markAllAsRead: () => request<void>("/api/notifications/read-all", { method: "POST", background: true }),
@@ -1647,7 +1699,7 @@ export const api = {
   // Push notifications to this device, even with the app closed.
   push: {
     // enabled is false when the server has no push keys set up.
-    key: () => request<{ enabled: boolean; public_key: string | null }>("/api/push/key"),
+    key: () => request<{ enabled: boolean; public_key: string | null }>("/api/push/key", { background: true }),
     subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string }; content_encoding?: string }) =>
       request<void>("/api/push/subscriptions", { method: "POST", body: JSON.stringify(subscription), background: true }),
     unsubscribe: (endpoint: string) =>

@@ -34,6 +34,10 @@ trait Auditable
             AuditLogger::record(static::auditEventName('updated'), $model, $changes, beforeData: $before);
         });
 
+        // Deleting an employee also deletes their assignments, and with them
+        // the way to know their branch — so read it while it's still there.
+        static::deleting(fn ($model) => AuditLogger::rememberBeforeDelete($model));
+
         static::deleted(function ($model) {
             AuditLogger::record(static::auditEventName('deleted'), $model, beforeData: $model->getAttributes());
         });

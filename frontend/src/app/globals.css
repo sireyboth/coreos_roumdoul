@@ -180,3 +180,13 @@
     opacity: 0;
   }
 }
+
+/* Page-loading progress bar (components/ui/page-load-gate.tsx). */
+@keyframes page-load-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}

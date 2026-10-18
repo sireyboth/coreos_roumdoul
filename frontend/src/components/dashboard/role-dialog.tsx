@@ -24,6 +24,7 @@ type Level = "none" | "view" | "manage";
 const AREAS: Record<string, { name: string; hint: string }> = {
   dashboard: { name: "Overview page", hint: "The company dashboard with today's numbers." },
   company: { name: "Company settings", hint: "Company profile, plan and modules." },
+  audit: { name: "Audit log", hint: "Who changed what, when and where — only in branches they can see." },
   branches: { name: "Branches", hint: "Branch list and details." },
   departments: { name: "Departments", hint: "Departments and their members." },
   teams: { name: "Teams", hint: "Teams and their members." },
@@ -42,7 +43,7 @@ const AREAS: Record<string, { name: string; hint: string }> = {
 };
 
 const SECTIONS: { title: string; resources: string[] }[] = [
-  { title: "General", resources: ["dashboard", "company"] },
+  { title: "General", resources: ["dashboard", "company", "audit"] },
   { title: "People & organisation", resources: ["employees", "branches", "departments", "teams", "users", "roles"] },
   { title: "Time & attendance", resources: ["attendance", "schedules", "work_schedules", "work_locations", "holidays"] },
   { title: "Requests & leave", resources: ["requests", "leave_policies"] },

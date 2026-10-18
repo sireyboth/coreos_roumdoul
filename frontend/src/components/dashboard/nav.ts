@@ -13,6 +13,7 @@ import {
   Network,
   PartyPopper,
   Scale,
+  ScrollText,
   ShieldCheck,
   SlidersHorizontal,
   User,
@@ -78,6 +79,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/dashboard/users", label: "Users", icon: KeyRound, tone: "from-orange-500 to-red-500", permission: "users.view" },
       { href: "/dashboard/roles", label: "Roles", icon: ShieldCheck, tone: "from-fuchsia-500 to-purple-500", permission: "roles.view" },
+      { href: "/dashboard/audit", label: "Audit Log", icon: ScrollText, tone: "from-slate-500 to-slate-700", permission: "audit.view" },
     ],
   },
 ];

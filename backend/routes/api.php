@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceCorrectionController;
 use App\Http\Controllers\Api\AttendanceReviewController;
+use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CalendarController;
@@ -163,6 +164,12 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
         Route::patch('/users/{user}/active', [UserController::class, 'setActive']);
         Route::put('/users/{user}/branch-access', [UserController::class, 'setBranchAccess']);
         Route::delete('/users/{user}', [UserController::class, 'destroy']);
+    });
+
+    // Read-only. Limited to the viewer's branches and, for pay, to people who can see pay.
+    Route::middleware('company_permission:audit.view')->group(function () {
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/audit-logs/options', [AuditLogController::class, 'options']);
     });
 
     Route::middleware('company_permission:roles.view')->group(function () {

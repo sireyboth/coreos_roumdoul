@@ -28,8 +28,10 @@ class CompanyPermissions
      * Permissions that don't follow the <resource>.view / .manage pattern.
      * "dashboard.view" gates the overview page: staff who only clock in and
      * check their own schedule don't need it.
+     * "audit.view" reads the activity log (who changed what, when, where),
+     * limited like everything else to the branches the person can see.
      */
-    public const STANDALONE = ['company.manage', 'dashboard.view'];
+    public const STANDALONE = ['company.manage', 'dashboard.view', 'audit.view'];
 
     /**
      * Extra permissions of a resource, beyond .view and .manage.
@@ -67,6 +69,7 @@ class CompanyPermissions
         $groups = [
             ['resource' => 'dashboard', 'permissions' => ['dashboard.view']],
             ['resource' => 'company', 'permissions' => ['company.manage']],
+            ['resource' => 'audit', 'permissions' => ['audit.view']],
         ];
 
         foreach (self::RESOURCES as $resource) {
