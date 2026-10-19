@@ -45,4 +45,10 @@ return [
         'subject' => env('VAPID_SUBJECT') ?: 'mailto:'.env('MAIL_FROM_ADDRESS', 'hello@example.com'),
     ],
 
+    // Help assistant (AiAssistantController). The key stays on the server.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
+    ],
+
 ];

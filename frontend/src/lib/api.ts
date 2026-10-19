@@ -1289,6 +1289,15 @@ export const api = {
 
   logout: () => request<{ message: string }>("/api/auth/logout", { method: "POST" }),
 
+  // Background: an answer takes seconds, and the chat shows its own
+  // "Thinking…" — it must not freeze the rest of the app meanwhile.
+  askAssistant: (body: { question: string; history: { role: "user" | "assistant"; content: string }[] }) =>
+    request<{ answer: string; status: "answered" | "off_topic" | "unknown" }>("/api/ai/assistant", {
+      method: "POST",
+      body: JSON.stringify(body),
+      background: true,
+    }),
+
   branches: {
     list: () => request<Paginated<Branch>>("/api/branches"),
     all: () => requestAll<Branch>("/api/branches"),

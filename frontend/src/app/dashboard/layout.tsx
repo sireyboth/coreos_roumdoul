@@ -7,6 +7,7 @@ import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLoadGate } from "@/components/ui/page-load-gate";
 import { AccountBanner } from "@/components/dashboard/account-banner";
+import { AiAssistant } from "@/components/dashboard/ai-assistant";
 import { BirthdayCelebration } from "@/components/dashboard/birthday-celebration";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
@@ -170,6 +171,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
       <PushPrompt />
       <BirthdayCelebration />
+      <AiAssistant />
     </div>
   );
 }

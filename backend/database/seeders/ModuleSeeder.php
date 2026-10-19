@@ -19,6 +19,9 @@ class ModuleSeeder extends Seeder
             ['code' => 'accounting', 'name' => 'Accounting', 'description' => 'Bookkeeping and financial reports.'],
             ['code' => 'id_cards', 'name' => 'ID Cards', 'description' => 'Printable employee ID card PDFs.'],
             ['code' => 'birthdays', 'name' => 'Birthdays', 'description' => 'Birthday alerts and celebration for each branch.'],
+            // Not in any plan by default: tick it on the plans that sell it.
+            // Paying (active) companies only, never trials; see AiAssistantController.
+            ['code' => 'ai_assistant', 'name' => 'Help Assistant', 'description' => 'AI help chat that answers how-to questions about the system.'],
         ];
 
         foreach ($modules as $module) {

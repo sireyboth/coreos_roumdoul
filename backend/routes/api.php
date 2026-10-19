@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AiAssistantController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceCorrectionController;
 use App\Http\Controllers\Api\AttendanceReviewController;
@@ -80,6 +81,10 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // Help assistant: sold as a module. Every member of a company that has
+    // it may ask, so no permission gate. Trials are refused in the controller.
+    Route::post('/ai/assistant', [AiAssistantController::class, 'ask'])->middleware('module:'.AiAssistantController::MODULE);
 
     Route::get('/push/key', [PushSubscriptionController::class, 'key']);
     Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
