@@ -446,6 +446,15 @@ class LeaveRequestTest extends TestCase
         $this->get(preg_replace('/signature=\w+/', 'signature=forged', $url))->assertForbidden();
     }
 
+    public function test_hr_recording_sick_leave_for_staff_needs_no_certificate(): void
+    {
+        $payload = ['employee_id' => $this->dara->id, 'leave_type_id' => $this->type('sick')->id, 'start_date' => '2026-10-02', 'end_date' => '2026-10-02'];
+
+        $this->as($this->admin)->postJson('/api/requests/preview', $payload)
+            ->assertOk()->assertJsonPath('attachment_required', false)->assertJsonMissingPath('problems.attachment');
+        $this->as($this->admin)->postJson('/api/requests', $payload)->assertCreated();
+    }
+
     public function test_a_document_set_to_always_is_needed_for_half_days_too(): void
     {
         Storage::fake('local');

@@ -55,7 +55,7 @@ final class EmployeeRequestService
             'days' => $days,
             'total' => $this->total($days),
             'balances' => $this->balancesFor($employee, $type, $days),
-            'attachment_required' => $this->needsAttachment($type, $this->total($days)),
+            'attachment_required' => $employee->user_id === $by->id && $this->needsAttachment($type, $this->total($days)),
             'problems' => $problems,
         ];
     }
@@ -452,7 +452,8 @@ final class EmployeeRequestService
         if ($locked = $this->lockedMonth($employee, $start, $end)) {
             $problems['start_date'] ??= $locked;
         }
-        if (! $hasFile && $this->needsAttachment($type, $total)) {
+        // A document applies to staff asking for themselves; HR recording a sick call can add it later.
+        if (! $hasFile && $employee->user_id === $by->id && $this->needsAttachment($type, $total)) {
             $problems['attachment'] = "Attach a document for {$type->name} (e.g. a medical certificate).";
         }
 
