@@ -903,7 +903,8 @@ export type LeaveAdjustment = {
 
 export type RequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type DayPart = "full" | "am" | "pm";
-export type RequestDate = { date: string; portion: number; part: DayPart };
+// paid: what the day pays in the end — the approver's choice, else the leave type's.
+export type RequestDate = { date: string; portion: number; part: DayPart; paid: boolean };
 
 export type EmployeeRequest = {
   id: number;
@@ -920,6 +921,10 @@ export type EmployeeRequest = {
   day_part: DayPart;
   days: number;
   dates: RequestDate[];
+  // "2 of 3 days paid (Mon 12 Oct, Tue 13 Oct)" when the approver changed which days are paid, else null.
+  pay_note: string | null;
+  // Set when someone corrected the leave type (e.g. asked as annual leave, really sick leave).
+  changed_from: { leave_type: string; by_name: string; at: string; notes: string | null } | null;
   reason: string | null;
   // Signed, short-lived links — open with photoSrc().
   attachments: { id: number; name: string; mime: string; size: number; url: string }[];
@@ -933,7 +938,9 @@ export type EmployeeRequest = {
   cancelled_by: { id: number; name: string } | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
-  can: { decide: boolean; cancel: boolean; delete: boolean };
+  // set_pay: may choose, while approving leave, which days are paid.
+  // change_type: may correct the leave type (waiting or approved, open months only).
+  can: { decide: boolean; set_pay: boolean; change_type: boolean; cancel: boolean; delete: boolean };
 };
 
 export type LeaveRequestInput = {
@@ -1629,9 +1636,11 @@ export const api = {
   },
   requests: {
     // mine = about me; approvals = waiting on me; all = my branches (requests.manage).
-    list: (params: { scope?: "mine" | "approvals" | "all"; status?: RequestStatus } = {}) => {
+    list: (params: { scope?: "mine" | "approvals" | "all"; status?: RequestStatus; from?: string; to?: string } = {}) => {
       const query = new URLSearchParams({ per_page: "500", scope: params.scope ?? "mine" });
       if (params.status) query.set("status", params.status);
+      if (params.from) query.set("from", params.from);
+      if (params.to) query.set("to", params.to);
       return request<Paginated<EmployeeRequest>>(`/api/requests?${query}`).then((page) => page.data);
     },
     waitingCount: () => request<{ count: number }>("/api/requests/waiting-count"),
@@ -1662,8 +1671,17 @@ export const api = {
       if (attachment) body.append("attachment", attachment);
       return request<EmployeeRequest>("/api/requests", { method: "POST", body });
     },
-    approve: (id: number, notes?: string) =>
-      request<EmployeeRequest>(`/api/requests/${id}/approve`, { method: "POST", body: JSON.stringify({ notes: notes || null }) }),
+    changeType: (id: number, leaveTypeId: number, notes?: string) =>
+      request<EmployeeRequest>(`/api/requests/${id}/change-type`, {
+        method: "POST",
+        body: JSON.stringify({ leave_type_id: leaveTypeId, notes: notes || null }),
+      }),
+    // paidDates: the days to pay, every other day unpaid (needs can.set_pay); left out = as the leave type says.
+    approve: (id: number, notes?: string, paidDates?: string[]) =>
+      request<EmployeeRequest>(`/api/requests/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ notes: notes || null, ...(paidDates ? { paid_dates: paidDates } : {}) }),
+      }),
     // A rejection always needs a reason.
     reject: (id: number, notes: string) =>
       request<EmployeeRequest>(`/api/requests/${id}/reject`, { method: "POST", body: JSON.stringify({ notes }) }),
@@ -1674,7 +1692,12 @@ export const api = {
   },
   attendanceCorrections: {
     list: () => request<Paginated<AttendanceCorrection>>("/api/attendance/corrections"),
-    all: () => requestAll<AttendanceCorrection>("/api/attendance/corrections?per_page=500"),
+    all: (params: { from?: string; to?: string } = {}) => {
+      const query = new URLSearchParams({ per_page: "500" });
+      if (params.from) query.set("from", params.from);
+      if (params.to) query.set("to", params.to);
+      return requestAll<AttendanceCorrection>(`/api/attendance/corrections?${query}`);
+    },
     create: (data: {
       employee_id?: number;
       date: string;

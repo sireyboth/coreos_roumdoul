@@ -32,6 +32,9 @@ final class EmployeeRequestService
     /** Longest single request: a year (maternity is 90 days, anything longer is a mistake). */
     private const MAX_SPAN_DAYS = 366;
 
+    /** May choose, when approving leave, which days are paid. */
+    public const SET_PAY = 'requests.set_pay';
+
     public function __construct(
         private readonly LeaveDayCounter $counter,
         private readonly LeaveBalance $balance,
@@ -186,9 +189,13 @@ final class EmployeeRequestService
         return $request->fresh();
     }
 
-    public function approve(User $by, EmployeeRequest $request, ?string $notes = null): EmployeeRequest
+    /**
+     * @param  array<int, string>|null  $paidDates  leave only: the dates to pay, the rest unpaid — whatever the
+     *                                             leave type says (needs requests.set_pay). Null leaves pay to the type.
+     */
+    public function approve(User $by, EmployeeRequest $request, ?string $notes = null, ?array $paidDates = null): EmployeeRequest
     {
-        return DB::transaction(fn () => $this->decide($by, $request, 'approved', $notes));
+        return DB::transaction(fn () => $this->decide($by, $request, 'approved', $notes, $paidDates));
     }
 
     public function reject(User $by, EmployeeRequest $request, string $notes): EmployeeRequest
@@ -243,6 +250,86 @@ final class EmployeeRequestService
 
             return $request;
         });
+    }
+
+    /**
+     * Corrects the leave type of a waiting or approved request (e.g. asked as
+     * annual leave, really sick leave). Every rule is checked again for the
+     * new type; the request keeps its status and history. Approved leave moves
+     * its days to the new type's balance and attendance is worked out again —
+     * never in a locked payroll month or an approved pay run. Paid days the
+     * approver chose are reset: they were chosen for the old type.
+     */
+    public function changeType(User $by, EmployeeRequest $request, LeaveType $type, ?string $notes = null): EmployeeRequest
+    {
+        $request->loadMissing(['employee.currentAssignment', 'employee.company', 'leaveType', 'attachments', 'approval.steps.approverUser']);
+        $wasStatus = $request->status;
+
+        if ($request->type !== 'leave' || ! in_array($wasStatus, EmployeeRequest::ACTIVE_STATUSES, true)) {
+            throw ValidationException::withMessages(['status' => ['Only waiting or approved leave can change type.']]);
+        }
+        if (! $this->canChangeType($by, $request)) {
+            abort(403, $this->chain->isAbout($by, $request) ? 'You can\'t change your own request.' : 'You can\'t change this request.');
+        }
+        if ($type->id === $request->leave_type_id) {
+            throw ValidationException::withMessages(['leave_type_id' => ["It is already {$type->name}."]]);
+        }
+
+        return DB::transaction(function () use ($by, $request, $type, $notes, $wasStatus) {
+            Employee::query()->withoutGlobalScopes()->whereKey($request->employee_id)->lockForUpdate()->first();
+
+            [$days, $problems] = $this->check($by, $request->employee, $type, [
+                'start_date' => $request->start_date->toDateString(),
+                'end_date' => $request->end_date->toDateString(),
+                'day_part' => $request->day_part,
+            ], hasFile: $request->attachments->isNotEmpty(), exceptRequestId: $request->id);
+            if ($problems !== []) {
+                throw ValidationException::withMessages(array_map(fn (string $message) => [$message], $problems));
+            }
+
+            $fromName = $request->leaveType?->name ?? 'Leave';
+            $claimed = EmployeeRequest::query()->withoutGlobalScopes()->whereKey($request->id)->where('status', $wasStatus)
+                ->where('leave_type_id', $request->leave_type_id)->exists();
+            if (! $claimed) {
+                throw ValidationException::withMessages(['status' => ['This request was changed a moment ago — reload to see it.']]);
+            }
+
+            // Counted again: the new type may count other days (calendar days for maternity).
+            $request->dates()->delete();
+            foreach ($days as $day) {
+                EmployeeRequestDay::query()->create(['employee_request_id' => $request->id, 'employee_id' => $request->employee_id, ...$day]);
+            }
+
+            $request->update([
+                'leave_type_id' => $type->id,
+                'days' => $this->total($days),
+                'details' => [...($request->details ?? []), 'changed_from' => [
+                    'leave_type' => $fromName, 'by' => $by->id, 'by_name' => trim($by->name), 'at' => now()->toIso8601String(), 'notes' => $notes,
+                ]],
+            ]);
+            $request->refresh()->load(['leaveType', 'employee']);
+
+            if ($wasStatus === 'approved') {
+                $this->recalculate($request);
+            }
+            $this->notifier->typeChanged($request, $by, $fromName);
+
+            return $request;
+        });
+    }
+
+    /** Waiting: whoever may decide it. Approved: whoever covers the employee (as for cancelling). Never your own. */
+    public function canChangeType(User $by, EmployeeRequest $request): bool
+    {
+        if ($request->type !== 'leave' || $this->chain->isAbout($by, $request)) {
+            return false;
+        }
+
+        return match ($request->status) {
+            'pending' => $this->chain->canDecide($by, $request),
+            'approved' => $this->chain->covers($by, $request->employee),
+            default => false,
+        };
     }
 
     /**
@@ -339,7 +426,7 @@ final class EmployeeRequestService
     }
 
     /** Must run inside a transaction. */
-    private function decide(User $by, EmployeeRequest $request, string $decision, ?string $notes): EmployeeRequest
+    private function decide(User $by, EmployeeRequest $request, string $decision, ?string $notes, ?array $paidDates = null): EmployeeRequest
     {
         $request->loadMissing(['employee.currentAssignment', 'leaveType', 'approval.steps.approverUser']);
 
@@ -348,6 +435,16 @@ final class EmployeeRequestService
         }
         if (! $this->chain->canDecide($by, $request)) {
             abort(403, $this->chain->isAbout($by, $request) ? 'You can\'t decide your own request.' : 'You can\'t decide this request.');
+        }
+        if ($paidDates !== null) {
+            abort_unless($by->hasCompanyPermission(self::SET_PAY), 403, 'You can\'t change which days are paid.');
+            if ($request->type !== 'leave') {
+                throw ValidationException::withMessages(['paid_dates' => ['Only leave has paid and unpaid days.']]);
+            }
+            $own = $request->dates()->pluck('date')->map(fn ($d) => $d->toDateString())->all();
+            if ($stray = array_diff($paidDates, $own)) {
+                throw ValidationException::withMessages(['paid_dates' => ['Not a day of this request: '.implode(', ', $stray).'.']]);
+            }
         }
 
         if ($decision === 'approved') {
@@ -370,6 +467,10 @@ final class EmployeeRequestService
             throw ValidationException::withMessages(['status' => ['This request was decided a moment ago — reload to see it.']]);
         }
 
+        if ($decision === 'approved' && $paidDates !== null) {
+            $this->setPay($request, $paidDates);
+        }
+
         $request->refresh();
         $this->chain->finish($request, $decision, $by, $notes);
 
@@ -387,7 +488,7 @@ final class EmployeeRequestService
      *
      * @return array{0: array<int, array{date: string, portion: float, part: string}>, 1: array<string, string>}
      */
-    private function check(User $by, Employee $employee, LeaveType $type, array $data, bool $hasFile): array
+    private function check(User $by, Employee $employee, LeaveType $type, array $data, bool $hasFile, ?int $exceptRequestId = null): array
     {
         $start = $data['start_date'];
         $end = $data['end_date'];
@@ -443,10 +544,10 @@ final class EmployeeRequestService
         if ($type->max_days_per_request && $total > $type->max_days_per_request) {
             $problems['end_date'] = "{$type->name} is at most ".$this->number($type->max_days_per_request).' days per request.';
         }
-        if ($clash = $this->clash($employee, $days)) {
+        if ($clash = $this->clash($employee, $days, $exceptRequestId)) {
             $problems['start_date'] ??= $clash;
         }
-        if ($type->requires_balance && ($short = $this->shortfall($employee, $type, $days))) {
+        if ($type->requires_balance && ($short = $this->shortfall($employee, $type, $days, $exceptRequestId))) {
             $problems['balance'] = $short;
         }
         if ($locked = $this->lockedMonth($employee, $start, $end)) {
@@ -536,7 +637,7 @@ final class EmployeeRequestService
     }
 
     /** Another request already holding one of these dates (a morning and an afternoon can share one). */
-    private function clash(Employee $employee, array $days): ?string
+    private function clash(Employee $employee, array $days, ?int $exceptRequestId = null): ?string
     {
         $dates = array_column($days, 'date');
         $taken = EmployeeRequestDay::query()
@@ -544,6 +645,7 @@ final class EmployeeRequestService
             ->where('employee_id', $employee->id)
             ->whereIn('date', $dates)
             ->whereHas('request', fn ($q) => $q->withoutGlobalScopes()->whereIn('status', EmployeeRequest::ACTIVE_STATUSES))
+            ->when($exceptRequestId, fn ($q) => $q->where('employee_request_id', '!=', $exceptRequestId))
             ->get();
 
         foreach ($days as $day) {
@@ -618,6 +720,20 @@ final class EmployeeRequestService
         }
 
         return null;
+    }
+
+    /**
+     * Pays $paidDates and not the rest. Only a day that differs from its
+     * leave type gets a value of its own; the others stay null (= the type).
+     */
+    private function setPay(EmployeeRequest $request, array $paidDates): void
+    {
+        $typePays = ($request->leaveType?->pay_percent ?? 100) > 0;
+
+        foreach ($request->dates()->get() as $day) {
+            $paid = in_array($day->date->toDateString(), $paidDates, true);
+            $day->update(['pay_percent' => $paid === $typePays ? null : ($paid ? 100 : 0)]);
+        }
     }
 
     private function assertMonthsOpen(Employee $employee, string $start, string $end): void

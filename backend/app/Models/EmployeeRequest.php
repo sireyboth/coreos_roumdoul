@@ -75,6 +75,26 @@ class EmployeeRequest extends Model
         };
     }
 
+    /**
+     * When the approver changed which days are paid, in words:
+     * "2 of 3 days paid (Mon 12 Oct, Tue 13 Oct)". Null when every day pays
+     * as its leave type says.
+     */
+    public function payNote(): ?string
+    {
+        $days = $this->dates;
+        if ($this->type !== 'leave' || $days->whereNotNull('pay_percent')->isEmpty()) {
+            return null;
+        }
+
+        $typePay = (int) ($this->leaveType?->pay_percent ?? 100);
+        $paid = $days->filter(fn (EmployeeRequestDay $d) => ($d->pay_percent ?? $typePay) > 0);
+        $number = fn (float $n) => rtrim(rtrim(number_format($n, 1), '0'), '.');
+
+        return $number($paid->sum('portion')).' of '.$number($days->sum('portion')).' '.($days->sum('portion') == 1 ? 'day' : 'days').' paid'
+            .($paid->isEmpty() ? '' : ' ('.$paid->map(fn (EmployeeRequestDay $d) => $d->date->format('D j M'))->join(', ').')');
+    }
+
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

@@ -36,7 +36,7 @@ const AREAS: Record<string, { name: string; hint: string }> = {
   holidays: { name: "Holidays", hint: "Public and company holidays." },
   schedules: { name: "Rosters", hint: "Who works which shift on which day." },
   attendance: { name: "Attendance", hint: "Scans, corrections, overtime, month close." },
-  requests: { name: "Requests", hint: "View: send own leave/requests. Manage: approve for others." },
+  requests: { name: "Requests", hint: "View: send own leave/requests. Manage: approve for others. Choose paid days: pay or not pay leave days when approving." },
   leave_policies: { name: "Leave policy", hint: "Leave types and balances." },
   salary: { name: "Salaries", hint: "Each employee's pay, tax details and allowances." },
   payroll: { name: "Payroll", hint: "Manage: prepare pay runs, settings, adjustments. Approve: sign runs off." },
@@ -50,7 +50,7 @@ const SECTIONS: { title: string; resources: string[] }[] = [
   { title: "Pay", resources: ["salary", "payroll"] },
 ];
 
-const EXTRA_LABELS: Record<string, string> = { approve: "Approve" };
+const EXTRA_LABELS: Record<string, string> = { approve: "Approve", set_pay: "Choose paid days" };
 
 /** One-click starting points; only permissions that exist are applied. */
 const TEMPLATES: { name: string; hint: string; permissions: string[] }[] = [
@@ -69,7 +69,7 @@ const TEMPLATES: { name: string; hint: string; permissions: string[] }[] = [
     hint: "Staff, attendance, leave and preparing payroll — not approving it",
     permissions: [
       "dashboard.view", "branches.view", "departments.view", "teams.view", "employees.view", "employees.manage", "work_locations.view", "work_schedules.view",
-      "holidays.view", "schedules.view", "schedules.manage", "attendance.view", "attendance.manage", "requests.view", "requests.manage", "leave_policies.view",
+      "holidays.view", "schedules.view", "schedules.manage", "attendance.view", "attendance.manage", "requests.view", "requests.manage", "requests.set_pay", "leave_policies.view",
       "leave_policies.manage", "salary.view", "salary.manage", "payroll.view", "payroll.manage",
     ],
   },

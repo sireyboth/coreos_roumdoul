@@ -16,7 +16,15 @@ class AttendanceCorrectionController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AttendanceCorrection::query()->with(['employee.currentAssignment', 'requestedBy', 'reviewedBy']);
+        $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $query = AttendanceCorrection::query()
+            ->with(['employee.currentAssignment', 'requestedBy', 'reviewedBy'])
+            ->when($request->filled('from'), fn ($q) => $q->whereDate('date', '>=', $request->input('from')))
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('date', '<=', $request->input('to')));
 
         if (! $request->user()->hasCompanyPermission('attendance.manage')) {
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));

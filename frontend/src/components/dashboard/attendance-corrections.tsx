@@ -21,6 +21,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useMe } from "@/contexts/me-context";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
+import { monthBounds, MonthBar } from "@/components/dashboard/calendar-shared";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
@@ -190,9 +191,21 @@ function scansFor(date: string, times: string[]): string[] {
 
 /** The Corrections tab on the Attendance page: request a missed scan, and (managers) review requests. */
 /** initialStatus: start filtered, e.g. "pending" when opened from the dashboard. */
-export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?: () => void; initialStatus?: string }) {
+export function AttendanceCorrections({
+  month,
+  onMonthChange,
+  onChanged,
+  initialStatus,
+}: {
+  month: string;
+  onMonthChange: (month: string) => void;
+  onChanged?: () => void;
+  initialStatus?: string;
+}) {
   const { me } = useMe();
-  const [corrections, setCorrections] = useState<AttendanceCorrection[] | null>(null);
+  // Kept with the month it answers; a different month means it is still loading.
+  const [result, setResult] = useState<{ month: string; data: AttendanceCorrection[] } | null>(null);
+  const corrections = result?.month === month ? result.data : null;
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
@@ -202,12 +215,15 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
   const [saving, setSaving] = useState(false);
 
   function load() {
-    api.attendanceCorrections.list().then((res) => setCorrections(res.data)).catch(() => setCorrections([]));
+    api.attendanceCorrections
+      .all(monthBounds(month))
+      .then((data) => setResult({ month, data }))
+      .catch(() => setResult({ month, data: [] }));
   }
 
   useEffect(() => {
     load();
-  }, []);
+  }, [month]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A review also changes the page's pending count, so the page reloads too.
   function reload() {
@@ -294,10 +310,14 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
     },
   ];
 
+  const employeeOptions = Array.from(new Map((corrections ?? []).map((c) => [c.employee.id, c.employee.name])).entries())
+    .map(([value, label]) => ({ value: String(value), label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Fix a missed check-in or check-out.</p>
+        <MonthBar month={month} onChange={onMonthChange} />
         <div className="flex flex-wrap gap-2">
           <ExcelActions
             onExport={exportCorrections}
@@ -392,6 +412,18 @@ export function AttendanceCorrections({ onChanged, initialStatus }: { onChanged?
             options: Object.entries(STATUS).map(([value, s]) => ({ value, label: s.label })),
             getValue: (correction) => correction.status,
           },
+          ...(canManage
+            ? [
+                {
+                  type: "select" as const,
+                  id: "employee",
+                  label: "Employee",
+                  options: employeeOptions,
+                  getValue: (correction: AttendanceCorrection) => String(correction.employee.id),
+                },
+              ]
+            : []),
+          { type: "date-range", id: "date", label: "Date", getValue: (correction) => dateOnly(correction.date) },
         ]}
         searchPlaceholder={canManage ? "Search by employee or reason…" : "Search by reason…"}
         initialFilters={initialStatus && initialStatus in STATUS ? { status: initialStatus } : undefined}

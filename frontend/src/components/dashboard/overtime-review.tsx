@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Check, Hourglass, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
+import { monthBounds, MonthBar, parseDate } from "@/components/dashboard/calendar-shared";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, type OvertimeEntry } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -25,25 +25,25 @@ const STATUS_TABS: { id: Status; label: string }[] = [
  * overtime reaches the monthly summary payroll reads. If a day's overtime
  * changes afterwards (e.g. a correction), it comes back here for review.
  */
-export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
+export function OvertimeReview({ month, onMonthChange, onChanged }: { month: string; onMonthChange: (month: string) => void; onChanged?: () => void }) {
   const [status, setStatus] = useState<Status>("pending");
   const [reloads, setReloads] = useState(0);
   // Kept with the request it answers; a different key means it is still loading.
   const [result, setResult] = useState<{ key: string; data: OvertimeEntry[] } | null>(null);
-  const requestKey = `${status}|${reloads}`;
+  const requestKey = `${status}|${month}|${reloads}`;
   const entries = result?.key === requestKey ? result.data : null;
   const [busy, setBusy] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     api.attendance
-      .overtime({ status })
+      .overtime({ status, ...monthBounds(month) })
       .then((data) => !cancelled && setResult({ key: requestKey, data }))
       .catch(() => !cancelled && setResult({ key: requestKey, data: [] }));
     return () => {
       cancelled = true;
     };
-  }, [status, requestKey]);
+  }, [status, month, requestKey]);
 
   async function review(entry: OvertimeEntry, decision: "approve" | "reject") {
     setBusy(entry.id);
@@ -125,8 +125,26 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
       : []),
   ];
 
+  const employeeOptions = Array.from(new Map((entries ?? []).map((e) => [e.employee.id, e.employee.name])).entries())
+    .map(([value, label]) => ({ value: String(value), label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const filters: DataTableFilter<OvertimeEntry>[] = [
+    {
+      type: "select",
+      id: "type",
+      label: "Type",
+      options: Object.entries(OVERTIME_TYPE).map(([value, label]) => ({ value, label })),
+      getValue: (e) => e.overtime_type,
+    },
+    { type: "select", id: "employee", label: "Employee", options: employeeOptions, getValue: (e) => String(e.employee.id) },
+    { type: "date-range", id: "date", label: "Date", getValue: (e) => e.date },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
+      <MonthBar month={month} onChange={onMonthChange} />
+
       <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
         {STATUS_TABS.map((tab) => (
           <button
@@ -149,6 +167,7 @@ export function OvertimeReview({ onChanged }: { onChanged?: () => void }) {
         data={entries}
         getRowId={(e) => e.id}
         columns={columns}
+        filters={filters}
         searchPlaceholder="Search employee…"
         emptyState={{
           icon: Hourglass,

@@ -571,24 +571,35 @@ export async function readAttendanceReport(csv: Blob): Promise<AttendanceReport>
 /** The codes a Calendar cell can show — one list for the cells, the totals and the legend. */
 export const CALENDAR_CODES = [
   { code: "P", total: "Present", legend: "Present, on time", fill: "FFDCFCE7" }, // green-100
-  { code: "L", total: "Late", legend: "Present, late", fill: "FFFEF3C7" }, // amber-100
-  { code: "I", total: "Incomplete", legend: "Incomplete (a scan is missing)", fill: "FFFFEDD5" }, // orange-100
+  { code: "L", total: "Late", legend: "Late", fill: "FFFEF3C7" }, // amber-100
+  { code: "E", total: "Left early", legend: "Left early", fill: "FFFEF9C3" }, // yellow-100
+  { code: "LE", total: "Late + early", legend: "Late and left early", fill: "FFFDE68A" }, // amber-200
+  { code: "M", total: "Missed scan", legend: "Missed a scan", fill: "FFFFEDD5" }, // orange-100
   { code: "A", total: "Absent", legend: "Absent", fill: "FFFEE2E2" }, // red-100
-  { code: "W", total: "Worked off", legend: "Worked on a day off", fill: "FFDBEAFE" }, // blue-100
-  { code: "LV", total: "Leave", legend: "On leave", fill: "FFEDE9FE" }, // violet-100
+  { code: "½", total: "Half-day leave", legend: "Half-day leave, worked the other half", fill: "FFF5F3FF" }, // violet-50
+  { code: "LV", total: "Leave", legend: "On leave (full day)", fill: "FFEDE9FE" }, // violet-100
+  { code: "W", total: "Worked off", legend: "Worked on a day off / holiday / leave", fill: "FFDBEAFE" }, // blue-100
   { code: "H", total: "Holiday", legend: "Holiday", fill: "FFE5E7EB" }, // gray-200
   { code: "OFF", total: "Off", legend: "Day off / weekly off", fill: "FFF3F4F6" }, // gray-100
 ];
 
 // The day totals under the grid; the rest are only counted per employee.
-export const DAILY_TOTALS = ["P", "L", "I", "A"];
+export const DAILY_TOTALS = ["P", "L", "E", "M", "A"];
 
-/** A report row's status as one Calendar code; null for days not yet due or with no schedule. */
-function calendarCode(status: string, dayType: string, lateMinutes: number): string | null {
+/**
+ * A report row's status as one Calendar code; null for days not yet due or
+ * with no schedule. A problem that needs fixing (absent, missed scan) wins
+ * over half-day leave; half-day leave wins over late / early.
+ */
+function calendarCode(status: string, dayType: string, leave: string, late: number, early: number): string | null {
   if (status === "Absent") return "A";
-  if (status === "Incomplete") return "I";
+  if (status === "Incomplete") return "M";
   if (status === "Worked off") return "W";
-  if (status === "Complete" || status === "In progress") return lateMinutes > 0 ? "L" : "P";
+  if (status === "Complete" || status === "In progress") {
+    // Half a day's leave comes as "Annual leave (am)" on a work day.
+    if (dayType === "Work" && /\((am|pm)\)$/.test(leave)) return "½";
+    return late > 0 && early > 0 ? "LE" : late > 0 ? "L" : early > 0 ? "E" : "P";
+  }
   if (status === "Off") return dayType === "Leave" ? "LV" : dayType === "Holiday" ? "H" : "OFF";
   return null;
 }
@@ -652,15 +663,17 @@ export function buildAttendanceCalendar(report: AttendanceReport, range: { from:
 
     const d = column.get(at(row, "Date"));
     const late = Number(at(row, "Late (min)")) || 0;
-    const code = calendarCode(at(row, "Status"), at(row, "Day type"), late);
+    const early = Number(at(row, "Early leave (min)")) || 0;
+    const code = calendarCode(at(row, "Status"), at(row, "Day type"), at(row, "Leave / holiday"), late, early);
     if (d === undefined || !code) continue;
 
     person.cells[d] = {
       code,
       note: [
         at(row, "Status"),
-        at(row, "Leave / holiday"),
+        at(row, "Leave / holiday").replace(/\(am\)$/, "(morning)").replace(/\(pm\)$/, "(afternoon)"),
         late > 0 ? `Late ${late} min` : "",
+        early > 0 ? `Left early ${early} min` : "",
         at(row, "Scans") ? `Scans: ${at(row, "Scans")}` : "",
         at(row, "Schedule") ? `Schedule: ${at(row, "Schedule")}` : "",
       ]

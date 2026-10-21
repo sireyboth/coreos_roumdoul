@@ -6,7 +6,8 @@ import { AlarmClock, CalendarHeart, ChevronDown, Inbox, Plus, Trash2 } from "luc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
+import { currentMonth, monthBounds, MonthBar } from "@/components/dashboard/calendar-shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { LateEarlyRequestDialog } from "@/components/dashboard/requests/late-early-request-dialog";
@@ -62,14 +63,16 @@ function RequestsPage() {
   // Which form is open: leave, or late arrival / early leave.
   const [asking, setAsking] = useState<"leave" | "late_early" | null>(null);
   const [open, setOpen] = useState<EmployeeRequest | null>(null);
+  // One month at a time, like Attendance; a request shows in every month it touches.
+  const [month, setMonth] = useState(currentMonth);
 
-  const key = `${scope}|${reloads}`;
+  const key = `${scope}|${month}|${reloads}`;
   const rows = result?.key === key ? result.data : null;
 
   useEffect(() => {
     let cancelled = false;
     api.requests
-      .list({ scope })
+      .list({ scope, ...monthBounds(month) })
       .then((data) => !cancelled && setResult({ key, data }))
       .catch((err) => {
         if (cancelled) return;
@@ -79,7 +82,7 @@ function RequestsPage() {
     return () => {
       cancelled = true;
     };
-  }, [scope, key]);
+  }, [scope, month, key]);
 
   useEffect(() => {
     api.requests.waitingCount().then((r) => setWaiting(r.count)).catch(() => setWaiting(0));
@@ -99,6 +102,8 @@ function RequestsPage() {
 
   const changed = useCallback((updated: EmployeeRequest) => {
     setResult((r) => (r ? { ...r, data: r.data.map((x) => (x.id === updated.id ? updated : x)) } : r));
+    // Still open (e.g. after changing the leave type): show the new version.
+    setOpen((o) => (o?.id === updated.id ? updated : o));
     setReloads((n) => n + 1);
   }, []);
 
@@ -211,6 +216,34 @@ function RequestsPage() {
     },
   ];
 
+  const optionsOf = (pairs: [string, string][]) =>
+    Array.from(new Map(pairs).entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+  const filters: DataTableFilter<EmployeeRequest>[] = [
+    {
+      type: "select",
+      id: "status",
+      label: "Status",
+      options: Object.entries(REQUEST_STATUS).map(([value, s]) => ({ value, label: s.label })),
+      getValue: (r) => r.status,
+    },
+    { type: "select", id: "type", label: "Request", options: optionsOf((rows ?? []).map((r) => [r.label, r.label])), getValue: (r) => r.label },
+    ...(scope !== "mine"
+      ? [
+          {
+            type: "select" as const,
+            id: "employee",
+            label: "Employee",
+            options: optionsOf((rows ?? []).map((r) => [String(r.employee.id), r.employee.name])),
+            getValue: (r: EmployeeRequest) => String(r.employee.id),
+          },
+        ]
+      : []),
+    { type: "date-range", id: "dates", label: "Dates", getValue: (r) => r.start_date },
+  ];
+
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
@@ -262,21 +295,14 @@ function RequestsPage() {
         </div>
       )}
 
+      <MonthBar month={month} onChange={setMonth} />
+
       <DataTable
         data={rows}
         getRowId={(r) => r.id}
         columns={columns}
         onRowClick={setOpen}
-        filters={[
-          {
-            type: "select",
-            id: "status",
-            label: "Status",
-            options: Object.entries(REQUEST_STATUS).map(([value, s]) => ({ value, label: s.label })),
-            getValue: (r) => r.status,
-          },
-          { type: "date-range", id: "dates", label: "Dates", getValue: (r) => r.start_date },
-        ]}
+        filters={filters}
         searchPlaceholder={scope === "mine" ? "Search requests…" : "Search employee or request…"}
         emptyState={{
           icon: scope === "approvals" ? Inbox : CalendarHeart,

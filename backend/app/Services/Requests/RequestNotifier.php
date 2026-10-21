@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
  *  - decided    → the employee (and whoever asked for them); the other
  *                 approvers' alerts are closed so nobody acts on it twice
  *  - cancelled  → the approvers while it was waiting, or whoever approved it
+ *  - type_changed → the employee, and whoever approved it (see typeChanged)
  */
 final class RequestNotifier
 {
@@ -42,6 +43,7 @@ final class RequestNotifier
 
             $title = $request->status === 'approved' ? '✅ '.$this->kind($request).' approved' : '❌ '.$this->kind($request).' rejected';
             $body = "{$this->summary($request)} — {$request->status} by ".trim($by->name).'.'
+                .(($pay = $request->payNote()) ? " {$pay}." : '')
                 .($request->decision_notes ? " Remark: {$request->decision_notes}" : '');
 
             foreach ($this->people($request, except: $by) as $user) {
@@ -68,6 +70,27 @@ final class RequestNotifier
 
             foreach ($recipients->reject(fn (User $u) => $u->id === $by->id) as $user) {
                 $this->send($user, $request, 'cancelled', '🚫 '.$this->kind($request).' cancelled', $body, $by);
+            }
+        });
+    }
+
+    /**
+     * HR corrected the leave type: the employee (and whoever sent it for
+     * them) is told, and so is whoever approved it, if that was someone else.
+     */
+    public function typeChanged(EmployeeRequest $request, User $by, string $fromName): void
+    {
+        DB::afterCommit(function () use ($request, $by, $fromName) {
+            $body = "{$fromName} → {$this->summary($request)} — changed by ".trim($by->name).'.'
+                .(($notes = $request->details['changed_from']['notes'] ?? null) ? " Remark: {$notes}" : '');
+
+            $recipients = $this->people($request, except: $by)
+                ->merge(User::query()->whereKey($request->decided_by)->whereKeyNot($by->id)->where('is_active', true)->get())
+                ->unique('id');
+
+            foreach ($recipients as $user) {
+                // One alert per change: a second correction is news too.
+                $this->send($user, $request, 'type_changed', '✏️ Leave type changed', $body, $by, dedupe: (string) ($request->details['changed_from']['at'] ?? $request->leave_type_id));
             }
         });
     }
@@ -127,7 +150,7 @@ final class RequestNotifier
         return "request.{$request->type}_{$event}";
     }
 
-    private function send(User $recipient, EmployeeRequest $request, string $event, string $title, string $body, ?User $actor = null): void
+    private function send(User $recipient, EmployeeRequest $request, string $event, string $title, string $body, ?User $actor = null, ?string $dedupe = null): void
     {
         $type = $this->type($request, $event);
 
@@ -137,7 +160,7 @@ final class RequestNotifier
             subject: $request,
             actor: $actor ?? $request->requestedBy,
             link: self::LINK.'?id='.$request->id,
-            dedupeKey: "{$type}:{$request->id}:{$recipient->id}",
+            dedupeKey: "{$type}:{$request->id}:{$recipient->id}".($dedupe !== null ? ":{$dedupe}" : ''),
         );
     }
 }

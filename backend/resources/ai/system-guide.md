@@ -217,7 +217,11 @@ The bell shows notifications (requests, approvals, birthdays). "Turn on notifica
 
 "Leave & Requests" → "Waiting for me" → "Review" → "Approve" or "Reject" (a remark is needed to reject). Line managers decide their team's requests; anyone who manages requests for the branch can also step in. Nobody decides their own request. "All requests" shows every request in your branches.
 
-To record leave for someone else (e.g. a sick call), use "New request", pick them under "For" and tick "Approve it now". Approvers can cancel any request with a remark. "Delete" removes a request completely and is meant for test data.
+To record leave for someone else (e.g. a sick call), use "New request", pick them under "For" and tick "Approve it now". When HR or an admin records it, a document (e.g. a medical certificate) is optional; staff asking for themselves still need it. Approvers can cancel any request with a remark. "Delete" removes a request completely and is meant for test data.
+
+**Wrong leave type** (e.g. asked as Annual leave, really Sick leave): open the request and click "Change type" next to its name, pick the right type, add a remark if you like, then "Save type". Works on waiting and approved leave, not in a locked payroll month. The same dates are checked again for the new type; approved leave moves its days to the new type's balance and attendance is recalculated. The employee is told, and the request shows "Changed from …". Whoever can approve the request (or, once approved, cancel it) can change it; nobody can change their own.
+
+**Paid days**: when reviewing leave, people with "Choose paid days" (company admins by default; add it to a role under Roles → Requests) see a "Paid days" box with a tick for each day. Untick or tick days before "Approve" — e.g. pay 2 of 3 days of unpaid leave. Attendance still shows the leave type as asked; payroll pays only the ticked days; the leave balance doesn't change. It can only be set while approving, never in a locked payroll month. To change it later, cancel the request and record it again.
 
 ### Report and export
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CalendarDays, ChevronLeft, ChevronRight, FileDown, ListTree, Search, Table2 } from "lucide-react";
+import { ArrowDown, ArrowUp, CalendarDays, FileDown, ListTree, Search, Table2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
 import { AttendanceLateDetail } from "@/components/dashboard/attendance-late-detail";
 import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance-month-close";
-import { currentMonth, parseDate, shiftMonth, WEEKDAYS } from "@/components/dashboard/calendar-shared";
+import { currentMonth, monthBounds, MonthBar, parseDate, WEEKDAYS } from "@/components/dashboard/calendar-shared";
 import { api, ApiError, type AttendanceDay } from "@/lib/api";
 import { buildInsights, duration, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
 import {
@@ -29,16 +29,19 @@ const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 tex
 const CODE_STYLE: Record<string, { cell: string; dot: string }> = {
   P: { cell: "bg-success/15 text-success", dot: "bg-success" },
   L: { cell: "bg-warning/20 text-warning", dot: "bg-warning" },
-  I: { cell: "bg-orange-500/15 text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
+  E: { cell: "bg-yellow-400/20 text-yellow-700 dark:text-yellow-300", dot: "bg-yellow-500" },
+  LE: { cell: "bg-amber-500/30 text-amber-800 dark:text-amber-200", dot: "bg-amber-600" },
+  M: { cell: "bg-orange-500/15 text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
   A: { cell: "bg-destructive/15 text-destructive", dot: "bg-destructive" },
-  W: { cell: "bg-info/15 text-info", dot: "bg-info" },
+  "½": { cell: "border border-dashed border-violet-500/60 bg-violet-500/5 text-violet-700 dark:text-violet-300", dot: "bg-violet-400" },
   LV: { cell: "bg-violet-500/15 text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
+  W: { cell: "bg-info/15 text-info", dot: "bg-info" },
   H: { cell: "bg-muted text-foreground/70", dot: "bg-muted-foreground" },
   OFF: { cell: "text-muted-foreground", dot: "bg-muted-foreground/40" },
 };
 
 // Codes that have a stored day behind them, so clicking opens its details.
-const OPENABLE = new Set(["P", "L", "I", "A", "W"]);
+const OPENABLE = new Set(["P", "L", "E", "LE", "M", "A", "½", "W"]);
 
 // A year, as the server allows.
 const MAX_DAYS = 366;
@@ -46,11 +49,6 @@ const MAX_DAYS = 366;
 const label = (code: string) => CALENDAR_CODES.find((c) => c.code === code)!.total;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-function monthRange(month: string): { from: string; to: string } {
-  const first = parseDate(`${month}-01`);
-  return { from: iso(first), to: iso(new Date(first.getFullYear(), first.getMonth() + 1, 0)) };
-}
 
 const daysBetween = (from: string, to: string) => Math.round((parseDate(to).getTime() - parseDate(from).getTime()) / 86_400_000);
 
@@ -81,18 +79,23 @@ type View = "calendar" | "detail";
  */
 export function AttendanceReport({
   canManage,
+  month,
+  onMonthChange: setMonth,
   onExport,
   onResolve,
 }: {
   canManage: boolean;
+  /** The month shown in Month mode — shared with the other attendance tabs. */
+  month: string;
+  onMonthChange: (month: string) => void;
   onExport: (month: string) => void;
   /** Takes the reviewer to where an item on the close-month checklist is fixed, for that month. */
   onResolve?: (target: ResolveTarget, month: string) => void;
 }) {
   const [mode, setMode] = useState<"month" | "range">("month");
-  const [month, setMonth] = useState(currentMonth);
-  const [custom, setCustom] = useState(() => monthRange(currentMonth()));
+  const [custom, setCustom] = useState(() => monthBounds(month));
   const [view, setView] = useState<View>("calendar");
+  const [employee, setEmployee] = useState("");
   const [branch, setBranch] = useState("");
   const [department, setDepartment] = useState("");
   const [search, setSearch] = useState("");
@@ -101,7 +104,7 @@ export function AttendanceReport({
   const [reloads, setReloads] = useState(0);
   const [openDay, setOpenDay] = useState<AttendanceDay | null>(null);
 
-  const range = mode === "month" ? monthRange(month) : custom;
+  const range = mode === "month" ? monthBounds(month) : custom;
   const rangeProblem =
     mode === "range" && (!custom.from || !custom.to)
       ? "Choose both dates."
@@ -149,11 +152,12 @@ export function AttendanceReport({
   const matches = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (p: PersonInsight) =>
+      (!employee || p.key === employee) &&
       (!branch || p.branch === branch) &&
       (!department || p.department === department) &&
       (!term || p.name.toLowerCase().includes(term) || p.code.toLowerCase().includes(term)) &&
       (!onlyIssues || p.absentDays > 0 || p.missedDays > 0);
-  }, [branch, department, search, onlyIssues]);
+  }, [employee, branch, department, search, onlyIssues]);
 
   const shownInsights = useMemo(() => insights.filter(matches), [insights, matches]);
   const shownKeys = useMemo(() => new Set(shownInsights.map((p) => p.key)), [shownInsights]);
@@ -162,7 +166,7 @@ export function AttendanceReport({
   // The trend compares like with like: the same people (by the same filters) the period before.
   const before = previousInsights ? totalsOf(previousInsights.filter(matches)) : null;
 
-  const scope = [branch && `Branch: ${branch}`, department && `Department: ${department}`, search.trim() && `Search: “${search.trim()}”`, onlyIssues && "Only absences / missed scans"]
+  const scope = [employee && `Employee: ${byKey.get(employee)?.name ?? ""}`, branch && `Branch: ${branch}`, department && `Department: ${department}`, search.trim() && `Search: “${search.trim()}”`, onlyIssues && "Only absences / missed scans"]
     .filter(Boolean)
     .join(" · ") || (canManage ? "All employees" : "My attendance");
 
@@ -195,18 +199,7 @@ export function AttendanceReport({
         </div>
 
         {mode === "month" ? (
-          <>
-            <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
-              <ChevronLeft className="size-4" />
-            </Button>
-            <h2 className="min-w-40 text-center text-base font-semibold">{periodLabel}</h2>
-            <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
-              <ChevronRight className="size-4" />
-            </Button>
-            <Button variant="outline" onClick={() => setMonth(currentMonth())}>
-              Today
-            </Button>
-          </>
+          <MonthBar month={month} onChange={setMonth} />
         ) : (
           <div className="flex items-center gap-2">
             <Input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom({ ...custom, from: e.target.value })} className="w-40" aria-label="From" />
@@ -251,6 +244,18 @@ export function AttendanceReport({
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className="w-52 pl-8" />
         </div>
+        {canManage && insights.length > 1 && (
+          <select value={employee} onChange={(e) => setEmployee(e.target.value)} className={SELECT_CLASS} aria-label="Employee">
+            <option value="">All employees</option>
+            {[...insights]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+        )}
         {branches.length > 1 && (
           <select value={branch} onChange={(e) => setBranch(e.target.value)} className={SELECT_CLASS} aria-label="Branch">
             <option value="">All branches</option>
@@ -401,6 +406,15 @@ function CalendarGrid({
 
   return (
     <>
+      <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 text-xs shadow-sm">
+        {CALENDAR_CODES.map((c) => (
+          <span key={c.code} className="flex items-center gap-1.5">
+            <span className={cn("flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-[11px] font-semibold", CODE_STYLE[c.code].cell)}>{c.code}</span>
+            {c.legend}
+          </span>
+        ))}
+      </div>
+
       <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-max min-w-full border-separate border-spacing-0 text-xs">
           <thead className="sticky top-0 z-30">
@@ -499,18 +513,10 @@ function CalendarGrid({
         </table>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground">
-        {CALENDAR_CODES.map((c) => (
-          <span key={c.code} className="flex items-center gap-1.5">
-            <span className={cn("flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-semibold", CODE_STYLE[c.code].cell)}>{c.code}</span>
-            {c.legend}
-          </span>
-        ))}
-        <span className="flex items-center gap-1.5">
-          <CalendarDays className="size-3.5" />
-          Click a day to open it; hover for its scans. A blank day is still to come, or has no schedule.
-        </span>
-      </div>
+      <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+        <CalendarDays className="size-3.5" />
+        Click a day to open it; hover for its scans. A blank day is still to come, or has no schedule.
+      </p>
     </>
   );
 }

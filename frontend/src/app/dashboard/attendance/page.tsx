@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarCheck, CalendarPlus, ChevronLeft, ScanLine, ChevronRight, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
+import { CalendarCheck, CalendarPlus, ScanLine, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { AttendanceFillMissedDialog } from "@/components/dashboard/attendance-fi
 import { MissedScansDialog } from "@/components/dashboard/missed-scans-dialog";
 import { AttendanceReport } from "@/components/dashboard/attendance-report";
 import { AttendanceTodayCard } from "@/components/dashboard/attendance-today-card";
-import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { OvertimeReview } from "@/components/dashboard/overtime-review";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -171,11 +171,8 @@ function AttendancePageContent() {
 
   useEffect(() => {
     let cancelled = false;
-    const first = parseDate(`${month}-01`);
-    const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-
     api.attendance
-      .list({ from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}`, per_page: 1000 })
+      .list({ ...monthBounds(month), per_page: 1000 })
       .then((res) => !cancelled && setResult({ key, data: res.data, total: res.total }))
       .catch(() => !cancelled && setResult({ key, data: [], total: 0 }));
 
@@ -442,20 +439,7 @@ function AttendancePageContent() {
 
         {tab === "records" && (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
-                <ChevronLeft className="size-4" />
-              </Button>
-              <h2 className="min-w-40 text-center text-base font-semibold">
-                {parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-              </h2>
-              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
-                <ChevronRight className="size-4" />
-              </Button>
-              <Button variant="outline" onClick={() => setMonth(currentMonth())}>
-                Today
-              </Button>
-            </div>
+            <MonthBar month={month} onChange={setMonth} />
 
             {truncated && result && (
               <Alert variant="warning">
@@ -503,13 +487,15 @@ function AttendancePageContent() {
           </>
         )}
 
-        {tab === "overtime" && canManage && <OvertimeReview onChanged={load} />}
+        {tab === "overtime" && canManage && <OvertimeReview month={month} onMonthChange={setMonth} onChanged={load} />}
 
-        {tab === "corrections" && <AttendanceCorrections key={linkedStatus ?? "all"} onChanged={load} initialStatus={linkedStatus} />}
+        {tab === "corrections" && <AttendanceCorrections key={linkedStatus ?? "all"} month={month} onMonthChange={setMonth} onChanged={load} initialStatus={linkedStatus} />}
 
         {tab === "report" && (
           <AttendanceReport
             canManage={canManage}
+            month={month}
+            onMonthChange={setMonth}
             onExport={(reportMonth) => {
               setMonth(reportMonth);
               setExportOpen(true);

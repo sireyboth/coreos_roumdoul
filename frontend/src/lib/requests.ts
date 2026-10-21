@@ -10,14 +10,15 @@ export const REQUEST_STATUS: Record<RequestStatus, { label: string; tone: "warni
 
 export const DAY_PART_LABEL: Record<DayPart, string> = { full: "Full day", am: "Morning", pm: "Afternoon" };
 
-const short = (date: string) => parseDate(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+/** "Mon 12 Oct". */
+export const shortDate = (date: string) => parseDate(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 
 /** "Thu 8 Oct – Fri 9 Oct", or "Wed 14 Oct (morning)" for a half day. */
 export function requestDates(r: Pick<EmployeeRequest, "start_date" | "end_date" | "day_part">): string {
   if (r.start_date === r.end_date) {
-    return short(r.start_date) + (r.day_part === "full" ? "" : ` (${DAY_PART_LABEL[r.day_part].toLowerCase()})`);
+    return shortDate(r.start_date) + (r.day_part === "full" ? "" : ` (${DAY_PART_LABEL[r.day_part].toLowerCase()})`);
   }
-  return `${short(r.start_date)} – ${short(r.end_date)}`;
+  return `${shortDate(r.start_date)} – ${shortDate(r.end_date)}`;
 }
 
 /** 1 → "1 day", 2.5 → "2.5 days". */
@@ -28,7 +29,7 @@ export function dayCount(days: number): string {
 
 /** A short list of the dates themselves: "Thu 8, Fri 9, Tue 13 Oct". */
 export function dateList(dates: { date: string }[], max = 8): string {
-  const shown = dates.slice(0, max).map((d) => short(d.date));
+  const shown = dates.slice(0, max).map((d) => shortDate(d.date));
   return shown.join(", ") + (dates.length > max ? ` and ${dates.length - max} more` : "");
 }
 

@@ -38,10 +38,11 @@ class AssistantService
             ->timeout(30)
             ->post('https://api.anthropic.com/v1/messages', [
                 'model' => config('services.anthropic.model'),
-                'max_tokens' => 400,
+                'max_tokens' => 600,
                 'system' => [
                     // The big, unchanging part is cached: much cheaper on repeat calls.
                     [
+
                         'type' => 'text',
                         'text' => $this->staticPrompt(),
                         'cache_control' => ['type' => 'ephemeral'],

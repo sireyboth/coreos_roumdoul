@@ -109,12 +109,32 @@ class EmployeeRequestController extends Controller
 
     public function approve(Request $request, EmployeeRequest $employeeRequest)
     {
-        $data = $request->validate(['notes' => ['nullable', 'string', 'max:500']]);
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:500'],
+            // Leave: the days to pay, every other day unpaid (requests.set_pay). Left out: pay as the leave type says.
+            'paid_dates' => ['sometimes', 'array'],
+            'paid_dates.*' => ['date_format:Y-m-d'],
+        ]);
         $this->assertVisible($request->user(), $employeeRequest);
 
-        $done = $this->requests->approve($request->user(), $employeeRequest, $data['notes'] ?? null);
+        $done = $this->requests->approve($request->user(), $employeeRequest, $data['notes'] ?? null, $data['paid_dates'] ?? null);
 
         return $this->present($done->load($this->relations()), $request->user());
+    }
+
+    /** Corrects the leave type (e.g. asked as annual leave, really sick leave), waiting or approved. */
+    public function changeType(Request $request, EmployeeRequest $employeeRequest)
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'leave_type_id' => ['required', 'integer', Rule::exists('leave_types', 'id')->where('company_id', $user->company_id)],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+        $this->assertVisible($user, $employeeRequest);
+
+        $done = $this->requests->changeType($user, $employeeRequest, LeaveType::query()->findOrFail($data['leave_type_id']), $data['notes'] ?? null);
+
+        return $this->present($done->load($this->relations()), $user);
     }
 
     public function reject(Request $request, EmployeeRequest $employeeRequest)
@@ -293,7 +313,15 @@ class EmployeeRequestController extends Controller
             'end_date' => $r->end_date->toDateString(),
             'day_part' => $r->day_part,
             'days' => $r->days,
-            'dates' => $r->dates->map(fn (EmployeeRequestDay $d) => ['date' => $d->date->toDateString(), 'portion' => $d->portion, 'part' => $d->part])->values(),
+            // paid: what the day pays in the end — the approver's choice, else the leave type's.
+            'dates' => $r->dates->map(fn (EmployeeRequestDay $d) => [
+                'date' => $d->date->toDateString(), 'portion' => $d->portion, 'part' => $d->part,
+                'paid' => ($d->pay_percent ?? $r->leaveType?->pay_percent ?? 100) > 0,
+            ])->values(),
+            // "2 of 3 days paid (Mon 12 Oct, Tue 13 Oct)" when the approver changed it, else null.
+            'pay_note' => $r->payNote(),
+            // Set when someone corrected the leave type: {leave_type, by_name, at, notes}.
+            'changed_from' => isset($r->details['changed_from']) ? collect($r->details['changed_from'])->only(['leave_type', 'by_name', 'at', 'notes']) : null,
             'reason' => $r->reason,
             'attachments' => $r->attachments->map(fn (Attachment $a) => [
                 'id' => $a->id, 'name' => $a->original_name, 'mime' => $a->mime, 'size' => $a->size, 'url' => $a->url,
@@ -310,6 +338,8 @@ class EmployeeRequestController extends Controller
             'cancel_reason' => $r->cancel_reason,
             'can' => [
                 'decide' => $this->chain->canDecide($viewer, $r),
+                'set_pay' => $r->type === 'leave' && $viewer->hasCompanyPermission(EmployeeRequestService::SET_PAY) && $this->chain->canDecide($viewer, $r),
+                'change_type' => $this->requests->canChangeType($viewer, $r),
                 'cancel' => in_array($r->status, EmployeeRequest::ACTIVE_STATUSES, true)
                     && ($this->chain->covers($viewer, $r->employee)
                         || ($isOwn && ($r->isPending() || $r->start_date->toDateString() > $today))),

@@ -37,8 +37,10 @@ class CompanyPermissions
      * Extra permissions of a resource, beyond .view and .manage.
      * payroll.approve: approving a pay run is its own right, so HR can prepare
      * runs (payroll.manage) while only a manager signs them off.
+     * requests.set_pay: when approving leave, choose which days are paid —
+     * apart from requests.manage, so a line manager can't pay their own team.
      */
-    public const EXTRA = ['payroll' => ['payroll.approve']];
+    public const EXTRA = ['payroll' => ['payroll.approve'], 'requests' => ['requests.set_pay']];
 
     /**
      * All permission strings that exist, e.g. "branches.view", "branches.manage".

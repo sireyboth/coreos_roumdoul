@@ -39,7 +39,7 @@ const monthName = (month: string) => utc(`${month}-01`).toLocaleDateString("en-G
 
 // Calendar codes: a light fill with dark ink of the same hue, readable in colour and in greyscale.
 const CODE_INK: Record<string, string> = {
-  P: "#166534", L: "#92400e", I: "#9a3412", A: "#991b1b", W: "#1e40af", LV: "#5b21b6", H: "#374151", OFF: "#6b7280",
+  P: "#166534", L: "#92400e", E: "#854d0e", LE: "#78350f", M: "#9a3412", A: "#991b1b", "½": "#6d28d9", W: "#1e40af", LV: "#5b21b6", H: "#374151", OFF: "#6b7280",
 };
 const fill = (argb: string) => `#${argb.slice(2)}`;
 
@@ -126,7 +126,7 @@ function calendarPage(calendar: AttendanceCalendar, people: PersonInsight[]): st
       return `<th class="day${weekend ? " weekend" : ""}"><span>${WEEKDAY[d.getUTCDay()].slice(0, 2)}</span>${d.getUTCDate()}</th>`;
     })
     .join("");
-  const totals = ["P", "L", "I", "A", "LV"];
+  const totals = ["P", "L", "E", "M", "A", "½", "LV"];
   const body = rows
     .map(
       (p) => `<tr>

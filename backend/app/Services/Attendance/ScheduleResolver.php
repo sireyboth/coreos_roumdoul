@@ -159,7 +159,8 @@ final class ScheduleResolver
             'code' => $leave->first()->request->leaveType?->code,
             'portion' => $portion,
             'part' => $part,
-            'pay_percent' => (int) ($leave->first()->request->leaveType?->pay_percent ?? 100),
+            // Each day's own pay (the approver may have paid unpaid leave); a morning and an afternoon weigh half each.
+            'pay_percent' => (int) round($leave->sum(fn (EmployeeRequestDay $d) => $d->portion * $d->payPercent()) / max(0.01, (float) $leave->sum('portion'))),
         ];
 
         if ($part === 'full') {

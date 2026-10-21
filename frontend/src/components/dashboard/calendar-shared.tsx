@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Moon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Moon } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,32 @@ export function shiftMonth(month: string, delta: number): string {
 export function parseDate(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+/** The first and last day of a month ("2026-10"), for a from / to query. */
+export function monthBounds(month: string): { from: string; to: string } {
+  const last = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}` };
+}
+
+/** ‹ October 2026 › Today — the month a list shows. */
+export function MonthBar({ month, onChange }: { month: string; onChange: (month: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, -1))} aria-label="Previous month">
+        <ChevronLeft className="size-4" />
+      </Button>
+      <h2 className="min-w-40 text-center text-base font-semibold">
+        {parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+      </h2>
+      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, 1))} aria-label="Next month">
+        <ChevronRight className="size-4" />
+      </Button>
+      <Button variant="outline" onClick={() => onChange(currentMonth())}>
+        Today
+      </Button>
+    </div>
+  );
 }
 
 export function DayDialog({

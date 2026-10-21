@@ -591,6 +591,160 @@ class LeaveRequestTest extends TestCase
         $this->assertEquals(3.5, $row['leave_days']);
     }
 
+    // ───────────────────────────── paid days chosen by the approver ─────────────────────────────
+
+    public function test_approver_pays_some_days_of_unpaid_leave_and_attendance_still_shows_the_leave(): void
+    {
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12', '2026-10-14')->assertCreated()->json('id');
+        $annualBefore = $this->balance($this->staff, 'annual')['available'];
+
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-12', '2026-10-13']])
+            ->assertOk()
+            ->assertJsonPath('leave_type.code', 'unpaid')
+            ->assertJsonPath('dates.0.paid', true)->assertJsonPath('dates.2.paid', false)
+            ->assertJsonPath('pay_note', '2 of 3 days paid (Mon 12 Oct, Tue 13 Oct)');
+
+        $row = collect($this->as($this->admin)->getJson('/api/attendance/summary?month=2026-10')->assertOk()->json('rows'))
+            ->firstWhere('employee.id', $this->dara->id);
+        $this->assertEquals(3, $row['leave_days']);
+        $this->assertEquals(2, $row['paid_leave_days']);
+        $this->assertEquals(1, $row['unpaid_leave_days']);
+
+        // Paid by the owner's choice, not out of annual leave.
+        $this->assertEquals($annualBefore, $this->balance($this->staff, 'annual')['available']);
+        $this->assertStringContainsString('2 of 3 days paid', $this->alerts($this->staff, 'request.leave_decided')->sole()->body);
+    }
+
+    public function test_a_day_of_paid_leave_can_be_made_unpaid_and_still_uses_the_balance(): void
+    {
+        $id = $this->ask($this->staff, 'annual', '2026-10-12', '2026-10-13')->assertCreated()->json('id');
+        $before = $this->balance($this->staff, 'annual')['available'];
+
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-12']])
+            ->assertOk()->assertJsonPath('pay_note', '1 of 2 days paid (Mon 12 Oct)');
+
+        $row = collect($this->as($this->admin)->getJson('/api/attendance/summary?month=2026-10')->json('rows'))->firstWhere('employee.id', $this->dara->id);
+        $this->assertEquals(1, $row['paid_leave_days']);
+        $this->assertEquals(1, $row['unpaid_leave_days']);
+        $this->assertEquals($before, $this->balance($this->staff, 'annual')['available']);
+    }
+
+    public function test_only_people_with_set_pay_choose_paid_days_and_leaving_it_out_changes_nothing(): void
+    {
+        $manager = $this->approverOf($this->branchA, 'Vanna');
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12')->assertCreated()->json('id');
+
+        $this->as($manager)->getJson("/api/requests/{$id}")->assertOk()->assertJsonPath('can.decide', true)->assertJsonPath('can.set_pay', false);
+        $this->as($manager)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-12']])->assertForbidden();
+        $this->as($this->admin)->getJson("/api/requests/{$id}")->assertJsonPath('can.set_pay', true);
+
+        // A plain approval pays as the type says.
+        $this->as($manager)->postJson("/api/requests/{$id}/approve")->assertOk()
+            ->assertJsonPath('pay_note', null)->assertJsonPath('dates.0.paid', false);
+    }
+
+    public function test_paid_days_must_belong_to_the_request_and_its_month_must_be_open(): void
+    {
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-20']])
+            ->assertStatus(422)->assertJsonValidationErrors('paid_dates');
+
+        $september = $this->as($this->admin)->postJson('/api/requests', [
+            'employee_id' => $this->dara->id, 'leave_type_id' => $this->type('unpaid')->id, 'start_date' => '2026-09-29', 'end_date' => '2026-09-29',
+        ])->assertCreated()->json('id');
+        $this->as($this->admin)->postJson('/api/attendance/periods', ['month' => '2026-09', 'ignore_pending_overtime' => true])->assertSuccessful();
+        $this->as($this->admin)->postJson("/api/requests/{$september}/approve", ['paid_dates' => ['2026-09-29']])
+            ->assertStatus(422)->assertJsonValidationErrors('start_date');
+    }
+
+    // ───────────────────────────── correcting the leave type ─────────────────────────────
+
+    public function test_hr_changes_a_waiting_request_from_annual_to_sick_leave(): void
+    {
+        $full = $this->balance($this->staff, 'annual')['available'];
+        $id = $this->ask($this->staff, 'annual', '2026-10-12', '2026-10-14')->assertCreated()->json('id');
+        $this->assertEquals($full - 3, $this->balance($this->staff, 'annual')['available']);
+
+        $this->as($this->admin)->getJson("/api/requests/{$id}")->assertJsonPath('can.change_type', true);
+        $this->as($this->staff)->getJson("/api/requests/{$id}")->assertJsonPath('can.change_type', false);
+
+        $this->as($this->admin)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $this->type('sick')->id, 'notes' => 'Was ill, not holiday'])
+            ->assertOk()
+            ->assertJsonPath('status', 'pending')
+            ->assertJsonPath('leave_type.code', 'sick')
+            ->assertJsonPath('days', 3)
+            ->assertJsonPath('changed_from.leave_type', 'Annual leave')
+            ->assertJsonPath('changed_from.notes', 'Was ill, not holiday');
+
+        $this->assertEquals($full, $this->balance($this->staff, 'annual')['available']);
+        $this->assertStringContainsString('Annual leave → Sick leave', $this->alerts($this->staff, 'request.leave_type_changed')->sole()->body);
+
+        // Still waiting: approved as sick leave.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve")->assertOk()->assertJsonPath('leave_type.code', 'sick');
+    }
+
+    public function test_approved_leave_changes_type_and_attendance_and_balance_follow(): void
+    {
+        $full = $this->balance($this->staff, 'annual')['available'];
+        $id = $this->ask($this->staff, 'annual', '2026-10-12', '2026-10-13')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-12']])->assertOk();
+
+        $this->as($this->admin)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $this->type('unpaid')->id])
+            ->assertOk()
+            ->assertJsonPath('status', 'approved')
+            ->assertJsonPath('leave_type.code', 'unpaid')
+            // The paid days were chosen for annual leave: back to what unpaid leave says.
+            ->assertJsonPath('pay_note', null)
+            ->assertJsonPath('dates.0.paid', false);
+
+        $this->assertEquals($full, $this->balance($this->staff, 'annual')['available']);
+        $row = collect($this->as($this->admin)->getJson('/api/attendance/summary?month=2026-10')->json('rows'))->firstWhere('employee.id', $this->dara->id);
+        $this->assertEquals(2, $row['leave_days']);
+        $this->assertEquals(0, $row['paid_leave_days']);
+        $this->assertEquals(2, $row['unpaid_leave_days']);
+    }
+
+    public function test_changing_type_checks_the_new_type_but_not_against_itself(): void
+    {
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12', '2026-10-13')->assertCreated()->json('id');
+        // 22 working days: more than Dara's annual leave.
+        $other = $this->ask($this->staff, 'unpaid', '2026-10-15', '2026-11-13')->assertCreated()->json('id');
+
+        // Its own days are no clash.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $this->type('sick')->id])->assertOk();
+
+        // Too little annual leave: refused, and nothing changes.
+        $this->as($this->admin)->postJson("/api/requests/{$other}/change-type", ['leave_type_id' => $this->type('annual')->id])
+            ->assertStatus(422)->assertJsonValidationErrors('balance');
+        $this->as($this->admin)->getJson("/api/requests/{$other}")->assertJsonPath('leave_type.code', 'unpaid')->assertJsonPath('changed_from', null);
+
+        // Same type: nothing to change.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $this->type('sick')->id])
+            ->assertStatus(422)->assertJsonValidationErrors('leave_type_id');
+    }
+
+    public function test_who_may_change_the_type_and_when_it_is_refused(): void
+    {
+        $id = $this->ask($this->staff, 'annual', '2026-10-12')->assertCreated()->json('id');
+        $sick = $this->type('sick')->id;
+
+        // The employee themselves, and a manager of another branch: no.
+        $this->as($this->staff)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $sick])->assertForbidden();
+        $this->as($this->approverOf($this->branchB, 'Other branch'))->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $sick])->assertNotFound();
+
+        // Rejected: nothing to fix.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/reject", ['notes' => 'No'])->assertOk();
+        $this->as($this->admin)->postJson("/api/requests/{$id}/change-type", ['leave_type_id' => $sick])->assertStatus(422)->assertJsonValidationErrors('status');
+
+        // A locked payroll month: no.
+        $september = $this->as($this->admin)->postJson('/api/requests', [
+            'employee_id' => $this->dara->id, 'leave_type_id' => $this->type('unpaid')->id, 'start_date' => '2026-09-29', 'end_date' => '2026-09-29', 'approve' => true,
+        ])->assertCreated()->json('id');
+        $this->as($this->admin)->postJson('/api/attendance/periods', ['month' => '2026-09', 'ignore_pending_overtime' => true])->assertSuccessful();
+        $this->as($this->admin)->postJson("/api/requests/{$september}/change-type", ['leave_type_id' => $sick])
+            ->assertStatus(422)->assertJsonValidationErrors('start_date');
+    }
+
     // ───────────────────────────── cancelling ─────────────────────────────
 
     public function test_staff_withdraw_a_waiting_request_or_approved_leave_that_has_not_started(): void
