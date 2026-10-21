@@ -923,6 +923,8 @@ export type EmployeeRequest = {
   dates: RequestDate[];
   // "2 of 3 days paid (Mon 12 Oct, Tue 13 Oct)" when the approver changed which days are paid, else null.
   pay_note: string | null;
+  // Set when someone corrected the paid days after approval (from / to in days).
+  pay_changed: { from: number; to: number; by_name: string; at: string; notes: string | null } | null;
   // Set when someone corrected the leave type (e.g. asked as annual leave, really sick leave).
   changed_from: { leave_type: string; by_name: string; at: string; notes: string | null } | null;
   reason: string | null;
@@ -938,7 +940,7 @@ export type EmployeeRequest = {
   cancelled_by: { id: number; name: string } | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
-  // set_pay: may choose, while approving leave, which days are paid.
+  // set_pay: may choose which days are paid — while approving, or fix them on approved leave.
   // change_type: may correct the leave type (waiting or approved, open months only).
   can: { decide: boolean; set_pay: boolean; change_type: boolean; cancel: boolean; delete: boolean };
 };
@@ -1671,6 +1673,12 @@ export const api = {
       if (attachment) body.append("attachment", attachment);
       return request<EmployeeRequest>("/api/requests", { method: "POST", body });
     },
+    // Approved leave: fix which days are paid (every other day unpaid). Open months only.
+    editPay: (id: number, paidDates: string[], notes?: string) =>
+      request<EmployeeRequest>(`/api/requests/${id}/paid-days`, {
+        method: "POST",
+        body: JSON.stringify({ paid_dates: paidDates, notes: notes || null }),
+      }),
     changeType: (id: number, leaveTypeId: number, notes?: string) =>
       request<EmployeeRequest>(`/api/requests/${id}/change-type`, {
         method: "POST",

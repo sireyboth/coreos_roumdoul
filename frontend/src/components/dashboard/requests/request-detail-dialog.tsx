@@ -50,21 +50,43 @@ export function RequestDetailDialog({
   // Days the approver switched (date → paid); the rest pay as the leave type says.
   const [payChanges, setPayChanges] = useState<Record<string, boolean>>({});
   const [payFor, setPayFor] = useState<number | null>(null);
+  // The remark when fixing the paid days of approved leave.
+  const [payNotes, setPayNotes] = useState("");
   // Correcting the leave type: the form while open, and the types to pick from (loaded on first use).
   const [typeEdit, setTypeEdit] = useState<{ typeId: string; notes: string } | null>(null);
   const [types, setTypes] = useState<LeaveType[] | null>(null);
   if ((request?.id ?? null) !== payFor) {
     setPayFor(request?.id ?? null);
     setPayChanges({});
+    setPayNotes("");
     setTypeEdit(null);
   }
   const isPaid = (d: { date: string; paid: boolean }) => payChanges[d.date] ?? d.paid;
+  // Approved leave: a tick differs from what's saved, so there is something to save.
+  const payDirty = request?.dates.some((d) => isPaid(d) !== d.paid) ?? false;
+
+  async function savePay() {
+    if (!request) return;
+    setBusy(true);
+    try {
+      const updated = await api.requests.editPay(request.id, request.dates.filter(isPaid).map((d) => d.date), payNotes.trim());
+      notifySuccess("Paid days saved", `${updated.employee.name} · ${updated.pay_note ?? `paid as ${updated.label} says`}`);
+      setPayChanges({});
+      setPayNotes("");
+      onChanged(updated);
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function close(open: boolean) {
     if (!open) {
       setNotes("");
       setNeedsReason(false);
       setPayChanges({});
+      setPayNotes("");
       setTypeEdit(null);
     }
     onOpenChange(open);
@@ -271,6 +293,7 @@ export function RequestDetailDialog({
                   <legend className="px-1 text-xs font-medium">Paid days</legend>
                   <p className="text-xs text-muted-foreground">
                     Attendance keeps this as {r.label.toLowerCase()}; payroll pays the days ticked. The leave balance doesn&apos;t change.
+                    {r.status === "approved" && " Already approved: fix the ticks and save — not possible once the month is locked."}
                   </p>
                   <div className="flex flex-col gap-1.5">
                     {r.dates.map((d) => (
@@ -289,6 +312,26 @@ export function RequestDetailDialog({
                       </label>
                     ))}
                   </div>
+                  {r.status === "approved" && payDirty && (
+                    <div className="flex flex-col gap-2 border-t border-border pt-2.5">
+                      <Input
+                        value={payNotes}
+                        onChange={(e) => setPayNotes(e.target.value)}
+                        maxLength={500}
+                        placeholder="Remark to the employee (optional), e.g. Only Monday was agreed"
+                        aria-label="Remark to the employee"
+                        disabled={busy}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setPayChanges({})} disabled={busy}>
+                          Undo
+                        </Button>
+                        <Button size="sm" onClick={savePay} disabled={busy}>
+                          Save paid days
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </fieldset>
               )}
 
@@ -326,6 +369,12 @@ export function RequestDetailDialog({
                   Sent {when(r.created_at)}
                   {r.requested_by && r.requested_by.name !== r.employee.name ? ` by ${r.requested_by.name}` : ""}
                 </li>
+                {r.pay_changed && (
+                  <li>
+                    Paid days changed from {r.pay_changed.from} to {r.pay_changed.to} by {r.pay_changed.by_name} {when(r.pay_changed.at)}
+                    {r.pay_changed.notes ? ` — “${r.pay_changed.notes}”` : ""}
+                  </li>
+                )}
                 {r.changed_from && (
                   <li>
                     Changed from {r.changed_from.leave_type} to {r.label} by {r.changed_from.by_name} {when(r.changed_from.at)}

@@ -296,6 +296,7 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
             Route::get('/requests/{employeeRequest}', [EmployeeRequestController::class, 'show'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/approve', [EmployeeRequestController::class, 'approve'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/reject', [EmployeeRequestController::class, 'reject'])->whereNumber('employeeRequest');
+            Route::post('/requests/{employeeRequest}/paid-days', [EmployeeRequestController::class, 'editPay'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/change-type', [EmployeeRequestController::class, 'changeType'])->whereNumber('employeeRequest');
             Route::post('/requests/{employeeRequest}/cancel', [EmployeeRequestController::class, 'cancel'])->whereNumber('employeeRequest');
         });

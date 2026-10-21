@@ -303,7 +303,8 @@ final class EmployeeRequestService
             $request->update([
                 'leave_type_id' => $type->id,
                 'days' => $this->total($days),
-                'details' => [...($request->details ?? []), 'changed_from' => [
+                // Paid days start over for the new type, so an earlier pay correction no longer applies.
+                'details' => [...collect($request->details ?? [])->except('pay_changed')->all(), 'changed_from' => [
                     'leave_type' => $fromName, 'by' => $by->id, 'by_name' => trim($by->name), 'at' => now()->toIso8601String(), 'notes' => $notes,
                 ]],
             ]);
@@ -316,6 +317,67 @@ final class EmployeeRequestService
 
             return $request;
         });
+    }
+
+    /**
+     * Fixes which days of approved leave are paid (ticked wrongly when it was
+     * approved). Open months only — a locked month or an approved pay run is
+     * fixed with a payroll adjustment instead. Attendance is worked out again.
+     *
+     * @param  array<int, string>  $paidDates  the days to pay, every other day unpaid
+     */
+    public function editPay(User $by, EmployeeRequest $request, array $paidDates, ?string $notes = null): EmployeeRequest
+    {
+        $request->loadMissing(['employee.currentAssignment', 'employee.company', 'leaveType']);
+
+        if ($request->status !== 'approved') {
+            throw ValidationException::withMessages(['status' => ['Paid days are chosen when approving — this request is '.$request->status.'.']]);
+        }
+        abort_unless($this->canSetPay($by, $request), 403, 'You can\'t change which days are paid.');
+
+        $own = $request->dates()->pluck('date')->map(fn ($d) => $d->toDateString())->all();
+        if ($stray = array_diff($paidDates, $own)) {
+            throw ValidationException::withMessages(['paid_dates' => ['Not a day of this request: '.implode(', ', $stray).'.']]);
+        }
+        $this->assertMonthsOpen($request->employee, $request->start_date->toDateString(), $request->end_date->toDateString());
+
+        return DB::transaction(function () use ($by, $request, $paidDates, $notes) {
+            $before = $this->paidDays($request);
+            $this->setPay($request, $paidDates);
+            $after = $this->paidDays($request);
+
+            $request->update(['details' => [...($request->details ?? []), 'pay_changed' => [
+                'from' => $before, 'to' => $after, 'by' => $by->id, 'by_name' => trim($by->name), 'at' => now()->toIso8601String(), 'notes' => $notes,
+            ]]]);
+            $request->refresh()->load(['leaveType', 'employee', 'dates']);
+
+            $this->recalculate($request);
+            $this->notifier->payChanged($request, $by);
+
+            return $request;
+        });
+    }
+
+    /** Waiting: whoever may decide it. Approved: whoever covers the employee. Both need requests.set_pay. */
+    public function canSetPay(User $by, EmployeeRequest $request): bool
+    {
+        if ($request->type !== 'leave' || ! $by->hasCompanyPermission(self::SET_PAY) || $this->chain->isAbout($by, $request)) {
+            return false;
+        }
+
+        return match ($request->status) {
+            'pending' => $this->chain->canDecide($by, $request),
+            'approved' => $this->chain->covers($by, $request->employee),
+            default => false,
+        };
+    }
+
+    /** How many of its days pay (a half day counts 0.5). */
+    private function paidDays(EmployeeRequest $request): float
+    {
+        $typePay = (int) ($request->leaveType?->pay_percent ?? 100);
+
+        return round($request->dates()->get()->filter(fn (EmployeeRequestDay $d) => ($d->pay_percent ?? $typePay) > 0)->sum('portion'), 2);
     }
 
     /** Waiting: whoever may decide it. Approved: whoever covers the employee (as for cancelling). Never your own. */

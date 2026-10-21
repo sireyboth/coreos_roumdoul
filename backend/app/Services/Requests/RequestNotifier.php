@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  *  - decided    → the employee (and whoever asked for them); the other
  *                 approvers' alerts are closed so nobody acts on it twice
  *  - cancelled  → the approvers while it was waiting, or whoever approved it
- *  - type_changed → the employee, and whoever approved it (see typeChanged)
+ *  - type_changed / pay_changed → the employee, and whoever approved it
  */
 final class RequestNotifier
 {
@@ -91,6 +91,25 @@ final class RequestNotifier
             foreach ($recipients as $user) {
                 // One alert per change: a second correction is news too.
                 $this->send($user, $request, 'type_changed', '✏️ Leave type changed', $body, $by, dedupe: (string) ($request->details['changed_from']['at'] ?? $request->leave_type_id));
+            }
+        });
+    }
+
+    /** Approved leave's paid days were corrected: told like a type change. */
+    public function payChanged(EmployeeRequest $request, User $by): void
+    {
+        DB::afterCommit(function () use ($request, $by) {
+            $change = $request->details['pay_changed'] ?? [];
+            $body = $this->summary($request).' — '.($request->payNote() ?? 'paid as '.($request->leaveType?->name ?? 'the leave type').' says')
+                .', changed by '.trim($by->name).'.'
+                .(($notes = $change['notes'] ?? null) ? " Remark: {$notes}" : '');
+
+            $recipients = $this->people($request, except: $by)
+                ->merge(User::query()->whereKey($request->decided_by)->whereKeyNot($by->id)->where('is_active', true)->get())
+                ->unique('id');
+
+            foreach ($recipients as $user) {
+                $this->send($user, $request, 'pay_changed', '✏️ Paid leave days changed', $body, $by, dedupe: (string) ($change['at'] ?? ''));
             }
         });
     }

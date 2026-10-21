@@ -657,6 +657,50 @@ class LeaveRequestTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('start_date');
     }
 
+    public function test_paid_days_ticked_wrongly_are_fixed_after_approval(): void
+    {
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12', '2026-10-14')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve", ['paid_dates' => ['2026-10-12', '2026-10-13']])->assertOk();
+        $this->as($this->admin)->getJson("/api/requests/{$id}")->assertJsonPath('can.set_pay', true);
+
+        // Only one day was meant to be paid.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/paid-days", ['paid_dates' => ['2026-10-12'], 'notes' => 'Only Monday agreed'])
+            ->assertOk()
+            ->assertJsonPath('status', 'approved')
+            ->assertJsonPath('pay_note', '1 of 3 days paid (Mon 12 Oct)')
+            ->assertJsonPath('pay_changed.from', 2)
+            ->assertJsonPath('pay_changed.to', 1)
+            ->assertJsonPath('pay_changed.notes', 'Only Monday agreed');
+
+        $row = collect($this->as($this->admin)->getJson('/api/attendance/summary?month=2026-10')->json('rows'))->firstWhere('employee.id', $this->dara->id);
+        $this->assertEquals(1, $row['paid_leave_days']);
+        $this->assertEquals(2, $row['unpaid_leave_days']);
+        $this->assertStringContainsString('1 of 3 days paid', $this->alerts($this->staff, 'request.leave_pay_changed')->sole()->body);
+
+        // None paid after all: an empty list is allowed.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/paid-days", ['paid_dates' => []])->assertOk()->assertJsonPath('pay_note', null);
+    }
+
+    public function test_fixing_paid_days_needs_set_pay_an_approved_request_and_an_open_month(): void
+    {
+        $manager = $this->approverOf($this->branchA, 'Vanna');
+        $id = $this->ask($this->staff, 'unpaid', '2026-10-12')->assertCreated()->json('id');
+
+        // Still waiting: that's what Approve is for.
+        $this->as($this->admin)->postJson("/api/requests/{$id}/paid-days", ['paid_dates' => ['2026-10-12']])->assertStatus(422)->assertJsonValidationErrors('status');
+
+        $this->as($manager)->postJson("/api/requests/{$id}/approve")->assertOk();
+        $this->as($manager)->postJson("/api/requests/{$id}/paid-days", ['paid_dates' => ['2026-10-12']])->assertForbidden();
+        $this->as($this->admin)->postJson("/api/requests/{$id}/paid-days", ['paid_dates' => ['2026-10-20']])->assertStatus(422)->assertJsonValidationErrors('paid_dates');
+
+        $september = $this->as($this->admin)->postJson('/api/requests', [
+            'employee_id' => $this->dara->id, 'leave_type_id' => $this->type('unpaid')->id, 'start_date' => '2026-09-29', 'end_date' => '2026-09-29', 'approve' => true,
+        ])->assertCreated()->json('id');
+        $this->as($this->admin)->postJson('/api/attendance/periods', ['month' => '2026-09', 'ignore_pending_overtime' => true])->assertSuccessful();
+        $this->as($this->admin)->postJson("/api/requests/{$september}/paid-days", ['paid_dates' => ['2026-09-29']])
+            ->assertStatus(422)->assertJsonValidationErrors('start_date');
+    }
+
     // ───────────────────────────── correcting the leave type ─────────────────────────────
 
     public function test_hr_changes_a_waiting_request_from_annual_to_sick_leave(): void
