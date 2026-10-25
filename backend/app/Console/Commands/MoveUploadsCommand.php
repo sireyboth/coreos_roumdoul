@@ -9,8 +9,8 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Copies photos and request attachments uploaded before UPLOADS_DISK changed
- * (e.g. from the server's own disk to S3), so they keep opening afterwards.
+ * Copies photos and request attachments that were saved on the server's own
+ * disk before uploads moved to S3, so they keep opening afterwards.
  * Safe to run more than once: files already on the target are skipped.
  */
 class MoveUploadsCommand extends Command
@@ -19,7 +19,7 @@ class MoveUploadsCommand extends Command
         {--from=local : The disk the old files are on}
         {--delete : Remove each file from the old disk once it is copied}';
 
-    protected $description = 'Copy employee photos and request attachments to the uploads disk (UPLOADS_DISK)';
+    protected $description = 'Copy employee photos and request attachments to S3';
 
     public function handle(): int
     {
@@ -27,7 +27,7 @@ class MoveUploadsCommand extends Command
         $toName = config('filesystems.uploads');
 
         if ($fromName === $toName) {
-            $this->error("UPLOADS_DISK is already \"{$toName}\". Set it to the new disk (e.g. s3) first.");
+            $this->error("Uploads already go to \"{$toName}\"; nothing to copy from it.");
 
             return self::FAILURE;
         }

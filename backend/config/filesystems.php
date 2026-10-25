@@ -20,13 +20,13 @@ return [
     | Uploads Disk
     |--------------------------------------------------------------------------
     |
-    | Where people's files go: employee photos and request attachments. "s3" in
-    | production; "local" in development and tests. Both are private — files are
-    | only served through the app's short-lived signed links.
+    | Where people's files go: employee photos and request attachments. Always
+    | S3, in every environment — never the server's own disk. Files are private
+    | and only served through the app's short-lived signed links.
     |
     */
 
-    'uploads' => env('UPLOADS_DISK', 'local'),
+    'uploads' => 's3',
 
     /*
     |--------------------------------------------------------------------------

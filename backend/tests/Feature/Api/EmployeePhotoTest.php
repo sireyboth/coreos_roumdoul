@@ -29,7 +29,7 @@ class EmployeePhotoTest extends TestCase
     {
         parent::setUp();
         $this->seed(PermissionSeeder::class);
-        Storage::fake('local');
+        Storage::fake('s3');
 
         $this->company = app(CompanyProvisioner::class)->provision('Photo Co', 'Boss', 'boss@photo.test', 'password123');
         $this->admin = $this->company->users()->first();
@@ -69,10 +69,10 @@ class EmployeePhotoTest extends TestCase
         $this->assertStringContainsString('signature=', $url);
 
         $path = Employee::query()->findOrFail($this->employeeId)->photo_path;
-        Storage::disk('local')->assertExists($path);
+        Storage::disk('s3')->assertExists($path);
         $this->assertStringStartsWith("employee-photos/{$this->company->id}/", $path);
 
-        [$width, $height, $type] = getimagesizefromstring(Storage::disk('local')->get($path));
+        [$width, $height, $type] = getimagesizefromstring(Storage::disk('s3')->get($path));
         $this->assertSame([512, 512, IMAGETYPE_JPEG], [$width, $height, $type]);
 
         // The internal path never appears in any response.
@@ -118,12 +118,12 @@ class EmployeePhotoTest extends TestCase
         $newPath = Employee::query()->findOrFail($this->employeeId)->photo_path;
 
         $this->assertNotSame($oldPath, $newPath);
-        Storage::disk('local')->assertMissing($oldPath);
+        Storage::disk('s3')->assertMissing($oldPath);
         $this->app['auth']->forgetGuards();
         $this->get($oldUrl)->assertNotFound();
 
         $this->as($this->admin)->deleteJson("/api/employees/{$this->employeeId}/photo")->assertNoContent();
-        Storage::disk('local')->assertMissing($newPath);
+        Storage::disk('s3')->assertMissing($newPath);
         $this->assertNull($this->photoUrl());
     }
 
@@ -191,10 +191,9 @@ class EmployeePhotoTest extends TestCase
         $this->assertSame($this->employeeId, $rows[0]['employee_id']);
     }
 
-    public function test_photos_go_to_the_uploads_disk_and_still_open_through_the_signed_link(): void
+    public function test_photos_always_go_to_s3_and_still_open_through_the_signed_link(): void
     {
-        Storage::fake('s3');
-        config(['filesystems.uploads' => 's3']);
+        Storage::fake('local');
 
         $url = $this->upload()->assertOk()->json('photo_url');
         $path = Employee::query()->findOrFail($this->employeeId)->photo_path;
@@ -206,16 +205,16 @@ class EmployeePhotoTest extends TestCase
 
     public function test_old_uploads_are_copied_to_the_new_disk_and_keep_working(): void
     {
-        Storage::fake('s3');
-        $this->upload()->assertOk();
-        $photo = Employee::query()->findOrFail($this->employeeId)->photo_path;
+        Storage::fake('local');
+        $photo = 'employee-photos/old.jpg';
+        Storage::disk('local')->put($photo, UploadedFile::fake()->image('old.jpg')->getContent());
+        Employee::query()->withoutGlobalScopes()->whereKey($this->employeeId)->update(['photo_path' => $photo]);
         Storage::disk('local')->put('request-attachments/1/note.pdf', '%PDF');
         $attachment = Attachment::query()->withoutGlobalScopes()->create([
             'company_id' => $this->company->id, 'attachable_type' => 'employee_request', 'attachable_id' => 1,
             'disk' => 'local', 'path' => 'request-attachments/1/note.pdf', 'original_name' => 'note.pdf', 'mime' => 'application/pdf', 'size' => 4,
         ]);
 
-        config(['filesystems.uploads' => 's3']);
         $this->artisan('uploads:move')->assertSuccessful();
 
         Storage::disk('s3')->assertExists([$photo, 'request-attachments/1/note.pdf']);

@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Storage;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -12,5 +13,8 @@ abstract class TestCase extends BaseTestCase
 
         // Most attendance tests aren't about the roster; the one that is turns it back on.
         config(['attendance.require_schedule' => false]);
+
+        // Uploads always go to S3; tests keep them in memory instead of a real bucket.
+        Storage::fake('s3');
     }
 }

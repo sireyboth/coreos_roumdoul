@@ -432,7 +432,7 @@ class LeaveRequestTest extends TestCase
 
     public function test_sick_leave_needs_a_certificate_that_opens_only_through_its_signed_link(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3');
 
         $this->ask($this->staff, 'sick', '2026-10-02')->assertStatus(422)->assertJsonValidationErrors('attachment');
 
@@ -457,7 +457,7 @@ class LeaveRequestTest extends TestCase
 
     public function test_a_document_set_to_always_is_needed_for_half_days_too(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3');
 
         $this->ask($this->staff, 'sick', '2026-10-02', null, ['day_part' => 'am'])
             ->assertStatus(422)->assertJsonValidationErrors('attachment');
@@ -852,7 +852,7 @@ class LeaveRequestTest extends TestCase
 
     public function test_deleting_approved_leave_removes_it_everywhere_and_gives_the_days_back(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3');
         $id = $this->ask($this->staff, 'annual', '2026-10-01', null, ['attachment' => UploadedFile::fake()->create('note.pdf', 10, 'application/pdf')])->json('id');
         $this->as($this->admin)->postJson("/api/requests/{$id}/approve")->assertOk();
         $file = EmployeeRequest::query()->withoutGlobalScopes()->findOrFail($id)->attachments()->firstOrFail()->path;
@@ -863,7 +863,7 @@ class LeaveRequestTest extends TestCase
 
         $this->assertNull(EmployeeRequest::query()->withoutGlobalScopes()->find($id));
         $this->assertFalse(Notification::query()->withoutGlobalScopes()->where('subject_type', (new EmployeeRequest)->getMorphClass())->where('subject_id', $id)->exists());
-        Storage::disk('local')->assertMissing($file);
+        Storage::disk('s3')->assertMissing($file);
         $this->assertEquals(13.5, $this->balance($this->staff, 'annual')['available']);
         $this->assertSame('absent', $this->attendanceDay($this->dara, '2026-10-01')->status);
     }
