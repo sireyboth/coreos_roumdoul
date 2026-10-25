@@ -63,6 +63,11 @@ class AiAssistantController extends Controller
             ], 429);
         }
 
+        // Counted before asking, so many questions sent at once can't all slip
+        // under the limit while the first ones are still waiting for an answer.
+        RateLimiter::hit($companyKey, 86400);
+        RateLimiter::hit($userKey, 86400);
+
         try {
             $result = $assistant->ask(
                 $data['question'],
@@ -72,14 +77,14 @@ class AiAssistantController extends Controller
         } catch (Throwable $e) {
             report($e);
 
+            // Count only questions that reached the AI: this one is given back.
+            RateLimiter::decrement($companyKey, 86400);
+            RateLimiter::decrement($userKey, 86400);
+
             return response()->json([
                 'message' => 'The assistant is not available right now. Try again in a few minutes.',
             ], 503);
         }
-
-        // Count only questions that reached the AI.
-        RateLimiter::hit($companyKey, 86400);
-        RateLimiter::hit($userKey, 86400);
 
         return response()->json([
             'answer' => $result['answer'],

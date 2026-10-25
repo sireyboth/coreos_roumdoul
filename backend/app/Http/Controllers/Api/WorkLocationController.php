@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\WorkLocation;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
 
 class WorkLocationController extends Controller
@@ -23,16 +25,26 @@ class WorkLocationController extends Controller
     /** The token is hidden on the model; only people who manage locations get it back. */
     private function reveal(Request $request, WorkLocation $location): WorkLocation
     {
-        return $request->user()->hasCompanyPermission('work_locations.manage') ? $location->makeVisible('qr_token') : $location;
+        return $request->user()->hasCompanyPermission('work_locations.manage') && $this->inReach($request, $location) ? $location->makeVisible('qr_token') : $location;
+    }
+
+    /**
+     * Someone limited to some branches changes only those branches' locations
+     * (and gets only their QR codes); company-wide ones are left to people
+     * who cover every branch.
+     */
+    private function inReach(Request $request, WorkLocation $location): bool
+    {
+        $branchIds = $request->user()->membership?->accessibleBranchIds();
+
+        return $branchIds === null || in_array((int) $location->branch_id, array_map('intval', $branchIds), true);
     }
 
     public function index(Request $request)
     {
         $locations = WorkLocation::query()->with('branch')->inDisplayOrder()->paginate(25);
 
-        if ($request->user()->hasCompanyPermission('work_locations.manage')) {
-            $locations->getCollection()->each->makeVisible('qr_token');
-        }
+        $locations->getCollection()->each(fn (WorkLocation $location) => $this->reveal($request, $location));
 
         return $locations;
     }
@@ -41,7 +53,7 @@ class WorkLocationController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
+            'branch_id' => ['nullable', $this->ownBranch($request)],
             'address' => ['nullable', 'string', 'max:255'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -59,6 +71,7 @@ class WorkLocationController extends Controller
     /** Invalidates this location's printed code and issues a new one. */
     public function regenerateQrCode(Request $request, WorkLocation $workLocation)
     {
+        abort_unless($this->inReach($request, $workLocation), 404);
         $workLocation->regenerateQrToken();
 
         return $this->reveal($request, $workLocation->fresh('branch'));
@@ -71,9 +84,11 @@ class WorkLocationController extends Controller
 
     public function update(Request $request, WorkLocation $workLocation)
     {
+        abort_unless($this->inReach($request, $workLocation), 404);
+
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
-            'branch_id' => ['nullable', 'exists:branches,id'],
+            'branch_id' => ['nullable', $this->ownBranch($request)],
             'address' => ['nullable', 'string', 'max:255'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -94,8 +109,10 @@ class WorkLocationController extends Controller
         return $this->reveal($request, $workLocation);
     }
 
-    public function destroy(WorkLocation $workLocation)
+    public function destroy(Request $request, WorkLocation $workLocation)
     {
+        abort_unless($this->inReach($request, $workLocation), 404);
+
         if ($workLocation->branch()->exists()) {
             return response()->json([
                 'message' => "This is {$workLocation->branch->name}'s check-in location — it's managed by the branch. Deactivate or delete the branch instead.",
@@ -115,5 +132,11 @@ class WorkLocationController extends Controller
         $workLocation->delete();
 
         return response()->noContent();
+    }
+
+    /** A branch of the caller's own company (an exists: rule alone would accept anyone's). */
+    private function ownBranch(Request $request): Exists
+    {
+        return Rule::exists('branches', 'id')->where('company_id', $request->user()->company_id)->whereNull('deleted_at');
     }
 }

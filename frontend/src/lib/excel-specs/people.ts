@@ -134,8 +134,13 @@ export async function exportEmployees({ salary, pay, schedule }: EmployeeSheetOp
       { header: "Address", value: (e) => e.address },
       { header: "NSSF number", value: (e) => e.nssf_number },
       { header: "Tax ID", value: (e) => e.tax_id },
-      { header: "Bank", value: (e) => e.bank_name },
-      { header: "Bank account number", value: (e) => e.bank_account_number },
+      // Bank details are pay: they only arrive for people who can see salaries.
+      ...(salary
+        ? [
+            { header: "Bank", value: (e: Employee) => e.bank_name },
+            { header: "Bank account number", value: (e: Employee) => e.bank_account_number },
+          ]
+        : []),
       ...(salary && !pay
         ? [
             { header: "Base salary", value: (e: Employee) => e.base_salary, type: "number" as const, format: "#,##0.00" },
@@ -242,15 +247,16 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
       { key: "address", header: "Address", hint: "Home address, optional." },
       { key: "nssf_number", header: "NSSF number", hint: "National Social Security Fund number, optional." },
       { key: "tax_id", header: "Tax ID", hint: "Optional." },
-      { key: "bank_name", header: "Bank", hint: "Bank name, optional.", example: "ABA Bank", aliases: ["Bank name"] },
-      {
-        key: "bank_account_number",
-        header: "Bank account number",
-        hint: "Optional. Format the column as Text so leading zeros are kept.",
-        example: "000 123 456",
-      },
       ...(salary
         ? [
+            // Where pay goes, so only for people who may set pay.
+            { key: "bank_name", header: "Bank", hint: "Bank name, optional.", example: "ABA Bank", aliases: ["Bank name"] },
+            {
+              key: "bank_account_number",
+              header: "Bank account number",
+              hint: "Optional. Format the column as Text so leading zeros are kept.",
+              example: "000 123 456",
+            },
             { key: "base_salary", header: "Base salary", type: "number" as const, hint: "Pay per month (or per day for daily pay), optional.", example: "650" },
             {
               key: "salary_currency",
@@ -327,7 +333,8 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
       const payload: EmployeeInput = row.pick(
         "name", "first_name", "last_name", "name_km", "employee_code", "email", "phone", "job_title",
         "employment_status", "employment_type", "sort_order", "hire_date", "termination_date", "gender", "date_of_birth", "address", "notes",
-        "nationality", "national_id_number", "passport_number", "nssf_number", "tax_id", "bank_name", "bank_account_number",
+        "nationality", "national_id_number", "passport_number", "nssf_number", "tax_id",
+        ...(salary ? ["bank_name", "bank_account_number"] : []),
         // With payroll the salary goes into the salary history instead (below).
         ...(salary && !pay ? ["base_salary", "salary_currency"] : []),
       ) as EmployeeInput;

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\AuditLogResource\Pages;
 use App\Models\AuditLog;
 use Filament\Forms\Components\KeyValue;
@@ -13,6 +14,10 @@ use Filament\Tables\Table;
 
 class AuditLogResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'audit_logs';
+
     protected static ?string $model = AuditLog::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-magnifying-glass';

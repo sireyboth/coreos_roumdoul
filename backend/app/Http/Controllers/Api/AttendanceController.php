@@ -12,6 +12,7 @@ use App\Services\Attendance\AttendanceRecorder;
 use App\Services\Attendance\ScheduleResolver;
 use App\Services\AttendanceService;
 use App\Services\AuditLogger;
+use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -117,6 +118,7 @@ class AttendanceController extends Controller
 
         // Scoped like every employee lookup, so a branch-limited manager only reaches their branch.
         $employee = Employee::query()->findOrFail($data['employee_id']);
+        SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'change the attendance of');
         $timezone = $this->timezone($request);
         $add = array_map(fn (string $value) => CarbonImmutable::parse($value, $timezone)->utc(), $data['add'] ?? []);
 
@@ -147,6 +149,7 @@ class AttendanceController extends Controller
 
         $recorder = app(AttendanceRecorder::class);
         foreach ($days as $day) {
+            SelfApproval::assertNotSelf($request->user(), $day->employee, 'ids', 'fill in the attendance of');
             $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids', $day->employee_id);
         }
 
@@ -176,6 +179,7 @@ class AttendanceController extends Controller
 
         $recorder = app(AttendanceRecorder::class);
         foreach ($days as $day) {
+            SelfApproval::assertNotSelf($request->user(), $day->employee, 'ids', 'delete attendance days of');
             $recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'ids', $day->employee_id);
         }
 

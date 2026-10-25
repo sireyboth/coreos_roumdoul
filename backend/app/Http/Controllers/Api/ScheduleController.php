@@ -37,6 +37,9 @@ class ScheduleController extends Controller
         // e.g. a rank-and-file employee checking when they're working.
         if (! $request->user()->hasCompanyPermission('schedules.manage')) {
             $query->whereHas('employee', fn ($q) => $q->where('user_id', $request->user()->id));
+        } else {
+            // Through the employee, so a branch-limited manager only sees their branches.
+            $query->whereHas('employee');
         }
 
         if ($request->filled('employee_id')) {
@@ -235,13 +238,16 @@ class ScheduleController extends Controller
         ];
     }
 
-    public function show(Schedule $schedule)
+    public function show(Request $request, Schedule $schedule)
     {
+        $this->authorizeRow($request, $schedule);
+
         return $schedule->load(self::WITH);
     }
 
     public function update(Request $request, Schedule $schedule)
     {
+        $this->authorizeRow($request, $schedule);
         $data = $request->validate([
             'employee_id' => ['sometimes', 'integer'],
             'work_schedule_id' => ['sometimes', $this->ownSchedule($request)],
@@ -270,8 +276,9 @@ class ScheduleController extends Controller
         return $schedule->load(self::WITH);
     }
 
-    public function destroy(Schedule $schedule)
+    public function destroy(Request $request, Schedule $schedule)
     {
+        $this->authorizeRow($request, $schedule);
         $date = $schedule->date->toDateString();
         $this->recorder->assertUnlocked($schedule->company_id, $date, employeeId: $schedule->employee_id);
 
@@ -280,6 +287,17 @@ class ScheduleController extends Controller
         $this->recalculate($employee, [$date]);
 
         return response()->noContent();
+    }
+
+    /**
+     * A roster row is reachable only through its person: someone in the
+     * caller's branches, and — without schedules.manage — only their own.
+     */
+    private function authorizeRow(Request $request, Schedule $schedule): void
+    {
+        $employee = Employee::query()->find($schedule->employee_id);
+
+        abort_unless($employee && ($request->user()->hasCompanyPermission('schedules.manage') || $employee->user_id === $request->user()->id), 404);
     }
 
     /** Recalculates the given dates that have already started (future days have nothing recorded). */

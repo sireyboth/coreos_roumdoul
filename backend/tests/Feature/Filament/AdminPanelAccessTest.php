@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PlanResource\Pages\ManagePlans;
 use App\Models\Plan;
 use App\Models\PlatformAdmin;
+use App\Models\PlatformPermission;
+use App\Models\PlatformRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -32,6 +35,25 @@ class AdminPanelAccessTest extends TestCase
         foreach ($pages as $page) {
             $this->actingAs($admin, 'platform')->get($page)->assertOk();
         }
+    }
+
+    public function test_a_platform_admin_only_opens_the_areas_their_roles_allow(): void
+    {
+        // No role: signed in, but nothing to open.
+        $nobody = PlatformAdmin::factory()->withoutRoles()->create();
+        $this->actingAs($nobody, 'platform')->get('/admin/companies')->assertForbidden();
+        $this->actingAs($nobody, 'platform')->get('/admin/plans')->assertForbidden();
+
+        // A support role sees companies, and nothing about plans.
+        $support = PlatformRole::query()->create(['name' => 'Support', 'code' => 'support']);
+        $support->permissions()->attach(PlatformPermission::query()->whereIn('code', ['companies.view'])->pluck('id'));
+        $agent = PlatformAdmin::factory()->withoutRoles()->create();
+        $agent->roles()->attach($support);
+
+        $this->actingAs($agent, 'platform')->get('/admin/companies')->assertOk();
+        $this->actingAs($agent, 'platform')->get('/admin/plans')->assertForbidden();
+        $this->assertFalse(CompanyResource::canCreate());
+        $this->assertFalse(CompanyResource::canDeleteAny());
     }
 
     public function test_platform_admin_can_edit_a_plan_in_a_modal(): void

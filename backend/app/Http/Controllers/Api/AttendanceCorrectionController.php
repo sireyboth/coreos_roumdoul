@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Services\Attendance\AttendanceNotifier;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AttendanceService;
+use App\Support\SelfApproval;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -86,6 +87,20 @@ class AttendanceCorrectionController extends Controller
         $timezone = $employee->company?->timezone ?: config('attendance.default_timezone');
         $recorder->assertUnlocked($employee->company_id, Carbon::parse($data['date'])->toDateString(), employeeId: $employee->id);
 
+        // Each scan belongs to the day being corrected (or its next morning, for a
+        // night shift) — never to another, possibly locked or already paid, day.
+        $date = Carbon::parse($data['date'])->toDateString();
+        $nextDay = Carbon::parse($data['date'])->addDay()->toDateString();
+        foreach ($times as $value) {
+            $day = Carbon::parse($value, $timezone)->toDateString();
+            if ($day !== $date && $day !== $nextDay) {
+                throw ValidationException::withMessages([
+                    'scans' => ["Scan times must be on {$date} (or the next morning for a night shift)."],
+                ]);
+            }
+            $recorder->assertUnlocked($employee->company_id, $day, employeeId: $employee->id);
+        }
+
         $scans = collect($times)
             ->map(fn (string $value) => Carbon::parse($value, $timezone)->setTimezone(config('app.timezone')))
             ->sortBy(fn (Carbon $time) => $time->getTimestamp())
@@ -108,6 +123,7 @@ class AttendanceCorrectionController extends Controller
     public function approve(Request $request, AttendanceCorrection $correction, AttendanceService $attendance, AttendanceNotifier $notifier)
     {
         $this->authorizeSameCompany($request, $correction);
+        SelfApproval::assertNotSelf($request->user(), $correction->employee_id, 'status', 'approve a correction for');
 
         if ($correction->status !== 'pending') {
             throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);

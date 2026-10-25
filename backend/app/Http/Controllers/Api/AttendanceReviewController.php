@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\Attendance\MonthlyAttendance;
 use App\Services\AuditLogger;
+use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -79,6 +80,7 @@ class AttendanceReviewController extends Controller
         if ($day->overtime_minutes <= 0) {
             throw ValidationException::withMessages(['overtime' => ['This day has no overtime to review.']]);
         }
+        SelfApproval::assertNotSelf($request->user(), $day->employee_id, 'overtime', 'review overtime for');
         $this->recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'overtime', $day->employee_id);
 
         $day->update([

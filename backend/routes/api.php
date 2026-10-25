@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CalendarController;
+use App\Http\Controllers\Api\CompanySettingsController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DayOffController;
 use App\Http\Controllers\Api\DepartmentController;
@@ -176,6 +177,8 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
         Route::get('/audit-logs/options', [AuditLogController::class, 'options']);
     });
+
+    Route::put('/company/settings', [CompanySettingsController::class, 'update'])->middleware('company_permission:company.manage');
 
     Route::middleware('company_permission:roles.view')->group(function () {
         Route::get('/roles', [RoleController::class, 'index']);

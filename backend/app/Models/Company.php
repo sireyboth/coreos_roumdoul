@@ -48,6 +48,7 @@ class Company extends Model
         'status',
         'trial_ends_at',
         'default_rest_days',
+        'allow_self_approval',
     ];
 
     protected function casts(): array
@@ -55,6 +56,7 @@ class Company extends Model
         return [
             'trial_ends_at' => 'datetime',
             'default_rest_days' => 'array',
+            'allow_self_approval' => 'boolean',
         ];
     }
 

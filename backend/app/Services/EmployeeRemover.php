@@ -30,6 +30,18 @@ class EmployeeRemover
             ]);
         }
 
+        // Their login goes too. A login with more than the plain employee role
+        // (a manager, an admin) is managed under Users, so it takes users.manage.
+        if (! $actor->hasCompanyPermission('users.manage')) {
+            $privileged = $employees->first(fn (Employee $employee) => $employee->user?->membership?->roles()->where('code', '!=', 'employee')->exists());
+
+            if ($privileged) {
+                throw ValidationException::withMessages([
+                    'employee' => ["{$privileged->name} has a login with a {$privileged->user->membership->roles()->value('name')} role. Ask someone who manages users to remove them."],
+                ]);
+            }
+        }
+
         $photos = [];
 
         DB::transaction(function () use ($employees, &$photos) {

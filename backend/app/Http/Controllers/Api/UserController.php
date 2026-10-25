@@ -82,6 +82,11 @@ class UserController extends Controller
 
         $user->update(['is_active' => $data['is_active']]);
 
+        // Signed out everywhere: reactivating them later means signing in again.
+        if (! $data['is_active']) {
+            $user->tokens()->delete();
+        }
+
         AuditLogger::record($data['is_active'] ? 'user.reactivated' : 'user.deactivated', $user);
 
         return $this->present($user);

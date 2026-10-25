@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
 use Filament\Forms;
@@ -14,6 +15,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PlanResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'plans';
+
     protected static ?string $model = Plan::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';

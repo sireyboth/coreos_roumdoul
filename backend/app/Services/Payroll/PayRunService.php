@@ -14,6 +14,7 @@ use App\Models\PayslipLine;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AuditLogger;
+use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -161,8 +162,15 @@ class PayRunService
             throw ValidationException::withMessages(['status' => ['Only a calculated pay run can be approved.']]);
         }
 
+        // Whoever prepared the run doesn't also sign it off, unless the company allows it.
+        if ($run->calculated_by === $by->id && ! SelfApproval::allowed($by)) {
+            throw ValidationException::withMessages(['status' => ['You prepared this pay run, so someone else needs to approve it.']]);
+        }
+
         // Once more against the final attendance, so what is approved is exactly what was checked.
-        $run = $this->calculate($run, $by);
+        // Still credited to whoever prepared it: the approver is recorded separately.
+        $preparer = $run->calculated_by ? User::query()->find($run->calculated_by) : null;
+        $run = $this->calculate($run, $preparer);
 
         $blocking = collect($run->warnings)->where('blocking', true);
         $payslipBlocking = $run->payslips()->get()->filter(fn (Payslip $p) => collect($p->warnings)->contains('blocking', true));
@@ -178,7 +186,11 @@ class PayRunService
             $run->update(['status' => 'approved', 'approved_at' => now(), 'approved_by' => $by->id]);
 
             // The attendance these payslips used can't change any more — only these people's, only these days.
-            foreach ($run->payslips()->get() as $payslip) {
+            // Where the money goes is fixed now too, so a later account change can't redirect it.
+            $payslips = $run->payslips()->with(['employee' => fn ($q) => $q->withoutGlobalScopes()->with('payProfile')])->get();
+            foreach ($payslips as $payslip) {
+                $payslip->update(['payment' => $payslip->paymentDetails()]);
+
                 AttendanceLock::query()->create([
                     'company_id' => $run->company_id, 'employee_id' => $payslip->employee_id, 'pay_run_id' => $run->id,
                     'start_date' => $payslip->inputs['employed']['from'] ?? $run->period_start->toDateString(),

@@ -9,6 +9,7 @@ use App\Models\LeaveType;
 use App\Models\RequestTypeSetting;
 use App\Services\Requests\ApprovalChain;
 use App\Services\Requests\LeaveBalance;
+use App\Support\SelfApproval;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -109,6 +110,7 @@ class LeaveController extends Controller
         if (! $this->chain->covers($request->user(), $employee)) {
             abort(404);
         }
+        SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'change the leave balance of');
         // Half days are the smallest unit anywhere else, so keep balances in halves too.
         if (fmod(abs((float) $data['days']) * 2, 1) !== 0.0) {
             throw ValidationException::withMessages(['days' => ['Use whole or half days (e.g. 1, 0.5, -2).']]);

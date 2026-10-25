@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\SystemSettingResource\Pages;
 use App\Filament\Resources\SystemSettingResource\RelationManagers;
 use App\Models\SystemSetting;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class SystemSettingResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'system_settings';
+
     protected static ?string $model = SystemSetting::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';

@@ -183,7 +183,8 @@ export type MeResponse = {
   roles: string[];
   permissions: string[];
   employee: { id: number; name: string } | null;
-  company: { id: number; name: string; slug: string; status: string; trial_ends_at: string | null } | null;
+  // allow_self_approval: people may approve or change their own attendance, leave balance and pay.
+  company: { id: number; name: string; slug: string; status: string; trial_ends_at: string | null; allow_self_approval: boolean } | null;
   // null limits mean unlimited.
   plan: { name: string; max_employees: number | null; max_branches: number | null } | null;
   usage: { employees: number; branches: number } | null;
@@ -1841,7 +1842,8 @@ export const api = {
   },
 
   profile: {
-    update: (data: { name: string; email: string | null }) =>
+    // current_password is needed only when the email changes.
+    update: (data: { name: string; email: string | null; current_password?: string }) =>
       request<{ id: number; name: string; email: string | null }>("/api/profile", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -1852,6 +1854,15 @@ export const api = {
       password_confirmation: string;
     }) =>
       request<{ message: string }>("/api/profile/password", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+  },
+
+  // Company-wide rules (company.manage). Read back through me.company.
+  companySettings: {
+    update: (data: { allow_self_approval?: boolean }) =>
+      request<{ id: number; allow_self_approval: boolean }>("/api/company/settings", {
         method: "PUT",
         body: JSON.stringify(data),
       }),

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\ModuleResource\Pages;
 use App\Filament\Resources\ModuleResource\RelationManagers;
 use App\Models\Module;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ModuleResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'modules';
+
     protected static ?string $model = Module::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';

@@ -9,6 +9,8 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +31,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A deactivated account is cut off at once, not only at its next sign-in:
+        // its tokens stop working on every request.
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid) => $isValid && ($token->tokenable?->is_active ?? false),
+        );
+
         // Sign-in attempts. Employee IDs are easy to guess (E-001, E-002...), so
         // guessing passwords must be slow: a few tries a minute per person+device,
         // and a looser cap per device so one office isn't locked out by shared wifi.

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
@@ -16,7 +17,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export default function RolesPage() {
-  const { me } = useMe();
+  const { me, refresh } = useMe();
   const confirm = useConfirm();
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
@@ -49,6 +50,21 @@ export default function RolesPage() {
   }
 
   const canManage = me?.permissions.includes("roles.manage") ?? false;
+  const canManageCompany = me?.permissions.includes("company.manage") ?? false;
+  const [savingSelfApproval, setSavingSelfApproval] = useState(false);
+
+  async function setSelfApproval(allow: boolean) {
+    setSavingSelfApproval(true);
+    try {
+      await api.companySettings.update({ allow_self_approval: allow });
+      notifySuccess(allow ? "People can now approve their own items" : "Self-approval is now blocked");
+      refresh();
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setSavingSelfApproval(false);
+    }
+  }
   const totalPermissions = groups.reduce((n, g) => n + g.permissions.length, 0);
 
   const columns: DataTableColumn<Role>[] = [
@@ -123,6 +139,30 @@ export default function RolesPage() {
               : undefined
           }
         />
+
+        {canManageCompany && me?.company && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Self-approval</CardTitle>
+              <CardDescription>
+                By default nobody approves or changes their own attendance, overtime, leave balance or pay, or approves a
+                pay run they prepared — someone else with the permission has to. Turn this on only if one person runs
+                everything.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={me.company.allow_self_approval}
+                  disabled={savingSelfApproval}
+                  onChange={(e) => setSelfApproval(e.target.checked)}
+                />
+                Allow people to approve their own items
+              </label>
+            </CardContent>
+          </Card>
+        )}
 
         {dialog && (
           <RoleDialog

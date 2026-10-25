@@ -206,8 +206,14 @@ export default function DashboardPage() {
 
   // Roles without dashboard.view (e.g. employees) never see this page — send
   // them to the first page they can use.
+  // Phones get the app-style home screen instead; its Overview tile comes
+  // back with ?view=full to see this page anyway.
   useEffect(() => {
-    if (me && !canDashboard) router.replace(homeFor(me));
+    if (!me) return;
+    const phone = window.matchMedia("(max-width: 767px)").matches;
+    const full = new URLSearchParams(window.location.search).get("view") === "full";
+    if (phone && !full) router.replace("/dashboard/home");
+    else if (!canDashboard) router.replace(homeFor(me));
   }, [me, canDashboard, router]);
 
   useEffect(() => {

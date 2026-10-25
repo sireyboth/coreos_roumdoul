@@ -199,10 +199,14 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
     passport_number: orNull(form.passport_number),
     nssf_number: orNull(form.nssf_number),
     tax_id: orNull(form.tax_id),
-    bank_name: orNull(form.bank_name),
-    bank_account_number: orNull(form.bank_account_number),
+    // The bank account decides where pay goes, so it is pay too.
     ...(options.salary
-      ? { base_salary: salary, salary_currency: salary === null ? null : (form.salary_currency as SalaryCurrency) }
+      ? {
+          bank_name: orNull(form.bank_name),
+          bank_account_number: orNull(form.bank_account_number),
+          base_salary: salary,
+          salary_currency: salary === null ? null : (form.salary_currency as SalaryCurrency),
+        }
       : {}),
     employee_code: orNull(form.employee_code),
     email: orNull(form.email),
@@ -623,28 +627,6 @@ export function EmployeeFormFields({
         <Field label="Tax ID" htmlFor={id("tax")}>
           <Input id={id("tax")} value={form.tax_id} onChange={(e) => onChange({ tax_id: e.target.value })} />
         </Field>
-        <Field label="Bank" htmlFor={id("bank")}>
-          <Input
-            id={id("bank")}
-            list={id("bank-list")}
-            placeholder="ABA Bank"
-            value={form.bank_name}
-            onChange={(e) => onChange({ bank_name: e.target.value })}
-          />
-          <datalist id={id("bank-list")}>
-            {CAMBODIAN_BANKS.map((bank) => (
-              <option key={bank} value={bank} />
-            ))}
-          </datalist>
-        </Field>
-        <Field label="Bank account number" htmlFor={id("account")}>
-          <Input
-            id={id("account")}
-            inputMode="numeric"
-            value={form.bank_account_number}
-            onChange={(e) => onChange({ bank_account_number: e.target.value })}
-          />
-        </Field>
       </Section>
 
       {salary !== "none" && (
@@ -678,6 +660,31 @@ export function EmployeeFormFields({
                 </option>
               ))}
             </select>
+          </Field>
+          {/* Where pay goes, so only people who may set pay can change it. */}
+          <Field label="Bank" htmlFor={id("bank")}>
+            <Input
+              id={id("bank")}
+              list={id("bank-list")}
+              placeholder="ABA Bank"
+              disabled={salary === "view"}
+              value={form.bank_name}
+              onChange={(e) => onChange({ bank_name: e.target.value })}
+            />
+            <datalist id={id("bank-list")}>
+              {CAMBODIAN_BANKS.map((bank) => (
+                <option key={bank} value={bank} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Bank account number" htmlFor={id("account")}>
+            <Input
+              id={id("account")}
+              inputMode="numeric"
+              disabled={salary === "view"}
+              value={form.bank_account_number}
+              onChange={(e) => onChange({ bank_account_number: e.target.value })}
+            />
           </Field>
         </Section>
       )}

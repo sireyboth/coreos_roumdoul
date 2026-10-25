@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\TaxExchangeRateResource\Pages;
 use App\Models\TaxExchangeRate;
 use Filament\Forms;
@@ -17,6 +18,10 @@ use Filament\Tables\Table;
  */
 class TaxExchangeRateResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'tax_exchange_rates';
+
     protected static ?string $model = TaxExchangeRate::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';

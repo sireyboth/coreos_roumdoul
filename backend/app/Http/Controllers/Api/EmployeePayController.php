@@ -14,6 +14,7 @@ use App\Models\Payslip;
 use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\Payroll\PayGroupService;
 use App\Services\Payroll\PayrollSetup;
+use App\Support\SelfApproval;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -98,6 +99,7 @@ class EmployeePayController extends Controller
 
     public function storeSalary(Request $request, Employee $employee)
     {
+        $this->assertNotOwn($request, $employee);
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'gt:0', 'max:999999999999'],
             'currency' => ['required', Rule::in(['USD', 'KHR'])],
@@ -115,8 +117,9 @@ class EmployeePayController extends Controller
         return response()->json($salary->load('createdBy:id,name'), 201);
     }
 
-    public function destroySalary(Employee $employee, EmployeeSalary $salary)
+    public function destroySalary(Request $request, Employee $employee, EmployeeSalary $salary)
     {
+        $this->assertNotOwn($request, $employee);
         abort_unless($salary->employee_id === $employee->id, 404);
         $this->salaries->remove($salary);
 
@@ -126,6 +129,7 @@ class EmployeePayController extends Controller
     /** Moves the employee to another pay group from a date (salary.manage). */
     public function storePayGroup(Request $request, Employee $employee, PayGroupService $groups)
     {
+        $this->assertNotOwn($request, $employee);
         $data = $request->validate([
             'pay_group_id' => ['required', 'integer'],
             'effective_from' => ['required', 'date_format:Y-m-d'],
@@ -137,8 +141,9 @@ class EmployeePayController extends Controller
         return response()->json($row->load(['payGroup:id,name', 'createdBy:id,name']), 201);
     }
 
-    public function destroyPayGroup(Employee $employee, EmployeePayGroup $assignment, PayGroupService $groups)
+    public function destroyPayGroup(Request $request, Employee $employee, EmployeePayGroup $assignment, PayGroupService $groups)
     {
+        $this->assertNotOwn($request, $employee);
         abort_unless($assignment->employee_id === $employee->id, 404);
         $groups->remove($assignment);
 
@@ -147,6 +152,7 @@ class EmployeePayController extends Controller
 
     public function updateProfile(Request $request, Employee $employee)
     {
+        $this->assertNotOwn($request, $employee);
         $data = $request->validate([
             'tax_resident' => ['sometimes', 'boolean'],
             'spouse_dependent' => ['sometimes', 'boolean'],
@@ -164,6 +170,7 @@ class EmployeePayController extends Controller
 
     public function storeItem(Request $request, Employee $employee)
     {
+        $this->assertNotOwn($request, $employee);
         $data = $request->validate($this->itemRules());
         $this->assertItemComponent($data['pay_component_id']);
 
@@ -174,6 +181,7 @@ class EmployeePayController extends Controller
 
     public function updateItem(Request $request, Employee $employee, EmployeePayItem $item)
     {
+        $this->assertNotOwn($request, $employee);
         abort_unless($item->employee_id === $employee->id, 404);
         $data = $request->validate(collect($this->itemRules())->except('pay_component_id')->map(fn ($r) => ['sometimes', ...$r])->all());
         $item->update($data);
@@ -181,12 +189,19 @@ class EmployeePayController extends Controller
         return $item->fresh('component:id,code,name,kind');
     }
 
-    public function destroyItem(Employee $employee, EmployeePayItem $item)
+    public function destroyItem(Request $request, Employee $employee, EmployeePayItem $item)
     {
+        $this->assertNotOwn($request, $employee);
         abort_unless($item->employee_id === $employee->id, 404);
         $item->delete();
 
         return response()->noContent();
+    }
+
+    /** Nobody sets their own pay, unless the company allows it (see SelfApproval). */
+    private function assertNotOwn(Request $request, Employee $employee): void
+    {
+        SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'change the pay of');
     }
 
     private function itemRules(): array

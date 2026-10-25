@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, QrCode, X } from "lucide-react";
+import { CheckCircle2, ChevronLeft, House, QrCode, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { useMe } from "@/contexts/me-context";
 import { useQrScanner } from "@/hooks/use-qr-scanner";
+import { isFreshAppLaunch } from "@/lib/app-launch";
 import { api, ApiError, type AttendanceToday, type ScanResult } from "@/lib/api";
 import { withLocationRetry } from "@/lib/location";
 import { clock } from "@/lib/schedule";
@@ -23,6 +25,12 @@ type Status =
  */
 export default function ScanPage() {
   const { me } = useMe();
+  const router = useRouter();
+  // Opened by a home-screen icon added before the Home page existed: go to
+  // Home instead, without starting the camera (see lib/app-launch.ts). Safe to
+  // read in the initializer — the layout's loader means this page never
+  // renders on the server.
+  const [launching] = useState(isFreshAppLaunch);
   const [status, setStatus] = useState<Status>({ kind: "scanning" });
   const [today, setToday] = useState<AttendanceToday | null>(null);
   const gpsRef = useRef<{ latitude: number; longitude: number } | null>(null);
@@ -47,7 +55,11 @@ export default function ScanPage() {
   }, [hasEmployee, loadToday]);
 
   useEffect(() => {
-    if (status.kind !== "scanning") return;
+    if (launching) router.replace("/dashboard/home");
+  }, [launching, router]);
+
+  useEffect(() => {
+    if (launching || status.kind !== "scanning") return;
     gpsRef.current = null;
     navigator.geolocation?.getCurrentPosition(
       (position) => {
@@ -56,7 +68,7 @@ export default function ScanPage() {
       () => {},
       { enableHighAccuracy: true, timeout: 8000 },
     );
-  }, [status.kind]);
+  }, [launching, status.kind]);
 
   const handleScan = useCallback(
     async (token: string) => {
@@ -72,7 +84,9 @@ export default function ScanPage() {
     [loadToday],
   );
 
-  const { videoRef, canvasRef, error: cameraError } = useQrScanner(status.kind === "scanning", handleScan);
+  const { videoRef, canvasRef, error: cameraError } = useQrScanner(!launching && status.kind === "scanning", handleScan);
+
+  if (launching) return null;
 
   if (!me?.employee) {
     return (
@@ -91,6 +105,14 @@ export default function ScanPage() {
 
   return (
     <div className="relative flex h-full flex-col bg-black text-white">
+      <Link
+        href="/dashboard/home"
+        className="absolute top-4 left-4 z-10 flex h-10 items-center gap-1.5 rounded-full bg-primary pr-4 pl-3 text-sm font-semibold text-primary-foreground shadow-md transition-transform active:scale-95 md:hidden"
+      >
+        <ChevronLeft className="size-4" />
+        <House className="size-4" />
+        Home
+      </Link>
       <Link href="/dashboard/attendance" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white" aria-label="Exit scan mode">
         <X className="size-5" />
       </Link>

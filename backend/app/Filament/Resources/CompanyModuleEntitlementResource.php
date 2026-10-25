@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\CompanyModuleEntitlementResource\Pages;
 use App\Filament\Resources\CompanyModuleEntitlementResource\RelationManagers;
 use App\Models\CompanyModuleEntitlement;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CompanyModuleEntitlementResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'module_entitlements';
+
     protected static ?string $model = CompanyModuleEntitlement::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';

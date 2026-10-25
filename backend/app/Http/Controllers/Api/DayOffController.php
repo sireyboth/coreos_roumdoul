@@ -54,6 +54,8 @@ class DayOffController extends Controller
 
     public function destroy(DayOff $dayOff)
     {
+        // Through the employee, so a branch-limited manager only reaches their branches.
+        abort_unless(Employee::query()->whereKey($dayOff->employee_id)->exists(), 404);
         $date = $dayOff->date->toDateString();
         $this->recorder->assertUnlocked($dayOff->company_id, $date, employeeId: $dayOff->employee_id);
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\PlatformPermissions;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -43,11 +44,21 @@ class PlatformAdmin extends Authenticatable implements FilamentUser
         return $this->belongsToMany(PlatformRole::class, 'platform_admin_role');
     }
 
+    /** @var array<int, string>|null  this admin's codes, read once per request */
+    private ?array $permissionCodes = null;
+
     public function hasPermission(string $code): bool
     {
-        return $this->roles()
-            ->whereHas('permissions', fn ($query) => $query->where('code', $code))
-            ->exists();
+        if ($this->permissionCodes === null) {
+            $roles = $this->roles()->with('permissions:id,code')->get();
+
+            // A super-admin can do everything, including areas added later.
+            $this->permissionCodes = $roles->contains('code', PlatformPermissions::SUPER_ADMIN)
+                ? ['*']
+                : $roles->pluck('permissions')->flatten()->pluck('code')->unique()->values()->all();
+        }
+
+        return $this->permissionCodes === ['*'] || in_array($code, $this->permissionCodes, true);
     }
 
     public function canAccessPanel(Panel $panel): bool

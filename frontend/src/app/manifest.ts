@@ -5,9 +5,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Business OS",
     short_name: "Business OS",
     description: "Business Operating System for Cambodian businesses",
-    // Opens straight to the instant QR scan page — this is the point of
-    // teaching employees to "Add to Home Screen" for this shortcut.
-    start_url: "/dashboard/scan",
+    // Opens on the phone Home page; its Scan button is one tap away.
+    // Previously the icon opened the camera straight away:
+    // start_url: "/dashboard/scan",
+    start_url: "/dashboard/home",
     display: "standalone",
     background_color: "#000000",
     theme_color: "#4f46e5",

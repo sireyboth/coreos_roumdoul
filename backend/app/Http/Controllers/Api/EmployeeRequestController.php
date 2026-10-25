@@ -217,7 +217,8 @@ class EmployeeRequestController extends Controller
 
         return Storage::disk($file->disk)->response($file->path, $file->original_name, [
             'Content-Type' => $file->mime,
-            'Cache-Control' => 'private, max-age=600',
+            // Medical certificates and the like: never kept in a browser or proxy cache.
+            'Cache-Control' => 'private, no-store',
             // Shown in the browser (a PDF or photo), never run as a page.
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",

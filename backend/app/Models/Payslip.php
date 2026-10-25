@@ -17,7 +17,7 @@ class Payslip extends Model
 
     protected $fillable = [
         'company_id', 'pay_run_id', 'employee_id', 'currency', 'pay_type', 'base_salary', 'daily_rate', 'hourly_rate',
-        'exchange_rate', 'gross', 'nssf_employee', 'tax', 'net', 'employer_cost', 'inputs', 'warnings',
+        'exchange_rate', 'gross', 'nssf_employee', 'tax', 'net', 'employer_cost', 'inputs', 'warnings', 'payment',
     ];
 
     protected $hidden = ['company_id'];
@@ -36,6 +36,29 @@ class Payslip extends Model
             'employer_cost' => 'decimal:2',
             'inputs' => 'array',
             'warnings' => 'array',
+            'payment' => 'array',
+        ];
+    }
+
+    /**
+     * How this payslip is paid: the copy taken at approval, or — before that —
+     * the employee's details as they are now. Needs employee.payProfile loaded.
+     *
+     * @return array{payment_method: string, bank_name: ?string, bank_account_number: ?string, bank_account_name: ?string}
+     */
+    public function paymentDetails(): array
+    {
+        if ($this->payment !== null) {
+            return $this->payment;
+        }
+
+        $e = $this->employee;
+
+        return [
+            'payment_method' => $e?->payProfile?->payment_method ?? 'bank',
+            'bank_name' => $e?->bank_name,
+            'bank_account_number' => $e?->bank_account_number,
+            'bank_account_name' => $e?->payProfile?->bank_account_name,
         ];
     }
 

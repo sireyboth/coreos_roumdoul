@@ -8,7 +8,7 @@ import { getToken } from "@/lib/api";
 /**
  * The company manifest's start_url (see ../manifest/route.ts) — not a page
  * anyone links to directly. Decides, on every tap of the home-screen icon,
- * whether to skip straight to the scan screen (already signed in on this
+ * whether to skip straight to the phone Home page (already signed in on this
  * device) or send the employee to this company's login page (not signed in
  * yet). A plain saved-token check is enough here: if it's stale or invalid,
  * /dashboard's own MeProvider still catches that and redirects to /login,
@@ -20,7 +20,9 @@ export default function CompanyLaunchPage() {
 
   useEffect(() => {
     const slug = decodeURIComponent(company).trim().toLowerCase();
-    router.replace(getToken() ? "/dashboard/scan" : `/c/${encodeURIComponent(slug)}/login`);
+    // Previously straight to the camera:
+    // router.replace(getToken() ? "/dashboard/scan" : `/c/${encodeURIComponent(slug)}/login`);
+    router.replace(getToken() ? "/dashboard/home" : `/c/${encodeURIComponent(slug)}/login`);
   }, [company, router]);
 
   return (

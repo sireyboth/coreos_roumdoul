@@ -50,7 +50,9 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Sign-ins last 30 days by default, so a lost phone or a leaked token
+    // doesn't stay usable forever. In minutes; empty means never expire.
+    'expiration' => env('SANCTUM_EXPIRATION', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------

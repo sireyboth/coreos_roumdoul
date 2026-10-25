@@ -49,40 +49,40 @@ class PayRunController extends Controller
 
         $run = $this->runs->create($company, $group, $data['period_start'] ?? "{$data['month']}-01", $data['period_end'] ?? null, $request->user());
 
-        return response()->json($this->detail($run), 201);
+        return response()->json($this->detail($request, $run), 201);
     }
 
-    public function show(PayRun $run)
+    public function show(Request $request, PayRun $run)
     {
-        return $this->detail($run);
+        return $this->detail($request, $run);
     }
 
     public function calculate(Request $request, PayRun $run)
     {
-        return $this->detail($this->runs->calculate($run, $request->user()));
+        return $this->detail($request, $this->runs->calculate($run, $request->user()));
     }
 
     /** One person only, after a fix to their attendance or pay. */
     public function calculateEmployee(Request $request, PayRun $run, int $employee)
     {
-        return $this->detail($this->runs->calculateEmployee($run, $employee, $request->user()));
+        return $this->detail($request, $this->runs->calculateEmployee($run, $employee, $request->user()));
     }
 
     public function approve(Request $request, PayRun $run)
     {
-        return $this->detail($this->runs->approve($run, $request->user()));
+        return $this->detail($request, $this->runs->approve($run, $request->user()));
     }
 
     public function markPaid(Request $request, PayRun $run)
     {
-        return $this->detail($this->runs->markPaid($run, $request->user()));
+        return $this->detail($request, $this->runs->markPaid($run, $request->user()));
     }
 
     public function reopen(Request $request, PayRun $run)
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
 
-        return $this->detail($this->runs->reopen($run, $request->user(), $data['reason']));
+        return $this->detail($request, $this->runs->reopen($run, $request->user(), $data['reason']));
     }
 
     public function destroy(PayRun $run)
@@ -92,8 +92,9 @@ class PayRunController extends Controller
         return response()->noContent();
     }
 
-    public function payslip(Payslip $payslip)
+    public function payslip(Request $request, Payslip $payslip)
     {
+        abort_unless($this->onlyVisible($request, Payslip::query()->whereKey($payslip->id))->exists(), 404);
         $payslip->load(['lines', 'employee' => fn ($q) => $q->withoutGlobalScope('branch_access'), 'payRun.payGroup:id,name']);
         $run = $payslip->payRun;
 
@@ -111,9 +112,9 @@ class PayRunController extends Controller
     }
 
     /** One row per payslip, for the bank or the accountant. */
-    public function export(PayRun $run): StreamedResponse
+    public function export(Request $request, PayRun $run): StreamedResponse
     {
-        $payslips = $run->payslips()->with(['employee' => fn ($q) => $q->withoutGlobalScope('branch_access')->with('payProfile')])->get();
+        $payslips = $this->onlyVisible($request, $run->payslips())->with(['employee' => fn ($q) => $q->withoutGlobalScope('branch_access')->with('payProfile')])->get();
 
         return response()->streamDownload(function () use ($payslips, $run) {
             $out = fopen('php://output', 'w');
@@ -123,10 +124,13 @@ class PayRunController extends Controller
 
             foreach ($payslips as $p) {
                 $e = $p->employee;
+                $pay = $p->paymentDetails();
+                // Only the typed-in text is made safe: amounts can be negative and must stay numbers.
+                $text = fn (?string $value) => $this->safeCell($value);
                 fputcsv($out, [
-                    $e?->employee_code, $e?->name, $run->period_start->toDateString(), $run->period_end->toDateString(),
+                    $text($e?->employee_code), $text($e?->name), $run->period_start->toDateString(), $run->period_end->toDateString(),
                     $p->currency, $p->base_salary, $p->gross, $p->nssf_employee, $p->tax, $p->net, $p->employer_cost,
-                    $e?->payProfile?->payment_method ?? 'bank', $e?->bank_name, $e?->bank_account_number, $e?->payProfile?->bank_account_name,
+                    $pay['payment_method'], $text($pay['bank_name']), $text($pay['bank_account_number']), $text($pay['bank_account_name']),
                 ]);
             }
 
@@ -138,10 +142,11 @@ class PayRunController extends Controller
      * Everything the printed payroll report needs: each payslip with its lines
      * and where the person sits, plus how they are paid.
      */
-    public function report(PayRun $run)
+    public function report(Request $request, PayRun $run)
     {
         $run->load([
             'approvedBy:id,name', 'paidBy:id,name', 'payGroup:id,name,schedule',
+            'payslips' => fn ($q) => $this->onlyVisible($request, $q),
             'payslips.lines',
             'payslips.employee' => fn ($q) => $q->withoutGlobalScope('branch_access')->with(['branch', 'department', 'payProfile']),
         ]);
@@ -162,10 +167,7 @@ class PayRunController extends Controller
                             ...$this->employee($p),
                             'department' => $e->department?->name,
                             'job_title' => $e->job_title,
-                            'payment_method' => $e->payProfile?->payment_method ?? 'bank',
-                            'bank_name' => $e->bank_name,
-                            'bank_account_number' => $e->bank_account_number,
-                            'bank_account_name' => $e->payProfile?->bank_account_name,
+                            ...$p->paymentDetails(),
                         ] : null,
                         'lines' => $p->lines->sortBy('sort_order')->values()->map(fn (PayslipLine $l) => [
                             ...$l->only(['code', 'name', 'kind', 'amount']),
@@ -174,6 +176,12 @@ class PayRunController extends Controller
                     ];
                 }),
         ];
+    }
+
+    /** A cell Excel would run as a formula (=, +, -, @ ...) is kept as text. */
+    private function safeCell(mixed $value): mixed
+    {
+        return is_string($value) && preg_match('/^[=+\-@\t\r]/', $value) ? "'".$value : $value;
     }
 
     private function filename(PayRun $run): string
@@ -194,9 +202,9 @@ class PayRunController extends Controller
         ];
     }
 
-    private function detail(PayRun $run): array
+    private function detail(Request $request, PayRun $run): array
     {
-        $run->load(['approvedBy:id,name', 'paidBy:id,name', 'payGroup:id,name,schedule', 'payslips.employee' => fn ($q) => $q->withoutGlobalScope('branch_access')->with('branch')]);
+        $run->load(['approvedBy:id,name', 'paidBy:id,name', 'payGroup:id,name,schedule', 'payslips' => fn ($q) => $this->onlyVisible($request, $q), 'payslips.employee' => fn ($q) => $q->withoutGlobalScope('branch_access')->with('branch')]);
         $stale = $this->runs->staleness($run);
 
         return [
@@ -216,6 +224,16 @@ class PayRunController extends Controller
                     'employee' => $this->employee($p),
                 ]),
         ];
+    }
+
+    /**
+     * Payslips keep showing people who moved branch or left (their employee is
+     * loaded without the branch scope) — but someone limited to some branches
+     * gets only the payslips of people they can see now.
+     */
+    private function onlyVisible(Request $request, $query)
+    {
+        return $request->user()->membership?->hasBranchRestriction() ? $query->whereHas('employee') : $query;
     }
 
     private function employee(Payslip $payslip): ?array

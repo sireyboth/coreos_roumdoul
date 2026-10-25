@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Branch;
+use App\Models\Employee;
 use App\Models\PlatformAdmin;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -91,10 +92,12 @@ class AuditLogController extends Controller
                 ->orWhere('ip_address', 'like', $term));
         }
 
+        $hiddenFields = $this->hiddenEmployeeFields($request);
+
         return $query
             ->orderByDesc('id')
             ->paginate($data['per_page'] ?? 50)
-            ->through(fn (AuditLog $log) => $this->present($log));
+            ->through(fn (AuditLog $log) => $this->present($log, $hiddenFields));
     }
 
     /** What the filters can offer: only people and branches this viewer may see. */
@@ -174,8 +177,27 @@ class AuditLogController extends Controller
         return null;
     }
 
-    private function present(AuditLog $log): array
+    /**
+     * An employee's row records every column, pay and ID numbers included —
+     * shown here only to people who could see them on the employee page.
+     *
+     * @return array<int, string>
+     */
+    private function hiddenEmployeeFields(Request $request): array
     {
+        $user = $request->user();
+
+        return [
+            ...($user->hasCompanyPermission('employees.manage') ? [] : Employee::PERSONAL_FIELDS),
+            ...($user->hasCompanyPermission('salary.view') ? [] : Employee::SALARY_FIELDS),
+        ];
+    }
+
+    /** @param  array<int, string>  $hiddenFields  employee columns this viewer may not see */
+    private function present(AuditLog $log, array $hiddenFields = []): array
+    {
+        $hide = Str::before($log->event, '.') === 'employee' ? $hiddenFields : [];
+
         $actor = match (true) {
             // Platform staff act on a company only through support access; their own identity stays internal.
             $log->actor_type === (new PlatformAdmin)->getMorphClass() => ['type' => 'support', 'id' => null, 'name' => 'Platform support'],
@@ -197,8 +219,8 @@ class AuditLogController extends Controller
             ] : null,
             'branch' => $log->branch ? ['id' => $log->branch->id, 'name' => $log->branch->name] : null,
             'reason' => $log->reason,
-            'before' => $this->withoutSecrets($log->before_data),
-            'after' => $this->withoutSecrets($log->after_data),
+            'before' => $this->withoutSecrets($log->before_data, $hide),
+            'after' => $this->withoutSecrets($log->after_data, $hide),
             'ip_address' => $log->ip_address,
             'user_agent' => $log->user_agent,
             'method' => $log->method,
@@ -206,12 +228,15 @@ class AuditLogController extends Controller
         ];
     }
 
-    private function withoutSecrets(?array $data): ?array
+    /** @param  array<int, string>  $hide  more keys to leave out */
+    private function withoutSecrets(?array $data, array $hide = []): ?array
     {
         if ($data === null) {
             return null;
         }
 
-        return collect($data)->reject(fn ($value, $key) => preg_match(self::SECRET_KEYS, (string) $key))->all();
+        return collect($data)
+            ->reject(fn ($value, $key) => preg_match(self::SECRET_KEYS, (string) $key) || in_array($key, $hide, true))
+            ->all();
     }
 }

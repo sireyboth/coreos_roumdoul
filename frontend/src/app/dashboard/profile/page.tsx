@@ -24,6 +24,9 @@ export default function ProfilePage() {
   const [name, setName] = useState(me?.user.name ?? "");
   const [email, setEmail] = useState(me?.user.email ?? "");
   const signsInById = Boolean(me?.user.login_id);
+  // Replacing the sign-in email asks for the password, like changing the password does.
+  const [emailPassword, setEmailPassword] = useState("");
+  const emailChanged = Boolean(me?.user.email) && (email.trim() === "" ? null : email) !== me?.user.email;
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaved, setProfileSaved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -44,8 +47,13 @@ export default function ProfilePage() {
     setSavingProfile(true);
 
     try {
-      await api.profile.update({ name, email: email.trim() === "" ? null : email });
+      await api.profile.update({
+        name,
+        email: email.trim() === "" ? null : email,
+        ...(emailChanged ? { current_password: emailPassword } : {}),
+      });
       notifySuccess("Profile updated");
+      setEmailPassword("");
       setProfileSaved(true);
       refresh();
     } catch (err) {
@@ -120,7 +128,21 @@ export default function ProfilePage() {
                   </p>
                 )}
               </div>
-              {profileError && <Alert variant="destructive">{profileError}</Alert>}
+              {emailChanged && (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="email_password">Current password</Label>
+                  <Input
+                    id="email_password"
+                    type="password"
+                    required
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                  <p className="text-xs text-muted-foreground">Needed to change the email you sign in with.</p>
+                </div>
+              )}
+              {profileError &&<Alert variant="destructive">{profileError}</Alert>}
               {profileSaved && <Badge variant="success">Saved</Badge>}
               <Button type="submit" disabled={savingProfile} className="self-start">
                 {savingProfile ? "Saving…" : "Save changes"}

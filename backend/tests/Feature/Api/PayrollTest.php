@@ -169,6 +169,9 @@ class PayrollTest extends TestCase
 
     public function test_approval_needs_no_blocking_problems_then_freezes_and_locks_only_those_days(): void
     {
+        // One admin both prepares and approves here, as a small company allows.
+        $this->company->update(['allow_self_approval' => true]);
+
         TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
         $dara = $this->employee('Dara');
         $other = $this->employee('Other');
@@ -647,6 +650,9 @@ class PayrollTest extends TestCase
 
     public function test_a_paid_period_cant_be_moved_to_another_group(): void
     {
+        // One admin both prepares and approves here, as a small company allows.
+        $this->company->update(['allow_self_approval' => true]);
+
         TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
         $half = $this->group(['name' => 'Twice a month', 'schedule' => 'semi_monthly', 'cutoff_days' => [15, 31]]);
         $dara = $this->employee('Dara');
@@ -730,6 +736,9 @@ class PayrollTest extends TestCase
 
     public function test_reopening_a_paid_run_unlocks_its_attendance_for_fixing(): void
     {
+        // One admin both prepares and approves here, as a small company allows.
+        $this->company->update(['allow_self_approval' => true]);
+
         TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
         $dara = $this->employee('Dara');
         $this->salary($dara, 400);
@@ -752,5 +761,52 @@ class PayrollTest extends TestCase
         $this->assertNull(PayRun::query()->find($run['id'])->paid_at);
         $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk();
         $this->assertDatabaseHas('audit_logs', ['event' => 'pay_run.reopened', 'subject_id' => $run['id'], 'reason' => 'Test scans were paid']);
+    }
+
+    public function test_whoever_prepared_a_run_cant_also_approve_it(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $this->salary($this->employee('Sokha'), 520);
+        $role = CompanyRole::query()->create(['company_id' => $this->company->id, 'name' => 'payroll-lead', 'code' => 'payroll-lead']);
+        $role->permissions()->attach(CompanyPermission::query()->whereIn('code', ['payroll.view', 'payroll.manage', 'payroll.approve'])->pluck('id'));
+        $lead = $this->createUserWithRole($this->company, 'payroll-lead');
+
+        $run = $this->actingAs($lead)->postJson('/api/payroll/runs', ['month' => '2026-09'])->assertCreated()->json();
+        $this->actingAs($lead)->postJson("/api/payroll/runs/{$run['id']}/approve")
+            ->assertUnprocessable()->assertJsonValidationErrors('status');
+
+        // Someone else signs it off, and the run still says who prepared it.
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk()->assertJsonPath('status', 'approved');
+        $run = PayRun::query()->find($run['id']);
+        $this->assertSame($lead->id, $run->calculated_by);
+        $this->assertSame($this->admin->id, $run->approved_by);
+    }
+
+    public function test_changing_a_bank_account_after_approval_doesnt_redirect_that_pay(): void
+    {
+        $this->company->update(['allow_self_approval' => true]);
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha', ['bank_name' => 'ABA Bank', 'bank_account_number' => '000111']);
+        $this->salary($sokha, 520);
+        $run = $this->createRun()->assertCreated()->json();
+        $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk();
+
+        $sokha->update(['bank_account_number' => '=HYPERLINK("http://evil")']);
+
+        $csv = $this->actingAs($this->admin)->get("/api/payroll/runs/{$run['id']}/export")->assertOk()->streamedContent();
+        $this->assertStringContainsString('000111', $csv);
+        $this->assertStringNotContainsString('HYPERLINK', $csv);
+        $this->assertSame('000111', collect($this->actingAs($this->admin)->getJson("/api/payroll/runs/{$run['id']}/report")->json('payslips'))->first()['employee']['bank_account_number']);
+    }
+
+    public function test_the_bank_export_keeps_formulas_as_text(): void
+    {
+        $this->company->update(['allow_self_approval' => true]);
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $this->salary($this->employee('Sokha', ['bank_account_number' => '=1+1']), 520);
+        $run = $this->createRun()->assertCreated()->json();
+
+        $csv = $this->actingAs($this->admin)->get("/api/payroll/runs/{$run['id']}/export")->assertOk()->streamedContent();
+        $this->assertStringContainsString("'=1+1", $csv);
     }
 }

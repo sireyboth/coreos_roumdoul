@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\PayComponent;
 use App\Models\PayrollAdjustment;
 use App\Services\Payroll\PayGroupService;
+use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -36,6 +37,8 @@ class PayrollAdjustmentController extends Controller
 
         return PayrollAdjustment::query()
             ->with(['employee' => fn ($q) => $q->withoutGlobalScope('branch_access'), 'createdBy:id,name'])
+            // Someone limited to some branches sees only their people's.
+            ->when($request->user()->membership?->hasBranchRestriction(), fn ($q) => $q->whereHas('employee'))
             ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $start->endOfMonth()->toDateString())
             ->orderBy('date')->orderBy('id')
             ->get()
@@ -46,6 +49,7 @@ class PayrollAdjustmentController extends Controller
     {
         $data = $request->validate($this->rules());
         $employee = Employee::query()->findOrFail($data['employee_id']);
+        SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'add pay adjustments for');
         $this->assertOpen(collect([$employee]), $data['date']);
 
         $adjustment = PayrollAdjustment::query()->create([...$data, 'source' => 'manual', 'created_by' => $request->user()->id]);
@@ -71,6 +75,9 @@ class PayrollAdjustmentController extends Controller
         if ($employees->count() !== count($data['employee_ids'])) {
             throw ValidationException::withMessages(['employee_ids' => ['Some of these employees no longer exist or are outside your branches.']]);
         }
+        foreach ($employees as $employee) {
+            SelfApproval::assertNotSelf($request->user(), $employee, 'employee_ids', 'add pay adjustments for');
+        }
         $this->assertOpen($employees, $data['date']);
 
         DB::transaction(fn () => $employees->each(fn (Employee $employee) => PayrollAdjustment::query()->create([
@@ -85,19 +92,20 @@ class PayrollAdjustmentController extends Controller
 
     public function update(Request $request, PayrollAdjustment $adjustment)
     {
-        $this->assertOpen(collect([$adjustment->employee]), $adjustment->date->toDateString());
+        $employee = $this->employeeOf($request, $adjustment);
+        $this->assertOpen(collect([$employee]), $adjustment->date->toDateString());
         $data = $request->validate(collect($this->rules())->except(['employee_id'])->map(fn ($r) => ['sometimes', ...$r])->all());
         if (isset($data['date'])) {
-            $this->assertOpen(collect([$adjustment->employee]), $data['date']);
+            $this->assertOpen(collect([$employee]), $data['date']);
         }
         $adjustment->update($data);
 
         return $this->present($adjustment->fresh(['employee', 'createdBy:id,name']));
     }
 
-    public function destroy(PayrollAdjustment $adjustment)
+    public function destroy(Request $request, PayrollAdjustment $adjustment)
     {
-        $this->assertOpen(collect([$adjustment->employee]), $adjustment->date->toDateString());
+        $this->assertOpen(collect([$this->employeeOf($request, $adjustment)]), $adjustment->date->toDateString());
         $adjustment->delete();
 
         return response()->noContent();
@@ -134,6 +142,11 @@ class PayrollAdjustmentController extends Controller
 
                 continue;
             }
+            if ($employee->user_id === $request->user()->id && ! SelfApproval::allowed($request->user())) {
+                $errors[] = ['row' => $i + 1, 'message' => 'You can\'t add pay adjustments for yourself — ask someone else who has the permission.'];
+
+                continue;
+            }
             if ($this->groups->paidOn([$employee->id], $date)->isNotEmpty()) {
                 $errors[] = ['row' => $i + 1, 'message' => "{$employee->name} is already paid for {$date}. Use a later date."];
 
@@ -162,6 +175,20 @@ class PayrollAdjustmentController extends Controller
             'taxable' => ['boolean'],
             'reason' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    /**
+     * The person an existing adjustment is for, as the caller may see them:
+     * someone outside their branches is not found. Null only when the
+     * employee was removed — the adjustment can still be tidied away.
+     */
+    private function employeeOf(Request $request, PayrollAdjustment $adjustment): ?Employee
+    {
+        $employee = Employee::query()->find($adjustment->employee_id);
+        abort_if(! $employee && Employee::query()->withoutGlobalScope('branch_access')->whereKey($adjustment->employee_id)->exists(), 404);
+        SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'change pay adjustments for');
+
+        return $employee;
     }
 
     /** @param  Collection<int, Employee|null>  $employees */

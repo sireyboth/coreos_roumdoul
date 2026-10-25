@@ -115,11 +115,15 @@ class Employee extends Model
     public const PERSONAL_FIELDS = [
         'gender', 'date_of_birth', 'address', 'notes',
         'nationality', 'national_id_number', 'passport_number',
-        'nssf_number', 'tax_id', 'bank_name', 'bank_account_number',
+        'nssf_number', 'tax_id',
     ];
 
-    /** Pay: revealed only with salary.view, on top of the personal fields. */
-    public const SALARY_FIELDS = ['base_salary', 'salary_currency'];
+    /**
+     * Pay: revealed only with salary.view, on top of the personal fields, and
+     * changed only with salary.manage. The bank account is here too: whoever
+     * can change it decides where someone's pay goes.
+     */
+    public const SALARY_FIELDS = ['base_salary', 'salary_currency', 'bank_name', 'bank_account_number'];
 
     /**
      * Identity details only the employee pages show. Not secret, but kept out

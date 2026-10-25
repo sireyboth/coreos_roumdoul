@@ -70,6 +70,7 @@ class RoleController extends Controller
                 Rule::unique('company_roles', 'name')->where(fn ($query) => $query->where('company_id', $companyId))->ignore($role->id),
             ],
             'permissions' => ['array'],
+            'permissions.*' => [Rule::in(CompanyPermissions::all())],
             ...CompanyRole::displayOrderRules(),
         ]);
 

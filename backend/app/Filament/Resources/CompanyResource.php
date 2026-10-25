@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\CompanyResource\Pages;
 use App\Filament\Resources\CompanyResource\RelationManagers;
 use App\Models\Company;
@@ -18,6 +19,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CompanyResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'companies';
+
     protected static ?string $model = Company::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
@@ -129,6 +134,7 @@ class CompanyResource extends Resource
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\Action::make('start_support_access')
+                    ->authorize(fn () => static::admin()?->hasPermission('support_access.manage') ?? false)
                     ->label('Start support access')
                     ->icon('heroicon-o-lifebuoy')
                     ->visible(fn (Company $record) => ! $record->supportAccessSessions()->whereNull('ended_at')->where('expires_at', '>', now())->exists())
@@ -156,6 +162,7 @@ class CompanyResource extends Resource
                         Notification::make()->title('Support access session started')->success()->send();
                     }),
                 Tables\Actions\Action::make('end_support_access')
+                    ->authorize(fn () => static::admin()?->hasPermission('support_access.manage') ?? false)
                     ->label('End support access')
                     ->icon('heroicon-o-lock-closed')
                     ->color('danger')

@@ -13,6 +13,7 @@ use App\Services\EmployeeAssignmentService;
 use App\Services\EmployeeRemover;
 use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\Payroll\PayGroupService;
+use App\Support\SelfApproval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -159,7 +160,7 @@ class EmployeeController extends Controller
 
         if ($touchesSalary && ! $request->user()->hasCompanyPermission('salary.manage')) {
             throw ValidationException::withMessages([
-                'base_salary' => ['You don\'t have permission to change salaries.'],
+                'base_salary' => ['You don\'t have permission to change salaries or bank details.'],
             ]);
         }
     }
@@ -456,15 +457,19 @@ class EmployeeController extends Controller
         $this->assertTeamFitsDepartment($data, $employee);
         $this->assertManagerFits($data, $employee);
         $this->assertSignInIdUnchanged($employee, $data);
-        $this->assertMayChangeSalary($request, array_filter(
+        $payChanges = array_filter(
             $data,
             fn ($value, $key) => match ($key) {
                 'base_salary' => ($value === null) !== ($employee->base_salary === null) || (float) $value !== (float) $employee->base_salary,
-                'salary_currency' => $value !== $employee->salary_currency,
+                'salary_currency', 'bank_name', 'bank_account_number' => $value !== $employee->{$key},
                 default => false,
             },
             ARRAY_FILTER_USE_BOTH,
-        ));
+        );
+        $this->assertMayChangeSalary($request, $payChanges);
+        if ($payChanges !== []) {
+            SelfApproval::assertNotSelf($request->user(), $employee, 'base_salary', 'change the pay or bank details of');
+        }
         $data = $this->withName($data, $employee);
 
         $employee->update(

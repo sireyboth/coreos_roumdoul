@@ -20,3 +20,6 @@ Schedule::command('model:prune', ['--model' => [Notification::class]])->daily();
 
 // Pay groups set to calculate automatically get their run once a period ends (never approved by itself).
 Schedule::command('payroll:prepare-runs')->hourly();
+
+// Drops sign-in tokens that expired (see sanctum.expiration) over a day ago.
+Schedule::command('sanctum:prune-expired', ['--hours' => 24])->daily();

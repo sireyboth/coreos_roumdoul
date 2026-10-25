@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\FeatureFlagResource\Pages;
 use App\Filament\Resources\FeatureFlagResource\RelationManagers;
 use App\Models\FeatureFlag;
@@ -15,6 +16,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class FeatureFlagResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'feature_flags';
+
     protected static ?string $model = FeatureFlag::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-flag';

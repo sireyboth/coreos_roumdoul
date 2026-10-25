@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\StatutoryRateResource\Pages;
 use App\Models\StatutoryRate;
 use Filament\Forms;
@@ -17,6 +18,10 @@ use Filament\Tables\Table;
  */
 class StatutoryRateResource extends Resource
 {
+    use RequiresPlatformPermission;
+
+    protected static string $permissionArea = 'statutory_rates';
+
     protected static ?string $model = StatutoryRate::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-scale';

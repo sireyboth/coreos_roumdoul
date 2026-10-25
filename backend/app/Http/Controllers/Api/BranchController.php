@@ -25,17 +25,23 @@ class BranchController extends Controller
         return $canSeeQr ? $branch->append('qr_token') : $branch;
     }
 
-    private function canSeeQr(Request $request): bool
+    private function canSeeQr(Request $request, Branch $branch): bool
     {
-        return $request->user()->hasCompanyPermission('branches.manage');
+        return $request->user()->hasCompanyPermission('branches.manage') && $this->inReach($request, $branch);
+    }
+
+    /** Someone limited to some branches changes only those, and gets only their QR codes. */
+    private function inReach(Request $request, Branch $branch): bool
+    {
+        $branchIds = $request->user()->membership?->accessibleBranchIds();
+
+        return $branchIds === null || in_array($branch->id, array_map('intval', $branchIds), true);
     }
 
     public function index(Request $request)
     {
         $branches = Branch::query()->with('workLocation')->inDisplayOrder()->paginate(25);
-        $canSeeQr = $this->canSeeQr($request);
-
-        $branches->getCollection()->each(fn (Branch $branch) => $this->present($branch, $canSeeQr));
+        $branches->getCollection()->each(fn (Branch $branch) => $this->present($branch, $this->canSeeQr($request, $branch)));
 
         return $branches;
     }
@@ -68,16 +74,18 @@ class BranchController extends Controller
 
         $this->syncWorkLocation($branch, $data['require_location'] ?? null);
 
-        return response()->json($this->present($branch->refresh(), $this->canSeeQr($request)), 201);
+        return response()->json($this->present($branch->refresh(), $this->canSeeQr($request, $branch)), 201);
     }
 
     public function show(Request $request, Branch $branch)
     {
-        return $this->present($branch->load('workLocation'), $this->canSeeQr($request));
+        return $this->present($branch->load('workLocation'), $this->canSeeQr($request, $branch));
     }
 
     public function update(Request $request, Branch $branch)
     {
+        abort_unless($this->inReach($request, $branch), 404);
+
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:255'],
@@ -96,11 +104,13 @@ class BranchController extends Controller
 
         $this->syncWorkLocation($branch, $data['require_location'] ?? null);
 
-        return $this->present($branch->refresh(), $this->canSeeQr($request));
+        return $this->present($branch->refresh(), $this->canSeeQr($request, $branch));
     }
 
-    public function destroy(Branch $branch)
+    public function destroy(Request $request, Branch $branch)
     {
+        abort_unless($this->inReach($request, $branch), 404);
+
         $employees = EmployeeAssignment::query()
             ->where('branch_id', $branch->id)
             ->whereNull('effective_to')
@@ -131,11 +141,13 @@ class BranchController extends Controller
      */
     public function regenerateQrCode(Request $request, Branch $branch)
     {
+        abort_unless($this->inReach($request, $branch), 404);
+
         $this->syncWorkLocation($branch);
 
         $branch->refresh()->workLocation->regenerateQrToken();
 
-        return $this->present($branch->fresh('workLocation'), $this->canSeeQr($request));
+        return $this->present($branch->fresh('workLocation'), $this->canSeeQr($request, $branch));
     }
 
     /**
