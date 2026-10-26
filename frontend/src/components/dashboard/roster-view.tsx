@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { BulkScheduleDialog } from "@/components/dashboard/bulk-schedule-dialog";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { useApi } from "@/hooks/use-api";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee, Schedule, WorkLocation, WorkSchedule } from "@/lib/api";
 import { slotsOn, slotsSummary, weekSummary } from "@/lib/schedule";
@@ -146,8 +147,6 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const { me } = useMe();
   const confirm = useConfirm();
   const [month, setMonth] = useState(currentMonth);
-  const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: Schedule[]; total: number } | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [workSchedules, setWorkSchedules] = useState<WorkSchedule[]>([]);
   const [locations, setLocations] = useState<WorkLocation[]>([]);
@@ -159,27 +158,16 @@ export function RosterView({ employee }: { employee?: Employee }) {
   const [bulkKey, setBulkKey] = useState(0);
 
   const employeeId = employee?.id;
-  const requestKey = `${employeeId ?? "all"}|${month}|${reloads}`;
-  // A month at a time: the API only returns the first 50 entries otherwise, which a roster outgrows in a day.
-  const schedules = result?.key === requestKey ? result.data : null;
-  const truncated = result?.key === requestKey && result.total > result.data.length;
-  const loadSchedules = () => setReloads((n) => n + 1);
-  const canManage = me?.permissions.includes("schedules.manage") ?? false;
-
-  useEffect(() => {
-    let cancelled = false;
+  const { data: result, error, reload: loadSchedules } = useApi(() => {
     const first = parseDate(`${month}-01`);
     const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
 
-    api.schedules
-      .list({ from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}`, employeeId })
-      .then((res) => !cancelled && setResult({ key: requestKey, data: res.data, total: res.total }))
-      .catch(() => !cancelled && setResult({ key: requestKey, data: [], total: 0 }));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [month, employeeId, requestKey]);
+    return api.schedules.list({ from: `${month}-01`, to: `${month}-${String(last).padStart(2, "0")}`, employeeId });
+  }, [month, employeeId]);
+  // A month at a time: the API only returns the first 50 entries otherwise, which a roster outgrows in a day.
+  const schedules = result?.data ?? (error ? [] : null);
+  const truncated = result !== null && result.total > result.data.length;
+  const canManage = me?.permissions.includes("schedules.manage") ?? false;
 
   useEffect(() => {
     // One person's tab already knows who it is; the full roster needs the whole list.

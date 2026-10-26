@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, Lock, LockOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { parseDate } from "@/components/dashboard/calendar-shared";
+import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendancePeriod } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -43,39 +44,28 @@ export function AttendanceMonthClose({
   onChanged?: () => void;
 }) {
   const confirm = useConfirm();
-  const [reloads, setReloads] = useState(0);
   const [busy, setBusy] = useState(false);
-  const key = `${month}|${reloads}`;
-  // Kept with the request they answer; a different key means still loading.
-  const [state, setState] = useState<{ key: string; period: AttendancePeriod | null; checklist: Checklist | null } | null>(null);
-  const current = state?.key === key ? state : null;
   const monthLabel = parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
-  useEffect(() => {
-    let cancelled = false;
+  const { data, error, reload } = useApi(() => {
     const { from, to } = monthBounds(month);
 
-    api.attendance
-      .periods()
-      .then(async (periods) => {
-        const period = periods.find((p) => p.month === month) ?? null;
-        // A closed month can't change, so there's nothing left to check.
-        const checklist = period
-          ? null
-          : await Promise.all([
-              api.attendance.list({ from, to, status: "incomplete", per_page: 1 }).then((r) => r.total),
-              api.attendanceCorrections.all().then((all) => all.filter((c) => c.status === "pending" && c.date.slice(0, 7) === month).length),
-              api.attendance.overtime({ status: "pending", from, to }).then((entries) => entries.length),
-              api.attendance.list({ from, to, status: "absent", per_page: 1 }).then((r) => r.total),
-            ]).then(([missed, corrections, overtime, absences]) => ({ missed, corrections, overtime, absences }));
-        if (!cancelled) setState({ key, period, checklist });
-      })
-      .catch(() => !cancelled && setState({ key, period: null, checklist: null }));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [month, key]);
+    return api.attendance.periods().then(async (periods): Promise<{ period: AttendancePeriod | null; checklist: Checklist | null }> => {
+      const period = periods.find((p) => p.month === month) ?? null;
+      // A closed month can't change, so there's nothing left to check.
+      const checklist = period
+        ? null
+        : await Promise.all([
+            api.attendance.list({ from, to, status: "incomplete", per_page: 1 }).then((r) => r.total),
+            api.attendanceCorrections.all().then((all) => all.filter((c) => c.status === "pending" && c.date.slice(0, 7) === month).length),
+            api.attendance.overtime({ status: "pending", from, to }).then((entries) => entries.length),
+            api.attendance.list({ from, to, status: "absent", per_page: 1 }).then((r) => r.total),
+          ]).then(([missed, corrections, overtime, absences]) => ({ missed, corrections, overtime, absences }));
+      return { period, checklist };
+    });
+  }, [month]);
+  // Null while loading; a failed check still offers Close.
+  const current = data ?? (error ? { period: null, checklist: null } : null);
 
   async function close(ignorePending = false) {
     if (!ignorePending) {
@@ -93,7 +83,7 @@ export function AttendanceMonthClose({
     try {
       await api.attendance.lockMonth(month, ignorePending);
       notifySuccess(`${monthLabel} closed`);
-      setReloads((n) => n + 1);
+      reload();
       onChanged?.();
     } catch (err) {
       if (err instanceof ApiError && err.code === "pending_overtime") pendingMessage = err.message;
@@ -122,7 +112,7 @@ export function AttendanceMonthClose({
     try {
       await api.attendance.unlockMonth(month);
       notifySuccess(`${monthLabel} reopened`);
-      setReloads((n) => n + 1);
+      reload();
       onChanged?.();
     } catch (err) {
       notifyError(err);

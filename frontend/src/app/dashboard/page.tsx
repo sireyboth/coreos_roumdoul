@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
+import { useApi } from "@/hooks/use-api";
 import { api, DashboardSummary } from "@/lib/api";
 import { DAY_STATUS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -195,9 +196,6 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
 export default function DashboardPage() {
   const { me } = useMe();
   const router = useRouter();
-  // Everything on this page comes from one small request that the server counts for us.
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-
   const can = (permission: string) => me?.permissions.includes(permission) ?? false;
   const canDashboard = can("dashboard.view");
   const canAttendance = can("attendance.view") && Boolean(me?.modules.attendance);
@@ -216,21 +214,10 @@ export default function DashboardPage() {
     else if (!canDashboard) router.replace(homeFor(me));
   }, [me, canDashboard, router]);
 
-  useEffect(() => {
-    if (!me || !canDashboard) return;
-    let cancelled = false;
-
-    api.dashboard
-      .summary()
-      .then((data) => !cancelled && setSummary(data))
-      // A failed load shows dashes, not zeros — a zero would look like real data.
-      .catch(() => !cancelled && setSummary({ today: isoDate(new Date()), employees: null, branches: null, attendance: null }));
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me?.user.id]);
+  // Everything on this page comes from one small request that the server counts for us.
+  const { data, error } = useApi(me && canDashboard ? () => api.dashboard.summary() : null, [me?.user.id], { keepPrevious: true });
+  // A failed load shows dashes, not zeros — a zero would look like real data.
+  const summary: DashboardSummary | null = data ?? (error ? { today: isoDate(new Date()), employees: null, branches: null, attendance: null } : null);
 
   if (!me || !canDashboard) return null;
 

@@ -23,6 +23,7 @@ import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { OvertimeReview } from "@/components/dashboard/overtime-review";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { useMe } from "@/contexts/me-context";
+import { useApi } from "@/hooks/use-api";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceException, type DaySlot } from "@/lib/api";
 import { attendanceImport } from "@/lib/excel-specs/time";
@@ -131,9 +132,6 @@ function AttendancePageContent() {
   // A linked date opens its own month.
   const [month, setMonth] = useState(() => linkedDate?.slice(0, 7) ?? currentMonth());
   const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: AttendanceDay[]; total: number } | null>(null);
-  // The signed-in person's own days that are missing a scan, so they can ask for a correction.
-  const [myIncomplete, setMyIncomplete] = useState<AttendanceDay[]>([]);
   const [preview, setPreview] = useState<AttendanceDay | null>(null);
   // The days chosen for "Fill missed scans", and how to clear the table's selection once done.
   const [filling, setFilling] = useState<{ days: AttendanceDay[]; clear: () => void } | null>(null);
@@ -143,11 +141,26 @@ function AttendancePageContent() {
   const [pendingOvertime, setPendingOvertime] = useState(0);
   const [pendingCorrections, setPendingCorrections] = useState(0);
 
-  const key = `${month}|${reloads}`;
-  const days = result?.key === key ? result.data : null;
+  const { data: page, error: pageError } = useApi(() => api.attendance.list({ ...monthBounds(month), per_page: 1000 }), [month, reloads]);
+  const result = page ?? (pageError ? { data: [] as AttendanceDay[], total: 0 } : null);
+  const days = result?.data ?? null;
   const missedCount = days?.filter((d) => d.slots.some((s) => s.scan_id === null && s.status === "missing")).length ?? 0;
-  const truncated = result?.key === key && result.total > result.data.length;
+  const truncated = result !== null && result.total > result.data.length;
   const employeeId = me?.employee?.id;
+  // The signed-in person's own days that are missing a scan, so they can ask for a correction.
+  const { data: incomplete } = useApi(
+    employeeId
+      ? () => {
+          const from = new Date();
+          from.setDate(from.getDate() - 45);
+          const iso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+          return api.attendance.list({ employee_id: employeeId, from: iso, status: "incomplete", per_page: 100 }).then((res) => res.data);
+        }
+      : null,
+    [employeeId, reloads],
+    { keepPrevious: true },
+  );
+  const myIncomplete = incomplete ?? [];
   const load = () => setReloads((n) => n + 1);
   const confirm = useConfirm();
 
@@ -168,35 +181,6 @@ function AttendancePageContent() {
     }
     load();
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    api.attendance
-      .list({ ...monthBounds(month), per_page: 1000 })
-      .then((res) => !cancelled && setResult({ key, data: res.data, total: res.total }))
-      .catch(() => !cancelled && setResult({ key, data: [], total: 0 }));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [month, key]);
-
-  useEffect(() => {
-    if (!employeeId) return;
-    let cancelled = false;
-    const from = new Date();
-    from.setDate(from.getDate() - 45);
-    const iso = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
-
-    api.attendance
-      .list({ employee_id: employeeId, from: iso, status: "incomplete", per_page: 100 })
-      .then((res) => !cancelled && setMyIncomplete(res.data))
-      .catch(() => !cancelled && setMyIncomplete([]));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [employeeId, reloads]);
 
   useEffect(() => {
     if (!canManage) return;

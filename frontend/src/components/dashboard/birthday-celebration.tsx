@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Cake, PartyPopper } from "lucide-react";
+import { Cake, CalendarDays, Gift, Heart, PartyPopper, Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api, type Notification } from "@/lib/api";
@@ -92,20 +92,65 @@ function BirthdayCelebrationContent() {
 
   return (
     <Dialog open={!!employeeId && !!alert} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="overflow-hidden text-center sm:max-w-md">
-        <Confetti />
-        <div className="relative flex flex-col items-center gap-3 pt-6 pb-1">
-          <div className="flex size-16 items-center justify-center rounded-full bg-linear-to-br from-rose-500 to-amber-400 text-white shadow-lg shadow-rose-500/25">
-            {isSelf ? <Cake className="size-8" /> : <PartyPopper className="size-8" />}
+      <DialogContent showCloseButton={false} className="gap-0 overflow-hidden p-0 text-center sm:max-w-sm">
+        {/* The card's front: a festive band with a pattern, icons and falling confetti. */}
+        <div className="relative h-36 overflow-hidden bg-linear-to-br from-rose-500 via-pink-500 to-amber-400">
+          <svg aria-hidden className="pointer-events-none absolute inset-0 size-full">
+            <defs>
+              <pattern id="birthday-band" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
+                <circle cx="5" cy="5" r="2" fill="white" fillOpacity="0.25" />
+                <path d="M22 16v8M18 20h8" stroke="white" strokeOpacity="0.22" strokeWidth="1.6" strokeLinecap="round" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#birthday-band)" />
+            <g fill="none" stroke="white" strokeOpacity="0.18" strokeWidth="1.5">
+              <circle cx="0" cy="100%" r="70" />
+              <circle cx="100%" cy="0" r="90" />
+            </g>
+          </svg>
+          <Confetti />
+          <Gift aria-hidden className="absolute top-5 left-6 size-9 -rotate-12 text-white/35" />
+          <Sparkles aria-hidden className="absolute top-4 right-8 size-7 text-white/45" />
+          <Star aria-hidden className="absolute right-16 bottom-8 size-4 fill-white/30 text-white/30" />
+          <Heart aria-hidden className="absolute bottom-9 left-16 size-4 fill-white/30 text-white/30" />
+        </div>
+
+        <div className="relative flex flex-col items-center px-6 pb-6">
+          <div className="-mt-12 flex size-24 items-center justify-center rounded-full bg-background shadow-xl">
+            <div className="flex size-20 items-center justify-center rounded-full bg-linear-to-br from-rose-500 to-amber-400 text-white">
+              {isSelf ? <Cake className="size-10" /> : <PartyPopper className="size-10" />}
+            </div>
           </div>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{today}</p>
-          <DialogTitle className="text-xl font-semibold">{isSelf ? `Happy birthday, ${name}` : `It's ${name}'s birthday`}</DialogTitle>
-          <DialogDescription className="max-w-xs text-sm text-muted-foreground">
+
+          <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+            <CalendarDays className="size-3.5" />
+            {today}
+          </p>
+
+          <DialogTitle className="mt-3 flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-muted-foreground">{isSelf ? "Happy birthday," : "Today we celebrate"}</span>
+            <span className="bg-linear-to-r from-rose-500 via-pink-500 to-amber-500 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+              {name}
+            </span>
+          </DialogTitle>
+
+          <div aria-hidden className="my-4 flex items-center gap-3 text-rose-400">
+            <span className="h-px w-12 bg-linear-to-r from-transparent to-rose-300" />
+            <Heart className="size-4 fill-current" />
+            <span className="h-px w-12 bg-linear-to-l from-transparent to-rose-300" />
+          </div>
+
+          <DialogDescription className="max-w-xs text-sm leading-relaxed text-muted-foreground">
             {isSelf
               ? "On behalf of the whole team, we wish you a wonderful day and a successful year ahead. Thank you for everything you bring to the team."
               : `Today is a special day for ${name}. Take a moment to share your best wishes.`}
           </DialogDescription>
-          <Button className="mt-3 w-full sm:w-auto sm:min-w-32" onClick={close}>
+
+          <Button
+            className="mt-6 h-11 w-full rounded-full bg-linear-to-r from-rose-500 to-amber-500 text-white shadow-lg shadow-rose-500/25 hover:opacity-95"
+            onClick={close}
+          >
+            {isSelf ? <Heart className="size-4" /> : <PartyPopper className="size-4" />}
             {isSelf ? "Thank you" : "Got it"}
           </Button>
         </div>

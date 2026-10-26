@@ -15,6 +15,7 @@ import { LeaveRequestDialog } from "@/components/dashboard/requests/leave-reques
 import { DELETE_REQUESTS_WARNING, RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useMe } from "@/contexts/me-context";
+import { useApi } from "@/hooks/use-api";
 import { api, type EmployeeRequest, type LeaveBalance } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { REQUEST_STATUS, requestAmount, requestDates } from "@/lib/requests";
@@ -56,7 +57,6 @@ function RequestsPage() {
 
   const [scope, setScope] = useState<Scope>(() => (params.get("scope") as Scope) || (selfEmployeeId ? "mine" : "approvals"));
   const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: EmployeeRequest[] } | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[] | null>(null);
   const [waiting, setWaiting] = useState(0);
   const [people, setPeople] = useState<{ id: number; name: string }[] | undefined>(undefined);
@@ -66,23 +66,8 @@ function RequestsPage() {
   // One month at a time, like Attendance; a request shows in every month it touches.
   const [month, setMonth] = useState(currentMonth);
 
-  const key = `${scope}|${month}|${reloads}`;
-  const rows = result?.key === key ? result.data : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    api.requests
-      .list({ scope, ...monthBounds(month) })
-      .then((data) => !cancelled && setResult({ key, data }))
-      .catch((err) => {
-        if (cancelled) return;
-        notifyError(err);
-        setResult({ key, data: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [scope, month, key]);
+  const { data, error } = useApi(() => api.requests.list({ scope, ...monthBounds(month) }), [scope, month, reloads], { notify: true });
+  const rows = data ?? (error ? [] : null);
 
   useEffect(() => {
     api.requests.waitingCount().then((r) => setWaiting(r.count)).catch(() => setWaiting(0));
@@ -101,7 +86,6 @@ function RequestsPage() {
   }, [params]);
 
   const changed = useCallback((updated: EmployeeRequest) => {
-    setResult((r) => (r ? { ...r, data: r.data.map((x) => (x.id === updated.id ? updated : x)) } : r));
     // Still open (e.g. after changing the leave type): show the new version.
     setOpen((o) => (o?.id === updated.id ? updated : o));
     setReloads((n) => n + 1);

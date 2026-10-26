@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, UserMinus, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { EMPLOYMENT_STATUSES, hasLeft, labelFor, statusVariant } from "@/components/dashboard/employee-form";
+import { useApi } from "@/hooks/use-api";
 import { api, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -44,27 +45,23 @@ export function MembersDialog({
   onChanged: () => void;
 }) {
   const targetId = target?.id;
-  const [members, setMembers] = useState<Employee[] | null>(null);
   const [candidates, setCandidates] = useState<Employee[] | null>(null);
   const [mode, setMode] = useState<"list" | "add">("list");
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
-  const [reloads, setReloads] = useState(0);
 
-  useEffect(() => {
-    if (targetId === undefined) return;
-    let cancelled = false;
-
-    api.employees
-      .list(kind === "department" ? { departmentId: targetId } : { teamId: targetId })
-      .then((res) => !cancelled && setMembers(res.data))
-      .catch(() => !cancelled && setMembers([]));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [kind, targetId, reloads]);
+  const { data: members, reload } = useApi(
+    targetId === undefined
+      ? null
+      : () =>
+          api.employees
+            .list(kind === "department" ? { departmentId: targetId } : { teamId: targetId })
+            .then((res) => res.data)
+            .catch((): Employee[] => []),
+    [kind, targetId],
+    { keepPrevious: true },
+  );
 
   const memberIds = useMemo(() => new Set((members ?? []).map((m) => m.id)), [members]);
   const term = search.trim().toLowerCase();
@@ -99,7 +96,7 @@ export function MembersDialog({
   }
 
   function refresh() {
-    setReloads((n) => n + 1);
+    reload();
     onChanged();
   }
 

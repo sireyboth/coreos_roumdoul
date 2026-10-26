@@ -95,12 +95,12 @@ class BirthdayNotificationTest extends TestCase
         $this->assertSame(2, $this->notifyAt('2026-10-10 08:05'));
 
         $own = $this->birthdayAlerts($daraUser)->sole();
-        $this->assertSame('🎂 Happy birthday, Dara!', $own->title);
+        $this->assertSame('Happy birthday, Dara!', $own->title);
         $this->assertTrue($own->data['is_self']);
         $this->assertSame("/dashboard?birthday={$dara->id}", $own->link);
 
         $colleague = $this->birthdayAlerts($sameBranch)->sole();
-        $this->assertSame("🎉 It's Dara's birthday today", $colleague->title);
+        $this->assertSame("It's Dara's birthday today", $colleague->title);
         $this->assertFalse($colleague->data['is_self']);
 
         $this->assertCount(0, $this->birthdayAlerts($otherBranch));

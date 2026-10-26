@@ -10,6 +10,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssignScheduleDialog } from "@/components/dashboard/assign-schedule-dialog";
 import { parseDate } from "@/components/dashboard/calendar-shared";
+import { useApi } from "@/hooks/use-api";
 import { api, type ScheduleAssignment, type WorkSchedule } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { daysOffText, weekSummary } from "@/lib/schedule";
@@ -30,23 +31,10 @@ function todayLocal(): string {
  */
 export function EmployeeScheduleAssignments({ employee, canManage }: { employee: { id: number; name: string }; canManage: boolean }) {
   const confirm = useConfirm();
-  const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: number; data: ScheduleAssignment[] } | null>(null);
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
-  const assignments = result?.key === reloads ? result.data : null;
-  const reload = () => setReloads((n) => n + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.scheduleAssignments
-      .list({ employeeId: employee.id })
-      .then((data) => !cancelled && setResult({ key: reloads, data }))
-      .catch(() => !cancelled && setResult({ key: reloads, data: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [employee.id, reloads]);
+  const { data, error, reload } = useApi(() => api.scheduleAssignments.list({ employeeId: employee.id }), [employee.id]);
+  const assignments = data ?? (error ? [] : null);
 
   // Each schedule's week, for the "what does that mean" line under its name.
   useEffect(() => {

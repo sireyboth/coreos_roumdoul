@@ -24,7 +24,8 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { CalendarAgenda } from "@/components/dashboard/calendar-agenda";
 import { TeamCalendar } from "@/components/dashboard/team-calendar";
 import { useMe } from "@/contexts/me-context";
-import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
+import { useApi } from "@/hooks/use-api";
+import { api, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
 import { dayOffImport, exportMonthCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
 import { formatMinutes, slotsSummary } from "@/lib/schedule";
@@ -43,7 +44,6 @@ export default function CalendarPage() {
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: CalendarMonth | null; error: string | null } | null>(null);
   const [selected, setSelected] = useState<CalendarDay | null>(null);
 
   // An admin who isn't an employee has no "my calendar" — they pick someone
@@ -51,7 +51,6 @@ export default function CalendarPage() {
   const hasOwnCalendar = Boolean(me?.employee);
   const needsPick = canManage && !hasOwnCalendar;
   const effectiveEmployeeId = employeeId || (needsPick ? String(employees[0]?.id ?? "") : "");
-  const requestKey = `${month}|${effectiveEmployeeId}|${reloads}`;
 
   useEffect(() => {
     if (canManage) {
@@ -59,27 +58,13 @@ export default function CalendarPage() {
     }
   }, [canManage]);
 
-  useEffect(() => {
-    if (activeView !== "individual") return;
-    if (needsPick && !effectiveEmployeeId) return;
-
-    let cancelled = false;
-
-    api.calendar
-      .month(month, effectiveEmployeeId ? Number(effectiveEmployeeId) : undefined)
-      .then((data) => !cancelled && setResult({ key: requestKey, data, error: null }))
-      .catch((err) => {
-        if (cancelled) return;
-        setResult({ key: requestKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't load the calendar." });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [month, effectiveEmployeeId, requestKey, activeView, needsPick]);
-
-  const loading = result?.key !== requestKey && !(needsPick && employees.length === 0);
-  const data = result?.data ?? null;
+  const { data, error, loading } = useApi<CalendarMonth>(
+    activeView === "individual" && !(needsPick && !effectiveEmployeeId)
+      ? () => api.calendar.month(month, effectiveEmployeeId ? Number(effectiveEmployeeId) : undefined)
+      : null,
+    [month, effectiveEmployeeId, reloads],
+    { errorMessage: "Couldn't load the calendar.", keepPrevious: true },
+  );
   const reload = () => setReloads((n) => n + 1);
 
   const leadingBlanks = data ? parseDate(data.days[0].date).getDay() : 0;
@@ -180,7 +165,7 @@ export default function CalendarPage() {
               <Alert variant="info">There are no employees yet. Add one from the Employees page to see their calendar.</Alert>
             )}
 
-            {result?.error && !loading && <Alert variant="warning">{result.error}</Alert>}
+            {error && <Alert variant="warning">{error}</Alert>}
 
             {data && (
               <div className="flex flex-wrap gap-2 text-sm">

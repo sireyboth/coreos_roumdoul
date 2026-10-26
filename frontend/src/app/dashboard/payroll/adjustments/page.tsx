@@ -16,6 +16,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { KIND_HINTS, KIND_LABELS, currentMonth, dateInMonth, dateLabel, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
+import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type PayKind, type PayrollAdjustment } from "@/lib/api";
 import { adjustmentImport } from "@/lib/excel-specs/payroll";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -186,33 +187,19 @@ export default function PayrollAdjustmentsPage() {
   const { me } = useMe();
   const canManage = me?.permissions.includes("payroll.manage") ?? false;
   const [month, setMonth] = useState(previousMonth);
-  const [rows, setRows] = useState<PayrollAdjustment[] | null>(null);
-  const [reloads, setReloads] = useState(0);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const spec = useMemo(() => adjustmentImport(dateInMonth(month)), [month]);
 
-  useEffect(() => {
-    let cancelled = false;
-    api.payroll
-      .adjustments(month)
-      .then((list) => !cancelled && setRows(list))
-      .catch((err) => {
-        notifyError(err);
-        setRows([]);
-      });
-    return () => {
-      cancelled = true;
-      setRows(null);
-    };
-  }, [month, reloads]);
+  const { data, error, reload } = useApi(() => api.payroll.adjustments(month), [month], { notify: true });
+  const rows = data ?? (error ? [] : null);
 
   async function remove(a: PayrollAdjustment) {
     const ok = await confirm({ title: `Remove “${a.name}”?`, description: `For ${a.employee?.name ?? "this employee"}, ${dateLabel(a.date)}.`, confirmLabel: "Remove", destructive: true });
     if (!ok) return;
     try {
       await api.payroll.removeAdjustment(a.id);
-      setReloads((n) => n + 1);
+      reload();
     } catch (err) {
       notifyError(err);
     }
@@ -286,8 +273,8 @@ export default function PayrollAdjustmentsPage() {
       />
       <p className="text-xs text-muted-foreground">Amounts are in each employee&apos;s salary currency (e.g. {money(35, "USD")} or {money(140000, "KHR")}).</p>
 
-      {adding && <AddDialog month={month} onOpenChange={setAdding} onSaved={() => setReloads((n) => n + 1)} />}
-      <ExcelImportDialog spec={spec} open={importing} onOpenChange={setImporting} onImported={() => setReloads((n) => n + 1)} />
+      {adding && <AddDialog month={month} onOpenChange={setAdding} onSaved={reload} />}
+      <ExcelImportDialog spec={spec} open={importing} onOpenChange={setImporting} onImported={reload} />
     </div>
   );
 }

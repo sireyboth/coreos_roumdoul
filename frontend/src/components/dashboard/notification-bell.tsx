@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BellOff, BellRing, CheckCheck } from "lucide-react";
+import { Bell, BellOff, BellRing, Cake, CheckCheck, Gift, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { requestSystemPermission, showSystemNotification, systemPermission, type SystemPermission } from "@/lib/alert-signals";
 import { api, type Notification } from "@/lib/api";
+import { alertStyle, alertTitle } from "@/lib/notification-style";
 import { disablePush, enablePush, onPushChange, pushState, setAppBadge, syncPush, type PushState } from "@/lib/push";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,60 @@ function timeAgo(iso: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function AlertIcon({ type }: { type: string }) {
+  const { icon: Icon, tone } = alertStyle(type);
+  return (
+    <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br text-white shadow-sm", tone)}>
+      <Icon className="size-4" />
+    </span>
+  );
+}
+
+/** A birthday alert drawn as a small greeting card. */
+function BirthdayAlertCard({ notification }: { notification: Notification }) {
+  const isSelf = notification.data.is_self === true;
+  return (
+    <div
+      className={cn(
+        "relative w-full overflow-hidden rounded-xl bg-linear-to-br from-rose-500 via-pink-500 to-amber-400 p-3.5 text-white shadow-md shadow-rose-500/20",
+        notification.read_at && "opacity-85",
+      )}
+    >
+      {/* Confetti-like scatter of dots and crosses. */}
+      <svg aria-hidden className="pointer-events-none absolute inset-0 size-full">
+        <defs>
+          <pattern id={`bday-${notification.id}`} width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(20)">
+            <circle cx="4" cy="4" r="1.6" fill="white" fillOpacity="0.28" />
+            <path d="M18 14v6M15 17h6" stroke="white" strokeOpacity="0.22" strokeWidth="1.4" strokeLinecap="round" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill={`url(#bday-${notification.id})`} />
+      </svg>
+      <Gift aria-hidden className="absolute -right-3 -bottom-3 size-20 rotate-12 text-white/15" />
+
+      <div className="relative flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
+          <Cake className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+            Birthday
+            <span className="size-0.5 rounded-full bg-white/70" />
+            {timeAgo(notification.created_at)}
+          </p>
+          <p className="mt-0.5 text-sm font-semibold leading-snug">{alertTitle(notification.data.title)}</p>
+          {notification.data.body && <p className="mt-0.5 text-xs text-white/85">{notification.data.body}</p>}
+          <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-600 shadow-sm">
+            <PartyPopper className="size-3.5" />
+            {isSelf ? "Open your card" : "Open the card"}
+          </span>
+        </div>
+        {!notification.read_at && <span className="mt-1 size-2 shrink-0 rounded-full bg-white" />}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -87,13 +142,13 @@ export function NotificationBell() {
           // A toast per new alert (at most three). The id keeps a second mounted bell from repeating it.
           const fresh = list.filter((n) => !n.read_at && !n.resolved_at && n.id > previous).slice(0, 3);
           fresh.forEach((n) => {
-            toast(n.data.title, {
+            toast(alertTitle(n.data.title), {
               id: `notification-${n.id}`,
               description: n.data.body,
               action: n.link ? { label: "Open", onClick: () => openNotification(n) } : undefined,
             });
             // With push on, the service worker already shows it on this device.
-            if (!pushOn) showSystemNotification(n.data.title, { body: n.data.body, tag: `notification-${n.id}`, onClick: () => openNotification(n) });
+            if (!pushOn) showSystemNotification(alertTitle(n.data.title), { body: n.data.body, tag: `notification-${n.id}`, onClick: () => openNotification(n) });
           });
         }
       }
@@ -162,7 +217,7 @@ export function NotificationBell() {
           </Badge>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[70vh] w-80 overflow-y-auto">
+      <DropdownMenuContent align="end" className="max-h-[70vh] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto">
         <DropdownMenuGroup>
           <div className="flex items-center justify-between gap-2 pr-1">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
@@ -175,26 +230,39 @@ export function NotificationBell() {
           </div>
           <DropdownMenuSeparator />
           {notifications.length === 0 && <p className="p-3 text-sm text-muted-foreground">No notifications yet.</p>}
-          {notifications.map((notification) => (
-            <DropdownMenuItem
-              key={notification.id}
-              onClick={() => openNotification(notification)}
-              className={cn("flex flex-col items-start gap-1 whitespace-normal", notification.read_at && "opacity-75")}
-            >
-              <div className="flex w-full items-center justify-between gap-2">
-                <span className={cn("text-sm", notification.read_at ? "font-normal" : "font-medium")}>{notification.data.title}</span>
-                {!notification.read_at && <span className="size-2 shrink-0 rounded-full bg-primary" />}
-              </div>
-              {notification.data.body && <span className="text-xs text-muted-foreground">{notification.data.body}</span>}
-              {notification.resolved_at && (
-                <Badge variant={notification.resolution === "rejected" ? "destructive" : "success"} className="capitalize">
-                  {notification.resolution}
-                  {notification.resolved_by ? ` by ${notification.resolved_by}` : ""}
-                </Badge>
-              )}
-              <span className="text-xs text-muted-foreground">{timeAgo(notification.created_at)}</span>
-            </DropdownMenuItem>
-          ))}
+          {notifications.map((notification) =>
+            notification.type === "birthday" ? (
+              <DropdownMenuItem
+                key={notification.id}
+                onClick={() => openNotification(notification)}
+                className="my-1 p-0 whitespace-normal focus:bg-transparent"
+              >
+                <BirthdayAlertCard notification={notification} />
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                key={notification.id}
+                onClick={() => openNotification(notification)}
+                className={cn("flex items-start gap-3 whitespace-normal py-2.5", notification.read_at && "opacity-75")}
+              >
+                <AlertIcon type={notification.type} />
+                <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className={cn("text-sm", notification.read_at ? "font-normal" : "font-medium")}>{alertTitle(notification.data.title)}</span>
+                    {!notification.read_at && <span className="size-2 shrink-0 rounded-full bg-primary" />}
+                  </div>
+                  {notification.data.body && <span className="text-xs text-muted-foreground">{notification.data.body}</span>}
+                  {notification.resolved_at && (
+                    <Badge variant={notification.resolution === "rejected" ? "destructive" : "success"} className="capitalize">
+                      {notification.resolution}
+                      {notification.resolved_by ? ` by ${notification.resolved_by}` : ""}
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">{timeAgo(notification.created_at)}</span>
+                </div>
+              </DropdownMenuItem>
+            ),
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <div className="flex flex-col gap-1 p-1">

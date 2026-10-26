@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, type Payslip, type PayslipBody } from "@/lib/api";
-import { notifyError } from "@/lib/notify";
+import { useApi } from "@/hooks/use-api";
+import { api, type PayslipBody } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { LINE_SECTIONS, WarningList, dateLabel, money, monthLabel } from "./shared";
 
@@ -118,20 +117,7 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
 
 /** A saved payslip, opened from a pay run. */
 export function PayslipDialog({ payslipId, onOpenChange }: { payslipId: number | null; onOpenChange: (open: boolean) => void }) {
-  const [slip, setSlip] = useState<Payslip | null>(null);
-
-  useEffect(() => {
-    if (!payslipId) return;
-    let cancelled = false;
-    api.payroll
-      .payslip(payslipId)
-      .then((s) => !cancelled && setSlip(s))
-      .catch(notifyError);
-    return () => {
-      cancelled = true;
-      setSlip(null);
-    };
-  }, [payslipId]);
+  const { data: slip } = useApi(payslipId ? () => api.payroll.payslip(payslipId) : null, [payslipId], { notify: true });
 
   return (
     <Dialog open={payslipId !== null} onOpenChange={onOpenChange}>

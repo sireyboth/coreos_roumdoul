@@ -19,7 +19,8 @@ import {
   WEEKDAYS,
 } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { api, ApiError, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
+import { useApi } from "@/hooks/use-api";
+import { api, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
 import { dayOffImport, exportTeamCalendar } from "@/lib/excel-specs/time";
 import { khmerDay } from "@/lib/khmer";
 import { slotsSummary } from "@/lib/schedule";
@@ -44,34 +45,17 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
   const [branchId, setBranchId] = useState("");
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState("");
-  const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; data: TeamData | null; error: string | null } | null>(null);
   const [selected, setSelected] = useState<{ employee: { id: number; name: string }; day: CalendarDay } | null>(null);
-
-  const requestKey = `${month}|${branchId}|${reloads}|${refreshKey}`;
 
   useEffect(() => {
     api.branches.list().then((res) => setBranches(res.data)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    api.calendar
-      .team(month, branchId ? Number(branchId) : undefined)
-      .then((data) => !cancelled && setResult({ key: requestKey, data, error: null }))
-      .catch((err) => {
-        if (cancelled) return;
-        setResult({ key: requestKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't load the team calendar." });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [month, branchId, requestKey]);
-
-  const loading = result?.key !== requestKey;
-  const data = result?.data ?? null;
+  const { data, error, loading, reload } = useApi<TeamData>(
+    () => api.calendar.team(month, branchId ? Number(branchId) : undefined),
+    [month, branchId, refreshKey],
+    { errorMessage: "Couldn't load the team calendar.", keepPrevious: true },
+  );
 
   const employees = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -147,12 +131,12 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
             onExport={() => exportTeamCalendar(month, branchId ? Number(branchId) : undefined)}
             // Days off are what the calendar adds by hand; one-off schedule changes go through the Roster.
             importSpec={canManage ? dayOffImport : undefined}
-            onImported={() => setReloads((n) => n + 1)}
+            onImported={reload}
           />
         </div>
       </div>
 
-      {result?.error && !loading && <Alert variant="warning">{result.error}</Alert>}
+      {error && <Alert variant="warning">{error}</Alert>}
       {data?.truncated && (
         <Alert variant="warning">
           Showing the first {data.employees.length} of {data.total} employees. Pick a branch to narrow it down.
@@ -319,7 +303,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
         onOpenChange={(isOpen) => {
           if (!isOpen) setSelected(null);
         }}
-        onChanged={() => setReloads((n) => n + 1)}
+        onChanged={reload}
       />
     </div>
   );

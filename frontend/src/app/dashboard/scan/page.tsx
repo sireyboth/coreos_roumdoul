@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronLeft, House, QrCode, X } from "lucide-react";
+import { CheckCircle2, QrCode, X } from "lucide-react";
+import { HomeButton } from "@/components/dashboard/home-button";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/contexts/me-context";
@@ -105,14 +106,7 @@ export default function ScanPage() {
 
   return (
     <div className="relative flex h-full flex-col bg-black text-white">
-      <Link
-        href="/dashboard/home"
-        className="absolute top-4 left-4 z-10 flex h-10 items-center gap-1.5 rounded-full bg-primary pr-4 pl-3 text-sm font-semibold text-primary-foreground shadow-md transition-transform active:scale-95 md:hidden"
-      >
-        <ChevronLeft className="size-4" />
-        <House className="size-4" />
-        Home
-      </Link>
+      <HomeButton className="absolute top-4 left-4 z-10 md:hidden" />
       <Link href="/dashboard/attendance" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white" aria-label="Exit scan mode">
         <X className="size-5" />
       </Link>

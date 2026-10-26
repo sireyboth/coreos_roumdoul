@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
 import { parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { useApi } from "@/hooks/use-api";
 import { api, type AttendanceDay } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -53,16 +54,23 @@ export function MissedScansDialog({
   const [month, setMonth] = useState(initialMonth);
   const [employeeId, setEmployeeId] = useState(ALL);
   const [people, setPeople] = useState<{ value: string; label: string }[]>([]);
-  const [result, setResult] = useState<{ key: string; days: AttendanceDay[] } | null>(null);
-  const [reloads, setReloads] = useState(0);
   // Times typed in, by day id then slot sequence; untouched slots use the schedule.
   const [times, setTimes] = useState<Record<number, Record<number, string>>>({});
   const [reason, setReason] = useState("");
   const [reasonMissing, setReasonMissing] = useState(false);
   const [saving, setSaving] = useState<number | "all" | null>(null);
 
-  const key = `${month}|${employeeId}|${reloads}`;
-  const days = result?.key === key ? result.days : null;
+  const { data, error, reload } = useApi(
+    open
+      ? () =>
+          api.attendance
+            .list({ ...monthRange(month), missed: true, per_page: 1000, employee_id: employeeId ? Number(employeeId) : undefined })
+            .then((page) => page.data.filter((d) => d.slots.some(isMissing)))
+      : null,
+    [month, employeeId],
+    { notify: true },
+  );
+  const days = data ?? (error ? [] : null);
 
   useEffect(() => {
     if (!open) return;
@@ -71,22 +79,6 @@ export function MissedScansDialog({
       .then((list) => setPeople([{ value: ALL, label: "All employees" }, ...list.map((e) => ({ value: String(e.id), label: e.name }))]))
       .catch(notifyError);
   }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    api.attendance
-      .list({ ...monthRange(month), missed: true, per_page: 1000, employee_id: employeeId ? Number(employeeId) : undefined })
-      .then((page) => !cancelled && setResult({ key, days: page.data.filter((d) => d.slots.some(isMissing)) }))
-      .catch((err) => {
-        if (cancelled) return;
-        notifyError(err);
-        setResult({ key, days: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, month, employeeId, key]);
 
   function close(next: boolean) {
     if (!next) {
@@ -128,11 +120,11 @@ export function MissedScansDialog({
         filled += (await api.attendance.fillMissed(group.ids, reason.trim(), group.times ?? undefined)).filled;
       }
       notifySuccess(`Missed scans saved on ${filled} ${filled === 1 ? "day" : "days"}`, reason.trim());
-      setReloads((n) => n + 1);
+      reload();
       onChanged();
     } catch (err) {
       notifyError(err);
-      setReloads((n) => n + 1);
+      reload();
     } finally {
       setSaving(null);
     }

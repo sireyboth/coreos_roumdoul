@@ -59,7 +59,7 @@ class BirthdayNotifier
             if ($self = $this->activeUser($employee)) {
                 NotificationService::send(
                     $self, self::TYPE,
-                    "🎂 Happy birthday, {$employee->name}!",
+                    "Happy birthday, {$employee->name}!",
                     "Everyone at {$company->name} wishes you a wonderful day.",
                     data: [...$data, 'is_self' => true],
                     subject: $employee,
@@ -72,7 +72,7 @@ class BirthdayNotifier
             foreach ($this->colleagues($company, $employee) as $colleague) {
                 NotificationService::send(
                     $colleague, self::TYPE,
-                    "🎉 It's {$employee->name}'s birthday today",
+                    "It's {$employee->name}'s birthday today",
                     'Take a moment to wish them a happy birthday!',
                     data: [...$data, 'is_self' => false],
                     subject: $employee,

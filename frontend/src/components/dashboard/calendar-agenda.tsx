@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Coffee, Flag, Palmtree, UserX, type LucideIcon } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { parseDate } from "@/components/dashboard/calendar-shared";
-import { api, ApiError, CalendarEvent, CalendarEventType, CalendarEvents, Employee } from "@/lib/api";
+import { useApi } from "@/hooks/use-api";
+import { api, CalendarEvent, CalendarEventType, CalendarEvents, Employee } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 // Full class strings so Tailwind can see them. Colours match the month grid.
@@ -82,27 +83,14 @@ export function CalendarAgenda({ canManage, employees }: { canManage: boolean; e
   // "" = everyone for a manager, yourself for anyone else.
   const [employeeId, setEmployeeId] = useState("");
   const [types, setTypes] = useState<CalendarEventType[]>(ALL_TYPES);
-  const [result, setResult] = useState<{ key: string; data: CalendarEvents | null; error: string | null } | null>(null);
 
   const [from, to] = rangeDates(range);
-  const requestKey = `${from}|${to}|${employeeId}`;
 
-  useEffect(() => {
-    let cancelled = false;
-    api.calendar
-      .events(from, to, employeeId ? Number(employeeId) : undefined)
-      .then((data) => !cancelled && setResult({ key: requestKey, data, error: null }))
-      .catch((err) => {
-        if (cancelled) return;
-        setResult({ key: requestKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't load the agenda." });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [from, to, employeeId, requestKey]);
-
-  const loading = result?.key !== requestKey;
-  const data = loading ? null : result?.data ?? null;
+  const { data, error, loading } = useApi<CalendarEvents>(
+    () => api.calendar.events(from, to, employeeId ? Number(employeeId) : undefined),
+    [from, to, employeeId],
+    { errorMessage: "Couldn't load the agenda." },
+  );
   const showPeople = canManage && !employeeId;
 
   // Filtering by type happens here, not on the server: switching chips is instant
@@ -190,7 +178,7 @@ export function CalendarAgenda({ canManage, employees }: { canManage: boolean; e
         })}
       </div>
 
-      {result?.error && !loading && <Alert variant="warning">{result.error}</Alert>}
+      {error && <Alert variant="warning">{error}</Alert>}
       {loading && <Skeleton className="h-96 w-full" />}
 
       {data && months.length === 0 && (

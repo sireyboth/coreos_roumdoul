@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, ChevronUp, FileDown, FileSpreadsheet, FileText, GripVertical } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { useMe } from "@/contexts/me-context";
+import { useApi } from "@/hooks/use-api";
 import { api, ApiError, Employee } from "@/lib/api";
 import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights";
 import { withBusy } from "@/lib/busy";
@@ -137,7 +138,6 @@ function ExportForm({
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [employeeId, setEmployeeId] = useState("");
-  const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   // Only mounted while the dialog is open, so this always runs in the browser.
@@ -146,19 +146,12 @@ function ExportForm({
   const picked = layout.order.filter((c) => !layout.hidden.includes(c));
   const showPicker = canPickEmployee && !employee;
 
-  useEffect(() => {
-    if (!showPicker) return;
-    let cancelled = false;
-
-    api.employees
-      .list()
-      .then((res) => !cancelled && setEmployees([...res.data].sort((a, b) => a.name.localeCompare(b.name))))
-      .catch(() => !cancelled && setEmployees([]));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [showPicker]);
+  const { data: sorted, error: employeesError } = useApi(
+    showPicker ? () => api.employees.list().then((res) => [...res.data].sort((a, b) => a.name.localeCompare(b.name))) : null,
+    [showPicker],
+    { keepPrevious: true },
+  );
+  const employees: Employee[] | null = sorted ?? (employeesError ? [] : null);
 
   const span = from && to ? daysBetween(from, to) : null;
   const rangeProblem =

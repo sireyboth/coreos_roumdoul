@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { useApi } from "@/hooks/use-api";
 import { api, type AuditEntry, type AuditFilters, type AuditModule, type AuditOptions } from "@/lib/api";
 import { notifyError } from "@/lib/notify";
 import { cn } from "@/lib/utils";
@@ -251,7 +252,6 @@ export default function AuditLogPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<{ rows: AuditEntry[]; total: number; lastPage: number } | null>(null);
   const [reloads, setReloads] = useState(0);
   const [selected, setSelected] = useState<AuditEntry | null>(null);
 
@@ -268,21 +268,15 @@ export default function AuditLogPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => {
-    let cancelled = false;
-    api.audit
-      .list({ ...filters, search, page, per_page: PAGE_SIZE })
-      .then((res) => !cancelled && setResult({ rows: res.data, total: res.total, lastPage: res.last_page ?? 1 }))
-      .catch((err) => {
-        if (cancelled) return;
-        notifyError(err);
-        setResult({ rows: [], total: 0, lastPage: 1 });
-      });
-    return () => {
-      cancelled = true;
-      setResult(null);
-    };
-  }, [filters, search, page, reloads]);
+  const { data, error } = useApi(
+    () =>
+      api.audit
+        .list({ ...filters, search, page, per_page: PAGE_SIZE })
+        .then((res) => ({ rows: res.data, total: res.total, lastPage: res.last_page ?? 1 })),
+    [filters, search, page, reloads],
+    { notify: true },
+  );
+  const result = data ?? (error ? { rows: [] as AuditEntry[], total: 0, lastPage: 1 } : null);
 
   function setFilter(key: keyof Filters, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));

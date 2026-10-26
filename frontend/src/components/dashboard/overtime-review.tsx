@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Hourglass, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { monthBounds, MonthBar, parseDate } from "@/components/dashboard/calendar-shared";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
+import { useApi } from "@/hooks/use-api";
 import { api, type OvertimeEntry } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { formatMinutes, OVERTIME_TYPE } from "@/lib/schedule";
@@ -27,23 +28,9 @@ const STATUS_TABS: { id: Status; label: string }[] = [
  */
 export function OvertimeReview({ month, onMonthChange, onChanged }: { month: string; onMonthChange: (month: string) => void; onChanged?: () => void }) {
   const [status, setStatus] = useState<Status>("pending");
-  const [reloads, setReloads] = useState(0);
-  // Kept with the request it answers; a different key means it is still loading.
-  const [result, setResult] = useState<{ key: string; data: OvertimeEntry[] } | null>(null);
-  const requestKey = `${status}|${month}|${reloads}`;
-  const entries = result?.key === requestKey ? result.data : null;
+  const { data, error, reload } = useApi(() => api.attendance.overtime({ status, ...monthBounds(month) }), [status, month]);
+  const entries = data ?? (error ? [] : null);
   const [busy, setBusy] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    api.attendance
-      .overtime({ status, ...monthBounds(month) })
-      .then((data) => !cancelled && setResult({ key: requestKey, data }))
-      .catch(() => !cancelled && setResult({ key: requestKey, data: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [status, month, requestKey]);
 
   async function review(entry: OvertimeEntry, decision: "approve" | "reject") {
     setBusy(entry.id);
@@ -54,7 +41,7 @@ export function OvertimeReview({ month, onMonthChange, onChanged }: { month: str
         decision === "approve" ? "Overtime approved" : "Overtime rejected",
         `${entry.employee.name} · ${formatMinutes(entry.overtime_minutes)} on ${entry.date}`,
       );
-      setReloads((n) => n + 1);
+      reload();
       onChanged?.();
     } catch (err) {
       notifyError(err);

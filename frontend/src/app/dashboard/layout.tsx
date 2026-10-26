@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronLeft, House, Loader2, Menu, X } from "lucide-react";
+import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLoadGate } from "@/components/ui/page-load-gate";
 import { AccountBanner } from "@/components/dashboard/account-banner";
 import { AiAssistant } from "@/components/dashboard/ai-assistant";
 import { BirthdayCelebration } from "@/components/dashboard/birthday-celebration";
+import { HomeButton } from "@/components/dashboard/home-button";
 import { MobileTabBar } from "@/components/dashboard/mobile-tab-bar";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
@@ -17,12 +18,10 @@ import { findNavItem } from "@/components/dashboard/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MeProvider, useMe } from "@/contexts/me-context";
 import { markAppSessionStarted } from "@/lib/app-launch";
-import { useT } from "@/lib/home-lang";
 
 function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean }) {
   const { me } = useMe();
   const pathname = usePathname();
-  const t = useT();
 
   return (
     <header className="flex items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur md:hidden">
@@ -30,14 +29,7 @@ function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean 
         <p className="truncate text-sm font-semibold">{me?.company?.name ?? "Business OS"}</p>
       ) : (
         // Every other page gets an obvious way back to the phone home screen.
-        <Link
-          href="/dashboard/home"
-          className="flex h-10 items-center gap-1.5 rounded-full bg-primary pr-4 pl-3 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/25 transition-transform active:scale-95"
-        >
-          <ChevronLeft className="size-4" />
-          <House className="size-4" />
-          {t({ km: "ទំព័រដើម", en: "Home" })}
-        </Link>
+        <HomeButton />
       )}
       <div className="flex items-center gap-2">
         <NotificationBell />

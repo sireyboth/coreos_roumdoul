@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CalendarPlus, Plus, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendanceDay, type Employee } from "@/lib/api";
 import { scansOn } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
@@ -57,43 +58,31 @@ export function AttendanceAddDialog({
 }
 
 function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) => void; onOpenDay: (day: AttendanceDay) => void }) {
-  const [employees, setEmployees] = useState<Employee[] | null>(null);
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState(todayLocal);
   const [times, setTimes] = useState<string[]>(["08:00", "17:00"]);
   const [reason, setReason] = useState("");
-  // The record found for an employee + date, keyed so a stale answer never shows for a new choice.
-  const [found, setFound] = useState<{ key: string; day: AttendanceDay | null } | null>(null);
-  const key = `${employeeId}|${date}`;
-  const existing = found?.key === key ? found.day : null;
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    api.employees
-      .all()
-      .then((list) => !cancelled && setEmployees([...list].sort((a, b) => a.name.localeCompare(b.name))))
-      .catch(() => !cancelled && setEmployees([]));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: sorted, error: employeesError } = useApi(
+    () => api.employees.all().then((list) => [...list].sort((a, b) => a.name.localeCompare(b.name))),
+    [],
+  );
+  const employees: Employee[] | null = sorted ?? (employeesError ? [] : null);
 
-  useEffect(() => {
-    if (!employeeId || !date) return;
-    let cancelled = false;
-    const lookup = `${employeeId}|${date}`;
-    api.attendance
-      .list({ employee_id: Number(employeeId), from: date, to: date, per_page: 1 })
-      .then((res) => !cancelled && setFound({ key: lookup, day: res.data.find((d) => d.date.slice(0, 10) === date && d.scans.length > 0) ?? null }))
-      .catch(() => {
-        // Only a hint; saving still works and the server has the final say.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [employeeId, date]);
+  // The record found for an employee + date. A failed lookup is only a hint;
+  // saving still works and the server has the final say.
+  const { data: found } = useApi(
+    employeeId && date
+      ? () =>
+          api.attendance
+            .list({ employee_id: Number(employeeId), from: date, to: date, per_page: 1 })
+            .then((res) => res.data.find((d) => d.date.slice(0, 10) === date && d.scans.length > 0) ?? null)
+      : null,
+    [employeeId, date],
+  );
+  const existing = found ?? null;
 
   const filled = times.filter(Boolean);
 

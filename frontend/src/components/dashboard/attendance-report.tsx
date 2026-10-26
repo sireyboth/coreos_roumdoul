@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CalendarDays, FileDown, ListTree, Search, Table2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialo
 import { AttendanceLateDetail } from "@/components/dashboard/attendance-late-detail";
 import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance-month-close";
 import { currentMonth, monthBounds, MonthBar, parseDate, WEEKDAYS } from "@/components/dashboard/calendar-shared";
-import { api, ApiError, type AttendanceDay } from "@/lib/api";
+import { useApi } from "@/hooks/use-api";
+import { api, type AttendanceDay } from "@/lib/api";
 import { buildInsights, duration, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
 import {
   buildAttendanceCalendar,
@@ -113,38 +114,19 @@ export function AttendanceReport({
         : daysBetween(range.from, range.to) > MAX_DAYS
           ? "Pick a range of one year or less."
           : null;
-  const requestKey = `${range.from}|${range.to}|${reloads}`;
+  const { from, to } = range;
 
-  // Kept with the request they answer; a different key means the new period is still loading.
-  const [result, setResult] = useState<{ key: string; report: Report | null; error: string | null } | null>(null);
-  const [previous, setPrevious] = useState<{ key: string; report: Report } | null>(null);
-  const report = result?.key === requestKey ? result.report : null;
-  const loading = !rangeProblem && result?.key !== requestKey;
-
-  useEffect(() => {
-    if (rangeProblem) return;
-    let cancelled = false;
-    const [from, to] = requestKey.split("|");
-
-    load({ from, to })
-      .then((data) => !cancelled && setResult({ key: requestKey, report: data, error: null }))
-      .catch((err) => !cancelled && setResult({ key: requestKey, report: null, error: err instanceof ApiError ? err.message : "The report couldn't be loaded." }));
-    // The period before, only for the trend arrows — a failure just leaves them out.
-    load(previousRange({ from, to }))
-      .then((data) => !cancelled && setPrevious({ key: requestKey, report: data }))
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [requestKey, rangeProblem]);
+  const {
+    data: report,
+    error: reportError,
+    loading,
+  } = useApi(rangeProblem ? null : () => load({ from, to }), [from, to, reloads], { errorMessage: "The report couldn't be loaded." });
+  // The period before, only for the trend arrows — a failure just leaves them out.
+  const { data: previous } = useApi(rangeProblem ? null : () => load(previousRange({ from, to })), [from, to, reloads]);
 
   const calendar = useMemo(() => (report ? buildAttendanceCalendar(report, range) : null), [report, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
   const insights = useMemo(() => (report ? buildInsights(report, minLate) : []), [report, minLate]);
-  const previousInsights = useMemo(
-    () => (previous?.key === requestKey ? buildInsights(previous.report, minLate) : null),
-    [previous, requestKey, minLate],
-  );
+  const previousInsights = useMemo(() => (previous ? buildInsights(previous, minLate) : null), [previous, minLate]);
 
   const branches = useMemo(() => [...new Set(insights.map((p) => p.branch).filter(Boolean))].sort(), [insights]);
   const departments = useMemo(() => [...new Set(insights.map((p) => p.department).filter(Boolean))].sort(), [insights]);
@@ -292,7 +274,7 @@ export function AttendanceReport({
       )}
 
       {rangeProblem && <Alert variant="warning">{rangeProblem}</Alert>}
-      {result?.error && !loading && <Alert variant="warning">{result.error}</Alert>}
+      {reportError && !loading && <Alert variant="warning">{reportError}</Alert>}
 
       {report && !loading && <Tiles totals={totals} before={before} />}
 

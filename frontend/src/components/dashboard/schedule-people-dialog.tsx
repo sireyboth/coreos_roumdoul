@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { parseDate } from "@/components/dashboard/calendar-shared";
+import { useApi } from "@/hooks/use-api";
 import { api, type ScheduleAssignment, type WorkSchedule } from "@/lib/api";
 import { daysOffText } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -34,24 +35,14 @@ export function SchedulePeopleDialog({
   schedule: WorkSchedule | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [result, setResult] = useState<{ scheduleId: number; rows: ScheduleAssignment[] } | null>(null);
   const [view, setView] = useState<View>("current");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    if (!schedule) return;
-    let cancelled = false;
-    api.scheduleAssignments
-      .list({ workScheduleId: schedule.id })
-      .then((rows) => !cancelled && setResult({ scheduleId: schedule.id, rows }))
-      .catch(() => !cancelled && setResult({ scheduleId: schedule.id, rows: [] }));
-    return () => {
-      cancelled = true;
-    };
-  }, [schedule]);
+  const { data, error } = useApi(schedule ? () => api.scheduleAssignments.list({ workScheduleId: schedule.id }) : null, [schedule?.id]);
+  const assignments = data ?? (error ? [] : null);
 
-  const loaded = schedule !== null && result?.scheduleId === schedule.id;
-  const following = loaded ? result.rows.filter((a) => a.employee && !a.employee.has_left) : [];
+  const loaded = schedule !== null && assignments !== null;
+  const following = loaded ? assignments.filter((a) => a.employee && !a.employee.has_left) : [];
   const groups: Record<View, ScheduleAssignment[]> = {
     current: following.filter((a) => a.state === "current"),
     upcoming: following.filter((a) => a.state === "upcoming"),
