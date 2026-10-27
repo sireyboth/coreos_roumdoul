@@ -16,20 +16,15 @@ import { useApi } from "@/hooks/use-api";
 import { api, type AuditEntry, type AuditFilters, type AuditModule, type AuditOptions } from "@/lib/api";
 import { notifyError } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { dateLocale, useLang, useT, type Lang, type TKey } from "@/lib/i18n";
+import { access as accessEn } from "@/lib/i18n/en/access";
+
+type T = (key: TKey, vars?: Record<string, string | number>) => string;
 
 const SELECT_CLASS =
   "h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-const MODULE_LABELS: Record<AuditModule, string> = {
-  people: "People & organisation",
-  attendance: "Attendance",
-  schedules: "Schedules & holidays",
-  requests: "Leave & requests",
-  salary: "Salaries",
-  payroll: "Payroll",
-  access: "Users & roles",
-  company: "Company",
-};
+const moduleLabel = (t: T, module: AuditModule) => t(`access.auditPage.module.${module}`);
 
 const PAGE_SIZE = 50;
 
@@ -40,9 +35,17 @@ function humanize(value: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** "employee.updated" → "Employee updated", "attendance.day_deleted" → "Attendance day deleted". */
-function eventTitle(event: string): string {
+type Entity = keyof typeof accessEn.auditPage.entity;
+type EventAction = keyof typeof accessEn.auditPage.eventAction;
+const isEntity = (value: string): value is Entity => Object.hasOwn(accessEn.auditPage.entity, value);
+const isEventAction = (value: string): value is EventAction => Object.hasOwn(accessEn.auditPage.eventAction, value);
+
+/** "employee.updated" → "Employee updated", "attendance.day_deleted" → "Attendance day deleted". Unknown codes are made readable as is. */
+function eventTitle(t: T, event: string): string {
   const [entity, action = ""] = event.split(".");
+  if (isEntity(entity) && isEventAction(action)) {
+    return t(`access.auditPage.eventAction.${action}`, { entity: t(`access.auditPage.entity.${entity}`) });
+  }
   return `${humanize(entity)} ${humanize(action).toLowerCase()}`.trim();
 }
 
@@ -57,16 +60,17 @@ function eventTone(event: string): Tone {
   return "secondary";
 }
 
-function formatWhen(iso: string) {
+function formatWhen(iso: string, lang: Lang) {
   const date = new Date(iso);
+  const locale = dateLocale(lang) ?? "en-GB";
   return {
-    date: date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-    time: date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    date: date.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" }),
+    time: date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
   };
 }
 
 /** A short device name from the browser's user agent, e.g. "Chrome on Windows". */
-function deviceOf(userAgent: string | null): { label: string; mobile: boolean } | null {
+function deviceOf(t: T, userAgent: string | null): { label: string; mobile: boolean } | null {
   if (!userAgent) return null;
   const os = /iPhone|iPad/.test(userAgent)
     ? "iOS"
@@ -88,15 +92,15 @@ function deviceOf(userAgent: string | null): { label: string; mobile: boolean } 
         : /Safari\//.test(userAgent)
           ? "Safari"
           : null;
-  const label = [browser, os].filter(Boolean).join(" on ") || "Other device";
+  const label = browser && os ? t("access.auditPage.deviceOn", { browser, os }) : browser || os || t("access.auditPage.otherDevice");
   return { label, mobile: /Mobile|iPhone|Android/.test(userAgent) };
 }
 
-function formatValue(value: unknown): string {
+function formatValue(t: T, lang: Lang, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "boolean") return value ? t("access.auditPage.yes") : t("access.auditPage.no");
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
-    const { date, time } = formatWhen(value);
+    const { date, time } = formatWhen(value, lang);
     return `${date} ${time}`;
   }
   if (typeof value === "object") return JSON.stringify(value);
@@ -139,7 +143,8 @@ function Actor({ entry }: { entry: AuditEntry }) {
 }
 
 function Where({ entry }: { entry: AuditEntry }) {
-  const device = deviceOf(entry.user_agent);
+  const t = useT();
+  const device = deviceOf(t, entry.user_agent);
   const DeviceIcon = device?.mobile ? Smartphone : Monitor;
   return (
     <div className="flex flex-col text-xs text-muted-foreground">
@@ -156,21 +161,23 @@ function Where({ entry }: { entry: AuditEntry }) {
 }
 
 function DetailDialog({ entry, onClose }: { entry: AuditEntry; onClose: () => void }) {
-  const when = formatWhen(entry.created_at);
-  const device = deviceOf(entry.user_agent);
+  const t = useT();
+  const lang = useLang();
+  const when = formatWhen(entry.created_at, lang);
+  const device = deviceOf(t, entry.user_agent);
   const changes = changesOf(entry);
   const isCreate = !entry.before && !!entry.after;
   const isDelete = !!entry.before && !entry.after;
 
   const facts: [string, React.ReactNode][] = [
-    ["When", `${when.date}, ${when.time}`],
-    ["Who", entry.actor.name],
-    ["Record", entry.subject ? `${entry.subject.label ?? `#${entry.subject.id}`} (${entry.subject.type})` : "—"],
-    ["Branch", entry.branch?.name ?? "Company-wide"],
-    ["Area", entry.module ? MODULE_LABELS[entry.module] : "—"],
-    ["Device", device?.label ?? "—"],
-    ["IP address", entry.ip_address ?? "—"],
-    ["From", entry.method && entry.path ? <code key="from" className="font-mono text-xs">{`${entry.method} ${entry.path}`}</code> : "Automatic (no request)"],
+    [t("access.auditPage.when"), `${when.date}, ${when.time}`],
+    [t("access.auditPage.who"), entry.actor.name],
+    [t("access.auditPage.record"), entry.subject ? `${entry.subject.label ?? `#${entry.subject.id}`} (${entry.subject.type})` : "—"],
+    [t("common.field.branch"), entry.branch?.name ?? t("access.auditPage.companyWide")],
+    [t("access.auditPage.area"), entry.module ? moduleLabel(t, entry.module) : "—"],
+    [t("access.auditPage.device"), device?.label ?? "—"],
+    [t("access.auditPage.ipAddress"), entry.ip_address ?? "—"],
+    [t("common.field.from"), entry.method && entry.path ? <code key="from" className="font-mono text-xs">{`${entry.method} ${entry.path}`}</code> : t("access.auditPage.automatic")],
   ];
 
   return (
@@ -178,11 +185,11 @@ function DetailDialog({ entry, onClose }: { entry: AuditEntry; onClose: () => vo
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
-            <DialogTitle>{eventTitle(entry.event)}</DialogTitle>
+            <DialogTitle>{eventTitle(t, entry.event)}</DialogTitle>
             <Badge variant={eventTone(entry.event)}>{entry.event}</Badge>
           </div>
           <DialogDescription>
-            {entry.actor.name} · {when.date} at {when.time}
+            {entry.actor.name} · {t("access.auditPage.whenAt", { date: when.date, time: when.time })}
           </DialogDescription>
         </DialogHeader>
 
@@ -197,37 +204,37 @@ function DetailDialog({ entry, onClose }: { entry: AuditEntry; onClose: () => vo
 
         {entry.reason && (
           <div className="rounded-lg border border-border p-3 text-sm">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reason</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("common.field.reason")}</span>
             <p className="mt-1">{entry.reason}</p>
           </div>
         )}
 
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">{isCreate ? "Saved values" : isDelete ? "Values before deleting" : "Changes"}</h3>
+          <h3 className="text-sm font-semibold">{isCreate ? t("access.auditPage.savedValues") : isDelete ? t("access.auditPage.valuesBeforeDelete") : t("access.auditPage.changes")}</h3>
           {changes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No field details were recorded for this action.</p>
+            <p className="text-sm text-muted-foreground">{t("access.auditPage.noDetails")}</p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-1/3">Field</TableHead>
-                    {!isCreate && <TableHead>Before</TableHead>}
+                    <TableHead className="w-1/3">{t("access.auditPage.field")}</TableHead>
+                    {!isCreate && <TableHead>{t("access.auditPage.before")}</TableHead>}
                     {!isCreate && !isDelete && <TableHead className="w-6" />}
-                    {!isDelete && <TableHead>After</TableHead>}
+                    {!isDelete && <TableHead>{t("access.auditPage.after")}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {changes.map((c) => (
                     <TableRow key={c.field}>
                       <TableCell className="align-top font-medium">{humanize(c.field)}</TableCell>
-                      {!isCreate && <TableCell className={cn("align-top break-all whitespace-normal", !isDelete && "text-muted-foreground line-through decoration-destructive/40")}>{formatValue(c.before)}</TableCell>}
+                      {!isCreate && <TableCell className={cn("align-top break-all whitespace-normal", !isDelete && "text-muted-foreground line-through decoration-destructive/40")}>{formatValue(t, lang, c.before)}</TableCell>}
                       {!isCreate && !isDelete && (
                         <TableCell className="align-top text-muted-foreground">
                           <ArrowRight className="size-3.5" />
                         </TableCell>
                       )}
-                      {!isDelete && <TableCell className="align-top break-all whitespace-normal">{formatValue(c.after)}</TableCell>}
+                      {!isDelete && <TableCell className="align-top break-all whitespace-normal">{formatValue(t, lang, c.after)}</TableCell>}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -247,6 +254,8 @@ type Filters = Required<Pick<AuditFilters, "from" | "to" | "user_id" | "branch_i
 const NO_FILTERS: Filters = { from: "", to: "", user_id: "", branch_id: "", module: "", action: "" };
 
 export default function AuditLogPage() {
+  const t = useT();
+  const lang = useLang();
   const [options, setOptions] = useState<AuditOptions | null>(null);
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [searchInput, setSearchInput] = useState("");
@@ -290,12 +299,12 @@ export default function AuditLogPage() {
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Audit Log"
-        description="Every change made in your company — who made it, what changed, when, and from where. You only see activity in the branches you have access to."
+        title={t("access.auditPage.title")}
+        description={t("access.auditPage.description")}
         action={
           <Button variant="outline" onClick={() => setReloads((n) => n + 1)}>
             <RotateCw className="size-4" />
-            Refresh
+            {t("access.auditPage.refresh")}
           </Button>
         }
       />
@@ -306,35 +315,35 @@ export default function AuditLogPage() {
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, action, reason or IP address…"
+            placeholder={t("access.auditPage.search")}
             className="h-9 pl-9"
-            aria-label="Search the audit log"
+            aria-label={t("access.auditPage.searchLabel")}
           />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-from">From</Label>
+            <Label htmlFor="audit-from">{t("common.field.from")}</Label>
             <Input id="audit-from" type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => setFilter("from", e.target.value)} className="h-9" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-to">To</Label>
+            <Label htmlFor="audit-to">{t("common.field.to")}</Label>
             <Input id="audit-to" type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => setFilter("to", e.target.value)} className="h-9" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-user">Who</Label>
+            <Label htmlFor="audit-user">{t("access.auditPage.who")}</Label>
             <SearchableSelect
               id="audit-user"
               options={(options?.users ?? []).map((u) => ({ value: String(u.id), label: u.name }))}
               value={filters.user_id}
               onChange={(v) => setFilter("user_id", v)}
-              placeholder="Anyone"
+              placeholder={t("access.auditPage.anyone")}
               className="h-9 w-full"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-branch">Branch</Label>
+            <Label htmlFor="audit-branch">{t("common.field.branch")}</Label>
             <select id="audit-branch" className={SELECT_CLASS} value={filters.branch_id} onChange={(e) => setFilter("branch_id", e.target.value)}>
-              <option value="">All branches</option>
+              <option value="">{t("access.auditPage.allBranches")}</option>
               {options?.branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -343,23 +352,23 @@ export default function AuditLogPage() {
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-module">Area</Label>
+            <Label htmlFor="audit-module">{t("access.auditPage.area")}</Label>
             <select id="audit-module" className={SELECT_CLASS} value={filters.module} onChange={(e) => setFilter("module", e.target.value)}>
-              <option value="">All areas</option>
+              <option value="">{t("access.auditPage.allAreas")}</option>
               {options?.modules.map((m) => (
                 <option key={m} value={m}>
-                  {MODULE_LABELS[m]}
+                  {moduleLabel(t, m)}
                 </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="audit-action">Action</Label>
+            <Label htmlFor="audit-action">{t("access.auditPage.action")}</Label>
             <select id="audit-action" className={SELECT_CLASS} value={filters.action} onChange={(e) => setFilter("action", e.target.value)}>
-              <option value="">Any action</option>
-              <option value="created">Created</option>
-              <option value="updated">Updated</option>
-              <option value="deleted">Deleted</option>
+              <option value="">{t("access.auditPage.anyAction")}</option>
+              <option value="created">{t("access.auditPage.created")}</option>
+              <option value="updated">{t("access.auditPage.updated")}</option>
+              <option value="deleted">{t("access.auditPage.deleted")}</option>
             </select>
           </div>
         </div>
@@ -375,7 +384,7 @@ export default function AuditLogPage() {
             }}
           >
             <X className="size-3.5" />
-            Clear filters
+            {t("access.auditPage.clearFilters")}
           </Button>
         )}
       </div>
@@ -389,8 +398,8 @@ export default function AuditLogPage() {
       ) : result.rows.length === 0 ? (
         <EmptyState
           icon={ScrollText}
-          title={filtered ? "Nothing matches these filters" : "No activity yet"}
-          description={filtered ? "Try a wider date range or clear a filter." : "Changes people make will appear here as they happen."}
+          title={filtered ? t("access.auditPage.noMatches") : t("access.auditPage.empty")}
+          description={filtered ? t("access.auditPage.noMatchesHint") : t("access.auditPage.emptyHint")}
         />
       ) : (
         <>
@@ -399,17 +408,17 @@ export default function AuditLogPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
-                  <TableHead className="w-36">When</TableHead>
-                  <TableHead>Who</TableHead>
-                  <TableHead>What</TableHead>
-                  <TableHead>Record</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Where</TableHead>
+                  <TableHead className="w-36">{t("access.auditPage.when")}</TableHead>
+                  <TableHead>{t("access.auditPage.who")}</TableHead>
+                  <TableHead>{t("access.auditPage.what")}</TableHead>
+                  <TableHead>{t("access.auditPage.record")}</TableHead>
+                  <TableHead>{t("common.field.branch")}</TableHead>
+                  <TableHead>{t("access.auditPage.where")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {result.rows.map((entry) => {
-                  const when = formatWhen(entry.created_at);
+                  const when = formatWhen(entry.created_at, lang);
                   return (
                     <TableRow key={entry.id} className="cursor-pointer" onClick={() => setSelected(entry)}>
                       <TableCell className="align-top">
@@ -423,7 +432,7 @@ export default function AuditLogPage() {
                       </TableCell>
                       <TableCell className="align-top">
                         <div className="flex flex-col items-start gap-1">
-                          <Badge variant={eventTone(entry.event)}>{eventTitle(entry.event)}</Badge>
+                          <Badge variant={eventTone(entry.event)}>{eventTitle(t, entry.event)}</Badge>
                           {entry.reason && <span className="max-w-64 truncate text-xs text-muted-foreground">{entry.reason}</span>}
                         </div>
                       </TableCell>
@@ -438,7 +447,7 @@ export default function AuditLogPage() {
                         )}
                       </TableCell>
                       <TableCell className="align-top">
-                        {entry.branch ? entry.branch.name : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Globe className="size-3.5" />Company-wide</span>}
+                        {entry.branch ? entry.branch.name : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Globe className="size-3.5" />{t("access.auditPage.companyWide")}</span>}
                       </TableCell>
                       <TableCell className="align-top">
                         <Where entry={entry} />
@@ -453,7 +462,7 @@ export default function AuditLogPage() {
           {/* Mobile: one card per change. */}
           <div className="flex flex-col gap-2 md:hidden">
             {result.rows.map((entry) => {
-              const when = formatWhen(entry.created_at);
+              const when = formatWhen(entry.created_at, lang);
               return (
                 <button
                   key={entry.id}
@@ -462,15 +471,15 @@ export default function AuditLogPage() {
                   className="flex flex-col gap-2 rounded-xl border border-border bg-card p-3 text-left text-sm transition-colors hover:bg-accent/40"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <Badge variant={eventTone(entry.event)}>{eventTitle(entry.event)}</Badge>
+                    <Badge variant={eventTone(entry.event)}>{eventTitle(t, entry.event)}</Badge>
                     <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                       {when.date} {when.time.slice(0, 5)}
                     </span>
                   </div>
                   {entry.subject && <span className="font-medium">{entry.subject.label ?? `${entry.subject.type} #${entry.subject.id}`}</span>}
                   <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>by {entry.actor.name}</span>
-                    <span>{entry.branch?.name ?? "Company-wide"}</span>
+                    <span>{t("access.auditPage.by", { name: entry.actor.name })}</span>
+                    <span>{entry.branch?.name ?? t("access.auditPage.companyWide")}</span>
                   </div>
                 </button>
               );
@@ -479,18 +488,18 @@ export default function AuditLogPage() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <span className="text-muted-foreground tabular-nums">
-              Showing {first.toLocaleString()}–{last.toLocaleString()} of {result.total.toLocaleString()}
+              {t("common.table.showing", { from: first.toLocaleString(), to: last.toLocaleString(), total: result.total.toLocaleString() })}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
                 <ChevronLeft className="size-4" />
-                Newer
+                {t("access.auditPage.newer")}
               </Button>
               <span className="text-muted-foreground tabular-nums">
-                Page {page} of {result.lastPage}
+                {t("access.auditPage.pageOf", { page, pages: result.lastPage })}
               </span>
               <Button variant="outline" size="sm" disabled={page >= result.lastPage} onClick={() => setPage((p) => p + 1)}>
-                Older
+                {t("access.auditPage.older")}
                 <ChevronRight className="size-4" />
               </Button>
             </div>

@@ -14,9 +14,11 @@ import { useApi } from "@/hooks/use-api";
 import { api, type ScheduleAssignment, type WorkSchedule } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { daysOffText, weekSummary } from "@/lib/schedule";
+import { dateLocale, translateNow, useLang, useT, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const formatDay = (date: string) => parseDate(date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const formatDay = (date: string, lang: Lang) =>
+  parseDate(date).toLocaleDateString(dateLocale(lang), { day: "numeric", month: "short", year: "numeric" });
 
 function todayLocal(): string {
   const now = new Date();
@@ -30,6 +32,8 @@ function todayLocal(): string {
  * before, so past attendance keeps being judged by what applied then.
  */
 export function EmployeeScheduleAssignments({ employee, canManage }: { employee: { id: number; name: string }; canManage: boolean }) {
+  const t = useT();
+  const lang = useLang();
   const confirm = useConfirm();
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -43,15 +47,15 @@ export function EmployeeScheduleAssignments({ employee, canManage }: { employee:
 
   async function endToday(assignment: ScheduleAssignment) {
     const ok = await confirm({
-      title: `Stop "${assignment.work_schedule?.name}" for ${employee.name}?`,
-      description: "It ends today. From tomorrow they have no work schedule until you assign another — so no expected hours and no absences.",
-      confirmLabel: "End today",
+      title: t("schedules.assignments.stopTitle", { schedule: assignment.work_schedule?.name ?? "", name: employee.name }),
+      description: t("schedules.assignments.stopText"),
+      confirmLabel: t("schedules.assignments.endToday"),
     });
     if (!ok) return;
 
     try {
       await api.scheduleAssignments.update(assignment.id, { effective_to: todayLocal() });
-      notifySuccess("Schedule ended");
+      notifySuccess(translateNow("schedules.assignments.ended"));
       reload();
     } catch (err) {
       notifyError(err);
@@ -60,17 +64,16 @@ export function EmployeeScheduleAssignments({ employee, canManage }: { employee:
 
   async function remove(assignment: ScheduleAssignment) {
     const ok = await confirm({
-      title: "Remove this schedule entry?",
-      description:
-        "Use this to undo a mistake. Days already worked in this period are re-checked as having no schedule. To change someone's schedule from a date, assign the new one instead.",
-      confirmLabel: "Remove",
+      title: t("schedules.assignments.removeTitle"),
+      description: t("schedules.assignments.removeText"),
+      confirmLabel: t("common.action.remove"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.scheduleAssignments.remove(assignment.id);
-      notifySuccess("Schedule entry removed");
+      notifySuccess(translateNow("schedules.assignments.removed"));
       reload();
     } catch (err) {
       notifyError(err);
@@ -83,17 +86,17 @@ export function EmployeeScheduleAssignments({ employee, canManage }: { employee:
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <CardTitle>Work schedule</CardTitle>
+          <CardTitle>{t("schedules.assignments.title")}</CardTitle>
           <CardDescription>
             {current
-              ? `Follows "${current.work_schedule?.name}" — off ${daysOffText(current.days_off)}.`
-              : "No work schedule right now, so no hours are expected."}
+              ? t("schedules.assignments.follows", { name: current.work_schedule?.name ?? "", days: daysOffText(current.days_off, lang) })
+              : t("schedules.assignments.none")}
           </CardDescription>
         </div>
         {canManage && (
           <Button onClick={() => setAssignOpen(true)}>
             <Plus className="size-4" />
-            {current ? "Change schedule" : "Assign a schedule"}
+            {current ? t("schedules.assignments.change") : t("schedules.assignments.assign")}
           </Button>
         )}
       </CardHeader>
@@ -106,7 +109,7 @@ export function EmployeeScheduleAssignments({ employee, canManage }: { employee:
           </div>
         ) : assignments.length === 0 ? (
           <Alert variant="info">
-            Assign a work schedule so {employee.name.split(" ")[0]}&apos;s scans can be checked against expected hours.
+            {t("schedules.assignments.empty", { name: employee.name.split(" ")[0] })}
           </Alert>
         ) : (
           <ol className="relative flex flex-col gap-3 border-l border-border pl-5">
@@ -124,25 +127,26 @@ export function EmployeeScheduleAssignments({ employee, canManage }: { employee:
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <CalendarClock className="size-4 text-muted-foreground" />
-                        <span className="font-medium">{a.work_schedule?.name ?? "Deleted schedule"}</span>
-                        <Badge variant={a.state === "current" ? "success" : a.state === "upcoming" ? "info" : "secondary"} className="capitalize">
-                          {a.state}
+                        <span className="font-medium">{a.work_schedule?.name ?? t("schedules.assignments.deletedSchedule")}</span>
+                        <Badge variant={a.state === "current" ? "success" : a.state === "upcoming" ? "info" : "secondary"}>
+                          {a.state && t(`schedules.assignments.state.${a.state}`)}
                         </Badge>
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        {formatDay(a.effective_from)} → {a.effective_to ? formatDay(a.effective_to) : "ongoing"} · off {daysOffText(a.days_off)}
+                        {formatDay(a.effective_from, lang)} → {a.effective_to ? formatDay(a.effective_to, lang) : t("schedules.assignments.ongoing")} ·{" "}
+                        {t("schedules.assignments.off", { days: daysOffText(a.days_off, lang) })}
                       </span>
-                      {schedule && <span className="truncate text-xs text-muted-foreground">{weekSummary(schedule)}</span>}
+                      {schedule && <span className="truncate text-xs text-muted-foreground">{weekSummary(schedule, lang)}</span>}
                     </div>
                     {canManage && a.state !== "ended" && (
                       <div className="flex gap-1.5">
                         {a.state === "current" && !a.effective_to && (
                           <Button variant="outline" size="sm" onClick={() => endToday(a)}>
                             <CalendarX2 className="size-3.5" />
-                            End today
+                            {t("schedules.assignments.endToday")}
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => remove(a)} aria-label="Remove this schedule entry">
+                        <Button variant="ghost" size="sm" onClick={() => remove(a)} aria-label={t("schedules.assignments.removeEntry")}>
                           <Trash2 className="size-3.5" />
                         </Button>
                       </div>

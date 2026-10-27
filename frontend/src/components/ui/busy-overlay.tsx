@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Loader2 } from "lucide-react";
 import { isBusy, subscribeBusy } from "@/lib/busy";
+import { useT } from "@/lib/i18n";
 
 // Input is blocked the moment work starts; the overlay itself only appears if
 // the work is still running after this long, so quick saves don't flash.
@@ -19,6 +20,7 @@ const BLOCKED_EVENTS = ["pointerdown", "pointerup", "mousedown", "mouseup", "cli
 export function BusyOverlay() {
   const busy = useSyncExternalStore(subscribeBusy, isBusy, () => false);
   const [visible, setVisible] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     if (!busy) return;
@@ -49,7 +51,7 @@ export function BusyOverlay() {
       {visible && (
         <div className="flex items-center gap-2.5 rounded-lg bg-popover px-4 py-2.5 text-sm font-medium text-popover-foreground shadow-lg ring-1 ring-foreground/10">
           <Loader2 className="size-4 animate-spin text-primary" />
-          Working…
+          {t("app.ui.working")}
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useT } from "@/lib/i18n";
 import { cropToSquareJpeg } from "@/lib/image";
 
 /**
@@ -25,11 +26,12 @@ export function PhotoCropDialog({
   onOpenChange: (open: boolean) => void;
   onCropped: (photo: Blob) => void | Promise<void>;
 }) {
+  const t = useT();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Adjust photo</DialogTitle>
+          <DialogTitle>{t("employees.photo.cropTitle")}</DialogTitle>
         </DialogHeader>
         {/* Keyed on the image itself, so a new photo always starts with
             fresh crop/zoom state — remounting is simpler and more direct
@@ -53,6 +55,7 @@ function CropEditor({
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<Area | null>(null);
   const [saving, setSaving] = useState(false);
+  const t = useT();
 
   const handleCropComplete = useCallback((_area: Area, areaPixels: Area) => {
     setArea(areaPixels);
@@ -86,7 +89,7 @@ function CropEditor({
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground">Zoom</span>
+        <span className="text-xs text-muted-foreground">{t("employees.photo.zoom")}</span>
         <input
           type="range"
           min={1}
@@ -95,14 +98,14 @@ function CropEditor({
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
           className="w-full accent-primary"
-          aria-label="Zoom"
+          aria-label={t("employees.photo.zoom")}
         />
       </div>
 
       <DialogFooter>
-        <DialogClose render={<Button type="button" variant="outline" disabled={saving} />}>Cancel</DialogClose>
+        <DialogClose render={<Button type="button" variant="outline" disabled={saving} />}>{t("common.action.cancel")}</DialogClose>
         <Button type="button" onClick={handleConfirm} disabled={saving || !area}>
-          {saving ? "Saving…" : "Use photo"}
+          {saving ? t("employees.photo.saving") : t("employees.photo.use")}
         </Button>
       </DialogFooter>
     </>

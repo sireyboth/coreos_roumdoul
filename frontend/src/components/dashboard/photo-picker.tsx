@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PhotoCropDialog } from "@/components/dashboard/photo-crop-dialog";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,7 @@ export function PhotoPicker({
   onRemove: () => void | Promise<void>;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   // The freshly-picked file, as an object URL, while the crop dialog is
@@ -48,7 +50,7 @@ export function PhotoPicker({
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file.");
+      setError(t("employees.photo.notImage"));
       return;
     }
 
@@ -67,7 +69,7 @@ export function PhotoPicker({
     try {
       await onPick(photo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't use that image.");
+      setError(err instanceof Error ? err.message : t("employees.photo.unusable"));
     }
   }
 
@@ -81,7 +83,7 @@ export function PhotoPicker({
       >
         {src && failed !== src ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={name || "Profile photo"} onError={() => setFailed(src)} className="size-full object-cover" />
+          <img src={src} alt={name || t("employees.photo.alt")} onError={() => setFailed(src)} className="size-full object-cover" />
         ) : (
           initials || <Camera className="size-8" />
         )}
@@ -93,16 +95,16 @@ export function PhotoPicker({
           <div className="flex flex-wrap justify-center gap-2">
             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
               <Camera className="size-3.5" />
-              {src ? "Change photo" : "Upload photo"}
+              {src ? t("employees.photo.change") : t("employees.photo.upload")}
             </Button>
             {src && (
               <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => onRemove()}>
                 <Trash2 className="size-3.5" />
-                Remove
+                {t("common.action.remove")}
               </Button>
             )}
           </div>
-          <p className="text-center text-xs text-muted-foreground">JPG, PNG or WebP. You can drag and zoom to crop it.</p>
+          <p className="text-center text-xs text-muted-foreground">{t("employees.photo.formats")}</p>
         </>
       )}
       {error && <p className="text-center text-xs text-destructive">{error}</p>}

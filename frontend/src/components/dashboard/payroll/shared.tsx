@@ -2,7 +2,16 @@
 
 import { Alert } from "@/components/ui/alert";
 import { formatSalary } from "@/components/dashboard/employee-form";
+import { WEEKDAY_KEYS } from "@/components/dashboard/calendar-shared";
 import type { LatenessParams, PayComponent, PayGroup, PayKind, PayLineKind, PayRunStatus, PaySchedule, PayWarning, SalaryReason } from "@/lib/api";
+import { dateLocale, translate, useT, type Lang, type TKey } from "@/lib/i18n";
+
+/*
+ * Labels: the English constants below (SCHEDULE_LABELS, KIND_LABELS…) stay for
+ * code that isn't translated yet. On screen use the keys instead —
+ * t(`payroll.shared.schedule.${s}`), t(`payroll.shared.kind.${k}`), RUN_STATUS[s].labelKey —
+ * and pass `lang` to the summary helpers.
+ */
 
 /** Money in its own currency: "$1,234.50" or "1,234,500 ៛". */
 export function money(amount: number | string | null | undefined, currency: string | null | undefined): string {
@@ -19,10 +28,15 @@ export function compactMoney(amount: number, currency: string | null | undefined
   return short;
 }
 
+/** The locale for dates on payroll screens: Khmer, else US English as before. */
+function locale(lang: Lang): string {
+  return dateLocale(lang) ?? "en-US";
+}
+
 /** "2026-09" → "September 2026". */
-export function monthLabel(month: string): string {
+export function monthLabel(month: string, lang: Lang = "en"): string {
   const [y, m] = month.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return new Date(y, m - 1, 1).toLocaleDateString(locale(lang), { month: "long", year: "numeric" });
 }
 
 /** The month most companies are paying for right now: last month. */
@@ -38,9 +52,9 @@ export function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function dateLabel(value: string | null | undefined): string {
+export function dateLabel(value: string | null | undefined, lang: Lang = "en"): string {
   if (!value) return "—";
-  return new Date(value.slice(0, 10) + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(value.slice(0, 10) + "T00:00:00").toLocaleDateString(locale(lang), { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** Today as YYYY-MM-DD, on this device's clock. */
@@ -64,22 +78,26 @@ export const SCHEDULE_LABELS: Record<PaySchedule, string> = {
   custom: "Dates picked each time",
 };
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 /** "1st → end of month", "26th → 25th", "Weeks from Monday"… */
-export function scheduleSummary(g: Pick<PayGroup, "schedule" | "cutoff_days" | "anchor_date">): string {
-  const day = (n: number) => (n >= 31 ? "end of month" : ordinal(n));
+export function scheduleSummary(g: Pick<PayGroup, "schedule" | "cutoff_days" | "anchor_date">, lang: Lang = "en"): string {
+  const tr = (key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  const nth = (n: number) => (lang === "en" ? ordinal(n) : tr("payroll.shared.summary.dayOfMonth", { n }));
+  const day = (n: number) => (n >= 31 ? tr("payroll.shared.summary.endOfMonth") : nth(n));
   const cut = g.cutoff_days ?? [31];
   switch (g.schedule) {
     case "monthly":
-      return cut[0] >= 31 ? "1st → end of month" : `${ordinal(cut[0] + 1)} → ${day(cut[0])}`;
+      return cut[0] >= 31 ? tr("payroll.shared.summary.monthlyFull") : tr("payroll.shared.summary.monthlyRange", { from: nth(cut[0] + 1), to: day(cut[0]) });
     case "semi_monthly":
-      return `Periods end on the ${day(cut[0])} and ${day(cut[1] ?? 31)}`;
+      return tr("payroll.shared.summary.semiMonthly", { first: day(cut[0]), second: day(cut[1] ?? 31) });
     case "weekly":
     case "biweekly":
-      return g.anchor_date ? `${g.schedule === "weekly" ? "Weeks" : "2 weeks"} starting ${WEEKDAYS[new Date(g.anchor_date + "T00:00:00").getDay()]}` : SCHEDULE_LABELS[g.schedule];
+      return g.anchor_date
+        ? tr(g.schedule === "weekly" ? "payroll.shared.summary.weeklyFrom" : "payroll.shared.summary.biweeklyFrom", {
+            day: tr(`calendar.shared.weekday.full.${WEEKDAY_KEYS[new Date(g.anchor_date + "T00:00:00").getDay()]}`),
+          })
+        : tr(`payroll.shared.schedule.${g.schedule}`);
     default:
-      return "HR picks each run's dates";
+      return tr("payroll.shared.summary.custom");
   }
 }
 
@@ -88,11 +106,11 @@ function ordinal(n: number): string {
   return `${n}${s}`;
 }
 
-export const RUN_STATUS: Record<PayRunStatus, { label: string; variant: "secondary" | "info" | "warning" | "success" }> = {
-  draft: { label: "Draft", variant: "secondary" },
-  calculated: { label: "In review", variant: "warning" },
-  approved: { label: "Approved", variant: "info" },
-  paid: { label: "Paid", variant: "success" },
+export const RUN_STATUS: Record<PayRunStatus, { label: string; labelKey: TKey; variant: "secondary" | "info" | "warning" | "success" }> = {
+  draft: { label: "Draft", labelKey: "common.status.draft", variant: "secondary" },
+  calculated: { label: "In review", labelKey: "payroll.shared.inReview", variant: "warning" },
+  approved: { label: "Approved", labelKey: "common.status.approved", variant: "info" },
+  paid: { label: "Paid", labelKey: "common.status.paid", variant: "success" },
 };
 
 export const KIND_LABELS: Record<PayKind, string> = {
@@ -108,76 +126,79 @@ export const KIND_HINTS: Record<PayKind, string> = {
 };
 
 /** Payslip sections, in the order a payslip reads. */
-export const LINE_SECTIONS: { kind: PayLineKind; title: string; sign: "+" | "−" | "" }[] = [
-  { kind: "earning", title: "Earnings", sign: "+" },
-  { kind: "deduction", title: "Deductions", sign: "−" },
-  { kind: "statutory", title: "NSSF and tax on salary", sign: "−" },
-  { kind: "net_deduction", title: "After-tax deductions", sign: "−" },
-  { kind: "employer", title: "Paid by the company (not from pay)", sign: "" },
+export const LINE_SECTIONS: { kind: PayLineKind; title: string; titleKey: TKey; sign: "+" | "−" | "" }[] = [
+  { kind: "earning", title: "Earnings", titleKey: "payroll.shared.section.earning", sign: "+" },
+  { kind: "deduction", title: "Deductions", titleKey: "payroll.shared.section.deduction", sign: "−" },
+  { kind: "statutory", title: "NSSF and tax on salary", titleKey: "payroll.shared.section.statutory", sign: "−" },
+  { kind: "net_deduction", title: "After-tax deductions", titleKey: "payroll.shared.section.net_deduction", sign: "−" },
+  { kind: "employer", title: "Paid by the company (not from pay)", titleKey: "payroll.shared.section.employer", sign: "" },
 ];
 
-export const SALARY_REASONS: { value: SalaryReason; label: string }[] = [
-  { value: "hired", label: "Starting salary" },
-  { value: "probation_passed", label: "Probation passed" },
-  { value: "promotion", label: "Promotion" },
-  { value: "annual_increase", label: "Annual increase" },
-  { value: "change", label: "Other change" },
-  { value: "correction", label: "Correction" },
+export const SALARY_REASONS: { value: SalaryReason; label: string; labelKey: TKey }[] = [
+  { value: "hired", label: "Starting salary", labelKey: "payroll.shared.salaryReason.hired" },
+  { value: "probation_passed", label: "Probation passed", labelKey: "payroll.shared.salaryReason.probation_passed" },
+  { value: "promotion", label: "Promotion", labelKey: "payroll.shared.salaryReason.promotion" },
+  { value: "annual_increase", label: "Annual increase", labelKey: "payroll.shared.salaryReason.annual_increase" },
+  { value: "change", label: "Other change", labelKey: "payroll.shared.salaryReason.change" },
+  { value: "correction", label: "Correction", labelKey: "payroll.shared.salaryReason.correction" },
 ];
 
 const pct = (n: unknown) => `${Math.round(Number(n) * 100)}%`;
 
 /** A component's rule in one line, for the settings list. */
-export function ruleSummary(c: PayComponent): string {
+export function ruleSummary(c: PayComponent, lang: Lang = "en"): string {
+  const tr = (key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const p = (c.params ?? {}) as Record<string, number> & Partial<LatenessParams>;
-  if (c.method === "base") return "The salary itself, prorated for joiners and leavers";
-  if (c.method === "employee_item") return "Amount set on each employee's Pay tab";
+  if (c.method === "base") return tr("payroll.shared.rule.base");
+  if (c.method === "employee_item") return tr("payroll.shared.rule.employeeItem");
 
   switch (c.template) {
     case "overtime":
-      return `Work day ${pct(p.workday)} · Day off ${pct(p.day_off)} · Holiday ${pct(p.holiday)}`;
+      return tr("payroll.shared.rule.overtime", { workday: pct(p.workday), dayOff: pct(p.day_off), holiday: pct(p.holiday) });
     case "attendance_bonus":
       return Number(p.amount) > 0
-        ? `${p.amount} when at most ${p.max_absent_days} absences and ${p.max_late_count} late arrivals`
-        : "Set an amount to use it";
+        ? tr("payroll.shared.rule.attendanceBonus", { amount: String(p.amount), absences: String(p.max_absent_days), lates: String(p.max_late_count) })
+        : tr("payroll.shared.rule.attendanceBonusUnset");
     case "absence":
-      return `Daily rate × days absent${Number(p.multiplier) !== 1 ? ` × ${pct(p.multiplier)}` : ""} (monthly salaries)`;
+      return tr("payroll.shared.rule.absence", { multiplier: Number(p.multiplier) !== 1 ? ` × ${pct(p.multiplier)}` : "" });
     case "unpaid_leave":
-      return "Daily rate × unpaid leave days (monthly salaries)";
+      return tr("payroll.shared.rule.unpaidLeave");
     case "unpaid_permission":
-      return "Minute rate × unpaid late-arrival / early-leave permission";
+      return tr("payroll.shared.rule.unpaidPermission");
     case "late":
     case "early_leave":
-      return latenessSummary(p as LatenessParams);
+      return latenessSummary(p as LatenessParams, lang);
     default:
       return "—";
   }
 }
 
-export function latenessSummary(p: LatenessParams): string {
+export function latenessSummary(p: LatenessParams, lang: Lang = "en"): string {
+  const tr = (key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
   switch (p.mode) {
     case "per_minute":
-      return p.grace_minutes > 0 ? `Per minute, after ${p.grace_minutes} min grace each day` : "Per minute";
+      return p.grace_minutes > 0 ? tr("payroll.shared.rule.perMinuteGrace", { n: p.grace_minutes }) : tr("payroll.shared.rule.perMinute");
     case "per_time":
-      return `${p.amount} each time${p.free_count > 0 ? `, first ${p.free_count} free each month` : ""}`;
+      return p.free_count > 0 ? tr("payroll.shared.rule.perTimeFree", { amount: p.amount, n: p.free_count }) : tr("payroll.shared.rule.perTime", { amount: p.amount });
     case "count_based":
-      return `Every ${p.every_n} times = one day's pay`;
+      return tr("payroll.shared.rule.countBased", { n: p.every_n });
     case "tiers":
-      return `${p.tiers.length} ${p.tiers.length === 1 ? "tier" : "tiers"} by minutes late each day`;
+      return tr(p.tiers.length === 1 ? "payroll.shared.rule.tiersOne" : "payroll.shared.rule.tiersOther", { n: p.tiers.length });
     default:
-      return "Not charged";
+      return tr("payroll.shared.rule.notCharged");
   }
 }
 
 /** Problems first (they stop approval), then things to know. */
 export function WarningList({ warnings, className }: { warnings: PayWarning[] | null | undefined; className?: string }) {
+  const t = useT();
   if (!warnings?.length) return null;
   const sorted = [...warnings].sort((a, b) => Number(b.blocking) - Number(a.blocking));
 
   return (
     <div className={className ?? "flex flex-col gap-2"}>
       {sorted.map((w, i) => (
-        <Alert key={`${w.code}-${i}`} variant={w.blocking ? "warning" : "info"} title={w.blocking ? "Fix before approving" : undefined}>
+        <Alert key={`${w.code}-${i}`} variant={w.blocking ? "warning" : "info"} title={w.blocking ? t("payroll.shared.fixBeforeApproving") : undefined}>
           {w.message}
         </Alert>
       ))}

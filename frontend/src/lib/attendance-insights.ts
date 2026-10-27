@@ -1,4 +1,5 @@
 import type { AttendanceReport } from "@/lib/excel-specs/time";
+import type { TKey } from "@/lib/i18n";
 
 /**
  * Numbers a reviewer needs from the attendance report: per person, how often
@@ -9,11 +10,12 @@ import type { AttendanceReport } from "@/lib/excel-specs/time";
 
 export type IssueKind = "late" | "early" | "missed" | "absent";
 
-export const ISSUES: { kind: IssueKind; label: string }[] = [
-  { kind: "late", label: "Late" },
-  { kind: "early", label: "Early leave" },
-  { kind: "missed", label: "Missed scan" },
-  { kind: "absent", label: "Absent" },
+// `label` goes into the exported files (English); screens show t(key).
+export const ISSUES: { kind: IssueKind; label: string; key: TKey }[] = [
+  { kind: "late", label: "Late", key: "attendance.report.issue.late" },
+  { kind: "early", label: "Early leave", key: "attendance.report.issue.early" },
+  { kind: "missed", label: "Missed scan", key: "attendance.report.issue.missed" },
+  { kind: "absent", label: "Absent", key: "attendance.report.issue.absent" },
 ];
 
 export type ReportDay = {

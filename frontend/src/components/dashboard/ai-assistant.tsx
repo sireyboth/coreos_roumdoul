@@ -6,14 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe } from "@/contexts/me-context";
 import { api } from "@/lib/api";
+import { translateNow, useT, type TKey } from "@/lib/i18n";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-const SUGGESTIONS = [
-  "How do I lock a month?",
-  "How do I request leave?",
-  "តើខ្ញុំស្កេនវត្តមានដោយរបៀបណា?",
-];
+const SUGGESTIONS: TKey[] = ["app.assistant.suggestion1", "app.assistant.suggestion2", "app.assistant.suggestion3"];
 
 // Questions per chat before a fresh one is needed. Each question resends the
 // recent chat, so long chats cost more. Matches the server's
@@ -22,6 +19,7 @@ const QUESTIONS_PER_CHAT = 10;
 
 export function AiAssistant() {
   const { me } = useMe();
+  const t = useT();
   const [open, setOpen] = useState(false);
   // True while the panel plays its exit animation; it unmounts when that ends.
   const [closing, setClosing] = useState(false);
@@ -58,7 +56,7 @@ export function AiAssistant() {
       setError(
         e instanceof Error && e.message
           ? e.message
-          : "The assistant is not available right now. Try again in a few minutes.",
+          : translateNow("app.assistant.unavailable"),
       );
     } finally {
       setLoading(false);
@@ -90,17 +88,17 @@ export function AiAssistant() {
       <Button
         onClick={() => setOpen(true)}
         className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 h-12 rounded-full shadow-lg transition-transform duration-150 animate-in fade-in-0 zoom-in-90 hover:scale-105 active:scale-95 motion-reduce:animate-none motion-reduce:transition-none"
-        aria-label="Open help assistant"
+        aria-label={t("app.assistant.open")}
       >
         <MessageCircleQuestion className="mr-2 h-5 w-5" />
-        Help
+        {t("app.assistant.button")}
       </Button>
     );
   }
 
   return (
     <section
-      aria-label="Help assistant"
+      aria-label={t("app.assistant.title")}
       onAnimationEnd={(e) => {
         // Ignore animations bubbling up from messages inside the panel.
         if (e.target === e.currentTarget && closing) {
@@ -116,10 +114,10 @@ export function AiAssistant() {
     >
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold">Help assistant</h2>
-          <p className="text-xs text-muted-foreground">Ask how to use CoreOS. English or Khmer.</p>
+          <h2 className="text-sm font-semibold">{t("app.assistant.title")}</h2>
+          <p className="text-xs text-muted-foreground">{t("app.assistant.subtitle")}</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={close} aria-label="Close">
+        <Button variant="ghost" size="icon" onClick={close} aria-label={t("common.action.close")}>
           <X className="h-4 w-4" />
         </Button>
       </header>
@@ -127,8 +125,8 @@ export function AiAssistant() {
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
         {messages.length === 0 && (
           <div className="space-y-2">
-            <p className="text-muted-foreground">Try one of these:</p>
-            {SUGGESTIONS.map((s, i) => (
+            <p className="text-muted-foreground">{t("app.assistant.tryThese")}</p>
+            {SUGGESTIONS.map((key) => t(key)).map((s, i) => (
               <button
                 key={s}
                 onClick={() => send(s)}
@@ -159,7 +157,7 @@ export function AiAssistant() {
         {loading && (
           <div
             role="status"
-            aria-label="Thinking"
+            aria-label={t("app.assistant.thinking")}
             className="mr-8 flex w-fit items-center gap-1 rounded-lg bg-muted px-3 py-3 duration-200 animate-in fade-in-0 motion-reduce:animate-none"
           >
             {[0, 150, 300].map((delay) => (
@@ -182,11 +180,11 @@ export function AiAssistant() {
       {limitReached ? (
         <div className="space-y-2 border-t p-3 text-center duration-300 animate-in fade-in-0 slide-in-from-bottom-2 motion-reduce:animate-none">
           <p className="text-xs text-muted-foreground">
-            This chat has reached {QUESTIONS_PER_CHAT} questions. Start a new chat to ask more.
+            {t("app.assistant.limitReached", { n: QUESTIONS_PER_CHAT })}
           </p>
           <Button onClick={newChat} className="w-full">
             <RotateCcw className="mr-2 h-4 w-4" />
-            Start a new chat
+            {t("app.assistant.newChat")}
           </Button>
         </div>
       ) : (
@@ -201,16 +199,16 @@ export function AiAssistant() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a question"
+              placeholder={t("app.assistant.placeholder")}
               maxLength={1000}
               disabled={loading}
-              aria-label="Your question"
+              aria-label={t("app.assistant.yourQuestion")}
             />
             <Button
               type="submit"
               size="icon"
               disabled={loading || !input.trim()}
-              aria-label="Send"
+              aria-label={t("common.action.send")}
               className="transition-transform duration-150 active:scale-90 motion-reduce:transition-none"
             >
               <Send className="h-4 w-4" />
@@ -218,7 +216,7 @@ export function AiAssistant() {
           </div>
           {asked > 0 && (
             <p className="text-right text-xs text-muted-foreground">
-              {asked} of {QUESTIONS_PER_CHAT} questions
+              {t("app.assistant.count", { n: asked, max: QUESTIONS_PER_CHAT })}
             </p>
           )}
         </form>

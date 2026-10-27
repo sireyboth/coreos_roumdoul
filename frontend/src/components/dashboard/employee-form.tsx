@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { Branch, Department, Employee, EmployeeInput, SalaryCurrency, Team } from "@/lib/api";
+import { translate, useLang, useT, type Lang, type TKey } from "@/lib/i18n";
 
 // Kept in step with Employee::STATUSES on the server. `aliases` are other
 // words an Excel import accepts for the same status.
@@ -58,6 +59,22 @@ const CAMBODIAN_BANKS = [
 
 export const labelFor = (options: { value: string; label: string }[], value: string | null | undefined) =>
   options.find((o) => o.value === value)?.label ?? value ?? "—";
+
+// The English labels above are what Excel files use; on screen these give the
+// name in the chosen language (employees.options in the dictionary).
+const OPTION_GROUPS = { status: EMPLOYMENT_STATUSES, type: EMPLOYMENT_TYPES, gender: GENDERS };
+type OptionGroup = keyof typeof OPTION_GROUPS;
+
+/** An employee status / type / gender in `lang`, e.g. labelIn(lang, "status", "on_leave"). */
+export function labelIn(lang: Lang, group: OptionGroup, value: string | null | undefined): string {
+  if (!OPTION_GROUPS[group].some((o) => o.value === value)) return value ?? "—";
+  return translate(lang, `employees.options.${group}.${value}` as TKey);
+}
+
+/** The same options with their labels in `lang` (for pickers and filters). */
+export function optionsIn<T extends { value: string; label: string }>(lang: Lang, group: OptionGroup, options: T[]): T[] {
+  return options.map((o) => ({ ...o, label: labelIn(lang, group, o.value) }));
+}
 
 /** "650.00" + "USD" → "$650.00"; riel has no decimals and its own symbol. */
 export function formatSalary(amount: string | number | null | undefined, currency: string | null | undefined): string {
@@ -307,6 +324,8 @@ export function EmployeeFormFields({
   salary?: SalaryAccess;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
+  const t = useT();
+  const lang = useLang();
 
   /**
    * Typing a first or last name keeps the full name in step — until someone
@@ -351,8 +370,8 @@ export function EmployeeFormFields({
 
   return (
     <div className="flex flex-col gap-5">
-      <Section title="Basic info">
-        <Field label="First name" htmlFor={id("first")}>
+      <Section title={t("employees.form.basic")}>
+        <Field label={t("employees.form.firstName")} htmlFor={id("first")}>
           <Input
             id={id("first")}
             autoComplete="given-name"
@@ -360,7 +379,7 @@ export function EmployeeFormFields({
             onChange={(e) => changeNamePart({ first_name: e.target.value })}
           />
         </Field>
-        <Field label="Last name" htmlFor={id("last")}>
+        <Field label={t("employees.form.lastName")} htmlFor={id("last")}>
           <Input
             id={id("last")}
             autoComplete="family-name"
@@ -368,10 +387,10 @@ export function EmployeeFormFields({
             onChange={(e) => changeNamePart({ last_name: e.target.value })}
           />
         </Field>
-        <Field label="Full name" htmlFor={id("name")} hint="Filled in from the first and last name. Edit it if they go by something else.">
+        <Field label={t("employees.form.fullName")} htmlFor={id("name")} hint={t("employees.form.fullNameHint")}>
           <Input id={id("name")} required value={form.name} onChange={(e) => onChange({ name: e.target.value })} />
         </Field>
-        <Field label="Name in Khmer (optional)" htmlFor={id("name-km")}>
+        <Field label={t("employees.form.nameKm")} htmlFor={id("name-km")}>
           <Input
             id={id("name-km")}
             lang="km"
@@ -381,7 +400,7 @@ export function EmployeeFormFields({
           />
         </Field>
         <Field
-          label={codeRequired ? "Employee ID" : "Employee code (optional)"}
+          label={codeRequired ? t("employees.form.employeeId") : t("employees.form.employeeCode")}
           htmlFor={id("code")}
           hint={codeHint}
         >
@@ -394,10 +413,10 @@ export function EmployeeFormFields({
             onChange={(e) => onChange({ employee_code: e.target.value })}
           />
         </Field>
-        <Field label="Phone (optional)" htmlFor={id("phone")}>
+        <Field label={t("employees.form.phone")} htmlFor={id("phone")}>
           <Input id={id("phone")} type="tel" value={form.phone} onChange={(e) => onChange({ phone: e.target.value })} />
         </Field>
-        <Field label="Email (optional)" htmlFor={id("email")} hint={emailHint} wide>
+        <Field label={t("employees.form.email")} htmlFor={id("email")} hint={emailHint} wide>
           <Input
             id={id("email")}
             type="email"
@@ -409,8 +428,8 @@ export function EmployeeFormFields({
         </Field>
       </Section>
 
-      <Section title="Work">
-        <Field label="Branch" htmlFor={id("branch")}>
+      <Section title={t("employees.form.work")}>
+        <Field label={t("common.field.branch")} htmlFor={id("branch")}>
           <select
             id={id("branch")}
             required
@@ -420,7 +439,7 @@ export function EmployeeFormFields({
           >
             {form.branch_id === "" && (
               <option value="" disabled>
-                Select…
+                {t("employees.form.select")}
               </option>
             )}
             {branches.map((branch) => (
@@ -431,14 +450,14 @@ export function EmployeeFormFields({
           </select>
         </Field>
         {departments.length > 0 && (
-          <Field label="Department (optional)" htmlFor={id("department")}>
+          <Field label={t("employees.form.department")} htmlFor={id("department")}>
             <select
               id={id("department")}
               value={form.department_id}
               onChange={(e) => changeDepartment(e.target.value)}
               className={SELECT_CLASS}
             >
-              <option value="">None</option>
+              <option value="">{t("employees.form.none")}</option>
               {departmentOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -448,14 +467,14 @@ export function EmployeeFormFields({
           </Field>
         )}
         {teams.length > 0 && (
-          <Field label="Team (optional)" htmlFor={id("team")}>
+          <Field label={t("employees.form.team")} htmlFor={id("team")}>
             <select
               id={id("team")}
               value={form.team_id}
               onChange={(e) => changeTeam(e.target.value)}
               className={SELECT_CLASS}
             >
-              <option value="">None</option>
+              <option value="">{t("employees.form.none")}</option>
               {teamOptions.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -464,29 +483,29 @@ export function EmployeeFormFields({
             </select>
           </Field>
         )}
-        <Field label="Job title (optional)" htmlFor={id("job")}>
+        <Field label={t("employees.form.jobTitle")} htmlFor={id("job")}>
           <Input id={id("job")} value={form.job_title} onChange={(e) => onChange({ job_title: e.target.value })} />
         </Field>
         {managers && (
           <Field
-            label="Line manager (optional)"
+            label={t("employees.form.manager")}
             htmlFor={id("manager")}
-            hint="Approves this person's leave and other requests first. Empty = anyone who can approve requests in their branch."
+            hint={t("employees.form.managerHint")}
           >
             <SearchableSelect
               id={id("manager")}
               options={managerOptions}
               value={form.manager_employee_id}
               onChange={(value) => onChange({ manager_employee_id: value })}
-              placeholder="No line manager"
+              placeholder={t("employees.form.noManager")}
               className="h-9 w-full rounded-md"
             />
           </Field>
         )}
         <Field
-          label="Display order (optional)"
+          label={t("common.order.label")}
           htmlFor={id("order")}
-          hint="Lowest shows first in every list (e.g. 1 = director). Empty = after numbered people."
+          hint={t("common.order.hint", { example: t("employees.form.orderExample") })}
         >
           <Input
             id={id("order")}
@@ -495,27 +514,27 @@ export function EmployeeFormFields({
             min={0}
             max={99999}
             step={1}
-            placeholder="e.g. 1"
+            placeholder={t("common.order.placeholder")}
             value={form.sort_order}
             onChange={(e) => onChange({ sort_order: e.target.value })}
           />
         </Field>
-        <Field label="Employment type" htmlFor={id("type")}>
+        <Field label={t("employees.form.employmentType")} htmlFor={id("type")}>
           <select
             id={id("type")}
             value={form.employment_type}
             onChange={(e) => onChange({ employment_type: e.target.value })}
             className={SELECT_CLASS}
           >
-            <option value="">Not set</option>
-            {EMPLOYMENT_TYPES.map((o) => (
+            <option value="">{t("employees.form.notSet")}</option>
+            {optionsIn(lang, "type", EMPLOYMENT_TYPES).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Hire date" htmlFor={id("hire")}>
+        <Field label={t("employees.form.hireDate")} htmlFor={id("hire")}>
           <Input
             id={id("hire")}
             type="date"
@@ -524,14 +543,14 @@ export function EmployeeFormFields({
           />
         </Field>
         <Field
-          label="Status"
+          label={t("common.field.status")}
           htmlFor={id("status")}
-          hint="Suspended employees and anyone who has left can't check in."
+          hint={t("employees.form.statusHint")}
           wide={!hasLeft(form.employment_status)}
         >
           <SearchableSelect
             id={id("status")}
-            options={EMPLOYMENT_STATUSES}
+            options={optionsIn(lang, "status", EMPLOYMENT_STATUSES)}
             value={form.employment_status}
             onChange={(value) => onChange({ employment_status: value })}
             clearable={false}
@@ -539,7 +558,7 @@ export function EmployeeFormFields({
           />
         </Field>
         {hasLeft(form.employment_status) && (
-          <Field label="Last working day" htmlFor={id("term")}>
+          <Field label={t("employees.form.lastDay")} htmlFor={id("term")}>
             <Input
               id={id("term")}
               type="date"
@@ -550,23 +569,23 @@ export function EmployeeFormFields({
         )}
       </Section>
 
-      <Section title="Personal">
-        <Field label="Gender" htmlFor={id("gender")}>
+      <Section title={t("employees.form.personal")}>
+        <Field label={t("employees.form.gender")} htmlFor={id("gender")}>
           <select
             id={id("gender")}
             value={form.gender}
             onChange={(e) => onChange({ gender: e.target.value })}
             className={SELECT_CLASS}
           >
-            <option value="">Not set</option>
-            {GENDERS.map((o) => (
+            <option value="">{t("employees.form.notSet")}</option>
+            {optionsIn(lang, "gender", GENDERS).map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Date of birth" htmlFor={id("dob")}>
+        <Field label={t("employees.form.dateOfBirth")} htmlFor={id("dob")}>
           <Input
             id={id("dob")}
             type="date"
@@ -574,7 +593,7 @@ export function EmployeeFormFields({
             onChange={(e) => onChange({ date_of_birth: e.target.value })}
           />
         </Field>
-        <Field label="Address" htmlFor={id("address")} wide>
+        <Field label={t("employees.form.address")} htmlFor={id("address")} wide>
           <textarea
             id={id("address")}
             rows={2}
@@ -584,9 +603,9 @@ export function EmployeeFormFields({
           />
         </Field>
         <Field
-          label="Notes"
+          label={t("common.field.notes")}
           htmlFor={id("notes")}
-          hint="Personal details are only visible to people who can manage employees."
+          hint={t("employees.form.notesHint")}
           wide
         >
           <textarea
@@ -599,42 +618,42 @@ export function EmployeeFormFields({
         </Field>
       </Section>
 
-      <Section title="Identity documents">
-        <Field label="Nationality" htmlFor={id("nationality")} wide>
+      <Section title={t("employees.form.identity")}>
+        <Field label={t("employees.form.nationality")} htmlFor={id("nationality")} wide>
           <Input
             id={id("nationality")}
-            placeholder="Cambodian"
+            placeholder={t("employees.form.nationalityPlaceholder")}
             value={form.nationality}
             onChange={(e) => onChange({ nationality: e.target.value })}
           />
         </Field>
-        <Field label="National ID card number" htmlFor={id("national-id")}>
+        <Field label={t("employees.form.nationalId")} htmlFor={id("national-id")}>
           <Input
             id={id("national-id")}
             value={form.national_id_number}
             onChange={(e) => onChange({ national_id_number: e.target.value })}
           />
         </Field>
-        <Field label="Passport number" htmlFor={id("passport")} hint="For foreign staff, or anyone without a national ID.">
+        <Field label={t("employees.form.passport")} htmlFor={id("passport")} hint={t("employees.form.passportHint")}>
           <Input id={id("passport")} value={form.passport_number} onChange={(e) => onChange({ passport_number: e.target.value })} />
         </Field>
       </Section>
 
-      <Section title="Payroll & compliance">
-        <Field label="NSSF number" htmlFor={id("nssf")} hint="National Social Security Fund.">
+      <Section title={t("employees.form.compliance")}>
+        <Field label={t("employees.form.nssf")} htmlFor={id("nssf")} hint={t("employees.form.nssfHint")}>
           <Input id={id("nssf")} value={form.nssf_number} onChange={(e) => onChange({ nssf_number: e.target.value })} />
         </Field>
-        <Field label="Tax ID" htmlFor={id("tax")}>
+        <Field label={t("employees.form.taxId")} htmlFor={id("tax")}>
           <Input id={id("tax")} value={form.tax_id} onChange={(e) => onChange({ tax_id: e.target.value })} />
         </Field>
       </Section>
 
       {salary !== "none" && (
-        <Section title="Salary">
+        <Section title={t("employees.form.salary")}>
           <Field
-            label="Base salary (per month)"
+            label={t("employees.form.baseSalary")}
             htmlFor={id("salary")}
-            hint={salary === "view" ? "You can see pay, but not change it." : "Only people with the salary permission can see this."}
+            hint={salary === "view" ? t("employees.form.salaryViewHint") : t("employees.form.salaryEditHint")}
           >
             <Input
               id={id("salary")}
@@ -646,7 +665,7 @@ export function EmployeeFormFields({
               onChange={(e) => onChange({ base_salary: e.target.value })}
             />
           </Field>
-          <Field label="Currency" htmlFor={id("currency")}>
+          <Field label={t("common.field.currency")} htmlFor={id("currency")}>
             <select
               id={id("currency")}
               disabled={salary === "view"}
@@ -662,7 +681,7 @@ export function EmployeeFormFields({
             </select>
           </Field>
           {/* Where pay goes, so only people who may set pay can change it. */}
-          <Field label="Bank" htmlFor={id("bank")}>
+          <Field label={t("employees.form.bank")} htmlFor={id("bank")}>
             <Input
               id={id("bank")}
               list={id("bank-list")}
@@ -677,7 +696,7 @@ export function EmployeeFormFields({
               ))}
             </datalist>
           </Field>
-          <Field label="Bank account number" htmlFor={id("account")}>
+          <Field label={t("employees.form.bankAccount")} htmlFor={id("account")}>
             <Input
               id={id("account")}
               inputMode="numeric"

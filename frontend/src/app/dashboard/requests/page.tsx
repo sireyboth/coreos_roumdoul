@@ -12,13 +12,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PageHeader } from "@/components/dashboard/page-header";
 import { LateEarlyRequestDialog } from "@/components/dashboard/requests/late-early-request-dialog";
 import { LeaveRequestDialog } from "@/components/dashboard/requests/leave-request-dialog";
-import { DELETE_REQUESTS_WARNING, RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
+import { RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, type EmployeeRequest, type LeaveBalance } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { REQUEST_STATUS, requestAmount, requestDates } from "@/lib/requests";
+import { useLang, useT } from "@/lib/i18n";
+import { REQUEST_STATUS, requestAmount, requestDates, requestLabel } from "@/lib/requests";
 import { cn } from "@/lib/utils";
 
 type Scope = "mine" | "approvals" | "all";
@@ -27,6 +28,7 @@ const MANAGE = "requests.manage";
 
 /** What's left of each leave that keeps a balance, for this year. */
 function Balances({ balances }: { balances: LeaveBalance[] | null }) {
+  const t = useT();
   if (!balances || balances.length === 0) return null;
 
   return (
@@ -37,10 +39,12 @@ function Balances({ balances }: { balances: LeaveBalance[] | null }) {
             <p className="truncate text-xs font-medium text-muted-foreground">{b.leave_type.name}</p>
             <p className="text-2xl font-semibold tabular-nums">
               {b.available}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">left</span>
+              <span className="ml-1 text-sm font-normal text-muted-foreground">{t("leave.requestsPage.left")}</span>
             </p>
             <p className="text-xs text-muted-foreground tabular-nums">
-              {b.used} used{b.pending > 0 ? ` · ${b.pending} waiting` : ""} · {b.earned < b.full_year ? `${b.earned} of ${b.full_year} earned` : `${b.full_year} a year`}
+              {t("leave.requestsPage.used", { n: b.used })}
+              {b.pending > 0 ? ` · ${t("leave.requestsPage.waiting", { n: b.pending })}` : ""} ·{" "}
+              {b.earned < b.full_year ? t("leave.requestsPage.earnedOf", { earned: b.earned, total: b.full_year }) : t("leave.requestsPage.perYear", { n: b.full_year })}
             </p>
           </CardContent>
         </Card>
@@ -50,6 +54,8 @@ function Balances({ balances }: { balances: LeaveBalance[] | null }) {
 }
 
 function RequestsPage() {
+  const t = useT();
+  const lang = useLang();
   const { me } = useMe();
   const params = useSearchParams();
   const canManage = me?.permissions.includes(MANAGE) ?? false;
@@ -95,15 +101,18 @@ function RequestsPage() {
 
   async function deleteRequests(selected: EmployeeRequest[], clearSelection: () => void) {
     const ok = await confirm({
-      title: selected.length === 1 ? `Delete this ${selected[0].label.toLowerCase()}?` : `Delete ${selected.length} requests?`,
-      description: DELETE_REQUESTS_WARNING,
+      title:
+        selected.length === 1
+          ? t("leave.shared.deleteOne", { label: requestLabel(selected[0], lang).toLowerCase() })
+          : t("leave.requestsPage.deleteMany", { n: selected.length }),
+      description: t("leave.shared.deleteWarning"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       const { deleted } = await api.requests.deleteMany(selected.map((r) => r.id));
-      notifySuccess(`${deleted} ${deleted === 1 ? "request" : "requests"} deleted`);
+      notifySuccess(t(deleted === 1 ? "leave.requestsPage.deletedOne" : "leave.requestsPage.deletedOther", { n: deleted }));
       clearSelection();
     } catch (err) {
       notifyError(err);
@@ -126,10 +135,10 @@ function RequestsPage() {
   }
 
   const tabs: { id: Scope; label: string; count?: number }[] = [
-    ...(selfEmployeeId ? [{ id: "mine" as const, label: "My requests" }] : []),
+    ...(selfEmployeeId ? [{ id: "mine" as const, label: t("leave.requestsPage.tabMine") }] : []),
     // Line managers see this tab once something waits on them; approvers always.
-    ...(canManage || waiting > 0 || scope === "approvals" ? [{ id: "approvals" as const, label: "Waiting for me", count: waiting }] : []),
-    ...(canManage ? [{ id: "all" as const, label: "All requests" }] : []),
+    ...(canManage || waiting > 0 || scope === "approvals" ? [{ id: "approvals" as const, label: t("leave.requestsPage.tabApprovals"), count: waiting }] : []),
+    ...(canManage ? [{ id: "all" as const, label: t("leave.requestsPage.tabAll") }] : []),
   ];
 
   const columns: DataTableColumn<EmployeeRequest>[] = [
@@ -137,7 +146,7 @@ function RequestsPage() {
       ? [
           {
             id: "employee",
-            header: "Employee",
+            header: t("common.field.employee"),
             primary: true,
             cell: (r: EmployeeRequest) => (
               <div className="flex flex-col">
@@ -152,43 +161,43 @@ function RequestsPage() {
       : []),
     {
       id: "type",
-      header: "Request",
+      header: t("leave.requestsPage.colRequest"),
       primary: scope === "mine",
       cell: (r) => (
         <div className="flex flex-col">
-          <span className="font-medium">{r.label}</span>
+          <span className="font-medium">{requestLabel(r, lang)}</span>
           {r.leave_type?.name_km && <span className="text-xs text-muted-foreground">{r.leave_type.name_km}</span>}
         </div>
       ),
-      sortValue: (r) => r.label,
-      searchValue: (r) => [r.label, r.reason].filter(Boolean).join(" "),
+      sortValue: (r) => requestLabel(r, lang),
+      searchValue: (r) => [requestLabel(r, lang), r.reason].filter(Boolean).join(" "),
     },
     {
       id: "dates",
-      header: "Dates",
+      header: t("leave.requestsPage.colDates"),
       cell: (r) => (
         <div className="flex flex-col">
-          <span>{requestDates(r)}</span>
-          <span className="text-xs text-muted-foreground tabular-nums">{requestAmount(r)}</span>
+          <span>{requestDates(r, lang)}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{requestAmount(r, lang)}</span>
         </div>
       ),
       sortValue: (r) => r.start_date,
-      sortLabels: ["Earliest first", "Latest first"],
+      sortLabels: [t("leave.requestsPage.sortEarliest"), t("leave.requestsPage.sortLatest")],
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (r) => (
         <div className="flex flex-col items-start gap-0.5">
-          <Badge variant={REQUEST_STATUS[r.status].tone}>{REQUEST_STATUS[r.status].label}</Badge>
+          <Badge variant={REQUEST_STATUS[r.status].tone}>{t(REQUEST_STATUS[r.status].key)}</Badge>
           <span className="text-xs text-muted-foreground">
             {r.status === "pending"
               ? r.waiting_on
-                ? `With ${r.waiting_on.name}`
-                : "With an approver"
+                ? t("leave.requestsPage.withName", { name: r.waiting_on.name })
+                : t("leave.requestsPage.withApprover")
               : r.status === "cancelled"
-                ? r.cancelled_by && `by ${r.cancelled_by.name}`
-                : r.decided_by && `by ${r.decided_by.name}`}
+                ? r.cancelled_by && t("leave.requestsPage.byName", { name: r.cancelled_by.name })
+                : r.decided_by && t("leave.requestsPage.byName", { name: r.decided_by.name })}
           </span>
           {/* The remark the employee reads. */}
           {(r.status === "cancelled" ? r.cancel_reason : r.decision_notes) && (
@@ -209,46 +218,52 @@ function RequestsPage() {
     {
       type: "select",
       id: "status",
-      label: "Status",
-      options: Object.entries(REQUEST_STATUS).map(([value, s]) => ({ value, label: s.label })),
+      label: t("common.field.status"),
+      options: Object.entries(REQUEST_STATUS).map(([value, s]) => ({ value, label: t(s.key) })),
       getValue: (r) => r.status,
     },
-    { type: "select", id: "type", label: "Request", options: optionsOf((rows ?? []).map((r) => [r.label, r.label])), getValue: (r) => r.label },
+    {
+      type: "select",
+      id: "type",
+      label: t("leave.requestsPage.colRequest"),
+      options: optionsOf((rows ?? []).map((r) => [requestLabel(r, lang), requestLabel(r, lang)])),
+      getValue: (r) => requestLabel(r, lang),
+    },
     ...(scope !== "mine"
       ? [
           {
             type: "select" as const,
             id: "employee",
-            label: "Employee",
+            label: t("common.field.employee"),
             options: optionsOf((rows ?? []).map((r) => [String(r.employee.id), r.employee.name])),
             getValue: (r: EmployeeRequest) => String(r.employee.id),
           },
         ]
       : []),
-    { type: "date-range", id: "dates", label: "Dates", getValue: (r) => r.start_date },
+    { type: "date-range", id: "dates", label: t("leave.requestsPage.colDates"), getValue: (r) => r.start_date },
   ];
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Leave & requests"
-        description="Ask for time off, or to arrive late or leave early — and follow what happens to it."
+        title={t("leave.requestsPage.title")}
+        description={t("leave.requestsPage.description")}
         action={
           (selfEmployeeId || canManage) && (
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button />}>
                 <Plus className="size-4" />
-                New request
+                {t("leave.requestsPage.newRequest")}
                 <ChevronDown className="size-3.5 opacity-70" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-60">
                 <DropdownMenuItem onClick={() => setAsking("leave")}>
                   <CalendarHeart className="size-4" />
-                  Leave
+                  {t("leave.requestsPage.leave")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setAsking("late_early")}>
                   <AlarmClock className="size-4" />
-                  Late arrival / Early leave
+                  {t("leave.shared.lateEarly")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -287,16 +302,21 @@ function RequestsPage() {
         columns={columns}
         onRowClick={setOpen}
         filters={filters}
-        searchPlaceholder={scope === "mine" ? "Search requests…" : "Search employee or request…"}
+        searchPlaceholder={scope === "mine" ? t("leave.requestsPage.searchOwn") : t("leave.requestsPage.searchAll")}
         emptyState={{
           icon: scope === "approvals" ? Inbox : CalendarHeart,
-          title: scope === "approvals" ? "Nothing waiting for you" : scope === "mine" ? "No requests yet" : "No requests",
+          title:
+            scope === "approvals"
+              ? t("leave.requestsPage.emptyApprovals")
+              : scope === "mine"
+                ? t("leave.requestsPage.emptyMine")
+                : t("leave.requestsPage.emptyAll"),
           description:
             scope === "approvals"
-              ? "Leave and late / early requests from your team show up here for you to approve."
+              ? t("leave.requestsPage.emptyApprovalsHint")
               : scope === "mine"
-                ? "Tap “New request” to ask for leave, or to arrive late or leave early."
-                : "Requests from the branches you cover show up here.",
+                ? t("leave.requestsPage.emptyMineHint")
+                : t("leave.requestsPage.emptyAllHint"),
         }}
         bulkActions={
           canManage
@@ -305,7 +325,7 @@ function RequestsPage() {
                 return deletable.length > 0 ? (
                   <Button variant="destructive" size="sm" onClick={() => deleteRequests(deletable, clearSelection)}>
                     <Trash2 className="size-3.5" />
-                    Delete {deletable.length}
+                    {t("leave.requestsPage.deleteN", { n: deletable.length })}
                   </Button>
                 ) : null;
               }
@@ -314,7 +334,7 @@ function RequestsPage() {
         rowActions={(r) =>
           r.can.decide ? (
             <Button size="sm" onClick={() => setOpen(r)}>
-              Review
+              {t("leave.requestsPage.review")}
             </Button>
           ) : null
         }

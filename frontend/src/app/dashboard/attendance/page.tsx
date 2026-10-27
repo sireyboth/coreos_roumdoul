@@ -10,7 +10,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { DataTable, type DataTableColumn, type DataTableFilter } from "@/components/ui/data-table";
 import { AttendanceAddDialog } from "@/components/dashboard/attendance-add-dialog";
 import { AttendanceCorrections } from "@/components/dashboard/attendance-corrections";
-import { AttendanceDayDialog, DELETE_DAYS_WARNING } from "@/components/dashboard/attendance-day-dialog";
+import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
@@ -27,6 +27,7 @@ import { useApi } from "@/hooks/use-api";
 import { displayOrderColumn } from "@/components/dashboard/display-order";
 import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceException, type DaySlot } from "@/lib/api";
 import { attendanceImport } from "@/lib/excel-specs/time";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +76,10 @@ function dayEnds(day: AttendanceDay): { in: Punch | null; out: Punch | null; bet
 
 /** One time, coloured by how it went, with the reason underneath. */
 function PunchCell({ punch, more }: { punch: Punch | null; more?: number }) {
-  const extra = more ? <span className="text-xs text-muted-foreground">+{more} more {more === 1 ? "scan" : "scans"}</span> : null;
+  const t = useT();
+  const extra = more ? (
+    <span className="text-xs text-muted-foreground">{t(more === 1 ? "attendance.page.moreScansOne" : "attendance.page.moreScansOther", { n: more })}</span>
+  ) : null;
 
   if (!punch) {
     return (
@@ -88,11 +92,11 @@ function PunchCell({ punch, more }: { punch: Punch | null; more?: number }) {
 
   const note =
     punch.status === "late"
-      ? `${punch.late}m late`
+      ? t("attendance.page.lateBy", { n: punch.late })
       : punch.status === "early"
-        ? `${punch.early}m early`
+        ? t("attendance.page.earlyBy", { n: punch.early })
         : punch.status === "missing" || punch.status === "pending"
-          ? `expected ${clock(punch.expected)}`
+          ? t("attendance.page.expected", { time: clock(punch.expected) })
           : null;
 
   return (
@@ -106,7 +110,7 @@ function PunchCell({ punch, more }: { punch: Punch | null; more?: number }) {
           (punch.status === "pending" || punch.status === "unscheduled") && "text-muted-foreground",
         )}
       >
-        {punch.at ? clock(punch.at) : punch.status === "missing" ? "Missing" : "Not yet"}
+        {punch.at ? clock(punch.at) : punch.status === "missing" ? t("attendance.page.missing") : t("attendance.page.notYet")}
       </span>
       {note && <span className={cn("text-xs", punch.status === "missing" ? "text-destructive/80" : "text-muted-foreground")}>{note}</span>}
       {extra}
@@ -115,6 +119,8 @@ function PunchCell({ punch, more }: { punch: Punch | null; more?: number }) {
 }
 
 function AttendancePageContent() {
+  const t = useT();
+  const lang = useLang();
   const { me } = useMe();
   const canManage = me?.permissions.includes("attendance.manage") ?? false;
   // ?tab=corrections deep-links to a tab (the old Corrections page redirects here).
@@ -166,15 +172,15 @@ function AttendancePageContent() {
 
   async function deleteDays(selected: AttendanceDay[], clearSelection: () => void) {
     const ok = await confirm({
-      title: selected.length === 1 ? "Delete this day's attendance?" : `Delete ${selected.length} days of attendance?`,
-      description: DELETE_DAYS_WARNING,
+      title: selected.length === 1 ? t("attendance.page.deleteTitleOne") : t("attendance.page.deleteTitleOther", { n: selected.length }),
+      description: t("attendance.day.deleteWarning"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       const { deleted } = await api.attendance.deleteDays(selected.map((d) => d.id));
-      notifySuccess(`${deleted} ${deleted === 1 ? "day" : "days"} deleted`);
+      notifySuccess(t(deleted === 1 ? "attendance.page.deletedOne" : "attendance.page.deletedOther", { n: deleted }));
       clearSelection();
     } catch (err) {
       notifyError(err);
@@ -203,7 +209,7 @@ function AttendancePageContent() {
       ? [
           {
             id: "employee",
-            header: "Employee",
+            header: t("common.field.employee"),
             primary: true,
             cell: (d: AttendanceDay) => (
               <div className="flex flex-col">
@@ -219,11 +225,11 @@ function AttendancePageContent() {
       : []),
     {
       id: "date",
-      header: "Date",
+      header: t("common.field.date"),
       primary: !canManage,
       cell: (d) => (
         <div className="flex flex-col">
-          <span>{parseDate(d.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
+          <span>{parseDate(d.date).toLocaleDateString(dateLocale(lang), { weekday: "short", day: "numeric", month: "short" })}</span>
           <span className="text-xs text-muted-foreground">{d.schedule ?? d.label ?? ""}</span>
         </div>
       ),
@@ -232,31 +238,32 @@ function AttendancePageContent() {
     },
     {
       id: "check_in",
-      header: "Check in",
+      header: t("attendance.page.checkIn"),
       cell: (d) => <PunchCell punch={dayEnds(d).in} />,
       // By time of day ("08:01"); days without one go last.
       sortValue: (d) => (dayEnds(d).in?.at ? clock(dayEnds(d).in!.at) : null),
-      sortLabels: ["Earliest first", "Latest first"],
+      sortLabels: [t("attendance.page.earliestFirst"), t("attendance.page.latestFirst")],
     },
     {
       id: "check_out",
-      header: "Check out",
+      header: t("attendance.page.checkOut"),
       cell: (d) => {
         const ends = dayEnds(d);
         return <PunchCell punch={ends.out} more={ends.between} />;
       },
       sortValue: (d) => (dayEnds(d).out?.at ? clock(dayEnds(d).out!.at) : null),
-      sortLabels: ["Earliest first", "Latest first"],
+      sortLabels: [t("attendance.page.earliestFirst"), t("attendance.page.latestFirst")],
     },
     {
       id: "worked",
-      header: "Worked",
+      header: t("attendance.page.worked"),
       cell: (d) => (
         <div className="flex flex-col text-sm">
-          <span className="tabular-nums">{d.worked_minutes ? formatMinutes(d.worked_minutes) : "—"}</span>
+          <span className="tabular-nums">{d.worked_minutes ? formatMinutes(d.worked_minutes, lang) : "—"}</span>
           {d.overtime_minutes > 0 && (
             <span className="text-xs text-info">
-              +{formatMinutes(d.overtime_minutes)} OT{d.overtime_status === "pending" ? " (to review)" : ""}
+              {t("attendance.page.overtime", { time: formatMinutes(d.overtime_minutes, lang) })}
+              {d.overtime_status === "pending" ? t("attendance.page.toReview") : ""}
             </span>
           )}
         </div>
@@ -265,16 +272,16 @@ function AttendancePageContent() {
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (d) => (
         <div className="flex flex-wrap gap-1">
-          <Badge variant={DAY_STATUS[d.status].tone}>{DAY_STATUS[d.status].label}</Badge>
+          <Badge variant={DAY_STATUS[d.status].tone}>{t(`attendance.status.day.${d.status}`)}</Badge>
           {d.exceptions
             .filter((code) => code !== "absent")
             .map((code) => (
               <Badge key={code} variant={EXCEPTIONS[code].tone}>
-                {EXCEPTIONS[code].label}
-                {code === "late" && d.late_minutes ? ` ${d.late_minutes}m` : ""}
+                {t(`attendance.status.exception.${code}`)}
+                {code === "late" && d.late_minutes ? ` ${t("common.time.minutes", { n: d.late_minutes })}` : ""}
               </Badge>
             ))}
         </div>
@@ -291,15 +298,15 @@ function AttendancePageContent() {
     {
       type: "select",
       id: "status",
-      label: "Status",
-      options: (Object.keys(DAY_STATUS) as AttendanceDayStatus[]).map((s) => ({ value: s, label: DAY_STATUS[s].label })),
+      label: t("common.field.status"),
+      options: (Object.keys(DAY_STATUS) as AttendanceDayStatus[]).map((s) => ({ value: s, label: t(`attendance.status.day.${s}`) })),
       getValue: (d) => d.status,
     },
     {
       type: "select",
       id: "exception",
-      label: "Problem",
-      options: (Object.keys(EXCEPTIONS) as AttendanceException[]).map((e) => ({ value: e, label: EXCEPTIONS[e].label })),
+      label: t("attendance.page.problem"),
+      options: (Object.keys(EXCEPTIONS) as AttendanceException[]).map((e) => ({ value: e, label: t(`attendance.status.exception.${e}`) })),
       getValue: (d) => d.exceptions[0],
       // A day can have several problems; it matches if it has the chosen one.
       matches: (d, selected) => d.exceptions.includes(selected as AttendanceException),
@@ -309,36 +316,36 @@ function AttendancePageContent() {
           {
             type: "select" as const,
             id: "employee",
-            label: "Employee",
+            label: t("common.field.employee"),
             options: employeeOptions,
             getValue: (d: AttendanceDay) => String(d.employee?.id ?? ""),
           },
         ]
       : []),
-    { type: "date-range", id: "date", label: "Date", getValue: (d) => d.date },
+    { type: "date-range", id: "date", label: t("common.field.date"), getValue: (d) => d.date },
   ];
 
   const tabs: { id: Tab; label: string; icon: typeof Clock; visible: boolean; count?: number }[] = [
-    { id: "records", label: "Records", icon: ListChecks, visible: true },
-    { id: "overtime", label: "Overtime", icon: Hourglass, visible: canManage, count: pendingOvertime },
+    { id: "records", label: t("attendance.page.tabs.records"), icon: ListChecks, visible: true },
+    { id: "overtime", label: t("attendance.page.tabs.overtime"), icon: Hourglass, visible: canManage, count: pendingOvertime },
     // Everyone: employees request their own corrections here, managers review them.
-    { id: "corrections", label: "Corrections", icon: FileClock, visible: true, count: canManage ? pendingCorrections : 0 },
+    { id: "corrections", label: t("attendance.page.tabs.corrections"), icon: FileClock, visible: true, count: canManage ? pendingCorrections : 0 },
     // Reviewing a period, exporting it, and closing a finished month.
-    { id: "report", label: "Report", icon: Table2, visible: true },
+    { id: "report", label: t("attendance.page.tabs.report"), icon: Table2, visible: true },
   ];
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Attendance"
+          title={t("attendance.page.title")}
           action={
             <div className="flex flex-wrap gap-2">
               {/* Export has its own dialog (date range, employee), so only Import comes from here. */}
               {canManage && (
                 <Button variant="outline" onClick={() => setMissedOpen(true)}>
                   <ScanLine className="size-4" />
-                  Missed scans
+                  {t("attendance.page.missedScans")}
                   {missedCount > 0 && (
                     <span className="rounded-full bg-warning/15 px-1.5 text-xs font-semibold tabular-nums text-warning">{missedCount}</span>
                   )}
@@ -347,13 +354,13 @@ function AttendancePageContent() {
               <ExcelActions importSpec={canManage ? attendanceImport : undefined} onImported={load} />
               <Button variant="outline" onClick={() => setExportOpen(true)}>
                 <FileDown className="size-4" />
-                Export
+                {t("common.action.export")}
               </Button>
               {/* The page's main action: solid, and last, where the eye lands. */}
               {canManage && (
                 <Button onClick={() => setAddOpen(true)}>
                   <CalendarPlus className="size-4" />
-                  Add attendance
+                  {t("attendance.page.addAttendance")}
                 </Button>
               )}
             </div>
@@ -363,15 +370,14 @@ function AttendancePageContent() {
         {myIncomplete.length > 0 && (
           <Alert
             variant="warning"
-            title={myIncomplete.length === 1 ? "One of your days is missing a scan" : `${myIncomplete.length} of your days are missing a scan`}
+            title={myIncomplete.length === 1 ? t("attendance.page.missingOne") : t("attendance.page.missingOther", { n: myIncomplete.length })}
             action={
               <button type="button" onClick={() => switchTab("corrections")} className="text-sm font-medium underline">
-                Request a correction
+                {t("attendance.page.requestCorrection")}
               </button>
             }
           >
-            {myIncomplete.map((d) => d.date).join(", ")} — those hours aren&apos;t fully counted until a correction adds the
-            missing scan.
+            {t("attendance.page.missingHint", { dates: myIncomplete.map((d) => d.date).join(", ") })}
           </Alert>
         )}
 
@@ -380,41 +386,36 @@ function AttendancePageContent() {
             <AttendanceTodayCard onScanned={load} />
             <Card>
               <CardHeader>
-                <CardTitle>Set up a one-tap shortcut</CardTitle>
-                <CardDescription>
-                  Open instant-scan mode on your phone, then use your browser&apos;s &quot;Add to Home Screen&quot; option.
-                  The icon opens straight to the camera, ready to scan — no need to open the app each time.
-                </CardDescription>
+                <CardTitle>{t("attendance.page.shortcutTitle")}</CardTitle>
+                <CardDescription>{t("attendance.page.shortcutHint")}</CardDescription>
               </CardHeader>
             </Card>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            Your account isn&apos;t linked to an employee record, so you can&apos;t scan yourself.
-          </p>
+          <p className="text-sm text-muted-foreground">{t("attendance.page.noEmployee")}</p>
         )}
 
         {/* Scrolls sideways on a narrow phone instead of widening the page. */}
         <div className="inline-flex max-w-full self-start overflow-x-auto rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
           {tabs
-            .filter((t) => t.visible)
-            .map((t) => (
+            .filter((item) => item.visible)
+            .map((item) => (
               <button
-                key={t.id}
+                key={item.id}
                 type="button"
                 role="tab"
-                aria-selected={tab === t.id}
-                onClick={() => switchTab(t.id)}
+                aria-selected={tab === item.id}
+                onClick={() => switchTab(item.id)}
                 className={cn(
                   "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  tab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  tab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <t.icon className="size-4" />
-                {t.label}
-                {t.count ? (
-                  <span className={cn("rounded-full px-1.5 text-xs tabular-nums", tab === t.id ? "bg-primary-foreground/20" : "bg-info/15 text-info")}>
-                    {t.count}
+                <item.icon className="size-4" />
+                {item.label}
+                {item.count ? (
+                  <span className={cn("rounded-full px-1.5 text-xs tabular-nums", tab === item.id ? "bg-primary-foreground/20" : "bg-info/15 text-info")}>
+                    {item.count}
                   </span>
                 ) : null}
               </button>
@@ -427,8 +428,7 @@ function AttendancePageContent() {
 
             {truncated && result && (
               <Alert variant="warning">
-                This month has {result.total.toLocaleString()} records; showing the newest {result.data.length.toLocaleString()}. Use the
-                filters, or open a single employee, to see the rest.
+                {t("attendance.page.truncated", { total: result.total.toLocaleString(), shown: result.data.length.toLocaleString() })}
               </Alert>
             )}
 
@@ -439,11 +439,11 @@ function AttendancePageContent() {
               getRowId={(d) => d.id}
               columns={columns}
               filters={filters}
-              searchPlaceholder="Search by employee or schedule…"
+              searchPlaceholder={t("attendance.page.searchPlaceholder")}
               emptyState={{
                 icon: Clock,
-                title: "No attendance this month",
-                description: "Scans and work days show up here once people have a work schedule.",
+                title: t("attendance.page.emptyTitle"),
+                description: t("attendance.page.emptyHint"),
               }}
               bulkActions={
                 canManage
@@ -451,11 +451,11 @@ function AttendancePageContent() {
                       <>
                         <Button size="sm" onClick={() => setFilling({ days: selected, clear: clearSelection })}>
                           <CalendarCheck className="size-3.5" />
-                          Fill missed scans
+                          {t("attendance.page.fillMissed")}
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => deleteDays(selected, clearSelection)}>
                           <Trash2 className="size-3.5" />
-                          Delete {selected.length}
+                          {t("attendance.page.deleteCount", { n: selected.length })}
                         </Button>
                       </>
                     )
@@ -464,7 +464,7 @@ function AttendancePageContent() {
               rowActions={(d) => (
                 <Button variant="outline" size="sm" onClick={() => setPreview(d)}>
                   <Eye className="size-3.5" />
-                  Details
+                  {t("attendance.page.details")}
                 </Button>
               )}
             />

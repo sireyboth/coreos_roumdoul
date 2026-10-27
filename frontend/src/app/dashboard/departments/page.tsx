@@ -26,6 +26,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department } from "@/lib/api";
 import { exportDepartments, departmentImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
@@ -62,6 +63,7 @@ function DepartmentFormDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(department?.name ?? "");
   const [code, setCode] = useState(department?.code ?? "");
   const [parentId, setParentId] = useState(department?.parent_department_id != null ? String(department.parent_department_id) : "");
@@ -92,16 +94,16 @@ function DepartmentFormDialog({
     try {
       if (department) {
         await api.departments.update(department.id, payload);
-        notifySuccess("Department updated");
+        notifySuccess(t("org.departmentsPage.updated"));
       } else {
         await api.departments.create(payload);
-        notifySuccess("Department created");
+        notifySuccess(t("org.departmentsPage.created"));
       }
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -111,24 +113,24 @@ function DepartmentFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{department ? `Edit "${department.name}"` : "Add a department"}</DialogTitle>
-          <DialogDescription>Departments group your employees, and can sit inside one another.</DialogDescription>
+          <DialogTitle>{department ? t("org.shared.editTitle", { name: department.name }) : t("org.departmentsPage.addTitle")}</DialogTitle>
+          <DialogDescription>{t("org.departmentsPage.formDescription")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="flex flex-col gap-2 sm:col-span-2">
-              <Label htmlFor="dept-name">Name</Label>
+              <Label htmlFor="dept-name">{t("common.field.name")}</Label>
               <Input id="dept-name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="dept-code">Code (optional)</Label>
+              <Label htmlFor="dept-code">{t("org.shared.code")}</Label>
               <Input id="dept-code" placeholder="FIN" value={code} onChange={(e) => setCode(e.target.value)} />
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="dept-parent">Part of (optional)</Label>
+            <Label htmlFor="dept-parent">{t("org.departmentsPage.partOf")}</Label>
             <select id="dept-parent" value={parentId} onChange={(e) => setParentId(e.target.value)} className={SELECT_CLASS}>
-              <option value="">Top level</option>
+              <option value="">{t("org.departmentsPage.topLevel")}</option>
               {parentOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -138,41 +140,41 @@ function DepartmentFormDialog({
           </div>
           {branches.length > 0 && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="dept-branch">Branch (optional)</Label>
+              <Label htmlFor="dept-branch">{t("org.departmentsPage.branch")}</Label>
               <select id="dept-branch" value={branchId} onChange={(e) => setBranchId(e.target.value)} className={SELECT_CLASS}>
-                <option value="">Company-wide</option>
+                <option value="">{t("org.shared.companyWide")}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-muted-foreground">Leave as company-wide if it spans every branch.</p>
+              <p className="text-xs text-muted-foreground">{t("org.departmentsPage.branchHint")}</p>
             </div>
           )}
           {department && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="dept-status">Status</Label>
+              <Label htmlFor="dept-status">{t("common.field.status")}</Label>
               <select
                 id="dept-status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as Department["status"])}
                 className={SELECT_CLASS}
               >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="active">{t("common.status.active")}</option>
+                <option value="inactive">{t("common.status.inactive")}</option>
               </select>
               <p className="text-xs text-muted-foreground">
-                Inactive departments can&apos;t be chosen for new assignments, but keep their history.
+                {t("org.departmentsPage.inactiveHint")}
               </p>
             </div>
           )}
-          <DisplayOrderField id="dept-order" value={sortOrder} onChange={setSortOrder} example="the main department" />
+          <DisplayOrderField id="dept-order" value={sortOrder} onChange={setSortOrder} example={t("org.departmentsPage.orderExample")} />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : department ? "Save changes" : "Add department"}
+              {saving ? t("org.shared.saving") : department ? t("org.shared.saveChanges") : t("org.departmentsPage.add")}
             </Button>
           </DialogFooter>
         </form>
@@ -182,6 +184,7 @@ function DepartmentFormDialog({
 }
 
 export default function DepartmentsPage() {
+  const t = useT();
   const { me } = useMe();
   const confirm = useConfirm();
   const [departments, setDepartments] = useState<Department[] | null>(null);
@@ -209,16 +212,15 @@ export default function DepartmentsPage() {
 
   async function handleDelete(department: Department) {
     const ok = await confirm({
-      title: `Delete "${department.name}"?`,
-      description:
-        "A department that still has employees, teams or sub-departments can't be deleted — move them first, or set it to inactive instead.",
+      title: t("org.shared.deleteTitle", { name: department.name }),
+      description: t("org.departmentsPage.deleteDescription"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.departments.remove(department.id);
-      notifySuccess(`"${department.name}" deleted`);
+      notifySuccess(t("org.shared.deleted", { name: department.name }));
     } catch (err) {
       notifyError(err);
     }
@@ -232,7 +234,7 @@ export default function DepartmentsPage() {
   const columns: DataTableColumn<Department>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (department) => (
         <div className="flex flex-col leading-tight">
@@ -246,27 +248,27 @@ export default function DepartmentsPage() {
     displayOrderColumn<Department>(),
     {
       id: "parent",
-      header: "Part of",
-      cell: (department) => <span className="text-muted-foreground">{department.parent?.name ?? "Top level"}</span>,
+      header: t("org.departmentsPage.colPartOf"),
+      cell: (department) => <span className="text-muted-foreground">{department.parent?.name ?? t("org.departmentsPage.topLevel")}</span>,
       sortValue: (department) => department.parent?.name,
       searchValue: (department) => department.parent?.name,
     },
     {
       id: "branch",
-      header: "Branch",
-      cell: (department) => <span className="text-muted-foreground">{department.branch?.name ?? "Company-wide"}</span>,
+      header: t("common.field.branch"),
+      cell: (department) => <span className="text-muted-foreground">{department.branch?.name ?? t("org.shared.companyWide")}</span>,
       sortValue: (department) => department.branch?.name,
       searchValue: (department) => department.branch?.name,
     },
     {
       id: "teams",
-      header: "Teams",
+      header: t("org.departmentsPage.colTeams"),
       cell: (department) => <span className="tabular-nums">{department.teams_count ?? 0}</span>,
       sortValue: (department) => department.teams_count ?? 0,
     },
     {
       id: "members",
-      header: "Employees",
+      header: t("org.shared.colEmployees"),
       cell: (department) => (
         <span className="inline-flex items-center gap-1.5 tabular-nums">
           <Users className="size-3.5 text-muted-foreground" />
@@ -277,10 +279,10 @@ export default function DepartmentsPage() {
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (department) => (
         <Badge variant={department.status === "active" ? "success" : "secondary"}>
-          {department.status === "active" ? "Active" : "Inactive"}
+          {department.status === "active" ? t("common.status.active") : t("common.status.inactive")}
         </Badge>
       ),
       sortValue: (department) => department.status,
@@ -291,10 +293,10 @@ export default function DepartmentsPage() {
     {
       type: "select",
       id: "status",
-      label: "Status",
+      label: t("common.field.status"),
       options: [
-        { value: "active", label: "Active" },
-        { value: "inactive", label: "Inactive" },
+        { value: "active", label: t("common.status.active") },
+        { value: "inactive", label: t("common.status.inactive") },
       ],
       getValue: (department) => department.status,
     },
@@ -304,15 +306,15 @@ export default function DepartmentsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Departments"
-          description="How your company is organized. Employees are assigned to a department from the Employees page."
+          title={t("org.departmentsPage.title")}
+          description={t("org.departmentsPage.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportDepartments} importSpec={canManage ? departmentImport : undefined} onImported={load} />
               {canManage && (
                 <Button onClick={() => openForm(null)}>
                   <Plus className="size-4" />
-                  Add department
+                  {t("org.departmentsPage.add")}
                 </Button>
               )}
             </div>
@@ -324,11 +326,11 @@ export default function DepartmentsPage() {
           getRowId={(department) => department.id}
           columns={columns}
           filters={filters}
-          searchPlaceholder="Search departments…"
+          searchPlaceholder={t("org.departmentsPage.search")}
           emptyState={{
             icon: Network,
-            title: "No departments yet",
-            description: "Create a department, then assign employees to it.",
+            title: t("org.departmentsPage.emptyTitle"),
+            description: t("org.departmentsPage.emptyDescription"),
           }}
           onRowClick={canSeeMembers ? setMembersFor : undefined}
           rowActions={
@@ -338,18 +340,18 @@ export default function DepartmentsPage() {
                     {canSeeMembers && (
                       <Button variant="outline" size="sm" onClick={() => setMembersFor(department)}>
                         <Users className="size-3.5" />
-                        Members
+                        {t("org.shared.members")}
                       </Button>
                     )}
                     {canManage && (
                       <>
                         <Button variant="outline" size="sm" onClick={() => openForm(department)}>
                           <Pencil className="size-3.5" />
-                          Edit
+                          {t("common.action.edit")}
                         </Button>
                         <Button variant="destructive" size="sm" onClick={() => handleDelete(department)}>
                           <Trash2 className="size-3.5" />
-                          Delete
+                          {t("common.action.delete")}
                         </Button>
                       </>
                     )}
@@ -365,7 +367,7 @@ export default function DepartmentsPage() {
         kind="department"
         target={membersFor}
         canManage={canManage}
-        hint="People already in another department are moved here (their history is kept)."
+        hint={t("org.departmentsPage.membersHint")}
         onOpenChange={(isOpen) => {
           if (!isOpen) setMembersFor(null);
         }}

@@ -23,6 +23,7 @@ import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights
 import { withBusy } from "@/lib/busy";
 import { PDF_CALENDAR_MAX_DAYS, printAttendancePdf } from "@/lib/attendance-pdf";
 import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel, buildAttendanceCalendar, readAttendanceReport } from "@/lib/excel-specs/time";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -133,6 +134,7 @@ function ExportForm({
   canPickEmployee: boolean;
   onDone: () => void;
 }) {
+  const t = useT();
   const { me } = useMe();
   const initial = monthRange(month);
   const [from, setFrom] = useState(initial.from);
@@ -156,11 +158,11 @@ function ExportForm({
   const span = from && to ? daysBetween(from, to) : null;
   const rangeProblem =
     !from || !to
-      ? "Choose both dates."
+      ? t("attendance.report.range.bothDates")
       : span! < 0
-        ? "The end date comes before the start date."
+        ? t("attendance.report.range.endBeforeStart")
         : span! > MAX_DAYS
-          ? "Pick a range of one year or less."
+          ? t("attendance.report.range.tooLong")
           : null;
 
   function applyMonth(target: string) {
@@ -172,7 +174,7 @@ function ExportForm({
   const pdf = layout.format === "pdf";
   // A month and a bit fits the calendar grid on one landscape page.
   const calendarFits = span !== null && span + 1 <= PDF_CALENDAR_MAX_DAYS;
-  const pdfProblem = pdf && layout.pdf.detail && layout.pdf.kinds.length === 0 ? "Pick at least one thing for the daily detail." : null;
+  const pdfProblem = pdf && layout.pdf.detail && layout.pdf.kinds.length === 0 ? t("attendance.exportDialog.pdf.pickOne") : null;
   const setPdf = (choices: Partial<PdfChoices>) => setLayout({ ...layout, pdf: { ...layout.pdf, ...choices } });
   const blocked = rangeProblem !== null || (pdf ? pdfProblem !== null : picked.length === 0);
 
@@ -215,11 +217,11 @@ function ExportForm({
         calendar: layout.calendar,
         range: { from, to },
       });
-      notifySuccess("Excel file downloaded", saved);
+      notifySuccess(t("common.excel.downloaded"), saved);
       onDone();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : "Something went wrong.");
+      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : t("common.message.somethingWrong"));
     } finally {
       setDownloading(false);
     }
@@ -228,16 +230,16 @@ function ExportForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{employee ? `Export attendance — ${employee.name}` : "Export attendance report"}</DialogTitle>
-        <DialogDescription>Choose a format, the dates and what to include.</DialogDescription>
+        <DialogTitle>{employee ? t("attendance.exportDialog.titleFor", { name: employee.name }) : t("attendance.exportDialog.title")}</DialogTitle>
+        <DialogDescription>{t("attendance.exportDialog.description")}</DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleDownload} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Format">
+        <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label={t("attendance.exportDialog.format.label")}>
           {(
             [
-              { id: "excel", icon: FileSpreadsheet, title: "Excel workbook", text: "Every column you choose, to sort, filter and calculate. Opens in Google Sheets too." },
-              { id: "pdf", icon: FileText, title: "PDF report", text: "A finished, printable report — summary, ranking, month calendar and daily detail." },
+              { id: "excel", icon: FileSpreadsheet, title: t("attendance.exportDialog.format.excelTitle"), text: t("attendance.exportDialog.format.excelText") },
+              { id: "pdf", icon: FileText, title: t("attendance.exportDialog.format.pdfTitle"), text: t("attendance.exportDialog.format.pdfText") },
             ] as const
           ).map((option) => (
             <button
@@ -265,20 +267,20 @@ function ExportForm({
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => applyMonth(currentMonth())}>
-                This month
+                {t("attendance.exportDialog.thisMonth")}
               </Button>
               <Button type="button" variant="outline" size="sm" onClick={() => applyMonth(shiftMonth(currentMonth(), -1))}>
-                Last month
+                {t("attendance.exportDialog.lastMonth")}
               </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="export-from">From</Label>
+                <Label htmlFor="export-from">{t("common.field.from")}</Label>
                 <Input id="export-from" type="date" required value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="export-to">To</Label>
+                <Label htmlFor="export-to">{t("common.field.to")}</Label>
                 <Input id="export-to" type="date" required value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
               </div>
             </div>
@@ -286,9 +288,9 @@ function ExportForm({
 
             {showPicker && (
               <div className="flex flex-col gap-2">
-                <Label htmlFor="export-employee">Employee</Label>
+                <Label htmlFor="export-employee">{t("common.field.employee")}</Label>
                 <select id="export-employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className={SELECT_CLASS}>
-                  <option value="">All employees</option>
+                  <option value="">{t("attendance.exportDialog.allEmployees")}</option>
                   {employees?.map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.name}
@@ -309,8 +311,8 @@ function ExportForm({
                     className="mt-0.5 size-4 rounded border-input"
                   />
                   <span>
-                    Add a Calendar sheet
-                    <span className="block text-xs text-muted-foreground">Employees down the side, dates across the top, with status totals.</span>
+                    {t("attendance.exportDialog.excel.calendar")}
+                    <span className="block text-xs text-muted-foreground">{t("attendance.exportDialog.excel.calendarHint")}</span>
                   </span>
                 </label>
 
@@ -322,8 +324,8 @@ function ExportForm({
                     className="mt-0.5 size-4 rounded border-input"
                   />
                   <span>
-                    Add a Charts sheet
-                    <span className="block text-xs text-muted-foreground">Days by status, worked hours and late minutes per employee.</span>
+                    {t("attendance.exportDialog.excel.charts")}
+                    <span className="block text-xs text-muted-foreground">{t("attendance.exportDialog.excel.chartsHint")}</span>
                   </span>
                 </label>
               </>
@@ -336,10 +338,10 @@ function ExportForm({
         {error && <Alert variant="destructive">{error}</Alert>}
 
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button type="submit" disabled={downloading || blocked}>
             {pdf ? <FileText className="size-4" /> : <FileDown className="size-4" />}
-            {downloading ? "Preparing…" : pdf ? "Create PDF" : "Download Excel"}
+            {downloading ? t("attendance.exportDialog.preparing") : pdf ? t("attendance.exportDialog.createPdf") : t("attendance.exportDialog.downloadExcel")}
           </Button>
         </DialogFooter>
       </form>
@@ -359,18 +361,19 @@ function PdfChoicesPanel({
   calendarFits: boolean;
   problem: string | null;
 }) {
+  const t = useT();
   const toggleKind = (kind: IssueKind) =>
     onChange({ kinds: choices.kinds.includes(kind) ? choices.kinds.filter((k) => k !== kind) : [...choices.kinds, kind] });
 
   return (
     <div className="flex flex-col gap-3">
-      <Label>The report contains</Label>
+      <Label>{t("attendance.exportDialog.pdf.contains")}</Label>
       <ol className="flex flex-col divide-y divide-border rounded-md border border-input text-sm">
         <li className="flex items-start gap-2 px-3 py-2.5">
           <input type="checkbox" checked disabled className="mt-0.5 size-4 rounded border-input" />
           <span>
-            Summary and ranking
-            <span className="block text-xs text-muted-foreground">Late and absence rates, time lost, missed scans, leave — and every employee ranked, most late days first.</span>
+            {t("attendance.exportDialog.pdf.summary")}
+            <span className="block text-xs text-muted-foreground">{t("attendance.exportDialog.pdf.summaryHint")}</span>
           </span>
         </li>
         <li>
@@ -383,11 +386,11 @@ function PdfChoicesPanel({
               className="mt-0.5 size-4 rounded border-input"
             />
             <span>
-              Month at a glance
+              {t("attendance.exportDialog.pdf.glance")}
               <span className="block text-xs text-muted-foreground">
                 {calendarFits
-                  ? "Everyone's month as a colour-coded grid, on a landscape page."
-                  : `Only for ${PDF_CALENDAR_MAX_DAYS} days or less — longer ranges don't fit on a page.`}
+                  ? t("attendance.exportDialog.pdf.glanceHint")
+                  : t("attendance.exportDialog.pdf.glanceTooLong", { n: PDF_CALENDAR_MAX_DAYS })}
               </span>
             </span>
           </label>
@@ -396,8 +399,8 @@ function PdfChoicesPanel({
           <label className="flex items-start gap-2">
             <input type="checkbox" checked={choices.detail} onChange={(e) => onChange({ detail: e.target.checked })} className="mt-0.5 size-4 rounded border-input" />
             <span>
-              Daily detail
-              <span className="block text-xs text-muted-foreground">Each person&apos;s days, grouped by month, with times and notes.</span>
+              {t("attendance.exportDialog.pdf.detail")}
+              <span className="block text-xs text-muted-foreground">{t("attendance.exportDialog.pdf.detailHint")}</span>
             </span>
           </label>
           {choices.detail && (
@@ -405,7 +408,7 @@ function PdfChoicesPanel({
               {ISSUES.map((issue) => (
                 <label key={issue.kind} className="flex items-center gap-1.5 text-sm">
                   <input type="checkbox" checked={choices.kinds.includes(issue.kind)} onChange={() => toggleKind(issue.kind)} className="size-4 rounded border-input" />
-                  {issue.label}
+                  {t(issue.key)}
                 </label>
               ))}
             </div>
@@ -413,8 +416,8 @@ function PdfChoicesPanel({
         </li>
         <li className="flex items-center gap-2 px-3 py-2.5">
           <span className="flex-1">
-            Count lateness from
-            <span className="block text-xs text-muted-foreground">Ignore a few minutes&apos; drift, everywhere in the report.</span>
+            {t("attendance.exportDialog.pdf.lateFrom")}
+            <span className="block text-xs text-muted-foreground">{t("attendance.exportDialog.pdf.lateFromHint")}</span>
           </span>
           <Input
             type="number"
@@ -423,14 +426,15 @@ function PdfChoicesPanel({
             value={choices.minLate}
             onChange={(e) => onChange({ minLate: Math.max(1, Number(e.target.value) || 1) })}
             className="h-8 w-16"
-            aria-label="Count lateness from this many minutes"
+            aria-label={t("attendance.exportDialog.pdf.lateFromAria")}
           />
-          <span className="text-muted-foreground">min</span>
+          <span className="text-muted-foreground">{t("attendance.exportDialog.pdf.min")}</span>
         </li>
       </ol>
       {problem && <p className="text-xs text-destructive">{problem}</p>}
       <p className="text-xs text-muted-foreground">
-        The PDF opens in your browser&apos;s print window — choose <strong>Save as PDF</strong>. Khmer names and notes come out exactly as on screen.
+        {t("attendance.exportDialog.pdf.printBefore")} <strong>{t("attendance.exportDialog.pdf.saveAsPdf")}</strong>
+        {t("attendance.exportDialog.pdf.printAfter")}
       </p>
     </div>
   );
@@ -442,6 +446,7 @@ function PdfChoicesPanel({
  * columns keep their place, so ticking one again puts it back where it was.
  */
 function ColumnPicker({ layout, onChange }: { layout: Layout; onChange: (layout: Layout) => void }) {
+  const t = useT();
   const [dragging, setDragging] = useState<number | null>(null);
   const hidden = new Set(layout.hidden);
   const pickedCount = layout.order.length - hidden.size;
@@ -461,20 +466,20 @@ function ColumnPicker({ layout, onChange }: { layout: Layout; onChange: (layout:
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <Label>
-          Columns{" "}
+          {t("attendance.exportDialog.columns.label")}{" "}
           <span className="font-normal text-muted-foreground">
-            ({pickedCount} of {layout.order.length})
+            {t("attendance.exportDialog.columns.count", { n: pickedCount, total: layout.order.length })}
           </span>
         </Label>
         <div className="flex gap-1">
           <Button type="button" variant="ghost" size="xs" onClick={() => onChange({ ...layout, hidden: [] })}>
-            All
+            {t("attendance.exportDialog.columns.all")}
           </Button>
           <Button type="button" variant="ghost" size="xs" onClick={() => onChange({ ...layout, hidden: [...layout.order] })}>
-            None
+            {t("attendance.exportDialog.columns.none")}
           </Button>
           <Button type="button" variant="ghost" size="xs" onClick={() => onChange({ ...defaultLayout(), charts: layout.charts, calendar: layout.calendar })}>
-            Reset
+            {t("attendance.exportDialog.columns.reset")}
           </Button>
         </div>
       </div>
@@ -519,7 +524,7 @@ function ColumnPicker({ layout, onChange }: { layout: Layout; onChange: (layout:
               size="icon-xs"
               disabled={i === 0}
               onClick={() => reorder(i, i - 1)}
-              aria-label={`Move ${column} up`}
+              aria-label={t("attendance.exportDialog.columns.moveUp", { column })}
             >
               <ChevronUp className="size-3.5" />
             </Button>
@@ -529,14 +534,14 @@ function ColumnPicker({ layout, onChange }: { layout: Layout; onChange: (layout:
               size="icon-xs"
               disabled={i === layout.order.length - 1}
               onClick={() => reorder(i, i + 1)}
-              aria-label={`Move ${column} down`}
+              aria-label={t("attendance.exportDialog.columns.moveDown", { column })}
             >
               <ChevronDown className="size-3.5" />
             </Button>
           </li>
         ))}
       </ol>
-      {pickedCount === 0 && <p className="text-xs text-destructive">Tick at least one column.</p>}
+      {pickedCount === 0 && <p className="text-xs text-destructive">{t("attendance.exportDialog.columns.tickOne")}</p>}
     </div>
   );
 }

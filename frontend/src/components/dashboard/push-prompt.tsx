@@ -5,6 +5,7 @@ import { BellRing, Share } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { translateNow, useT } from "@/lib/i18n";
 import { enablePush, onPushChange, pushState, type PushState } from "@/lib/push";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -40,6 +41,7 @@ function snooze() {
 export function PushPrompt() {
   const [state, setState] = useState<"off" | "needs-install" | null>(null);
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -77,10 +79,10 @@ export function PushPrompt() {
     setBusy(false);
     setState(null);
 
-    if (result === "on") toast.success("Notifications are on for this device.");
-    else if (result === "blocked") toast.error("Notifications are blocked. Turn them on for this site in your phone or browser settings.");
+    if (result === "on") toast.success(translateNow("app.pushPrompt.result.on"));
+    else if (result === "blocked") toast.error(translateNow("app.pushPrompt.result.blocked"));
     else if (result === "off") snooze(); // Closed the browser's box without choosing: ask again later.
-    else toast.error("Couldn't turn on notifications. Try again from the bell.");
+    else toast.error(translateNow("app.pushPrompt.result.failed"));
   }
 
   return (
@@ -91,21 +93,26 @@ export function PushPrompt() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <BellRing className="size-4 text-primary" />
-                Get notifications on your iPhone
+                {t("app.pushPrompt.iphone.title")}
               </DialogTitle>
               <DialogDescription>
-                iPhone only sends notifications to apps on your Home Screen. Add it once:
+                {t("app.pushPrompt.iphone.description")}
               </DialogDescription>
             </DialogHeader>
             <ol className="list-decimal space-y-1.5 pl-5 text-sm">
               <li>
-                Tap the Share button <Share className="inline size-3.5 align-text-top" /> at the bottom of Safari.
+                {t("app.pushPrompt.iphone.step1Before")} <Share className="inline size-3.5 align-text-top" /> {t("app.pushPrompt.iphone.step1After")}
               </li>
-              <li>Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
-              <li>Open the app from the new icon on your Home Screen.</li>
+              {/* The iPhone's own button names, as Safari shows them. */}
+              <li>
+                {t("app.pushPrompt.iphone.step2Before")} <strong>Add to Home Screen</strong>
+                {t("app.pushPrompt.iphone.step2Middle")} <strong>Add</strong>
+                {t("app.pushPrompt.iphone.step2After")}
+              </li>
+              <li>{t("app.pushPrompt.iphone.step3")}</li>
             </ol>
             <DialogFooter>
-              <Button onClick={later}>Got it</Button>
+              <Button onClick={later}>{t("app.pushPrompt.iphone.gotIt")}</Button>
             </DialogFooter>
           </>
         ) : (
@@ -113,18 +120,18 @@ export function PushPrompt() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <BellRing className="size-4 text-primary" />
-                Turn on notifications?
+                {t("app.pushPrompt.ask.title")}
               </DialogTitle>
               <DialogDescription>
-                Get alerts for attendance, approvals and other updates on this device — even when the app is closed.
+                {t("app.pushPrompt.ask.description")}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={later} disabled={busy}>
-                Not now
+                {t("app.pushPrompt.ask.notNow")}
               </Button>
               <Button onClick={allow} disabled={busy}>
-                {busy ? "Just a moment…" : "Allow"}
+                {t(busy ? "app.pushPrompt.ask.wait" : "app.pushPrompt.ask.allow")}
               </Button>
             </DialogFooter>
           </>

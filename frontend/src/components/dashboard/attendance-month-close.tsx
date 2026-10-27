@@ -8,17 +8,42 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { parseDate } from "@/components/dashboard/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendancePeriod } from "@/lib/api";
+import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 export type ResolveTarget = "missed" | "absences" | "corrections" | "overtime";
 
 type Checklist = Record<ResolveTarget, number>;
 
-const CHECKS: { target: ResolveTarget; label: (n: number) => string; hint: string; action: string }[] = [
-  { target: "missed", label: (n) => `${n} ${n === 1 ? "day is" : "days are"} missing a scan`, hint: "Hours aren't fully counted until the scan is filled in.", action: "Fill missed scans" },
-  { target: "corrections", label: (n) => `${n} correction ${n === 1 ? "request is" : "requests are"} waiting`, hint: "Approving one can change the day.", action: "Review" },
-  { target: "overtime", label: (n) => `${n} overtime ${n === 1 ? "entry is" : "entries are"} waiting`, hint: "Overtime nobody reviewed stays unapproved once the month is closed.", action: "Review" },
-  { target: "absences", label: (n) => `${n} ${n === 1 ? "absence" : "absences"} without leave`, hint: "Check each is a real absence, not leave someone forgot to request.", action: "Check" },
+const CHECKS: { target: ResolveTarget; one: TKey; many: TKey; hint: TKey; action: TKey }[] = [
+  {
+    target: "missed",
+    one: "attendance.monthClose.check.missedOne",
+    many: "attendance.monthClose.check.missedMany",
+    hint: "attendance.monthClose.check.missedHint",
+    action: "attendance.monthClose.check.missedAction",
+  },
+  {
+    target: "corrections",
+    one: "attendance.monthClose.check.correctionsOne",
+    many: "attendance.monthClose.check.correctionsMany",
+    hint: "attendance.monthClose.check.correctionsHint",
+    action: "attendance.monthClose.check.review",
+  },
+  {
+    target: "overtime",
+    one: "attendance.monthClose.check.overtimeOne",
+    many: "attendance.monthClose.check.overtimeMany",
+    hint: "attendance.monthClose.check.overtimeHint",
+    action: "attendance.monthClose.check.review",
+  },
+  {
+    target: "absences",
+    one: "attendance.monthClose.check.absencesOne",
+    many: "attendance.monthClose.check.absencesMany",
+    hint: "attendance.monthClose.check.absencesHint",
+    action: "attendance.monthClose.check.check",
+  },
 ];
 
 function monthBounds(month: string): { from: string; to: string } {
@@ -43,9 +68,11 @@ export function AttendanceMonthClose({
   /** The month was closed or reopened. */
   onChanged?: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
-  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" });
 
   const { data, error, reload } = useApi(() => {
     const { from, to } = monthBounds(month);
@@ -70,10 +97,9 @@ export function AttendanceMonthClose({
   async function close(ignorePending = false) {
     if (!ignorePending) {
       const ok = await confirm({
-        title: `Close ${monthLabel}?`,
-        description:
-          "Its attendance is worked out one last time, then frozen: no scans, corrections, roster or schedule changes can alter it until someone reopens it.",
-        confirmLabel: "Close month",
+        title: t("attendance.monthClose.confirm.closeTitle", { month: monthLabel }),
+        description: t("attendance.monthClose.confirm.closeText"),
+        confirmLabel: t("attendance.monthClose.open.close"),
       });
       if (!ok) return;
     }
@@ -82,7 +108,7 @@ export function AttendanceMonthClose({
     setBusy(true);
     try {
       await api.attendance.lockMonth(month, ignorePending);
-      notifySuccess(`${monthLabel} closed`);
+      notifySuccess(t("attendance.monthClose.confirm.closed", { month: monthLabel }));
       reload();
       onChanged?.();
     } catch (err) {
@@ -94,16 +120,21 @@ export function AttendanceMonthClose({
 
     // Some overtime was never reviewed: say so, and let them close anyway.
     if (pendingMessage) {
-      const anyway = await confirm({ title: "Overtime still waiting for approval", description: pendingMessage, confirmLabel: "Close anyway", destructive: true });
+      const anyway = await confirm({
+        title: t("attendance.monthClose.confirm.pendingTitle"),
+        description: pendingMessage,
+        confirmLabel: t("attendance.monthClose.confirm.closeAnyway"),
+        destructive: true,
+      });
       if (anyway) await close(true);
     }
   }
 
   async function reopen() {
     const ok = await confirm({
-      title: `Reopen ${monthLabel}?`,
-      description: "Its attendance can change again — corrections, roster changes and recalculation. Close it again when you're done.",
-      confirmLabel: "Reopen",
+      title: t("attendance.monthClose.confirm.reopenTitle", { month: monthLabel }),
+      description: t("attendance.monthClose.confirm.reopenText"),
+      confirmLabel: t("attendance.monthClose.closed.reopen"),
       destructive: true,
     });
     if (!ok) return;
@@ -111,7 +142,7 @@ export function AttendanceMonthClose({
     setBusy(true);
     try {
       await api.attendance.unlockMonth(month);
-      notifySuccess(`${monthLabel} reopened`);
+      notifySuccess(t("attendance.monthClose.confirm.reopened", { month: monthLabel }));
       reload();
       onChanged?.();
     } catch (err) {
@@ -128,15 +159,20 @@ export function AttendanceMonthClose({
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
         <Badge variant="secondary">
           <Lock className="size-3" />
-          Month closed
+          {t("attendance.monthClose.closed.badge")}
         </Badge>
         <span className="text-sm text-muted-foreground">
-          {monthLabel} was closed {new Date(current.period.locked_at).toLocaleDateString()}
-          {current.period.locked_by ? ` by ${current.period.locked_by.name}` : ""}. Nothing in it can change.
+          {current.period.locked_by
+            ? t("attendance.monthClose.closed.textBy", {
+                month: monthLabel,
+                date: new Date(current.period.locked_at).toLocaleDateString(dateLocale(lang)),
+                name: current.period.locked_by.name,
+              })
+            : t("attendance.monthClose.closed.text", { month: monthLabel, date: new Date(current.period.locked_at).toLocaleDateString(dateLocale(lang)) })}
         </span>
         <Button variant="outline" size="sm" className="ml-auto" onClick={reopen} disabled={busy}>
           <LockOpen className="size-4" />
-          Reopen
+          {t("attendance.monthClose.closed.reopen")}
         </Button>
       </div>
     );
@@ -149,12 +185,12 @@ export function AttendanceMonthClose({
       <div className="flex flex-wrap items-center gap-3">
         {open.length === 0 && <CheckCircle2 className="size-5 text-success" />}
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">{open.length ? `Before you close ${monthLabel}` : `${monthLabel} is ready to close`}</p>
-          {open.length === 0 && <p className="text-xs text-muted-foreground">No missed scans, waiting requests, unreviewed overtime or unexplained absences.</p>}
+          <p className="text-sm font-semibold">{t(open.length ? "attendance.monthClose.open.before" : "attendance.monthClose.open.ready", { month: monthLabel })}</p>
+          {open.length === 0 && <p className="text-xs text-muted-foreground">{t("attendance.monthClose.open.allClear")}</p>}
         </div>
         <Button size="sm" variant={open.length ? "outline" : "default"} onClick={() => close()} disabled={busy}>
           <Lock className="size-4" />
-          Close month
+          {t("attendance.monthClose.open.close")}
         </Button>
       </div>
       {open.length > 0 && (
@@ -162,12 +198,12 @@ export function AttendanceMonthClose({
           {open.map((c) => (
             <li key={c.target} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium">{c.label(current.checklist![c.target])}</span>
-                <span className="text-xs text-muted-foreground">{c.hint}</span>
+                <span className="text-sm font-medium">{t(current.checklist![c.target] === 1 ? c.one : c.many, { n: current.checklist![c.target] })}</span>
+                <span className="text-xs text-muted-foreground">{t(c.hint)}</span>
               </span>
               {onResolve && (
                 <Button variant="outline" size="sm" onClick={() => onResolve(c.target)}>
-                  {c.action}
+                  {t(c.action)}
                 </Button>
               )}
             </li>

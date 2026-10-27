@@ -9,10 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
 import { AttendanceLateDetail } from "@/components/dashboard/attendance-late-detail";
 import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance-month-close";
-import { currentMonth, monthBounds, MonthBar, parseDate, WEEKDAYS } from "@/components/dashboard/calendar-shared";
+import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type AttendanceDay } from "@/lib/api";
-import { buildInsights, duration, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
+import { buildInsights, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
+import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
+import { formatMinutes } from "@/lib/schedule";
 import {
   buildAttendanceCalendar,
   CALENDAR_CODES,
@@ -47,7 +49,24 @@ const OPENABLE = new Set(["P", "L", "E", "LE", "M", "A", "½", "W"]);
 // A year, as the server allows.
 const MAX_DAYS = 366;
 
-const label = (code: string) => CALENDAR_CODES.find((c) => c.code === code)!.total;
+// Each Calendar code's name in attendance.report.code (the codes' own text is for the Excel file).
+const CODE_NAME: Record<string, string> = {
+  P: "present",
+  L: "late",
+  E: "early",
+  LE: "lateEarly",
+  M: "missed",
+  A: "absent",
+  "½": "halfDay",
+  LV: "leave",
+  W: "workedOff",
+  H: "holiday",
+  OFF: "off",
+};
+
+const codeKey = (code: string, part: "total" | "legend") => `attendance.report.code.${CODE_NAME[code]}.${part}` as TKey;
+
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -63,7 +82,10 @@ function previousRange(range: { from: string; to: string }): { from: string; to:
   return { from: iso(from), to: iso(to) };
 }
 
-const fmt = (date: string) => parseDate(date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const fmt = (date: string, locale?: string) => parseDate(date).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
+
+const periodOf = (mode: "month" | "range", month: string, range: { from: string; to: string }, locale?: string) =>
+  mode === "month" ? parseDate(`${month}-01`).toLocaleDateString(locale, { month: "long", year: "numeric" }) : `${fmt(range.from, locale)} – ${fmt(range.to, locale)}`;
 
 async function load(range: { from: string; to: string }): Promise<Report> {
   const { blob } = await api.attendance.export({ ...range, with_ids: true });
@@ -93,6 +115,8 @@ export function AttendanceReport({
   /** Takes the reviewer to where an item on the close-month checklist is fixed, for that month. */
   onResolve?: (target: ResolveTarget, month: string) => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [mode, setMode] = useState<"month" | "range">("month");
   const [custom, setCustom] = useState(() => monthBounds(month));
   const [view, setView] = useState<View>("calendar");
@@ -108,11 +132,11 @@ export function AttendanceReport({
   const range = mode === "month" ? monthBounds(month) : custom;
   const rangeProblem =
     mode === "range" && (!custom.from || !custom.to)
-      ? "Choose both dates."
+      ? t("attendance.report.range.bothDates")
       : daysBetween(range.from, range.to) < 0
-        ? "The end date comes before the start date."
+        ? t("attendance.report.range.endBeforeStart")
         : daysBetween(range.from, range.to) > MAX_DAYS
-          ? "Pick a range of one year or less."
+          ? t("attendance.report.range.tooLong")
           : null;
   const { from, to } = range;
 
@@ -120,7 +144,7 @@ export function AttendanceReport({
     data: report,
     error: reportError,
     loading,
-  } = useApi(rangeProblem ? null : () => load({ from, to }), [from, to, reloads], { errorMessage: "The report couldn't be loaded." });
+  } = useApi(rangeProblem ? null : () => load({ from, to }), [from, to, reloads], { errorMessage: t("attendance.report.loadFailed") });
   // The period before, only for the trend arrows — a failure just leaves them out.
   const { data: previous } = useApi(rangeProblem ? null : () => load(previousRange({ from, to })), [from, to, reloads]);
 
@@ -148,11 +172,13 @@ export function AttendanceReport({
   // The trend compares like with like: the same people (by the same filters) the period before.
   const before = previousInsights ? totalsOf(previousInsights.filter(matches)) : null;
 
+  // `scope` and `periodLabel` go into the PDF header, so they stay English; the screen shows `periodTitle`.
   const scope = [employee && `Employee: ${byKey.get(employee)?.name ?? ""}`, branch && `Branch: ${branch}`, department && `Department: ${department}`, search.trim() && `Search: “${search.trim()}”`, onlyIssues && "Only absences / missed scans"]
     .filter(Boolean)
     .join(" · ") || (canManage ? "All employees" : "My attendance");
 
-  const periodLabel = mode === "month" ? parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : `${fmt(range.from)} – ${fmt(range.to)}`;
+  const periodLabel = periodOf(mode, month, range);
+  const periodTitle = periodOf(mode, month, range, dateLocale(lang));
 
   async function open(person: PersonInsight | undefined, date: string) {
     if (!person?.employeeId) return;
@@ -175,7 +201,7 @@ export function AttendanceReport({
               onClick={() => setMode(m)}
               className={cn("rounded-md px-3 py-1 text-sm font-medium", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
             >
-              {m === "month" ? "Month" : "Date range"}
+              {t(`attendance.report.mode.${m}`)}
             </button>
           ))}
         </div>
@@ -184,18 +210,18 @@ export function AttendanceReport({
           <MonthBar month={month} onChange={setMonth} />
         ) : (
           <div className="flex items-center gap-2">
-            <Input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom({ ...custom, from: e.target.value })} className="w-40" aria-label="From" />
-            <span className="text-muted-foreground">to</span>
-            <Input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} className="w-40" aria-label="To" />
+            <Input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom({ ...custom, from: e.target.value })} className="w-40" aria-label={t("common.field.from")} />
+            <span className="text-muted-foreground">{t("common.table.to")}</span>
+            <Input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} className="w-40" aria-label={t("common.field.to")} />
           </div>
         )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-lg border border-border bg-card p-0.5" role="tablist" aria-label="View">
+          <div className="inline-flex rounded-lg border border-border bg-card p-0.5" role="tablist" aria-label={t("attendance.report.view.label")}>
             {(
               [
-                { id: "calendar", label: "Calendar", icon: Table2 },
-                { id: "detail", label: "Late detail", icon: ListTree },
+                { id: "calendar", label: t("attendance.report.view.calendar"), icon: Table2 },
+                { id: "detail", label: t("attendance.report.view.detail"), icon: ListTree },
               ] as const
             ).map((v) => (
               <button
@@ -216,7 +242,7 @@ export function AttendanceReport({
           </div>
           <Button variant="outline" onClick={() => onExport(range.from.slice(0, 7))}>
             <FileDown className="size-4" />
-            Export Excel
+            {t("attendance.report.exportExcel")}
           </Button>
         </div>
       </div>
@@ -224,11 +250,11 @@ export function AttendanceReport({
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" className="w-52 pl-8" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("attendance.report.filter.search")} className="w-52 pl-8" />
         </div>
         {canManage && insights.length > 1 && (
-          <select value={employee} onChange={(e) => setEmployee(e.target.value)} className={SELECT_CLASS} aria-label="Employee">
-            <option value="">All employees</option>
+          <select value={employee} onChange={(e) => setEmployee(e.target.value)} className={SELECT_CLASS} aria-label={t("common.field.employee")}>
+            <option value="">{t("attendance.report.filter.allEmployees")}</option>
             {[...insights]
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((p) => (
@@ -239,8 +265,8 @@ export function AttendanceReport({
           </select>
         )}
         {branches.length > 1 && (
-          <select value={branch} onChange={(e) => setBranch(e.target.value)} className={SELECT_CLASS} aria-label="Branch">
-            <option value="">All branches</option>
+          <select value={branch} onChange={(e) => setBranch(e.target.value)} className={SELECT_CLASS} aria-label={t("common.field.branch")}>
+            <option value="">{t("attendance.report.filter.allBranches")}</option>
             {branches.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -249,8 +275,8 @@ export function AttendanceReport({
           </select>
         )}
         {departments.length > 1 && (
-          <select value={department} onChange={(e) => setDepartment(e.target.value)} className={SELECT_CLASS} aria-label="Department">
-            <option value="">All departments</option>
+          <select value={department} onChange={(e) => setDepartment(e.target.value)} className={SELECT_CLASS} aria-label={t("common.field.department")}>
+            <option value="">{t("attendance.report.filter.allDepartments")}</option>
             {departments.map((d) => (
               <option key={d} value={d}>
                 {d}
@@ -260,7 +286,7 @@ export function AttendanceReport({
         )}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={onlyIssues} onChange={(e) => setOnlyIssues(e.target.checked)} className="size-4 rounded border-input" />
-          Only absences / missed scans
+          {t("attendance.report.filter.onlyIssues")}
         </label>
       </div>
 
@@ -296,6 +322,7 @@ export function AttendanceReport({
           onMinLate={setMinLate}
           range={range}
           periodLabel={periodLabel}
+          periodTitle={periodTitle}
           scope={scope}
           onOpenDay={(person, date) => open(person, date)}
         />
@@ -316,14 +343,17 @@ export function AttendanceReport({
 
 /** The headline numbers, each with how it moved since the period before (up is worse for all but leave). */
 function Tiles({ totals, before }: { totals: ReportTotals; before: ReportTotals | null }) {
-  const points = (n: number) => `${n} pts`;
+  const t = useT();
+  const lang = useLang();
+  const points = (n: number) => t("attendance.report.tiles.points", { n });
+  const duration = (n: number) => formatMinutes(n, lang);
   const tiles: { label: string; value: string; now: number; then?: number; change?: (n: number) => string; neutral?: boolean }[] = [
-    { label: "Late rate", value: `${totals.latePct}%`, now: totals.latePct, then: before?.latePct, change: points },
-    { label: "Absence rate", value: `${totals.absencePct}%`, now: totals.absencePct, then: before?.absencePct, change: points },
-    { label: "Late days", value: String(totals.lateDays), now: totals.lateDays, then: before?.lateDays },
-    { label: "Time lost to lateness", value: duration(totals.lateMinutes), now: totals.lateMinutes, then: before?.lateMinutes, change: duration },
-    { label: "Missed scans", value: String(totals.missedDays), now: totals.missedDays, then: before?.missedDays },
-    { label: "Leave days", value: String(totals.leaveDays), now: totals.leaveDays, then: before?.leaveDays, neutral: true },
+    { label: t("attendance.report.tiles.lateRate"), value: `${totals.latePct}%`, now: totals.latePct, then: before?.latePct, change: points },
+    { label: t("attendance.report.tiles.absenceRate"), value: `${totals.absencePct}%`, now: totals.absencePct, then: before?.absencePct, change: points },
+    { label: t("attendance.report.tiles.lateDays"), value: String(totals.lateDays), now: totals.lateDays, then: before?.lateDays },
+    { label: t("attendance.report.tiles.timeLost"), value: duration(totals.lateMinutes), now: totals.lateMinutes, then: before?.lateMinutes, change: duration },
+    { label: t("attendance.report.tiles.missedScans"), value: String(totals.missedDays), now: totals.missedDays, then: before?.missedDays },
+    { label: t("attendance.report.tiles.leaveDays"), value: String(totals.leaveDays), now: totals.leaveDays, then: before?.leaveDays, neutral: true },
   ];
 
   return (
@@ -340,11 +370,11 @@ function Tiles({ totals, before }: { totals: ReportTotals; before: ReportTotals 
                   "mt-1.5 inline-flex items-center gap-0.5 text-[11px] font-medium tabular-nums",
                   change === 0 || tile.neutral ? "text-muted-foreground" : change > 0 ? "text-destructive" : "text-success",
                 )}
-                title="Compared with the same number of days just before"
+                title={t("attendance.report.tiles.compared")}
               >
                 {change > 0 ? <ArrowUp className="size-3" /> : change < 0 ? <ArrowDown className="size-3" /> : null}
-                {change === 0 ? "No change" : (tile.change ?? String)(Math.abs(change))}
-                {change !== 0 && <span className="ml-1 font-normal text-muted-foreground">vs before</span>}
+                {change === 0 ? t("attendance.report.tiles.noChange") : (tile.change ?? String)(Math.abs(change))}
+                {change !== 0 && <span className="ml-1 font-normal text-muted-foreground">{t("attendance.report.tiles.vsBefore")}</span>}
               </p>
             )}
           </div>
@@ -365,6 +395,7 @@ function CalendarGrid({
   insights: Map<string, PersonInsight>;
   onOpen: (key: string, date: string) => void;
 }) {
+  const t = useT();
   const today = iso(new Date());
 
   // Day totals follow the rows shown.
@@ -381,7 +412,7 @@ function CalendarGrid({
   if (people.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-        {calendar.people.length === 0 ? "No attendance to show for this period." : "No one matches these filters."}
+        {calendar.people.length === 0 ? t("attendance.report.calendar.noAttendance") : t("attendance.report.calendar.noMatch")}
       </p>
     );
   }
@@ -392,7 +423,7 @@ function CalendarGrid({
         {CALENDAR_CODES.map((c) => (
           <span key={c.code} className="flex items-center gap-1.5">
             <span className={cn("flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-[11px] font-semibold", CODE_STYLE[c.code].cell)}>{c.code}</span>
-            {c.legend}
+            {t(codeKey(c.code, "legend"))}
           </span>
         ))}
       </div>
@@ -402,14 +433,14 @@ function CalendarGrid({
           <thead className="sticky top-0 z-30">
             <tr>
               <th className="sticky left-0 z-20 min-w-28 border-b border-r border-border bg-muted px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:min-w-44 sm:px-3">
-                Employee
+                {t("common.field.employee")}
               </th>
               {calendar.dates.map((date) => {
                 const d = parseDate(date);
                 const weekend = d.getDay() === 0 || d.getDay() === 6;
                 return (
                   <th key={date} className={cn("border-b border-border bg-muted px-0.5 py-1.5 text-center font-normal", date === today && "bg-primary/10")}>
-                    <div className={cn("text-[10px] uppercase text-muted-foreground", weekend && "text-foreground/70")}>{WEEKDAYS[d.getDay()].slice(0, 2)}</div>
+                    <div className={cn("text-[10px] uppercase text-muted-foreground", weekend && "text-foreground/70")}>{t(`attendance.report.weekday.${WEEKDAY_KEYS[d.getDay()]}`)}</div>
                     <div className={cn("text-sm font-semibold", date === today && "text-primary")}>{d.getDate()}</div>
                   </th>
                 );
@@ -417,14 +448,14 @@ function CalendarGrid({
               {CALENDAR_CODES.map((c, i) => (
                 <th
                   key={c.code}
-                  title={c.legend}
+                  title={t(codeKey(c.code, "legend"))}
                   className={cn("border-b border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground", i === 0 && "border-l")}
                 >
-                  {c.total}
+                  {t(codeKey(c.code, "total"))}
                 </th>
               ))}
-              <th className="border-b border-l border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground" title="Late days ÷ days attended">
-                Late %
+              <th className="border-b border-l border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground" title={t("attendance.report.calendar.latePctHint")}>
+                {t("attendance.report.calendar.latePct")}
               </th>
             </tr>
           </thead>
@@ -480,7 +511,7 @@ function CalendarGrid({
                 <th className="sticky left-0 z-10 border-b border-r border-border bg-muted px-2 py-1 text-left text-[11px] font-semibold sm:px-3">
                   <span className="flex items-center gap-1.5">
                     <span className={cn("size-2 rounded-full", CODE_STYLE[code].dot)} />
-                    {label(code)}
+                    {t(codeKey(code, "total"))}
                   </span>
                 </th>
                 {daily[code].map((count, d) => (
@@ -497,7 +528,7 @@ function CalendarGrid({
 
       <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
         <CalendarDays className="size-3.5" />
-        Click a day to open it; hover for its scans. A blank day is still to come, or has no schedule.
+        {t("attendance.report.calendar.hint")}
       </p>
     </>
   );

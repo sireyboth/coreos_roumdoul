@@ -18,6 +18,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import { useT, type TKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -109,11 +110,11 @@ const SELECT_CLASS =
   "h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 /** "A → Z" for text, "Low → High" for numbers, "Oldest first" for dates — judged by the first value present. */
-function sortLabelsFor<T>(getValue: (row: T) => string | number | null | undefined, rows: T[]): [string, string] {
+function sortLabelsFor<T>(getValue: (row: T) => string | number | null | undefined, rows: T[]): [TKey, TKey] {
   const sample = rows.map(getValue).find((value) => value != null && value !== "");
-  if (typeof sample === "number") return ["Low → High", "High → Low"];
-  if (typeof sample === "string" && /^\d{4}-\d{2}-\d{2}/.test(sample)) return ["Oldest first", "Newest first"];
-  return ["A → Z", "Z → A"];
+  if (typeof sample === "number") return ["common.table.sortLow", "common.table.sortHigh"];
+  if (typeof sample === "string" && /^\d{4}-\d{2}-\d{2}/.test(sample)) return ["common.table.sortOldest", "common.table.sortNewest"];
+  return ["common.table.sortAsc", "common.table.sortDesc"];
 }
 
 /*
@@ -138,10 +139,10 @@ export function DataTable<T>({
   data,
   columns,
   getRowId,
-  searchPlaceholder = "Search…",
+  searchPlaceholder,
   filters = [],
   rowActions,
-  actionsHeader = "Actions",
+  actionsHeader,
   onRowClick,
   emptyState,
   toolbar,
@@ -151,6 +152,7 @@ export function DataTable<T>({
   pageSizeOptions = [10, 25, 50],
   defaultPageSize,
 }: DataTableProps<T>) {
+  const t = useT();
   const [search, setSearch] = useState("");
   const [filterValues, setFilterValues] = useState<Record<string, string>>(initialFilters ?? {});
   const [sort, setSort] = useState<Sort>(initialSort ?? null);
@@ -228,7 +230,7 @@ export function DataTable<T>({
     return (
       <input
         type="checkbox"
-        aria-label="Select row"
+        aria-label={t("common.table.selectRow")}
         checked={selectedIds.has(id)}
         onChange={(e) => setSelected([id], e.target.checked)}
         className="size-4 cursor-pointer rounded border-input accent-primary"
@@ -265,7 +267,7 @@ export function DataTable<T>({
   const sortOptions = columns
     .filter((column) => column.sortValue)
     .flatMap((column) => {
-      const [asc, desc] = column.sortLabels ?? sortLabelsFor(column.sortValue!, data ?? []);
+      const [asc, desc] = column.sortLabels ?? sortLabelsFor(column.sortValue!, data ?? []).map((key) => t(key));
       return [
         { value: `${column.id}:asc`, label: `${column.header}: ${asc}` },
         { value: `${column.id}:desc`, label: `${column.header}: ${desc}` },
@@ -299,8 +301,8 @@ export function DataTable<T>({
             <Input
               value={search}
               onChange={(e) => updateSearch(e.target.value)}
-              placeholder={searchPlaceholder}
-              aria-label="Search"
+              placeholder={searchPlaceholder ?? t("common.table.search")}
+              aria-label={t("common.action.search")}
               className="pl-8"
             />
           </div>
@@ -310,7 +312,7 @@ export function DataTable<T>({
               <SearchableSelect
                 key={filter.id}
                 ariaLabel={filter.label}
-                placeholder={`${filter.label}: all`}
+                placeholder={t("common.table.filterAll", { label: filter.label })}
                 options={filter.options}
                 value={filterValues[filter.id] ?? ""}
                 onChange={(value) => updateFilter(filter.id, value)}
@@ -323,7 +325,7 @@ export function DataTable<T>({
                 onChange={(e) => updateFilter(filter.id, e.target.value)}
                 className={SELECT_CLASS}
               >
-                <option value="">{filter.label}: all</option>
+                <option value="">{t("common.table.filterAll", { label: filter.label })}</option>
                 {filter.options.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
@@ -336,15 +338,15 @@ export function DataTable<T>({
                 <span className="shrink-0 text-xs text-muted-foreground">{filter.label}</span>
                 <Input
                   type="date"
-                  aria-label={`${filter.label} from`}
+                  aria-label={t("common.table.rangeFrom", { label: filter.label })}
                   value={filterValues[`${filter.id}.from`] ?? ""}
                   onChange={(e) => updateFilter(`${filter.id}.from`, e.target.value)}
                   className="min-w-0 flex-1 sm:w-auto sm:flex-none"
                 />
-                <span className="shrink-0 text-xs text-muted-foreground">to</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{t("common.table.to")}</span>
                 <Input
                   type="date"
-                  aria-label={`${filter.label} to`}
+                  aria-label={t("common.table.rangeTo", { label: filter.label })}
                   value={filterValues[`${filter.id}.to`] ?? ""}
                   onChange={(e) => updateFilter(`${filter.id}.to`, e.target.value)}
                   className="min-w-0 flex-1 sm:w-auto sm:flex-none"
@@ -355,15 +357,15 @@ export function DataTable<T>({
 
           {sortOptions.length > 0 && (
             <select
-              aria-label="Sort"
+              aria-label={t("common.table.sort")}
               value={sort ? `${sort.columnId}:${sort.direction}` : ""}
               onChange={(e) => chooseSort(e.target.value)}
               className={SELECT_CLASS}
             >
-              <option value="">Sort: default order</option>
+              <option value="">{t("common.table.sortDefault")}</option>
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  Sort: {option.label}
+                  {t("common.table.sortBy", { label: option.label })}
                 </option>
               ))}
             </select>
@@ -372,7 +374,7 @@ export function DataTable<T>({
           {hasActiveFilters && (
             <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
               <X className="size-3.5" />
-              Clear
+              {t("common.table.clear")}
             </Button>
           )}
 
@@ -381,7 +383,7 @@ export function DataTable<T>({
       )}
 
       {data === null && (
-        <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading">
+        <div className="flex flex-col gap-2" aria-busy="true" aria-label={t("common.table.loading")}>
           {Array.from({ length: 5 }).map((_, index) => (
             <Skeleton key={index} className="h-12 w-full rounded-lg" />
           ))}
@@ -391,11 +393,11 @@ export function DataTable<T>({
       {data !== null && rows.length === 0 && (
         <EmptyState
           icon={SearchX}
-          title="No results"
-          description="Nothing matches your search or filters."
+          title={t("common.table.noResults")}
+          description={t("common.table.noResultsHint")}
           action={
             <Button type="button" variant="outline" size="sm" onClick={clearAll}>
-              Clear search and filters
+              {t("common.table.clearAll")}
             </Button>
           }
         />
@@ -405,14 +407,14 @@ export function DataTable<T>({
         <>
           {bulkActions && selectedRows.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
-              <span className="font-medium">{selectedRows.length} selected</span>
+              <span className="font-medium">{t("common.table.selected", { n: selectedRows.length })}</span>
               {selectedRows.length < rows.length && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(rows.map(getRowId), true)}>
-                  Select all {rows.length}
+                  {t("common.table.selectAll", { n: rows.length })}
                 </Button>
               )}
               <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
-                Clear selection
+                {t("common.table.clearSelection")}
               </Button>
               <div className="ml-auto flex items-center gap-2">{bulkActions(selectedRows, clearSelection)}</div>
             </div>
@@ -427,7 +429,7 @@ export function DataTable<T>({
                     <TableHead className={cn("left-0 w-12 min-w-12 max-w-12", PIN_HEAD)}>
                       <input
                         type="checkbox"
-                        aria-label="Select all rows on this page"
+                        aria-label={t("common.table.selectPage")}
                         checked={allPageSelected}
                         ref={(el) => {
                           if (el) el.indeterminate = pageSelected > 0 && !allPageSelected;
@@ -467,7 +469,7 @@ export function DataTable<T>({
                       </TableHead>
                     );
                   })}
-                  {rowActions && <TableHead className={cn("text-right", PIN_HEAD, PIN_RIGHT_EDGE)}>{actionsHeader}</TableHead>}
+                  {rowActions && <TableHead className={cn("text-right", PIN_HEAD, PIN_RIGHT_EDGE)}>{actionsHeader ?? t("common.table.actions")}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -544,12 +546,12 @@ export function DataTable<T>({
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <p>
-              Showing {start + 1}–{Math.min(start + pageSize, rows.length)} of {rows.length}
-              {hasActiveFilters && data.length !== rows.length ? ` (filtered from ${data.length})` : ""}
+              {t("common.table.showing", { from: start + 1, to: Math.min(start + pageSize, rows.length), total: rows.length })}
+              {hasActiveFilters && data.length !== rows.length ? t("common.table.filteredFrom", { n: data.length }) : ""}
             </p>
             <div className="flex items-center gap-2">
               <select
-                aria-label="Rows per page"
+                aria-label={t("common.table.rowsPerPage")}
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
@@ -559,7 +561,7 @@ export function DataTable<T>({
               >
                 {pageSizeOptions.map((size) => (
                   <option key={size} value={size}>
-                    {size} / page
+                    {t("common.table.perPage", { n: size })}
                   </option>
                 ))}
               </select>
@@ -567,7 +569,7 @@ export function DataTable<T>({
                 type="button"
                 variant="outline"
                 size="icon"
-                aria-label="Previous page"
+                aria-label={t("common.table.previousPage")}
                 disabled={currentPage <= 1}
                 onClick={() => setPage(currentPage - 1)}
               >
@@ -580,7 +582,7 @@ export function DataTable<T>({
                 type="button"
                 variant="outline"
                 size="icon"
-                aria-label="Next page"
+                aria-label={t("common.table.nextPage")}
                 disabled={currentPage >= pageCount}
                 onClick={() => setPage(currentPage + 1)}
               >

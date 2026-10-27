@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendanceDay, type Employee } from "@/lib/api";
 import { scansOn } from "@/lib/excel-specs/time";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -58,6 +59,7 @@ export function AttendanceAddDialog({
 }
 
 function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) => void; onOpenDay: (day: AttendanceDay) => void }) {
+  const t = useT();
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState(todayLocal);
   const [times, setTimes] = useState<string[]>(["08:00", "17:00"]);
@@ -94,11 +96,11 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
 
     try {
       const res = await api.attendance.adjust({ employee_id: Number(employeeId), date, reason, add: scansOn(date, filled), void: [] });
-      notifySuccess("Attendance added", "The day was recalculated.");
+      notifySuccess(t("attendance.add.added"), t("attendance.add.recalculated"));
       onSaved(res.day);
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : "Something went wrong.");
+      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -107,19 +109,16 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Add attendance</DialogTitle>
-        <DialogDescription>
-          Record a day with no scans — for example work on a day off, or a day the scanner was down. It is saved right away and marked as
-          adjusted by you.
-        </DialogDescription>
+        <DialogTitle>{t("attendance.add.title")}</DialogTitle>
+        <DialogDescription>{t("attendance.add.description")}</DialogDescription>
       </DialogHeader>
 
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="add-employee">Employee</Label>
+            <Label htmlFor="add-employee">{t("common.field.employee")}</Label>
             <select id="add-employee" required value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className={SELECT_CLASS}>
-              <option value="">{employees ? "Choose an employee" : "Loading…"}</option>
+              <option value="">{employees ? t("attendance.add.chooseEmployee") : t("common.message.loading")}</option>
               {employees?.map((emp) => (
                 <option key={emp.id} value={emp.id}>
                   {emp.name}
@@ -129,45 +128,42 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="add-date">Date</Label>
+            <Label htmlFor="add-date">{t("common.field.date")}</Label>
             <Input id="add-date" type="date" required value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
 
         {existing ? (
           <Alert
-            title="This day already has scans"
+            title={t("attendance.add.existsTitle")}
             action={
               <Button type="button" size="sm" variant="outline" onClick={() => onOpenDay(existing)}>
-                Open day
+                {t("attendance.add.openDay")}
               </Button>
             }
           >
-            Open it and use Adjust scans to change or add times.
+            {t("attendance.add.existsHint")}
           </Alert>
         ) : (
           <div className="flex flex-col gap-2">
-            <Label>Scans</Label>
-            <p className="-mt-1 text-xs text-muted-foreground">
-              Every scan of the day, in order. The schedule decides which is an IN and which an OUT; a time earlier than the one before it is
-              read as the next morning.
-            </p>
+            <Label>{t("attendance.add.scans")}</Label>
+            <p className="-mt-1 text-xs text-muted-foreground">{t("attendance.add.scansHint")}</p>
             {times.map((time, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">#{i + 1}</span>
                 <Input
                   type="time"
                   required
-                  aria-label={`Scan ${i + 1}`}
+                  aria-label={t("attendance.add.scanN", { n: i + 1 })}
                   value={time}
-                  onChange={(e) => setTimes((all) => all.map((t, j) => (j === i ? e.target.value : t)))}
+                  onChange={(e) => setTimes((all) => all.map((value, j) => (j === i ? e.target.value : value)))}
                   className="w-36"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Remove scan ${i + 1}`}
+                  aria-label={t("attendance.add.removeScanN", { n: i + 1 })}
                   disabled={times.length === 1}
                   onClick={() => setTimes((all) => all.filter((_, j) => j !== i))}
                 >
@@ -184,18 +180,18 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
               onClick={() => setTimes((all) => [...all, ""])}
             >
               <Plus className="size-3.5" />
-              Add a scan
+              {t("attendance.add.addScan")}
             </Button>
           </div>
         )}
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="add-reason">Reason</Label>
+          <Label htmlFor="add-reason">{t("common.field.reason")}</Label>
           <Input
             id="add-reason"
             required
             maxLength={255}
-            placeholder="e.g. Worked Sunday stock count; confirmed by branch manager"
+            placeholder={t("attendance.add.reasonPlaceholder")}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
@@ -204,10 +200,10 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
         {error && <Alert variant="destructive">{error}</Alert>}
 
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button type="submit" disabled={saving || !employeeId || existing !== null || filled.length === 0}>
             <CalendarPlus className="size-4" />
-            {saving ? "Saving…" : "Add attendance"}
+            {saving ? t("attendance.add.saving") : t("attendance.add.title")}
           </Button>
         </DialogFooter>
       </form>

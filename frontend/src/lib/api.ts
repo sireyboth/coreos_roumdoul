@@ -472,6 +472,24 @@ export type CalendarEvents = {
 
 // One small answer for the whole dashboard, counted by the server. Sections the
 // caller can't see are null.
+// Day and month only — the API never sends the year, so never anyone's age.
+export type Birthday = {
+  employee: {
+    id: number;
+    name: string;
+    employee_code: string | null;
+    job_title: string | null;
+    photo_url: string | null;
+    branch: { id: number; name: string } | null;
+    department: { id: number; name: string } | null;
+  };
+  month: number;
+  day: number;
+  // Next time it comes round, in the company's timezone (today counts).
+  next_date: string;
+  days_until: number;
+};
+
 export type DashboardSummary = {
   today: string;
   employees: number | null;
@@ -1545,6 +1563,9 @@ export const api = {
   dashboard: {
     summary: () => request<DashboardSummary>("/api/dashboard/summary"),
   },
+
+  // Soonest first; `today` is the company's date, not the browser's.
+  birthdays: () => request<{ today: string; data: Birthday[] }>("/api/birthdays"),
 
   attendance: {
     // The API sends 50 rows unless asked for more (max 1000) — say so, or a busy

@@ -6,6 +6,7 @@ import { Cake, CalendarDays, Gift, Heart, PartyPopper, Sparkles, Star } from "lu
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api, type Notification } from "@/lib/api";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 
 const CONFETTI_COLORS = ["#f43f5e", "#f59e0b", "#10b981", "#3b82f6", "#a855f7", "#ec4899"];
 
@@ -53,6 +54,8 @@ function BirthdayCelebrationContent() {
   const params = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const t = useT();
+  const lang = useLang();
   const employeeId = params.get("birthday");
   const [alert, setAlert] = useState<Notification | null>(null);
 
@@ -88,7 +91,7 @@ function BirthdayCelebrationContent() {
 
   const name = String(alert?.data.employee_name ?? "");
   const isSelf = alert?.data.is_self === true;
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date().toLocaleDateString(dateLocale(lang), { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <Dialog open={!!employeeId && !!alert} onOpenChange={(open) => !open && close()}>
@@ -128,7 +131,7 @@ function BirthdayCelebrationContent() {
           </p>
 
           <DialogTitle className="mt-3 flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-muted-foreground">{isSelf ? "Happy birthday," : "Today we celebrate"}</span>
+            <span className="text-sm font-medium text-muted-foreground">{isSelf ? t("employees.celebration.happyBirthday") : t("employees.celebration.weCelebrate")}</span>
             <span className="bg-linear-to-r from-rose-500 via-pink-500 to-amber-500 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
               {name}
             </span>
@@ -142,8 +145,8 @@ function BirthdayCelebrationContent() {
 
           <DialogDescription className="max-w-xs text-sm leading-relaxed text-muted-foreground">
             {isSelf
-              ? "On behalf of the whole team, we wish you a wonderful day and a successful year ahead. Thank you for everything you bring to the team."
-              : `Today is a special day for ${name}. Take a moment to share your best wishes.`}
+              ? t("employees.celebration.selfMessage")
+              : t("employees.celebration.otherMessage", { name })}
           </DialogDescription>
 
           <Button
@@ -151,7 +154,7 @@ function BirthdayCelebrationContent() {
             onClick={close}
           >
             {isSelf ? <Heart className="size-4" /> : <PartyPopper className="size-4" />}
-            {isSelf ? "Thank you" : "Got it"}
+            {isSelf ? t("employees.celebration.thanks") : t("employees.celebration.gotIt")}
           </Button>
         </div>
       </DialogContent>

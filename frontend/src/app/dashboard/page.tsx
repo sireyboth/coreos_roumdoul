@@ -23,29 +23,28 @@ import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, DashboardSummary } from "@/lib/api";
+import { companyStatusLabel } from "@/components/dashboard/account-banner";
+import { dateLocale, pageLabel, translate, useLang, useT, type Lang, type TKey } from "@/lib/i18n";
 import { DAY_STATUS } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
-const MODULE_LABELS: Record<string, string> = {
-  attendance: "Attendance",
-  hr: "HR",
-  payroll: "Payroll",
-  pos: "POS",
-  inventory: "Inventory",
-  crm: "CRM",
-  accounting: "Accounting",
-};
+// Module codes with a name in app.dashboard.module; any other code shows as is.
+const MODULE_CODES = ["attendance", "hr", "payroll", "pos", "inventory", "crm", "accounting", "id_cards", "birthdays", "ai_assistant"];
+
+function moduleLabel(lang: Lang, code: string): string {
+  return MODULE_CODES.includes(code) ? translate(lang, `app.dashboard.module.${code}` as TKey) : code;
+}
 
 // Local calendar date as YYYY-MM-DD (toISOString would shift it to UTC).
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function greeting(): string {
+function greeting(): TKey {
   const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
+  if (hour < 12) return "home.greeting.morning";
+  if (hour < 18) return "home.greeting.afternoon";
+  return "home.greeting.evening";
 }
 
 type Kpi = {
@@ -89,15 +88,17 @@ function KpiCard({ kpi }: { kpi: Kpi }) {
 }
 
 function WeekChart({ week }: { week: { date: string; count: number }[] | null }) {
+  const t = useT();
+  const lang = useLang();
   const days = useMemo(
     () =>
       (week ?? []).map((d, i, all) => ({
         key: d.date,
-        label: new Date(d.date + "T00:00:00").toLocaleDateString([], { weekday: "short" }),
+        label: new Date(d.date + "T00:00:00").toLocaleDateString(dateLocale(lang), { weekday: "short" }),
         count: d.count,
         today: i === all.length - 1,
       })),
-    [week],
+    [week, lang],
   );
 
   const max = Math.max(1, ...days.map((d) => d.count));
@@ -107,12 +108,12 @@ function WeekChart({ week }: { week: { date: string; count: number }[] | null })
     <Card className="lg:col-span-2">
       <CardHeader className="grid-cols-[1fr_auto]">
         <div>
-          <CardTitle>Attendance this week</CardTitle>
-          <CardDescription>Check-in sessions recorded over the last 7 days</CardDescription>
+          <CardTitle>{t("app.dashboard.week.title")}</CardTitle>
+          <CardDescription>{t("app.dashboard.week.description")}</CardDescription>
         </div>
         <div className="text-right">
           <p className="text-2xl font-semibold tabular-nums">{week === null ? "—" : total}</p>
-          <p className="text-xs text-muted-foreground">total sessions</p>
+          <p className="text-xs text-muted-foreground">{t("app.dashboard.week.total")}</p>
         </div>
       </CardHeader>
       <CardContent>
@@ -147,18 +148,19 @@ function WeekChart({ week }: { week: { date: string; count: number }[] | null })
 }
 
 function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["attendance"]>["recent"] | null }) {
+  const t = useT();
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="grid-cols-[1fr_auto]">
         <div>
-          <CardTitle>Recent check-ins</CardTitle>
-          <CardDescription>Latest attendance activity</CardDescription>
+          <CardTitle>{t("app.dashboard.recent.title")}</CardTitle>
+          <CardDescription>{t("app.dashboard.recent.description")}</CardDescription>
         </div>
         <Link
           href="/dashboard/attendance"
           className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
         >
-          View all <ArrowUpRight className="size-3.5" />
+          {t("app.dashboard.recent.viewAll")} <ArrowUpRight className="size-3.5" />
         </Link>
       </CardHeader>
       <CardContent className="flex flex-col divide-y divide-border">
@@ -173,7 +175,7 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
             </div>
           ))}
         {recent?.length === 0 && (
-          <p className="py-8 text-center text-sm text-muted-foreground">No attendance recorded yet.</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">{t("app.dashboard.recent.empty")}</p>
         )}
         {(recent ?? []).map((s) => (
           <div key={s.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
@@ -184,8 +186,8 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
                 {s.date} · {s.check_in ?? "—"}{s.check_out ? ` → ${s.check_out}` : ""}
               </p>
             </div>
-            {s.late_minutes > 0 && <Badge variant="warning">{s.late_minutes}m late</Badge>}
-            <Badge variant={DAY_STATUS[s.status].tone}>{DAY_STATUS[s.status].label}</Badge>
+            {s.late_minutes > 0 && <Badge variant="warning">{t("app.dashboard.recent.late", { n: s.late_minutes })}</Badge>}
+            <Badge variant={DAY_STATUS[s.status].tone}>{t(`attendance.status.day.${s.status}`)}</Badge>
           </div>
         ))}
       </CardContent>
@@ -196,7 +198,9 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
 export default function DashboardPage() {
   const { me } = useMe();
   const router = useRouter();
-  const can = (permission: string) => me?.permissions.includes(permission) ?? false;
+  const t = useT();
+  const lang = useLang();
+  const can =(permission: string) => me?.permissions.includes(permission) ?? false;
   const canDashboard = can("dashboard.view");
   const canAttendance = can("attendance.view") && Boolean(me?.modules.attendance);
   const canEmployees = can("employees.view");
@@ -227,9 +231,9 @@ export default function DashboardPage() {
   const kpis: Kpi[] = [];
   if (canAttendance)
     kpis.push({
-      label: "Checked in today",
+      label: t("app.dashboard.kpi.checkedIn"),
       value: summary ? (summary.attendance?.checked_in_today ?? null) : null,
-      hint: "People who scanned today",
+      hint: t("app.dashboard.kpi.checkedInHint"),
       icon: CalendarCheck2,
       href: `/dashboard/attendance?date=${isoDate(new Date())}`,
       tone: "text-emerald-600 dark:text-emerald-400",
@@ -237,9 +241,9 @@ export default function DashboardPage() {
     });
   if (canEmployees)
     kpis.push({
-      label: "Employees",
+      label: t("app.dashboard.kpi.employees"),
       value: summary?.employees ?? null,
-      hint: "On your team",
+      hint: t("app.dashboard.kpi.employeesHint"),
       icon: Users,
       href: "/dashboard/employees",
       tone: "text-violet-600 dark:text-violet-400",
@@ -247,9 +251,9 @@ export default function DashboardPage() {
     });
   if (canBranches)
     kpis.push({
-      label: "Branches",
+      label: t("app.dashboard.kpi.branches"),
       value: summary?.branches ?? null,
-      hint: "Active locations",
+      hint: t("app.dashboard.kpi.branchesHint"),
       icon: Building2,
       href: "/dashboard/branches",
       tone: "text-sky-600 dark:text-sky-400",
@@ -257,9 +261,9 @@ export default function DashboardPage() {
     });
   if (canAttendance)
     kpis.push({
-      label: "Pending corrections",
+      label: t("app.dashboard.kpi.corrections"),
       value: summary ? (summary.attendance?.pending_corrections ?? null) : null,
-      hint: "Waiting for review",
+      hint: t("app.dashboard.kpi.correctionsHint"),
       icon: FileClock,
       href: "/dashboard/attendance?tab=corrections&status=pending",
       tone: "text-amber-600 dark:text-amber-400",
@@ -268,9 +272,9 @@ export default function DashboardPage() {
   // Only people who manage attendance get this number (null otherwise).
   if (canAttendance && summary?.attendance?.pending_overtime != null)
     kpis.push({
-      label: "Overtime to review",
+      label: t("app.dashboard.kpi.overtime"),
       value: summary.attendance.pending_overtime,
-      hint: "Waiting for approval",
+      hint: t("app.dashboard.kpi.overtimeHint"),
       icon: Hourglass,
       // The Overtime tab opens on "Waiting".
       href: "/dashboard/attendance?tab=overtime",
@@ -278,9 +282,9 @@ export default function DashboardPage() {
       soft: "bg-sky-500/12",
     });
   kpis.push({
-    label: "Active modules",
+    label: t("app.dashboard.kpi.modules"),
     value: `${enabledModules}/${totalModules}`,
-    hint: "Included in your plan",
+    hint: t("app.dashboard.kpi.modulesHint"),
     icon: Layers,
     tone: "text-fuchsia-600 dark:text-fuchsia-400",
     soft: "bg-fuchsia-500/12",
@@ -305,10 +309,10 @@ export default function DashboardPage() {
         <div className="relative flex flex-wrap items-center justify-between gap-6">
           <div className="min-w-0">
             <p className="text-sm font-medium text-white/70">
-              {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
+              {new Date().toLocaleDateString(dateLocale(lang), { weekday: "long", month: "long", day: "numeric" })}
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
-              {greeting()}, {me.user.name.split(" ")[0]} 👋
+              {t(greeting())}, {me.user.name.split(" ")[0]} 👋
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/80">
               <span className="font-medium text-white">{me.company?.name ?? "Business OS"}</span>
@@ -320,7 +324,7 @@ export default function DashboardPage() {
               {me.company?.status && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-xs font-medium capitalize text-emerald-100">
                   <span className="size-1.5 rounded-full bg-emerald-300" />
-                  {me.company.status}
+                  {companyStatusLabel(lang, me.company.status)}
                 </span>
               )}
             </div>
@@ -333,7 +337,7 @@ export default function DashboardPage() {
               className="h-11 bg-white px-5 text-indigo-700 shadow-lg hover:bg-white/90"
             >
               <QrCode className="size-4" />
-              Check in / out
+              {t("app.dashboard.hero.checkInOut")}
             </Button>
           )}
         </div>
@@ -353,8 +357,8 @@ export default function DashboardPage() {
         ) : (
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Quick access</CardTitle>
-              <CardDescription>Jump straight to what you manage</CardDescription>
+              <CardTitle>{t("app.dashboard.quick.accessTitle")}</CardTitle>
+              <CardDescription>{t("app.dashboard.quick.accessDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
               {quickLinks.map((item) => (
@@ -366,8 +370,8 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Modules</CardTitle>
-            <CardDescription>What your plan currently grants you</CardDescription>
+            <CardTitle>{t("app.dashboard.modules.title")}</CardTitle>
+            <CardDescription>{t("app.dashboard.modules.description")}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {Object.entries(me.modules).map(([key, enabled]) => (
@@ -378,8 +382,8 @@ export default function DashboardPage() {
                   enabled ? "border-success/25 bg-success/6" : "border-border bg-muted/50 opacity-60",
                 )}
               >
-                <span className="font-medium">{MODULE_LABELS[key] ?? key}</span>
-                <Badge variant={enabled ? "success" : "secondary"}>{enabled ? "On" : "Off"}</Badge>
+                <span className="font-medium">{moduleLabel(lang, key)}</span>
+                <Badge variant={enabled ? "success" : "secondary"}>{t(enabled ? "app.dashboard.modules.on" : "app.dashboard.modules.off")}</Badge>
               </div>
             ))}
           </CardContent>
@@ -393,8 +397,8 @@ export default function DashboardPage() {
         {(canAttendance || quickLinks.length > 0) && (
           <Card className={cn(!canAttendance && "lg:col-span-3")}>
             <CardHeader>
-              <CardTitle>Quick actions</CardTitle>
-              <CardDescription>Shortcuts to your workspace</CardDescription>
+              <CardTitle>{t("app.dashboard.quick.actionsTitle")}</CardTitle>
+              <CardDescription>{t("app.dashboard.quick.actionsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className={cn("grid gap-2", !canAttendance && "sm:grid-cols-2 lg:grid-cols-4")}>
               {quickLinks.map((item) => (
@@ -410,6 +414,7 @@ export default function DashboardPage() {
 
 function QuickLink({ item, compact }: { item: (typeof NAV_GROUPS)[number]["items"][number]; compact?: boolean }) {
   const Icon = item.icon;
+  const lang = useLang();
 
   return (
     <Link
@@ -422,7 +427,7 @@ function QuickLink({ item, compact }: { item: (typeof NAV_GROUPS)[number]["items
       <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg bg-linear-to-br text-white shadow-sm", item.tone)}>
         <Icon className="size-4" />
       </span>
-      <span className="flex-1 text-sm font-medium">{item.label}</span>
+      <span className="flex-1 text-sm font-medium">{pageLabel(lang, item.href, item.label)}</span>
       <ArrowUpRight className="size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
     </Link>
   );

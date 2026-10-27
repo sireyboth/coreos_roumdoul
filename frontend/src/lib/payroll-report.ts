@@ -77,11 +77,15 @@ export function componentTotals(rows: RegisterRow[], kind: PayLineKind): Compone
 
 export type GroupTotal = RegisterTotals & { name: string; people: number };
 
-/** Totals per branch, department, or both ("HQ · Sales"). */
-export function groupTotals(rows: RegisterRow[], by: "branch" | "department" | "both"): GroupTotal[] {
+/** Totals per branch, department, or both ("HQ · Sales"). `none` names the empty group: English for the PDF, translated on screen. */
+export function groupTotals(
+  rows: RegisterRow[],
+  by: "branch" | "department" | "both",
+  none: { branch: string; department: string } = { branch: "No branch", department: "No department" },
+): GroupTotal[] {
   const label = (r: RegisterRow) => {
-    const branch = r.slip.employee?.branch || "No branch";
-    const department = r.slip.employee?.department || "No department";
+    const branch = r.slip.employee?.branch || none.branch;
+    const department = r.slip.employee?.department || none.department;
     return by === "branch" ? branch : by === "department" ? department : `${branch} · ${department}`;
   };
   const groups = new Map<string, RegisterRow[]>();

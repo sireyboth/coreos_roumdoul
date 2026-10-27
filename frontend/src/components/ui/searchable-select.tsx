@@ -2,6 +2,7 @@
 
 import { Combobox } from "@base-ui/react/combobox";
 import { CheckIcon, ChevronDown, X } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Option = { value: string; label: string };
@@ -31,6 +32,7 @@ export function SearchableSelect({
   clearable?: boolean;
   className?: string;
 }) {
+  const t = useT();
   const selected = options.find((option) => option.value === value) ?? null;
 
   return (
@@ -56,11 +58,11 @@ export function SearchableSelect({
           className="h-full min-w-0 flex-1 bg-transparent pl-2.5 pr-1 outline-none placeholder:text-foreground"
         />
         {clearable && selected && (
-          <Combobox.Clear aria-label="Clear" className="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground">
+          <Combobox.Clear aria-label={t("common.table.clear")} className="flex size-6 items-center justify-center rounded text-muted-foreground hover:text-foreground">
             <X className="size-3.5" />
           </Combobox.Clear>
         )}
-        <Combobox.Trigger aria-label="Show options" className="flex size-6 items-center justify-center text-muted-foreground">
+        <Combobox.Trigger aria-label={t("common.table.showOptions")} className="flex size-6 items-center justify-center text-muted-foreground">
           <ChevronDown className="size-3.5" />
         </Combobox.Trigger>
       </Combobox.InputGroup>
@@ -68,7 +70,7 @@ export function SearchableSelect({
       <Combobox.Portal>
         <Combobox.Positioner className="isolate z-50 outline-none" sideOffset={4} align="start">
           <Combobox.Popup className="max-h-[min(20rem,var(--available-height))] w-(--anchor-width) min-w-48 overflow-y-auto rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none">
-            <Combobox.Empty className="px-2 py-1.5 text-muted-foreground empty:hidden">No matches</Combobox.Empty>
+            <Combobox.Empty className="px-2 py-1.5 text-muted-foreground empty:hidden">{t("common.table.noMatches")}</Combobox.Empty>
             <Combobox.List>
               {(option: Option) => (
                 <Combobox.Item

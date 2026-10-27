@@ -54,7 +54,7 @@ export function MobileTabBar() {
 
   return (
     <nav
-      aria-label="Main"
+      aria-label={t("sidebar.mainMenu")}
       className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-card/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_-12px_rgb(0_0_0/0.15)] backdrop-blur-lg md:hidden"
     >
       <div className="mx-auto flex max-w-md items-stretch">
@@ -63,7 +63,7 @@ export function MobileTabBar() {
           <div className="flex flex-1 justify-center">
             <Link
               href="/dashboard/scan"
-              aria-label={t("common.scan")}
+              aria-label={t("common.action.scan")}
               className="-mt-5 flex size-15 items-center justify-center rounded-full bg-linear-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/30 ring-4 ring-background transition-transform active:scale-95"
             >
               <QrCode className="size-6.5" />

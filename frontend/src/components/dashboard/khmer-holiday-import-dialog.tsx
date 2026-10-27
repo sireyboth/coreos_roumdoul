@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { khmerHolidaysForYear } from "@/lib/khmer";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -34,6 +35,8 @@ export function KhmerHolidayImportDialog({
   existingDates: Set<string>;
   onImported: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
   const [nameStyle, setNameStyle] = useState<NameStyle>("en");
@@ -66,8 +69,8 @@ export function KhmerHolidayImportDialog({
     try {
       const result = await api.holidays.import(chosen.map((h) => ({ name: nameFor(h), date: h.date })));
       notifySuccess(
-        `${result.created} holiday${result.created === 1 ? "" : "s"} imported`,
-        result.skipped.length > 0 ? `${result.skipped.length} already existed and were left alone.` : undefined,
+        t(result.created === 1 ? "calendar.khmerImport.importedOne" : "calendar.khmerImport.importedOther", { n: result.created }),
+        result.skipped.length > 0 ? t("calendar.khmerImport.skipped", { n: result.skipped.length }) : undefined,
       );
       onOpenChange(false);
       onImported();
@@ -82,16 +85,13 @@ export function KhmerHolidayImportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Import Cambodian holidays</DialogTitle>
-          <DialogDescription>
-            Public and religious holidays worked out from the Khmer lunar calendar. Imported holidays are normal
-            holidays — you can edit or delete them afterwards.
-          </DialogDescription>
+          <DialogTitle>{t("calendar.khmerImport.title")}</DialogTitle>
+          <DialogDescription>{t("calendar.khmerImport.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="import-year">Year</Label>
+            <Label htmlFor="import-year">{t("calendar.khmerImport.year")}</Label>
             <select
               id="import-year"
               value={year}
@@ -109,24 +109,21 @@ export function KhmerHolidayImportDialog({
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="import-names">Names in</Label>
+            <Label htmlFor="import-names">{t("calendar.khmerImport.namesIn")}</Label>
             <select
               id="import-names"
               value={nameStyle}
               onChange={(e) => setNameStyle(e.target.value as NameStyle)}
               className={SELECT_CLASS}
             >
-              <option value="en">English</option>
-              <option value="km">ខ្មែរ</option>
-              <option value="both">Both</option>
+              <option value="en">{t("calendar.khmerImport.nameEn")}</option>
+              <option value="km">{t("calendar.khmerImport.nameKm")}</option>
+              <option value="both">{t("calendar.khmerImport.nameBoth")}</option>
             </select>
           </div>
         </div>
 
-        <Alert variant="info">
-          The government often adds a day off when a holiday falls on a Sunday, and announces it each year. Those
-          substitute days aren&apos;t included — add them yourself after importing.
-        </Alert>
+        <Alert variant="info">{t("calendar.khmerImport.substituteNote")}</Alert>
 
         <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
           {holidays.map((holiday) => {
@@ -147,14 +144,14 @@ export function KhmerHolidayImportDialog({
                     className="size-4 rounded border-input"
                   />
                   <span className="w-28 shrink-0 text-muted-foreground">
-                    {date.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })}
+                    {date.toLocaleDateString(dateLocale(lang), { weekday: "short", day: "numeric", month: "short" })}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{holiday.label}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{holiday.nameKm}</span>
+                    <span className="block font-medium">{lang === "km" ? holiday.nameKm : holiday.label}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{lang === "km" ? holiday.label : holiday.nameKm}</span>
                   </span>
-                  {isSunday && <Badge variant="warning">Sunday</Badge>}
-                  {already && <Badge variant="secondary">Already added</Badge>}
+                  {isSunday && <Badge variant="warning">{t("calendar.khmerImport.sunday")}</Badge>}
+                  {already && <Badge variant="secondary">{t("calendar.khmerImport.alreadyAdded")}</Badge>}
                 </label>
               </li>
             );
@@ -162,9 +159,11 @@ export function KhmerHolidayImportDialog({
         </ul>
 
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button onClick={handleImport} disabled={saving || chosen.length === 0}>
-            {saving ? "Importing…" : `Import ${chosen.length} holiday${chosen.length === 1 ? "" : "s"}`}
+            {saving
+              ? t("calendar.khmerImport.importing")
+              : t(chosen.length === 1 ? "calendar.khmerImport.importOne" : "calendar.khmerImport.importOther", { n: chosen.length })}
           </Button>
         </DialogFooter>
       </DialogContent>

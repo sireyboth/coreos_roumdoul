@@ -16,10 +16,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { EMPLOYMENT_STATUSES, hasLeft, labelFor, statusVariant } from "@/components/dashboard/employee-form";
+import { hasLeft, labelIn, statusVariant } from "@/components/dashboard/employee-form";
 import { useApi } from "@/hooks/use-api";
 import { api, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useLang, useT } from "@/lib/i18n";
 
 type Target = { id: number; name: string };
 
@@ -44,6 +45,8 @@ export function MembersDialog({
   // Called after people were added or removed, so the page can refresh its counts.
   onChanged: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const targetId = target?.id;
   const [candidates, setCandidates] = useState<Employee[] | null>(null);
   const [mode, setMode] = useState<"list" | "add">("list");
@@ -108,7 +111,7 @@ export function MembersDialog({
       const ids = [...picked];
       const call = kind === "department" ? api.departments.addMembers : api.teams.addMembers;
       await call(target.id, ids);
-      notifySuccess(`${ids.length} ${ids.length === 1 ? "employee" : "employees"} added to ${target.name}`);
+      notifySuccess(t(ids.length === 1 ? "org.members.addedOne" : "org.members.addedOther", { n: ids.length, name: target.name }));
       // The picked people are members now; the candidate list is stale.
       setCandidates(null);
       setMode("list");
@@ -128,7 +131,7 @@ export function MembersDialog({
     try {
       const call = kind === "department" ? api.departments.removeMember : api.teams.removeMember;
       await call(target.id, employee.id);
-      notifySuccess(`${employee.name} removed from ${target.name}`);
+      notifySuccess(t("org.members.removed", { employee: employee.name, name: target.name }));
       setCandidates(null);
       refresh();
     } catch (err) {
@@ -144,19 +147,21 @@ export function MembersDialog({
     return e.team?.name ?? null;
   }
 
-  const noun = kind === "department" ? "department" : "team";
+  const isDepartment = kind === "department";
 
   return (
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{mode === "add" ? `Add people to ${target?.name}` : target?.name}</DialogTitle>
+          <DialogTitle>{mode === "add" ? t("org.members.addTitle", { name: target?.name ?? "" }) : target?.name}</DialogTitle>
           <DialogDescription>
             {mode === "add"
-              ? (hint ?? `Pick the employees to add to this ${noun}.`)
+              ? (hint ?? t(isDepartment ? "org.members.pickDepartment" : "org.members.pickTeam"))
               : members === null
-                ? "Loading…"
-                : `${members.length} ${members.length === 1 ? "employee" : "employees"} in this ${noun}`}
+                ? t("common.message.loading")
+                : isDepartment
+                  ? t(members.length === 1 ? "org.members.countDepartmentOne" : "org.members.countDepartmentOther", { n: members.length })
+                  : t(members.length === 1 ? "org.members.countTeamOne" : "org.members.countTeamOther", { n: members.length })}
           </DialogDescription>
         </DialogHeader>
 
@@ -165,8 +170,8 @@ export function MembersDialog({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, code or job title…"
-            aria-label="Search employees"
+            placeholder={t("org.members.search")}
+            aria-label={t("org.members.searchLabel")}
             className="pl-8"
           />
         </div>
@@ -183,7 +188,9 @@ export function MembersDialog({
               )}
               {members !== null && shownMembers.length === 0 && (
                 <p className="p-8 text-center text-sm text-muted-foreground">
-                  {members.length === 0 ? `No one is in this ${noun} yet.` : "No one matches your search."}
+                  {members.length === 0
+                    ? t(isDepartment ? "org.members.emptyDepartment" : "org.members.emptyTeam")
+                    : t("org.members.noMatches")}
                 </p>
               )}
               <ul className="divide-y divide-border">
@@ -198,13 +205,13 @@ export function MembersDialog({
                     </div>
                     {employee.employment_status !== "active" && (
                       <Badge variant={statusVariant(employee.employment_status)}>
-                        {labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}
+                        {labelIn(lang, "status", employee.employment_status)}
                       </Badge>
                     )}
                     {canManage && (
                       <Button variant="outline" size="sm" disabled={busy} onClick={() => handleRemove(employee)}>
                         <UserMinus className="size-3.5" />
-                        Remove
+                        {t("org.members.remove")}
                       </Button>
                     )}
                   </li>
@@ -225,8 +232,8 @@ export function MembersDialog({
               {candidates !== null && available.length === 0 && (
                 <p className="p-8 text-center text-sm text-muted-foreground">
                   {candidates.filter((e) => !memberIds.has(e.id)).length === 0
-                    ? `Everyone is already in this ${noun}.`
-                    : "No one matches your search."}
+                    ? t(isDepartment ? "org.members.allInDepartment" : "org.members.allInTeam")
+                    : t("org.members.noMatches")}
                 </p>
               )}
               <ul className="divide-y divide-border">
@@ -249,7 +256,7 @@ export function MembersDialog({
                             {[employee.job_title, employee.branch?.name].filter(Boolean).join(" · ") || "—"}
                           </p>
                         </div>
-                        {place && <Badge variant="secondary">Moves from {place}</Badge>}
+                        {place && <Badge variant="secondary">{t("org.members.movesFrom", { place })}</Badge>}
                       </label>
                     </li>
                   );
@@ -262,21 +269,27 @@ export function MembersDialog({
         <DialogFooter>
           {mode === "list" ? (
             <>
-              <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+              <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.close")}</DialogClose>
               {canManage && (
                 <Button onClick={startAdding} disabled={busy}>
                   <UserPlus className="size-4" />
-                  Add people
+                  {t("org.members.addPeople")}
                 </Button>
               )}
             </>
           ) : (
             <>
               <Button type="button" variant="outline" onClick={() => setMode("list")} disabled={busy}>
-                Back
+                {t("common.action.back")}
               </Button>
               <Button onClick={handleAdd} disabled={busy || picked.size === 0}>
-                {busy ? "Adding…" : `Add ${picked.size || ""} ${picked.size === 1 ? "person" : "people"}`.replace("  ", " ")}
+                {busy
+                  ? t("org.members.adding")
+                  : picked.size === 0
+                    ? t("org.members.addPeople")
+                    : picked.size === 1
+                      ? t("org.members.addOne")
+                      : t("org.members.addOther", { n: picked.size })}
               </Button>
             </>
           )}

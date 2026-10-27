@@ -18,6 +18,7 @@ import { LoginLink } from "@/components/dashboard/login-link";
 import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
 import { api, ApiError, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 
 export function CreateLoginDialog({
   employee,
@@ -28,6 +29,7 @@ export function CreateLoginDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   // Start on whatever they already have on file: an email, else an ID, else email.
   const [method, setMethod] = useState<SignInMethod>(employee?.email ? "email" : employee?.employee_code ? "employee_id" : "email");
   const [email, setEmail] = useState(employee?.email ?? "");
@@ -53,16 +55,16 @@ export function CreateLoginDialog({
           : { login_method: "employee_id", employee_code: code, password },
       );
       notifySuccess(
-        "Login created",
+        t("access.createLogin.created"),
         method === "email"
-          ? `${employee.name} can now sign in with ${email}.`
-          : `${employee.name} signs in with employee ID ${code}. Share your company sign-in link with them.`,
+          ? t("access.createLogin.createdEmail", { name: employee.name, email })
+          : t("access.createLogin.createdId", { name: employee.name, code }),
       );
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -72,20 +74,20 @@ export function CreateLoginDialog({
     <Dialog open={employee !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a login for {employee?.name}</DialogTitle>
-          <DialogDescription>Choose one way for them to sign in, and give them a temporary password.</DialogDescription>
+          <DialogTitle>{t("access.createLogin.title", { name: employee?.name ?? "" })}</DialogTitle>
+          <DialogDescription>{t("access.createLogin.description")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <SignInMethodPicker value={method} onChange={setMethod} name="create-login-method" />
 
           {method === "email" ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-email">{t("common.field.email")}</Label>
               <Input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="login-code">Employee ID</Label>
+              <Label htmlFor="login-code">{t("access.createLogin.employeeId")}</Label>
               <Input
                 id="login-code"
                 required
@@ -96,18 +98,18 @@ export function CreateLoginDialog({
               />
               <p className="text-xs text-muted-foreground">
                 {codeLocked
-                  ? "This is their existing employee ID. Change it on their profile first if it's wrong."
-                  : "They don't have an employee ID yet — this one will be saved on their profile."}
+                  ? t("access.createLogin.codeLocked")
+                  : t("access.createLogin.codeNew")}
               </p>
               <p className="text-xs text-muted-foreground">
-                Share this link with them — it opens the sign-in page with your company already filled in.
+                {t("access.createLogin.shareLink")}
               </p>
               <LoginLink />
             </div>
           )}
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="login-password">Temporary password</Label>
+            <Label htmlFor="login-password">{t("access.createLogin.tempPassword")}</Label>
             <Input
               id="login-password"
               type="password"
@@ -120,9 +122,9 @@ export function CreateLoginDialog({
           </div>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Creating…" : "Create login"}
+              {saving ? t("access.createLogin.creating") : t("access.createLogin.create")}
             </Button>
           </DialogFooter>
         </form>

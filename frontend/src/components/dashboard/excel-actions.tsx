@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ExcelImportDialog } from "@/components/dashboard/excel-import-dialog";
 import type { ImportSpec } from "@/lib/excel-import";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 
 /**
  * The "Import" and "Export" buttons every module shows in its header.
@@ -23,9 +24,10 @@ export function ExcelActions<Ctx>({
   onExport?: () => Promise<string>;
   importSpec?: ImportSpec<Ctx>;
   onImported?: () => void;
-  /** Names what the buttons are for when a page has more than one set, e.g. "assignments". */
+  /** Names what the buttons are for when a page has more than one set, e.g. "assignments" — already translated. */
   subject?: string;
 }) {
+  const t = useT();
   const [exporting, setExporting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -34,7 +36,7 @@ export function ExcelActions<Ctx>({
     setExporting(true);
     try {
       const filename = await onExport();
-      notifySuccess("Excel file downloaded", filename);
+      notifySuccess(t("common.excel.downloaded"), filename);
     } catch (err) {
       notifyError(err);
     } finally {
@@ -47,13 +49,13 @@ export function ExcelActions<Ctx>({
       {importSpec && (
         <Button variant="outline" onClick={() => setImportOpen(true)}>
           <FileUp className="size-4" />
-          {subject ? `Import ${subject}` : "Import"}
+          {subject ? t("common.excel.importSubject", { subject }) : t("common.excel.import")}
         </Button>
       )}
       {onExport && (
         <Button variant="outline" onClick={handleExport} disabled={exporting}>
           <FileDown className="size-4" />
-          {exporting ? "Exporting…" : subject ? `Export ${subject}` : "Export"}
+          {exporting ? t("common.excel.exporting") : subject ? t("common.excel.exportSubject", { subject }) : t("common.excel.export")}
         </Button>
       )}
       {importSpec && (

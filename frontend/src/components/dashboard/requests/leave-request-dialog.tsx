@@ -19,7 +19,8 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError, type DayPart, type EmployeeRequest, type LeavePreview, type LeaveType } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { DAY_PART_LABEL, dateList, dayCount } from "@/lib/requests";
+import { translateNow, useLang, useT } from "@/lib/i18n";
+import { DAY_PART_KEY, dateList, dayCount } from "@/lib/requests";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -51,6 +52,8 @@ export function LeaveRequestDialog({
   selfEmployeeId: number | null;
   people?: { id: number; name: string }[];
 }) {
+  const t = useT();
+  const lang = useLang();
   const [types, setTypes] = useState<LeaveType[] | null>(null);
   const [employeeId, setEmployeeId] = useState<string>(selfEmployeeId ? String(selfEmployeeId) : "");
   const [typeId, setTypeId] = useState("");
@@ -75,7 +78,7 @@ export function LeaveRequestDialog({
       .catch(() => setTypes([]));
   }, [open, types]);
 
-  const type = types?.find((t) => String(t.id) === typeId) ?? null;
+  const type = types?.find((lt) => String(lt.id) === typeId) ?? null;
   const forSomeoneElse = employeeId !== "" && Number(employeeId) !== selfEmployeeId;
   const halfDayPossible = Boolean(type?.allow_half_day) && start === end;
   const dayPart: DayPart = halfDayPossible ? part : "full";
@@ -103,7 +106,7 @@ export function LeaveRequestDialog({
       api.requests
         .preview(input)
         .then((data) => !cancelled && setPreview({ key: inputKey, data, error: null }))
-        .catch((err) => !cancelled && setPreview({ key: inputKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't check these dates." }));
+        .catch((err) => !cancelled && setPreview({ key: inputKey, data: null, error: err instanceof ApiError ? err.message : translateNow("leave.leaveDialog.checkFailed") }));
     }, 300);
     return () => {
       cancelled = true;
@@ -135,8 +138,12 @@ export function LeaveRequestDialog({
         file,
       );
       notifySuccess(
-        created.status === "approved" ? "Leave recorded" : "Leave request sent",
-        created.status === "approved" ? `${created.employee.name} · ${dayCount(created.days)}` : created.waiting_on ? `${created.waiting_on.name} will review it.` : "An approver will review it.",
+        created.status === "approved" ? t("leave.leaveDialog.recorded") : t("leave.leaveDialog.sent"),
+        created.status === "approved"
+          ? `${created.employee.name} · ${dayCount(created.days, lang)}`
+          : created.waiting_on
+            ? t("leave.shared.willReview", { name: created.waiting_on.name })
+            : t("leave.shared.approverWillReview"),
       );
       onCreated(created);
       onOpenChange(false);
@@ -155,23 +162,23 @@ export function LeaveRequestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ask for leave</DialogTitle>
-          <DialogDescription>Only working days count — holidays and days off inside the dates are free.</DialogDescription>
+          <DialogTitle>{t("leave.leaveDialog.title")}</DialogTitle>
+          <DialogDescription>{t("leave.leaveDialog.description")}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {people && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="leave-employee">For</Label>
+              <Label htmlFor="leave-employee">{t("leave.shared.for")}</Label>
               <SearchableSelect
                 id="leave-employee"
                 options={[
-                  ...(selfEmployeeId ? [{ value: String(selfEmployeeId), label: "Myself" }] : []),
+                  ...(selfEmployeeId ? [{ value: String(selfEmployeeId), label: t("leave.shared.myself") }] : []),
                   ...people.filter((p) => p.id !== selfEmployeeId).map((p) => ({ value: String(p.id), label: p.name })),
                 ]}
                 value={employeeId}
                 onChange={setEmployeeId}
-                placeholder="Choose a person"
+                placeholder={t("leave.shared.choosePerson")}
                 clearable={false}
                 className="h-9 w-full rounded-md"
               />
@@ -179,13 +186,13 @@ export function LeaveRequestDialog({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="leave-type">Type of leave</Label>
+            <Label htmlFor="leave-type">{t("leave.leaveDialog.type")}</Label>
             <select id="leave-type" value={typeId} onChange={(e) => setTypeId(e.target.value)} className={SELECT_CLASS} disabled={!types}>
-              {(types ?? []).map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {t.name_km ? ` · ${t.name_km}` : ""}
-                  {t.pay_percent === 0 ? " (unpaid)" : t.pay_percent < 100 ? ` (${t.pay_percent}% pay)` : ""}
+              {(types ?? []).map((lt) => (
+                <option key={lt.id} value={lt.id}>
+                  {lt.name}
+                  {lt.name_km ? ` · ${lt.name_km}` : ""}
+                  {lt.pay_percent === 0 ? t("leave.shared.unpaidTag") : lt.pay_percent < 100 ? t("leave.shared.payTag", { percent: lt.pay_percent }) : ""}
                 </option>
               ))}
             </select>
@@ -193,17 +200,17 @@ export function LeaveRequestDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="leave-start">From</Label>
+              <Label htmlFor="leave-start">{t("common.field.from")}</Label>
               <Input id="leave-start" type="date" value={start} onChange={(e) => changeStart(e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="leave-end">To</Label>
+              <Label htmlFor="leave-end">{t("common.field.to")}</Label>
               <Input id="leave-end" type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} required />
             </div>
           </div>
 
           {halfDayPossible && (
-            <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label="Part of the day">
+            <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label={t("leave.leaveDialog.partOfDay")}>
               {(["full", "am", "pm"] as DayPart[]).map((p) => (
                 <button
                   key={p}
@@ -216,7 +223,7 @@ export function LeaveRequestDialog({
                     part === p ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {DAY_PART_LABEL[p]}
+                  {t(DAY_PART_KEY[p])}
                 </button>
               ))}
             </div>
@@ -226,7 +233,7 @@ export function LeaveRequestDialog({
           <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm" aria-live="polite">
             {checking || !current ? (
               <p className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" /> Checking the dates…
+                <Loader2 className="size-3.5 animate-spin" /> {t("leave.leaveDialog.checking")}
               </p>
             ) : current.error ? (
               <p className="text-destructive">{current.error}</p>
@@ -234,14 +241,14 @@ export function LeaveRequestDialog({
               <div className="flex flex-col gap-1.5">
                 <p className="flex items-center gap-2 font-medium">
                   <CalendarCheck className="size-4 text-primary" />
-                  {current.data.total > 0 ? `Takes ${dayCount(current.data.total)}` : "Takes no working days"}
+                  {current.data.total > 0 ? t("leave.leaveDialog.takes", { days: dayCount(current.data.total, lang) }) : t("leave.leaveDialog.takesNone")}
                 </p>
-                {current.data.days.length > 0 && <p className="text-xs text-muted-foreground">{dateList(current.data.days)}</p>}
+                {current.data.days.length > 0 && <p className="text-xs text-muted-foreground">{dateList(current.data.days, undefined, lang)}</p>}
                 {current.data.balances.map((b) => (
                   <p key={b.year} className="text-xs">
-                    {b.leave_type.name} {b.year}: <span className="font-medium tabular-nums">{b.available}</span> left
+                    {b.leave_type.name} {b.year}: <span className="font-medium tabular-nums">{b.available}</span> {t("leave.leaveDialog.left")}
                     {" → "}
-                    <span className={cn("font-medium tabular-nums", b.after < 0 && "text-destructive")}>{b.after}</span> after
+                    <span className={cn("font-medium tabular-nums", b.after < 0 && "text-destructive")}>{b.after}</span> {t("leave.leaveDialog.after")}
                   </p>
                 ))}
               </div>
@@ -249,7 +256,7 @@ export function LeaveRequestDialog({
           </div>
 
           {problems.length > 0 && (
-            <Alert variant="warning" title="Can't send this yet">
+            <Alert variant="warning" title={t("leave.shared.cantSendYet")}>
               <ul className="list-disc pl-4">
                 {problems.map(([field, message]) => (
                   <li key={field}>{message}</li>
@@ -259,14 +266,16 @@ export function LeaveRequestDialog({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="leave-reason">Reason (optional)</Label>
-            <Textarea id="leave-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} placeholder="e.g. Family wedding in Siem Reap" />
+            <Label htmlFor="leave-reason">
+              {t("common.field.reason")} {t("common.field.optional")}
+            </Label>
+            <Textarea id="leave-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} placeholder={t("leave.leaveDialog.reasonPlaceholder")} />
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="leave-file">
-              {needsFile ? "Document (required)" : "Document (optional)"}
-              <span className="ml-1 font-normal text-muted-foreground">— e.g. a medical certificate; PDF or photo, up to 10 MB</span>
+              {needsFile ? t("leave.leaveDialog.documentRequired") : t("leave.shared.documentOptional")}
+              <span className="ml-1 font-normal text-muted-foreground">{t("leave.leaveDialog.documentHint")}</span>
             </Label>
             <label
               htmlFor="leave-file"
@@ -276,7 +285,7 @@ export function LeaveRequestDialog({
               )}
             >
               <Paperclip className="size-4" />
-              <span className="truncate">{file ? file.name : "Choose a file or take a photo"}</span>
+              <span className="truncate">{file ? file.name : t("leave.shared.chooseFile")}</span>
             </label>
             <input
               id="leave-file"
@@ -291,8 +300,8 @@ export function LeaveRequestDialog({
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-0.5" checked={approveNow} onChange={(e) => setApproveNow(e.target.checked)} />
               <span>
-                Approve it now
-                <span className="block text-xs text-muted-foreground">For leave you are recording for them, e.g. a sick call this morning.</span>
+                {t("leave.shared.approveNow")}
+                <span className="block text-xs text-muted-foreground">{t("leave.leaveDialog.approveNowHint")}</span>
               </span>
             </label>
           )}
@@ -300,9 +309,9 @@ export function LeaveRequestDialog({
           {error && <Alert variant="destructive">{error}</Alert>}
 
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={!canSend}>
-              {saving ? "Sending…" : forSomeoneElse && approveNow ? "Record leave" : "Send request"}
+              {saving ? t("leave.shared.sending") : forSomeoneElse && approveNow ? t("leave.leaveDialog.record") : t("leave.shared.sendRequest")}
             </Button>
           </DialogFooter>
         </form>

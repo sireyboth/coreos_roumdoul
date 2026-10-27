@@ -18,11 +18,13 @@ import { parseDate } from "@/components/dashboard/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type ScheduleAssignment, type WorkSchedule } from "@/lib/api";
 import { daysOffText } from "@/lib/schedule";
+import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type View = "current" | "upcoming";
 
-const shortDate = (date: string) => parseDate(date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+const shortDate = (date: string, lang: Lang) =>
+  parseDate(date).toLocaleDateString(dateLocale(lang), { day: "numeric", month: "short", year: "numeric" });
 
 /**
  * Who follows a work schedule: today (the number on the list) and from a
@@ -35,6 +37,8 @@ export function SchedulePeopleDialog({
   schedule: WorkSchedule | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [view, setView] = useState<View>("current");
   const [search, setSearch] = useState("");
 
@@ -64,13 +68,16 @@ export function SchedulePeopleDialog({
     <Dialog open={schedule !== null} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>People on {schedule?.name}</DialogTitle>
+          <DialogTitle>{t("schedules.people.title", { name: schedule?.name ?? "" })}</DialogTitle>
           <DialogDescription>
             {loaded
-              ? `${groups.current.length} ${groups.current.length === 1 ? "person follows" : "people follow"} it today${
-                  groups.upcoming.length ? `, ${groups.upcoming.length} more from a later date` : ""
-                }.`
-              : "Loading…"}
+              ? groups.upcoming.length
+                ? t(groups.current.length === 1 ? "schedules.people.followsOneMore" : "schedules.people.followsManyMore", {
+                    n: groups.current.length,
+                    more: groups.upcoming.length,
+                  })
+                : t(groups.current.length === 1 ? "schedules.people.followsOne" : "schedules.people.followsMany", { n: groups.current.length })
+              : t("common.message.loading")}
           </DialogDescription>
         </DialogHeader>
 
@@ -88,12 +95,12 @@ export function SchedulePeopleDialog({
                   view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {v === "current" ? "Today" : "Upcoming"} ({groups[v].length})
+                {t(v === "current" ? "schedules.people.today" : "schedules.people.upcoming", { n: groups[v].length })}
               </button>
             ))}
           </div>
           <Input
-            placeholder="Search by name or ID…"
+            placeholder={t("schedules.people.search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 min-w-0 flex-1 sm:max-w-56"
@@ -101,11 +108,11 @@ export function SchedulePeopleDialog({
         </div>
 
         {!loaded ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">{t("common.message.loading")}</p>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
             <Users className="size-6" />
-            {query ? "Nobody matches that search." : view === "current" ? "Nobody follows this schedule today." : "Nobody starts it later."}
+            {query ? t("schedules.people.noMatch") : view === "current" ? t("schedules.people.noneToday") : t("schedules.people.noneLater")}
           </div>
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border">
@@ -117,11 +124,14 @@ export function SchedulePeopleDialog({
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-0.5 text-xs text-muted-foreground">
                   <span>
-                    {view === "upcoming" ? "From " : "Since "}
-                    {shortDate(a.effective_from)}
-                    {a.effective_to ? ` until ${shortDate(a.effective_to)}` : ""}
+                    {a.effective_to
+                      ? t(view === "upcoming" ? "schedules.people.fromUntil" : "schedules.people.sinceUntil", {
+                          from: shortDate(a.effective_from, lang),
+                          to: shortDate(a.effective_to, lang),
+                        })
+                      : t(view === "upcoming" ? "schedules.people.from" : "schedules.people.since", { from: shortDate(a.effective_from, lang) })}
                   </span>
-                  <Badge variant="outline">Off {daysOffText(a.days_off)}</Badge>
+                  <Badge variant="outline">{t("schedules.people.off", { days: daysOffText(a.days_off, lang) })}</Badge>
                 </div>
               </li>
             ))}
@@ -129,7 +139,7 @@ export function SchedulePeopleDialog({
         )}
 
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.close")}</DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

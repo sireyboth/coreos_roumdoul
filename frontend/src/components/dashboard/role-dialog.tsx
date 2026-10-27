@@ -11,6 +11,7 @@ import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dash
 import { api, ApiError, type PermissionGroup, type Role } from "@/lib/api";
 import { notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { useT, type TKey } from "@/lib/i18n";
 
 /*
  * Create or edit a role. Each area of the system is one row with a simple
@@ -20,44 +21,45 @@ import { cn } from "@/lib/utils";
 
 type Level = "none" | "view" | "manage";
 
-/** Plain words for each area: its name and what access to it means. */
-const AREAS: Record<string, { name: string; hint: string }> = {
-  dashboard: { name: "Overview page", hint: "The company dashboard with today's numbers." },
-  company: { name: "Company settings", hint: "Company profile, plan and modules." },
-  audit: { name: "Audit log", hint: "Who changed what, when and where — only in branches they can see." },
-  branches: { name: "Branches", hint: "Branch list and details." },
-  departments: { name: "Departments", hint: "Departments and their members." },
-  teams: { name: "Teams", hint: "Teams and their members." },
-  employees: { name: "Employees", hint: "Staff list and profiles (not pay)." },
-  users: { name: "User accounts", hint: "Logins and who can sign in." },
-  roles: { name: "Roles & permissions", hint: "This page — who can do what." },
-  work_locations: { name: "Work locations", hint: "Places where staff can check in." },
-  work_schedules: { name: "Work schedules", hint: "Shift times and rules." },
-  holidays: { name: "Holidays", hint: "Public and company holidays." },
-  schedules: { name: "Rosters", hint: "Who works which shift on which day." },
-  attendance: { name: "Attendance", hint: "Scans, corrections, overtime, month close." },
-  requests: { name: "Requests", hint: "View: send own leave/requests. Manage: approve for others. Choose paid days: pay or not pay leave days when approving." },
-  leave_policies: { name: "Leave policy", hint: "Leave types and balances." },
-  salary: { name: "Salaries", hint: "Each employee's pay, tax details and allowances." },
-  payroll: { name: "Payroll", hint: "Manage: prepare pay runs, settings, adjustments. Approve: sign runs off." },
-};
+/** Areas with plain words (name + what access means) in access.roleDialog.area. */
+const AREAS = [
+  "dashboard", "company", "audit", "branches", "departments", "teams", "employees", "users", "roles", "work_locations",
+  "work_schedules", "holidays", "schedules", "attendance", "requests", "leave_policies", "salary", "payroll",
+] as const;
+type Area = (typeof AREAS)[number];
 
-const SECTIONS: { title: string; resources: string[] }[] = [
-  { title: "General", resources: ["dashboard", "company", "audit"] },
-  { title: "People & organisation", resources: ["employees", "branches", "departments", "teams", "users", "roles"] },
-  { title: "Time & attendance", resources: ["attendance", "schedules", "work_schedules", "work_locations", "holidays"] },
-  { title: "Requests & leave", resources: ["requests", "leave_policies"] },
-  { title: "Pay", resources: ["salary", "payroll"] },
+function isArea(resource: string): resource is Area {
+  return (AREAS as readonly string[]).includes(resource);
+}
+
+/** An area's name and hint in the chosen language; an unknown one shows its code, made readable. */
+function areaOf(t: (key: TKey) => string, resource: string): { name: string; hint: string } {
+  return isArea(resource)
+    ? { name: t(`access.roleDialog.area.${resource}.name`), hint: t(`access.roleDialog.area.${resource}.hint`) }
+    : { name: resource.replace(/_/g, " "), hint: "" };
+}
+
+type SectionId = "general" | "people" | "time" | "requests" | "pay" | "other";
+
+const SECTIONS: { id: SectionId; resources: string[] }[] = [
+  { id: "general", resources: ["dashboard", "company", "audit"] },
+  { id: "people", resources: ["employees", "branches", "departments", "teams", "users", "roles"] },
+  { id: "time", resources: ["attendance", "schedules", "work_schedules", "work_locations", "holidays"] },
+  { id: "requests", resources: ["requests", "leave_policies"] },
+  { id: "pay", resources: ["salary", "payroll"] },
 ];
 
-const EXTRA_LABELS: Record<string, string> = { approve: "Approve", set_pay: "Choose paid days" };
+const EXTRAS = ["approve", "set_pay"] as const;
+
+function isExtra(action: string): action is (typeof EXTRAS)[number] {
+  return (EXTRAS as readonly string[]).includes(action);
+}
 
 /** One-click starting points; only permissions that exist are applied. */
-const TEMPLATES: { name: string; hint: string; permissions: string[] }[] = [
-  { name: "Employee", hint: "Check in, own schedule, send requests", permissions: ["employees.view", "schedules.view", "holidays.view", "attendance.view", "requests.view"] },
+const TEMPLATES: { id: "employee" | "supervisor" | "hrOffice" | "payrollApprover"; permissions: string[] }[] = [
+  { id: "employee", permissions: ["employees.view", "schedules.view", "holidays.view", "attendance.view", "requests.view"] },
   {
-    name: "Supervisor",
-    hint: "Runs a team's attendance and approvals",
+    id: "supervisor",
     permissions: [
       "dashboard.view", "branches.view", "departments.view", "teams.view", "teams.manage", "employees.view", "employees.manage", "work_locations.view",
       "work_schedules.view", "work_schedules.manage", "holidays.view", "holidays.manage", "schedules.view", "schedules.manage", "attendance.view", "attendance.manage",
@@ -65,15 +67,14 @@ const TEMPLATES: { name: string; hint: string; permissions: string[] }[] = [
     ],
   },
   {
-    name: "HR office",
-    hint: "Staff, attendance, leave and preparing payroll — not approving it",
+    id: "hrOffice",
     permissions: [
       "dashboard.view", "branches.view", "departments.view", "teams.view", "employees.view", "employees.manage", "work_locations.view", "work_schedules.view",
       "holidays.view", "schedules.view", "schedules.manage", "attendance.view", "attendance.manage", "requests.view", "requests.manage", "requests.set_pay", "leave_policies.view",
       "leave_policies.manage", "salary.view", "salary.manage", "payroll.view", "payroll.manage",
     ],
   },
-  { name: "Payroll approver", hint: "Checks and approves pay runs only", permissions: ["dashboard.view", "employees.view", "salary.view", "payroll.view", "payroll.approve"] },
+  { id: "payrollApprover", permissions: ["dashboard.view", "employees.view", "salary.view", "payroll.view", "payroll.approve"] },
 ];
 
 function levelOf(group: PermissionGroup, selected: Set<string>): Level {
@@ -84,10 +85,10 @@ function levelOf(group: PermissionGroup, selected: Set<string>): Level {
 
 function LevelSwitch({ group, level, onChange }: { group: PermissionGroup; level: Level; onChange: (l: Level) => void }) {
   const options: Level[] = ["none", ...(group.permissions.some((p) => p.endsWith(".view")) ? (["view"] as Level[]) : []), ...(group.permissions.some((p) => p.endsWith(".manage")) ? (["manage"] as Level[]) : [])];
-  const label = { none: "No access", view: "View", manage: "Manage" };
+  const t = useT();
 
   return (
-    <div role="radiogroup" aria-label={AREAS[group.resource]?.name ?? group.resource} className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-0.5">
+    <div role="radiogroup" aria-label={areaOf(t, group.resource).name} className="inline-flex shrink-0 rounded-lg border border-border bg-muted/40 p-0.5">
       {options.map((o) => (
         <button
           key={o}
@@ -104,7 +105,7 @@ function LevelSwitch({ group, level, onChange }: { group: PermissionGroup; level
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          {label[o]}
+          {t(`access.roleDialog.level.${o}`)}
         </button>
       ))}
     </div>
@@ -125,6 +126,7 @@ export function RoleDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(role?.name ?? "");
   const [order, setOrder] = useState(role ? fromSortOrder(role.sort_order) : "");
   const [selected, setSelected] = useState<Set<string>>(() => new Set(role?.permissions ?? []));
@@ -141,13 +143,16 @@ export function RoleDialog({
   const sections = useMemo(() => {
     const listed = new Set(SECTIONS.flatMap((s) => s.resources));
     const others = groups.map((g) => g.resource).filter((r) => !listed.has(r));
-    return [...SECTIONS, ...(others.length ? [{ title: "Other", resources: others }] : [])]
+    return [...SECTIONS, ...(others.length ? [{ id: "other" as const, resources: others }] : [])]
       .map((s) => ({ ...s, groups: s.resources.map((r) => byResource.get(r)).filter((g): g is PermissionGroup => !!g) }))
       .filter((s) => s.groups.length > 0);
   }, [groups, byResource]);
 
   const q = query.trim().toLowerCase();
-  const matches = (g: PermissionGroup) => !q || `${AREAS[g.resource]?.name ?? g.resource} ${AREAS[g.resource]?.hint ?? ""} ${g.resource}`.toLowerCase().includes(q);
+  const matches = (g: PermissionGroup) => {
+    const area = areaOf(t, g.resource);
+    return !q || `${area.name} ${area.hint} ${g.resource}`.toLowerCase().includes(q);
+  };
 
   function update(fn: (next: Set<string>) => void) {
     if (locked) return;
@@ -203,15 +208,15 @@ export function RoleDialog({
           ...(locked ? {} : { permissions }),
           sort_order: toSortOrder(order),
         });
-        notifySuccess("Role updated");
+        notifySuccess(t("access.roleDialog.updated"));
       } else {
         await api.roles.create({ name: name.trim(), permissions, sort_order: toSortOrder(order) });
-        notifySuccess("Role created");
+        notifySuccess(t("access.roleDialog.created"));
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -224,47 +229,47 @@ export function RoleDialog({
       <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b border-border px-5 py-4 pr-12">
-            <DialogTitle>{role ? `Edit “${role.name}”` : "Create a role"}</DialogTitle>
+            <DialogTitle>{role ? t("access.roleDialog.editTitle", { name: role.name }) : t("access.roleDialog.createTitle")}</DialogTitle>
             <DialogDescription>
               {locked
-                ? "This role's permissions are fixed. You can rename it and change where it appears in lists."
+                ? t("access.roleDialog.lockedDescription")
                 : role
-                  ? "Changes apply immediately to everyone with this role."
-                  : "A role is a job position, e.g. “HR office” or “Supervisor”. Choose what it can see and do."}
+                  ? t("access.roleDialog.editDescription")
+                  : t("access.roleDialog.createDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_12rem]">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="role-name">Role name</Label>
-                <Input id="role-name" required maxLength={255} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. HR office" autoFocus={!role} />
+                <Label htmlFor="role-name">{t("access.roleDialog.name")}</Label>
+                <Input id="role-name" required maxLength={255} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("access.roleDialog.namePlaceholder")} autoFocus={!role} />
               </div>
-              <DisplayOrderField id="role-order" value={order} onChange={setOrder} example="the most senior role" />
+              <DisplayOrderField id="role-order" value={order} onChange={setOrder} example={t("access.roleDialog.orderExample")} />
             </div>
 
             {locked ? (
-              <Alert variant="info" title="Full access">
+              <Alert variant="info" title={t("access.roleDialog.fullAccess")}>
                 <span className="inline-flex items-center gap-1.5">
-                  <Lock className="size-3.5" /> The company admin can always do everything, so nobody gets locked out.
+                  <Lock className="size-3.5" /> {t("access.roleDialog.fullAccessHint")}
                 </span>
               </Alert>
             ) : (
               <>
                 <div className="flex flex-col gap-2">
                   <p className="flex items-center gap-1.5 text-sm font-medium">
-                    <Sparkles className="size-4 text-primary" /> Quick start
+                    <Sparkles className="size-4 text-primary" /> {t("access.roleDialog.quickStart")}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {TEMPLATES.map((t) => (
+                    {TEMPLATES.map((tpl) => (
                       <button
-                        key={t.name}
+                        key={tpl.id}
                         type="button"
-                        title={t.hint}
-                        onClick={() => applyTemplate(t.permissions)}
+                        title={t(`access.roleDialog.template.${tpl.id}.hint`)}
+                        onClick={() => applyTemplate(tpl.permissions)}
                         className="rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground/80 transition-colors hover:border-primary hover:bg-primary/5 hover:text-foreground"
                       >
-                        {t.name}
+                        {t(`access.roleDialog.template.${tpl.id}.name`)}
                       </button>
                     ))}
                     <button
@@ -272,18 +277,18 @@ export function RoleDialog({
                       onClick={() => applyTemplate([...allCodes])}
                       className="rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground/80 transition-colors hover:border-primary hover:bg-primary/5"
                     >
-                      Full access
+                      {t("access.roleDialog.fullAccess")}
                     </button>
                     <button type="button" onClick={() => applyTemplate([])} className="rounded-full px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground">
-                      Clear all
+                      {t("access.roleDialog.clearAll")}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Pick one to fill everything in, then adjust below.</p>
+                  <p className="text-xs text-muted-foreground">{t("access.roleDialog.quickStartHint")}</p>
                 </div>
 
                 <div className="relative">
                   <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find an area, e.g. payroll" className="pl-9" aria-label="Find an area" />
+                  <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("access.roleDialog.find")} className="pl-9" aria-label={t("access.roleDialog.findLabel")} />
                 </div>
 
                 {sections.map((section) => {
@@ -291,18 +296,18 @@ export function RoleDialog({
                   if (shown.length === 0) return null;
                   const on = section.groups.filter((g) => levelOf(g, selected) !== "none").length;
                   return (
-                    <section key={section.title} className="flex flex-col gap-1">
+                    <section key={section.id} className="flex flex-col gap-1">
                       <div className="flex items-baseline justify-between px-1">
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`access.roleDialog.section.${section.id}`)}</h3>
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {on} of {section.groups.length} on
+                          {t("access.roleDialog.sectionCount", { on, total: section.groups.length })}
                         </span>
                       </div>
                       <div className="divide-y divide-border rounded-lg border border-border">
                         {shown.map((g) => {
                           const level = levelOf(g, selected);
                           const extras = g.permissions.filter((p) => !p.endsWith(".view") && !p.endsWith(".manage"));
-                          const area = AREAS[g.resource] ?? { name: g.resource.replace(/_/g, " "), hint: "" };
+                          const area = areaOf(t, g.resource);
                           return (
                             <div key={g.resource} className={cn("flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between", level === "none" && "bg-muted/20")}>
                               <div className="min-w-0">
@@ -313,6 +318,7 @@ export function RoleDialog({
                                 <LevelSwitch group={g} level={level} onChange={(l) => setLevel(g, l)} />
                                 {extras.map((code) => {
                                   const on = selected.has(code);
+                                  const action = code.split(".")[1];
                                   return (
                                     <button
                                       key={code}
@@ -326,7 +332,7 @@ export function RoleDialog({
                                       )}
                                     >
                                       {on ? "✓ " : "+ "}
-                                      {EXTRA_LABELS[code.split(".")[1]] ?? code.split(".")[1]}
+                                      {isExtra(action) ? t(`access.roleDialog.extra.${action}`) : action}
                                     </button>
                                   );
                                 })}
@@ -338,18 +344,18 @@ export function RoleDialog({
                     </section>
                   );
                 })}
-                {sections.every((s) => s.groups.filter(matches).length === 0) && <p className="py-6 text-center text-sm text-muted-foreground">No area matches “{query}”.</p>}
+                {sections.every((s) => s.groups.filter(matches).length === 0) && <p className="py-6 text-center text-sm text-muted-foreground">{t("access.roleDialog.noMatch", { query })}</p>}
               </>
             )}
             {error && <Alert variant="destructive">{error}</Alert>}
           </div>
 
           <DialogFooter className="mx-0 mb-0 flex-row items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3 sm:justify-between">
-            <span className="text-xs text-muted-foreground tabular-nums">{locked ? "All permissions" : `${count} of ${total} permissions`}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{locked ? t("access.roleDialog.allPermissions") : t("access.roleDialog.permissionCount", { n: count, total })}</span>
             <div className="flex gap-2">
-              <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+              <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
               <Button type="submit" disabled={saving || !name.trim()}>
-                {saving ? "Saving…" : role ? "Save changes" : "Create role"}
+                {saving ? t("access.roleDialog.saving") : role ? t("access.roleDialog.saveChanges") : t("access.roleDialog.create")}
               </Button>
             </div>
           </DialogFooter>

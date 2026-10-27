@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, ApiError, type OvertimeMode, type ScheduleSlot, type WorkSchedule, type WorkScheduleInput } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { formatMinutes, slotsOn, WEEK_ORDER, WEEKDAY_LONG, WEEKDAY_SHORT } from "@/lib/schedule";
+import { formatMinutes, slotsOn, WEEK_ORDER, weekdayLong, weekdayShort } from "@/lib/schedule";
+import { translateNow, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
 
@@ -64,11 +65,8 @@ function dayMinutes(stretches: Stretch[]): number {
   }, 0);
 }
 
-const OVERTIME_MODES: { value: OvertimeMode; label: string; help: string }[] = [
-  { value: "off", label: "Don't count overtime", help: "Time past the schedule is recorded as worked, but never as overtime." },
-  { value: "after_last_out", label: "Time after the last OUT", help: "Staying past the day's final OUT counts as overtime." },
-  { value: "above_scheduled", label: "Hours above the schedule", help: "Worked hours beyond the day's scheduled hours count as overtime." },
-];
+// Labels are schedules.form.mode.<value> and schedules.form.mode.<value>Help.
+const OVERTIME_MODES: OvertimeMode[] = ["off", "after_last_out", "above_scheduled"];
 
 /** Create or edit a work schedule: the week's slots, plus the tolerance and overtime rules. */
 export function WorkScheduleDialog({
@@ -82,6 +80,8 @@ export function WorkScheduleDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [name, setName] = useState(schedule?.name ?? "");
   const [description, setDescription] = useState(schedule?.description ?? "");
   const [active, setActive] = useState(schedule?.is_active ?? true);
@@ -153,7 +153,7 @@ export function WorkScheduleDialog({
     setError(null);
 
     if (noHours && overtimeMode === "off") {
-      setError("Add hours to at least one day, or turn overtime on to make an overtime-only schedule.");
+      setError(t("schedules.form.needHours"));
       return;
     }
 
@@ -180,16 +180,16 @@ export function WorkScheduleDialog({
     try {
       if (schedule) {
         await api.workSchedules.update(schedule.id, payload);
-        notifySuccess("Schedule updated", "Days already finished keep the hours they were judged by.");
+        notifySuccess(translateNow("schedules.form.updated"), translateNow("schedules.form.updatedHint"));
       } else {
         await api.workSchedules.create(payload);
-        notifySuccess("Schedule created");
+        notifySuccess(translateNow("schedules.form.created"));
       }
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : "Something went wrong.");
+      setError(err instanceof ApiError ? (err.errors ? Object.values(err.errors)[0][0] : err.message) : translateNow("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -199,22 +199,19 @@ export function WorkScheduleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{schedule ? `Edit "${schedule.name}"` : "New work schedule"}</DialogTitle>
-          <DialogDescription>
-            When people on this schedule should scan in and out. Add as many IN → OUT stretches per day as you need — a
-            split shift is simply two.
-          </DialogDescription>
+          <DialogTitle>{schedule ? t("schedules.form.titleEdit", { name: schedule.name }) : t("schedules.form.titleNew")}</DialogTitle>
+          <DialogDescription>{t("schedules.form.description")}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="ws-name">Name</Label>
-              <Input id="ws-name" required placeholder="Split shift" value={name} onChange={(e) => setName(e.target.value)} />
+              <Label htmlFor="ws-name">{t("schedules.form.name")}</Label>
+              <Input id="ws-name" required placeholder={t("schedules.form.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="ws-description">Description (optional)</Label>
-              <Input id="ws-description" placeholder="Shop floor, Mon–Sat" value={description} onChange={(e) => setDescription(e.target.value)} />
+              <Label htmlFor="ws-description">{t("schedules.form.descriptionLabel")}</Label>
+              <Input id="ws-description" placeholder={t("schedules.form.descriptionPlaceholder")} value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
           </div>
 
@@ -222,23 +219,18 @@ export function WorkScheduleDialog({
           <section className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold">Hours</h3>
-                <p className="text-xs text-muted-foreground">
-                  {formatMinutes(weeklyMinutes)} per week. A time earlier than the one before it is the next morning
-                  (night shifts).
-                </p>
+                <h3 className="text-sm font-semibold">{t("schedules.form.hours")}</h3>
+                <p className="text-xs text-muted-foreground">{t("schedules.form.perWeek", { time: formatMinutes(weeklyMinutes, lang) })}</p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={copyMondayToAll} disabled={week[1].length === 0}>
                 <Copy className="size-3.5" />
-                Copy Monday to every working day
+                {t("schedules.form.copyMonday")}
               </Button>
             </div>
 
             {noHours && (
-              <Alert variant={overtimeMode === "off" ? "warning" : "info"} title="Overtime-only schedule">
-                {overtimeMode === "off"
-                  ? "No day has hours. Turn overtime on below to save it as an overtime-only schedule, or add hours."
-                  : "No day has hours, so every hour worked under this schedule counts as overtime — as holiday overtime on a holiday. Use it as a one-day roster override, not as someone's usual schedule."}
+              <Alert variant={overtimeMode === "off" ? "warning" : "info"} title={t("schedules.form.overtimeOnlyTitle")}>
+                {overtimeMode === "off" ? t("schedules.form.overtimeOnlyOff") : t("schedules.form.overtimeOnlyOn")}
               </Alert>
             )}
 
@@ -249,37 +241,37 @@ export function WorkScheduleDialog({
                 return (
                   <li key={weekday} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-start">
                     <div className="flex w-32 shrink-0 items-center justify-between gap-2 pt-1.5 sm:justify-start">
-                      <span className="text-sm font-medium">{WEEKDAY_LONG[weekday]}</span>
-                      {stretches.length > 0 && <span className="text-xs text-muted-foreground">{formatMinutes(dayMinutes(stretches))}</span>}
+                      <span className="text-sm font-medium">{weekdayLong(weekday, lang)}</span>
+                      {stretches.length > 0 && <span className="text-xs text-muted-foreground">{formatMinutes(dayMinutes(stretches), lang)}</span>}
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col gap-2">
                       {stretches.length === 0 ? (
                         <div className="flex items-center gap-3 pt-1">
-                          <span className="text-sm text-muted-foreground">No hours</span>
+                          <span className="text-sm text-muted-foreground">{t("schedules.form.noHours")}</span>
                           <Button type="button" variant="ghost" size="sm" onClick={() => addStretch(weekday)}>
                             <Plus className="size-3.5" />
-                            Add hours
+                            {t("schedules.form.addHours")}
                           </Button>
                         </div>
                       ) : (
                         stretches.map((stretch, i) => (
                           <div key={i} className="flex flex-wrap items-center gap-2">
-                            <span className="w-8 text-xs font-semibold text-success">IN</span>
+                            <span className="w-8 text-xs font-semibold text-success">{t("schedules.form.in")}</span>
                             <Input
                               type="time"
                               required
-                              aria-label={`${WEEKDAY_LONG[weekday]} stretch ${i + 1} in`}
+                              aria-label={t("schedules.form.stretchIn", { day: weekdayLong(weekday, lang), n: i + 1 })}
                               value={stretch.in}
                               onChange={(e) => updateStretch(weekday, i, { in: e.target.value })}
                               className="w-32"
                             />
                             <span className="text-muted-foreground">→</span>
-                            <span className="w-9 text-xs font-semibold text-destructive">OUT</span>
+                            <span className="w-9 text-xs font-semibold text-destructive">{t("schedules.form.out")}</span>
                             <Input
                               type="time"
                               required
-                              aria-label={`${WEEKDAY_LONG[weekday]} stretch ${i + 1} out`}
+                              aria-label={t("schedules.form.stretchOut", { day: weekdayLong(weekday, lang), n: i + 1 })}
                               value={stretch.out}
                               onChange={(e) => updateStretch(weekday, i, { out: e.target.value })}
                               className="w-32"
@@ -287,14 +279,14 @@ export function WorkScheduleDialog({
                             {slots[i * 2 + 1]?.next_day && (
                               <span className="inline-flex items-center gap-1 rounded-md bg-info/12 px-1.5 py-0.5 text-xs text-info">
                                 <Moon className="size-3" />
-                                next day
+                                {t("schedules.form.nextDay")}
                               </span>
                             )}
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon-sm"
-                              aria-label="Remove these hours"
+                              aria-label={t("schedules.form.removeHours")}
                               onClick={() => setDay(weekday, stretches.filter((_, j) => j !== i))}
                             >
                               <X className="size-3.5" />
@@ -305,7 +297,7 @@ export function WorkScheduleDialog({
                       {stretches.length > 0 && stretches.length < 6 && (
                         <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => addStretch(weekday)}>
                           <Plus className="size-3.5" />
-                          Add a stretch (e.g. after lunch)
+                          {t("schedules.form.addStretch")}
                         </Button>
                       )}
                     </div>
@@ -317,7 +309,7 @@ export function WorkScheduleDialog({
 
           {/* ── Scanning ── */}
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Scanning</h3>
+            <h3 className="text-sm font-semibold">{t("schedules.form.scanning")}</h3>
             <label className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -326,31 +318,28 @@ export function WorkScheduleDialog({
                 className="mt-0.5 size-4 rounded border-input"
               />
               <span className="flex flex-col">
-                Automatic attendance — no scanning needed
-                <span className="text-xs text-muted-foreground">
-                  For top management and others who don&apos;t scan. Each IN and OUT is recorded at its scheduled time once
-                  it passes, so they&apos;re never late or absent. Holidays and days off still apply.
-                </span>
+                {t("schedules.form.auto")}
+                <span className="text-xs text-muted-foreground">{t("schedules.form.autoHint")}</span>
               </span>
             </label>
           </section>
 
           {/* ── Tolerances ── */}
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">Tolerances</h3>
+            <h3 className="text-sm font-semibold">{t("schedules.form.tolerances")}</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-late">Late after (min)</Label>
+                <Label htmlFor="ws-late">{t("schedules.form.late")}</Label>
                 <Input id="ws-late" type="number" min={0} max={240} value={lateGrace} onChange={(e) => setLateGrace(e.target.value)} />
-                <p className="text-xs text-muted-foreground">Grace after each IN before it counts as late.</p>
+                <p className="text-xs text-muted-foreground">{t("schedules.form.lateHint")}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-early">Early leave allowance (min)</Label>
+                <Label htmlFor="ws-early">{t("schedules.form.early")}</Label>
                 <Input id="ws-early" type="number" min={0} max={240} value={earlyGrace} onChange={(e) => setEarlyGrace(e.target.value)} />
-                <p className="text-xs text-muted-foreground">How early an OUT may be before it counts.</p>
+                <p className="text-xs text-muted-foreground">{t("schedules.form.earlyHint")}</p>
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-break">Unpaid break (min)</Label>
+                <Label htmlFor="ws-break">{t("schedules.form.break")}</Label>
                 <Input
                   id="ws-break"
                   type="number"
@@ -361,26 +350,22 @@ export function WorkScheduleDialog({
                   disabled={!singleStretchDays}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {singleStretchDays
-                    ? "Taken off days with one IN/OUT, where people don't scan out for lunch."
-                    : "Not needed: the gap between your stretches is the break."}
+                  {singleStretchDays ? t("schedules.form.breakHint") : t("schedules.form.breakNotNeeded")}
                 </p>
               </div>
             </div>
             {singleStretchDays && (
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={breakPaid} onChange={(e) => setBreakPaid(e.target.checked)} className="size-4 rounded border-input" />
-                The break is paid (counts as worked time)
+                {t("schedules.form.breakPaid")}
               </label>
             )}
           </section>
 
           {/* ── Days off ── */}
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">Suggested weekly days off</h3>
-            <p className="-mt-1 text-xs text-muted-foreground">
-              Pre-filled when you assign this schedule. Each person can have their own days off.
-            </p>
+            <h3 className="text-sm font-semibold">{t("schedules.form.daysOff")}</h3>
+            <p className="-mt-1 text-xs text-muted-foreground">{t("schedules.form.daysOffHint")}</p>
             <div className="flex flex-wrap gap-1.5">
               {WEEK_ORDER.map((weekday) => (
                 <button
@@ -393,7 +378,7 @@ export function WorkScheduleDialog({
                     daysOff.includes(weekday) ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-muted",
                   )}
                 >
-                  {WEEKDAY_SHORT[weekday]}
+                  {weekdayShort(weekday, lang)}
                 </button>
               ))}
             </div>
@@ -401,27 +386,27 @@ export function WorkScheduleDialog({
 
           {/* ── Overtime ── */}
           <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">Overtime</h3>
+            <h3 className="text-sm font-semibold">{t("schedules.form.overtime")}</h3>
             <div className="grid gap-2 sm:grid-cols-3">
               {OVERTIME_MODES.map((mode) => (
                 <label
-                  key={mode.value}
+                  key={mode}
                   className={cn(
                     "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors",
-                    overtimeMode === mode.value ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
+                    overtimeMode === mode ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
                   )}
                 >
                   <span className="flex items-center gap-2 font-medium">
                     <input
                       type="radio"
                       name="overtime-mode"
-                      checked={overtimeMode === mode.value}
-                      onChange={() => setOvertimeMode(mode.value)}
+                      checked={overtimeMode === mode}
+                      onChange={() => setOvertimeMode(mode)}
                       className="size-4"
                     />
-                    {mode.label}
+                    {t(`schedules.form.mode.${mode}`)}
                   </span>
-                  <span className="text-xs text-muted-foreground">{mode.help}</span>
+                  <span className="text-xs text-muted-foreground">{t(`schedules.form.mode.${mode}Help`)}</span>
                 </label>
               ))}
             </div>
@@ -429,23 +414,23 @@ export function WorkScheduleDialog({
             {overtimeMode !== "off" && (
               <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="ws-ot-min">Ignore overtime shorter than (min)</Label>
+                  <Label htmlFor="ws-ot-min">{t("schedules.form.ignoreShorter")}</Label>
                   <Input id="ws-ot-min" type="number" min={0} max={480} value={overtimeMin} onChange={(e) => setOvertimeMin(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="ws-ot-round">Round overtime down to</Label>
+                  <Label htmlFor="ws-ot-round">{t("schedules.form.roundDown")}</Label>
                   <select id="ws-ot-round" value={overtimeRound} onChange={(e) => setOvertimeRound(e.target.value)} className={SELECT_CLASS}>
-                    <option value="0">Exact minutes</option>
+                    <option value="0">{t("schedules.form.exactMinutes")}</option>
                     {[5, 10, 15, 30, 60].map((m) => (
                       <option key={m} value={m}>
-                        {m === 60 ? "Whole hours" : `${m} minutes`}
+                        {m === 60 ? t("schedules.form.wholeHours") : t("schedules.form.minutes", { n: m })}
                       </option>
                     ))}
                   </select>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={overtimeEarly} onChange={(e) => setOvertimeEarly(e.target.checked)} className="size-4 rounded border-input" />
-                  Coming in before the first IN counts too
+                  {t("schedules.form.countEarly")}
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -454,11 +439,9 @@ export function WorkScheduleDialog({
                     onChange={(e) => setOvertimeApproval(e.target.checked)}
                     className="size-4 rounded border-input"
                   />
-                  A manager must approve it before it counts
+                  {t("schedules.form.needsApproval")}
                 </label>
-                <p className="text-xs text-muted-foreground sm:col-span-2">
-                  Work on a day off or a holiday is overtime in full, recorded as day-off or holiday overtime.
-                </p>
+                <p className="text-xs text-muted-foreground sm:col-span-2">{t("schedules.form.dayOffNote")}</p>
               </div>
             )}
           </section>
@@ -466,18 +449,18 @@ export function WorkScheduleDialog({
           {schedule && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4 rounded border-input" />
-              Active — inactive schedules can&apos;t be newly assigned
+              {t("schedules.form.active")}
             </label>
           )}
 
-          <DisplayOrderField id="ws-order" value={sortOrder} onChange={setSortOrder} example="the most used schedule" />
+          <DisplayOrderField id="ws-order" value={sortOrder} onChange={setSortOrder} example={t("schedules.form.orderExample")} />
 
           {error && <Alert variant="destructive">{error}</Alert>}
 
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : schedule ? "Save changes" : "Create schedule"}
+              {saving ? t("schedules.form.saving") : schedule ? t("schedules.form.saveChanges") : t("schedules.form.create")}
             </Button>
           </DialogFooter>
         </form>

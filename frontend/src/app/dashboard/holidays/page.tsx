@@ -25,6 +25,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Holiday } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
 import { exportHolidays, holidayImport } from "@/lib/excel-specs/time";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 function HolidayFormDialog({
@@ -38,6 +39,7 @@ function HolidayFormDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(holiday?.name ?? "");
   const [date, setDate] = useState(holiday ? dateOnly(holiday.date) : "");
   const [recurring, setRecurring] = useState(holiday?.is_recurring_yearly ?? false);
@@ -54,16 +56,16 @@ function HolidayFormDialog({
     try {
       if (holiday) {
         await api.holidays.update(holiday.id, payload);
-        notifySuccess("Holiday updated");
+        notifySuccess(t("calendar.holidays.updated"));
       } else {
         await api.holidays.create(payload);
-        notifySuccess("Holiday added");
+        notifySuccess(t("calendar.holidays.added"));
       }
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -73,16 +75,16 @@ function HolidayFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{holiday ? `Edit "${holiday.name}"` : "Add a holiday"}</DialogTitle>
-          <DialogDescription>Employees won&apos;t be scheduled on this date.</DialogDescription>
+          <DialogTitle>{holiday ? t("calendar.holidays.editTitle", { name: holiday.name }) : t("calendar.holidays.addTitle")}</DialogTitle>
+          <DialogDescription>{t("calendar.holidays.formText")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{t("common.field.name")}</Label>
             <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="date">Date</Label>
+            <Label htmlFor="date">{t("common.field.date")}</Label>
             <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <label className="flex items-center gap-2 text-sm">
@@ -92,13 +94,13 @@ function HolidayFormDialog({
               onChange={(e) => setRecurring(e.target.checked)}
               className="size-4 rounded border-input"
             />
-            Repeats every year
+            {t("calendar.holidays.repeats")}
           </label>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : holiday ? "Save changes" : "Add holiday"}
+              {saving ? t("calendar.holidays.saving") : holiday ? t("calendar.holidays.saveChanges") : t("calendar.holidays.add")}
             </Button>
           </DialogFooter>
         </form>
@@ -109,6 +111,7 @@ function HolidayFormDialog({
 
 export default function HolidaysPage() {
   const { me } = useMe();
+  const t = useT();
   const confirm = useConfirm();
   const [holidays, setHolidays] = useState<Holiday[] | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -133,15 +136,15 @@ export default function HolidaysPage() {
 
   async function handleDelete(holiday: Holiday) {
     const ok = await confirm({
-      title: `Delete "${holiday.name}"?`,
-      description: "It will no longer be treated as a holiday.",
+      title: t("calendar.holidays.deleteTitle", { name: holiday.name }),
+      description: t("calendar.holidays.deleteText"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.holidays.remove(holiday.id);
-      notifySuccess(`"${holiday.name}" deleted`);
+      notifySuccess(t("calendar.holidays.deleted", { name: holiday.name }));
     } catch (err) {
       notifyError(err);
     }
@@ -153,7 +156,7 @@ export default function HolidaysPage() {
   const columns: DataTableColumn<Holiday>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (holiday) => <span className="font-medium">{holiday.name}</span>,
       sortValue: (holiday) => holiday.name,
@@ -161,15 +164,15 @@ export default function HolidaysPage() {
     },
     {
       id: "date",
-      header: "Date",
+      header: t("common.field.date"),
       cell: (holiday) => <span className="text-muted-foreground">{dateOnly(holiday.date)}</span>,
       sortValue: (holiday) => dateOnly(holiday.date),
     },
     {
       id: "recurs",
-      header: "Recurs",
+      header: t("calendar.holidays.colRecurs"),
       cell: (holiday) =>
-        holiday.is_recurring_yearly ? <Badge variant="outline">Yearly</Badge> : <span className="text-muted-foreground">—</span>,
+        holiday.is_recurring_yearly ? <Badge variant="outline">{t("calendar.holidays.yearly")}</Badge> : <span className="text-muted-foreground">—</span>,
     },
   ];
 
@@ -177,8 +180,8 @@ export default function HolidaysPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Holidays"
-          description="Company-wide non-working days."
+          title={t("calendar.holidays.title")}
+          description={t("calendar.holidays.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportHolidays} importSpec={canManage ? holidayImport : undefined} onImported={load} />
@@ -186,11 +189,11 @@ export default function HolidaysPage() {
                 <>
                   <Button variant="outline" onClick={() => setImportOpen(true)}>
                     <Flag className="size-4" />
-                    Import Cambodian holidays
+                    {t("calendar.holidays.importCambodian")}
                   </Button>
                   <Button onClick={() => openForm(null)}>
                     <Plus className="size-4" />
-                    Add holiday
+                    {t("calendar.holidays.add")}
                   </Button>
                 </>
               )}
@@ -202,11 +205,11 @@ export default function HolidaysPage() {
           data={holidays}
           getRowId={(holiday) => holiday.id}
           columns={columns}
-          searchPlaceholder="Search holidays…"
+          searchPlaceholder={t("calendar.holidays.search")}
           emptyState={{
             icon: PartyPopper,
-            title: "No holidays yet",
-            description: "Add your company's public holidays so they're excluded from the roster.",
+            title: t("calendar.holidays.emptyTitle"),
+            description: t("calendar.holidays.emptyText"),
           }}
           rowActions={
             canManage
@@ -214,11 +217,11 @@ export default function HolidaysPage() {
                   <>
                     <Button variant="outline" size="sm" onClick={() => openForm(holiday)}>
                       <Pencil className="size-3.5" />
-                      Edit
+                      {t("common.action.edit")}
                     </Button>
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(holiday)}>
                       <Trash2 className="size-3.5" />
-                      Delete
+                      {t("common.action.delete")}
                     </Button>
                   </>
                 )

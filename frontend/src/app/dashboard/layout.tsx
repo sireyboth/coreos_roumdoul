@@ -15,13 +15,17 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
 import { findNavItem } from "@/components/dashboard/nav";
+import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { companyStatusLabel } from "@/components/dashboard/account-banner";
+import { pageLabel, useLang, useT } from "@/lib/i18n";
 import { MeProvider, useMe } from "@/contexts/me-context";
 import { markAppSessionStarted } from "@/lib/app-launch";
 
 function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean }) {
   const { me } = useMe();
   const pathname = usePathname();
+  const t = useT();
 
   return (
     <header className="flex items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur md:hidden">
@@ -38,7 +42,7 @@ function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean 
           variant="outline"
           size="icon"
           onClick={onToggle}
-          aria-label="Toggle menu"
+          aria-label={t("app.shell.toggleMenu")}
           className="relative"
         >
           <Menu
@@ -61,6 +65,8 @@ function TopBar() {
   const { me } = useMe();
   const pathname = usePathname();
   const item = findNavItem(pathname);
+  const lang = useLang();
+  const t = useT();
   const initials = me?.user.name
     ?.split(" ")
     .map((part) => part[0])
@@ -73,20 +79,21 @@ function TopBar() {
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">{me?.company?.name ?? "Business OS"}</span>
         <span className="text-muted-foreground/50">/</span>
-        <span className="font-semibold">{item?.label ?? "Dashboard"}</span>
+        <span className="font-semibold">{pageLabel(lang, item?.href ?? "/dashboard", item?.label ?? "Dashboard")}</span>
       </div>
       <div className="flex items-center gap-2">
         {me?.company?.status && (
           <span className="mr-2 hidden items-center gap-1.5 rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium capitalize text-success lg:inline-flex">
             <span className="size-1.5 rounded-full bg-success" />
-            {me.company.status}
+            {companyStatusLabel(lang, me.company.status)}
           </span>
         )}
+        <LanguageToggle />
         <NotificationBell />
         <ThemeToggle />
         <Link
           href="/dashboard/profile"
-          aria-label="Profile"
+          aria-label={t("app.shell.profile")}
           className="ml-1 flex size-9 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-transform hover:scale-105"
         >
           {initials}
@@ -131,6 +138,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { loading } = useMe();
   const pathname = usePathname();
+  const t = useT();
   // Any page but scan means the app is up; the scan page itself decides
   // whether it was opened by an older home-screen icon (lib/app-launch.ts).
   useEffect(() => {
@@ -141,7 +149,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-screen items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin text-primary" />
-        Loading your workspace…
+        {t("app.shell.loadingWorkspace")}
       </div>
     );
   }

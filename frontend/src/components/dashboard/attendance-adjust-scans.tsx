@@ -8,12 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, ApiError, type AttendanceDay } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 type Row = {
   // Set for a scan already on the day; a new row has none.
   scanId: number | null;
-  role: string | null;
+  role: AttendanceDay["scans"][number]["role"] | null;
   // "2026-10-05T08:00" on the company's clock — what a datetime-local input holds.
   original: string;
   value: string;
@@ -38,10 +39,11 @@ export function AttendanceAdjustScans({
   onCancel: () => void;
   onSaved: (day: AttendanceDay | null) => void;
 }) {
+  const t = useT();
   const [rows, setRows] = useState<Row[]>(() =>
     day.scans.map((entry) => ({
       scanId: entry.scan_id,
-      role: entry.role === "extra" ? "Extra" : entry.role.toUpperCase(),
+      role: entry.role,
       original: local(entry.at),
       value: local(entry.at),
       removed: false,
@@ -66,11 +68,11 @@ export function AttendanceAdjustScans({
 
     try {
       const res = await api.attendance.adjust({ employee_id: day.employee.id, date: day.date, reason, add: adds, void: voids });
-      notifySuccess("Attendance adjusted", "The day was recalculated.");
+      notifySuccess(t("attendance.adjust.saved"), t("attendance.adjust.savedHint"));
       onSaved(res.day);
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -79,38 +81,49 @@ export function AttendanceAdjustScans({
   return (
     <form onSubmit={handleSave} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Adjust scans</h3>
-        <p className="-mt-1 text-xs text-muted-foreground">
-          Change a time, remove a wrong scan, or add a missing one. The schedule still decides whether each is an IN or an OUT. Removed and
-          replaced scans stay on record with your reason.
-        </p>
+        <h3 className="text-sm font-semibold">{t("attendance.adjust.title")}</h3>
+        <p className="-mt-1 text-xs text-muted-foreground">{t("attendance.adjust.hint")}</p>
 
         {rows.map((row, i) => (
           <div key={row.scanId ?? `new-${i}`} className="flex items-center gap-2">
-            <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">{row.role ?? "New"}</span>
+            <span className="w-12 shrink-0 text-xs font-medium text-muted-foreground">
+              {row.role === "in"
+                ? t("attendance.adjust.roleIn")
+                : row.role === "out"
+                  ? t("attendance.adjust.roleOut")
+                  : row.role === "extra"
+                    ? t("attendance.adjust.roleExtra")
+                    : t("attendance.adjust.roleNew")}
+            </span>
             <Input
               type="datetime-local"
               required={!row.removed}
               disabled={row.removed}
-              aria-label={`Scan ${i + 1}`}
+              aria-label={t("attendance.adjust.scanN", { n: i + 1 })}
               value={row.value}
               onChange={(e) => update(i, { value: e.target.value })}
               className={cn("w-56", row.removed && "line-through")}
             />
             {row.scanId !== null && row.value !== row.original && !row.removed && (
-              <span className="text-xs text-warning">Changed</span>
+              <span className="text-xs text-warning">{t("attendance.adjust.changed")}</span>
             )}
             {row.scanId === null ? (
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove this new scan" onClick={() => setRows((all) => all.filter((_, j) => j !== i))}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("attendance.adjust.removeNew")}
+                onClick={() => setRows((all) => all.filter((_, j) => j !== i))}
+              >
                 <Trash2 className="size-3.5" />
               </Button>
             ) : row.removed || row.value !== row.original ? (
               <Button type="button" variant="ghost" size="sm" onClick={() => update(i, { value: row.original, removed: false })}>
                 <RotateCcw className="size-3.5" />
-                Undo
+                {t("common.action.undo")}
               </Button>
             ) : (
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Remove this scan" onClick={() => update(i, { removed: true })}>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label={t("attendance.adjust.removeScan")} onClick={() => update(i, { removed: true })}>
                 <Trash2 className="size-3.5" />
               </Button>
             )}
@@ -131,17 +144,17 @@ export function AttendanceAdjustScans({
           }
         >
           <Plus className="size-3.5" />
-          Add a scan
+          {t("attendance.adjust.addScan")}
         </Button>
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="adjust-reason">Reason</Label>
+        <Label htmlFor="adjust-reason">{t("common.field.reason")}</Label>
         <Input
           id="adjust-reason"
           required
           maxLength={255}
-          placeholder="e.g. Scanner was down; confirmed with the branch manager"
+          placeholder={t("attendance.adjust.reasonPlaceholder")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
         />
@@ -151,10 +164,10 @@ export function AttendanceAdjustScans({
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          {t("common.action.cancel")}
         </Button>
         <Button type="submit" disabled={saving || !changed}>
-          {saving ? "Saving…" : "Save adjustment"}
+          {saving ? t("attendance.adjust.saving") : t("attendance.adjust.save")}
         </Button>
       </div>
     </form>

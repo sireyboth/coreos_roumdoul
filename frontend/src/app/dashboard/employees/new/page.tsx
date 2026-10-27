@@ -22,13 +22,14 @@ import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { LoginLink } from "@/components/dashboard/login-link";
 import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
 import { useMe } from "@/contexts/me-context";
-import { SCHEDULE_LABELS } from "@/components/dashboard/payroll/shared";
 import { api, ApiError, Branch, Department, Team, type PayGroupOption } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function NewEmployeePage() {
   const { me, refresh } = useMe();
   const router = useRouter();
+  const t = useT();
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canManageBranches = me?.permissions.includes("branches.manage") ?? false;
   // A new employee's pay can only be set by someone allowed to change pay.
@@ -118,18 +119,18 @@ export default function NewEmployeePage() {
 
       refresh();
       notifySuccess(
-        "Employee added",
+        t("employees.newPage.added"),
         !loginPassword
           ? undefined
           : method === "email"
-            ? `${form.email} can now sign in.`
-            : `They sign in with employee ID ${form.employee_code}. Share your company sign-in link with them.`,
+            ? t("employees.newPage.addedEmail", { email: form.email })
+            : t("employees.newPage.addedId", { code: form.employee_code }),
       );
-      if (photoFailed) toast.warning("The photo couldn't be uploaded", { description: "You can add it again from their page." });
+      if (photoFailed) toast.warning(t("employees.newPage.photoFailed"), { description: t("employees.newPage.photoFailedHint") });
       router.push(`/dashboard/employees/${created.id}`);
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
       setSaving(false);
     }
   }
@@ -139,22 +140,22 @@ export default function NewEmployeePage() {
       <div className="flex w-full flex-col gap-6">
         <Link href="/dashboard/employees" className="inline-flex items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
-          Employees
+          {t("employees.shared.backToList")}
         </Link>
 
-        <PageHeader title="Add an employee" description="Only the name and branch are required. You can fill in the rest later." />
+        <PageHeader title={t("employees.newPage.title")} description={t("employees.newPage.description")} />
 
         <PlanLimitAlert resource="employees" />
 
         {branches !== null && branches.length === 0 && (
           <Alert variant="warning">
-            You need a branch before adding employees.{" "}
+            {t("employees.shared.needBranch")}{" "}
             {canManageBranches ? (
               <Link href="/dashboard/branches" className="font-medium underline">
-                Create one first
+                {t("employees.shared.createBranch")}
               </Link>
             ) : (
-              "Ask a company admin to create one."
+              t("employees.shared.askAdmin")
             )}
           </Alert>
         )}
@@ -162,8 +163,8 @@ export default function NewEmployeePage() {
         <form onSubmit={handleSubmit} className="grid items-start gap-6 lg:grid-cols-[300px_1fr]">
           <Card>
             <CardHeader>
-              <CardTitle>Photo</CardTitle>
-              <CardDescription>Optional — shown across the app.</CardDescription>
+              <CardTitle>{t("employees.newPage.photo")}</CardTitle>
+              <CardDescription>{t("employees.newPage.photoHint")}</CardDescription>
             </CardHeader>
             <CardContent>
               <PhotoPicker
@@ -189,7 +190,7 @@ export default function NewEmployeePage() {
                   managers={managers ?? undefined}
                   emailRequired={loginPassword !== "" && method === "email"}
                   codeRequired={loginPassword !== "" && method === "employee_id"}
-                  codeHint={loginPassword !== "" && method === "employee_id" ? "This is what they'll sign in with." : undefined}
+                  codeHint={loginPassword !== "" && method === "employee_id" ? t("employees.newPage.codeHint") : undefined}
                   salary={canEditSalary ? "edit" : "none"}
                 />
               </CardContent>
@@ -198,12 +199,12 @@ export default function NewEmployeePage() {
             {payGroups.length > 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Pay group</CardTitle>
-                  <CardDescription>When and by which rules they are paid, from their first day. You can change it later on their Pay tab.</CardDescription>
+                  <CardTitle>{t("employees.newPage.payGroup")}</CardTitle>
+                  <CardDescription>{t("employees.newPage.payGroupHint")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex max-w-sm flex-col gap-2">
-                    <Label htmlFor="new-pay-group">Pay group</Label>
+                    <Label htmlFor="new-pay-group">{t("employees.newPage.payGroup")}</Label>
                     <select
                       id="new-pay-group"
                       className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none"
@@ -212,8 +213,8 @@ export default function NewEmployeePage() {
                     >
                       {payGroups.map((g) => (
                         <option key={g.id} value={g.id}>
-                          {g.name} — {SCHEDULE_LABELS[g.schedule]}
-                          {g.is_default ? " (default)" : ""}
+                          {g.name} — {t(`payroll.shared.schedule.${g.schedule}`)}
+                          {g.is_default ? t("employees.newPage.defaultGroup") : ""}
                         </option>
                       ))}
                     </select>
@@ -224,17 +225,18 @@ export default function NewEmployeePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Sign-in</CardTitle>
+                <CardTitle>{t("employees.shared.signIn")}</CardTitle>
                 <CardDescription>
-                  Optional. Give this employee a login so they can sign in and check in. Choose <strong>one</strong> way for them
-                  to sign in. You can also do this later.
+                  {t("employees.newPage.signInHintBefore")}
+                  <strong>{t("employees.newPage.signInHintOne")}</strong>
+                  {t("employees.newPage.signInHintAfter")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <SignInMethodPicker value={method} onChange={setMethod} />
 
                 <div className="flex max-w-sm flex-col gap-2">
-                  <Label htmlFor="login_password">Temporary password</Label>
+                  <Label htmlFor="login_password">{t("employees.newPage.tempPassword")}</Label>
                   <Input
                     id="login_password"
                     type="password"
@@ -243,18 +245,22 @@ export default function NewEmployeePage() {
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">Leave empty to add the employee without a login.</p>
+                  <p className="text-xs text-muted-foreground">{t("employees.newPage.passwordHint")}</p>
                 </div>
 
                 {loginPassword !== "" && (
                   <Alert variant="info">
                     {method === "email" ? (
-                      <>They&apos;ll sign in with the <strong>email</strong> above and this password.</>
+                      <>
+                        {t("employees.newPage.emailInfoBefore")}
+                        <strong>{t("employees.newPage.emailInfoStrong")}</strong>
+                        {t("employees.newPage.emailInfoAfter")}
+                      </>
                     ) : (
                       <>
-                        They&apos;ll sign in with employee ID{" "}
-                        <strong>{form.employee_code || "(fill in the Employee ID above)"}</strong> and this password. No email
-                        needed. Share this link so the company is filled in for them:
+                        {t("employees.newPage.idInfoBefore")}
+                        <strong>{form.employee_code || t("employees.newPage.idMissing")}</strong>
+                        {t("employees.newPage.idInfoAfter")}
                         <div className="mt-2">
                           <LoginLink />
                         </div>
@@ -269,10 +275,10 @@ export default function NewEmployeePage() {
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" type="button" render={<Link href="/dashboard/employees" />} nativeButton={false}>
-                Cancel
+                {t("common.action.cancel")}
               </Button>
               <Button type="submit" disabled={saving || atEmployeeLimit || !form.branch_id || !form.name.trim()}>
-                {saving ? "Adding…" : "Add employee"}
+                {saving ? t("employees.newPage.adding") : t("employees.shared.addEmployee")}
               </Button>
             </div>
           </div>

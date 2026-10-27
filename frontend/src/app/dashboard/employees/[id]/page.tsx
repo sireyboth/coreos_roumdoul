@@ -16,13 +16,11 @@ import { CardPreviewDialog } from "@/components/dashboard/card-preview-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
-  EMPLOYMENT_STATUSES,
-  EMPLOYMENT_TYPES,
   EmployeeFormFields,
   formFromEmployee,
   type SalaryAccess,
   formatSalary,
-  labelFor,
+  labelIn,
   statusVariant,
   toPayload,
   type EmployeeForm,
@@ -35,14 +33,15 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/download";
+import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 type Tab = "profile" | "schedule" | "pay";
 
-function dateLabel(value: string | null | undefined): string {
+function dateLabel(value: string | null | undefined, lang: Lang): string {
   if (!value) return "—";
-  return new Date(value.slice(0, 10) + "T00:00:00").toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  return new Date(value.slice(0, 10) + "T00:00:00").toLocaleDateString(dateLocale(lang), { year: "numeric", month: "short", day: "numeric" });
 }
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -60,6 +59,8 @@ export default function EmployeePage() {
   const { me, refresh } = useMe();
   const router = useRouter();
   const confirm = useConfirm();
+  const t = useT();
+  const lang = useLang();
 
   const canManage = me?.permissions.includes("employees.manage") ?? false;
   const canRoster = me?.permissions.includes("schedules.view") ?? false;
@@ -166,10 +167,10 @@ export default function EmployeePage() {
       const updated = await api.employees.update(employee.id, payload);
       setEmployee(updated);
       setForm(formFromEmployee(updated));
-      notifySuccess("Employee updated");
+      notifySuccess(t("employees.profilePage.updated"));
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -180,7 +181,7 @@ export default function EmployeePage() {
     try {
       const res = await api.employees.uploadPhoto(id, blob);
       setEmployee((current) => (current ? { ...current, photo_url: res.photo_url } : current));
-      notifySuccess("Photo updated");
+      notifySuccess(t("employees.profilePage.photoUpdated"));
     } catch (err) {
       notifyError(err);
     } finally {
@@ -193,7 +194,7 @@ export default function EmployeePage() {
     try {
       await api.employees.removePhoto(id);
       setEmployee((current) => (current ? { ...current, photo_url: null } : current));
-      notifySuccess("Photo removed");
+      notifySuccess(t("employees.profilePage.photoRemoved"));
     } catch (err) {
       notifyError(err);
     } finally {
@@ -205,16 +206,15 @@ export default function EmployeePage() {
     if (!employee) return;
 
     const ok = await confirm({
-      title: `Delete ${employee.name}?`,
-      description:
-        "This can't be undone: their attendance, schedules and login are deleted too. If they've only left, set their status to Terminated instead.",
+      title: t("employees.shared.deleteTitle", { name: employee.name }),
+      description: t("employees.shared.deleteWarning"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.employees.remove(employee.id);
-      notifySuccess(`${employee.name} deleted`);
+      notifySuccess(t("employees.shared.deleted", { name: employee.name }));
       refresh();
       router.push("/dashboard/employees");
     } catch (err) {
@@ -225,7 +225,7 @@ export default function EmployeePage() {
   const back = (
     <Link href="/dashboard/employees" className="inline-flex items-center gap-1.5 self-start text-sm text-muted-foreground hover:text-foreground">
       <ArrowLeft className="size-4" />
-      Employees
+      {t("employees.shared.backToList")}
     </Link>
   );
 
@@ -235,8 +235,8 @@ export default function EmployeePage() {
         {back}
         <EmptyState
           icon={UserX}
-          title="Employee not found"
-          description="They may have been deleted, or you don't have access to their branch."
+          title={t("employees.profilePage.notFound")}
+          description={t("employees.profilePage.notFoundHint")}
         />
       </div>
     );
@@ -260,10 +260,10 @@ export default function EmployeePage() {
 
 
   const tabs = [
-    { id: "profile" as const, label: "Profile", icon: User, visible: true },
-    { id: "schedule" as const, label: "Schedule", icon: CalendarRange, visible: canRoster },
-    { id: "pay" as const, label: "Pay", icon: Wallet, visible: canPay },
-  ].filter((t) => t.visible);
+    { id: "profile" as const, label: t("employees.profilePage.tabProfile"), icon: User, visible: true },
+    { id: "schedule" as const, label: t("employees.profilePage.tabSchedule"), icon: CalendarRange, visible: canRoster },
+    { id: "pay" as const, label: t("employees.profilePage.tabPay"), icon: Wallet, visible: canPay },
+  ].filter((tab) => tab.visible);
   const activeTab: Tab = tab === "schedule" && canRoster ? "schedule" : tab === "pay" && canPay ? "pay" : "profile";
 
   return (
@@ -292,43 +292,45 @@ export default function EmployeePage() {
                     </p>
                   )}
                   {employee.job_title && <p className="text-sm text-muted-foreground">{employee.job_title}</p>}
-                  <Badge variant={statusVariant(employee.employment_status)}>{labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}</Badge>
+                  <Badge variant={statusVariant(employee.employment_status)}>{labelIn(lang, "status", employee.employment_status)}</Badge>
                 </div>
 
                 <dl className="w-full divide-y divide-border border-t border-border pt-1">
-                  <Fact label="Branch">{employee.branch?.name ?? "—"}</Fact>
-                  {employee.department && <Fact label="Department">{employee.department.name}</Fact>}
-                  {employee.team && <Fact label="Team">{employee.team.name}</Fact>}
-                  {employee.employee_code && <Fact label="Code">{employee.employee_code}</Fact>}
-                  <Fact label="Phone">{employee.phone ?? "—"}</Fact>
-                  <Fact label="Email">{employee.email ?? "—"}</Fact>
-                  <Fact label="Hired">{dateLabel(employee.hire_date)}</Fact>
+                  <Fact label={t("common.field.branch")}>{employee.branch?.name ?? "—"}</Fact>
+                  {employee.department && <Fact label={t("common.field.department")}>{employee.department.name}</Fact>}
+                  {employee.team && <Fact label={t("common.field.team")}>{employee.team.name}</Fact>}
+                  {employee.employee_code && <Fact label={t("employees.profilePage.code")}>{employee.employee_code}</Fact>}
+                  <Fact label={t("common.field.phone")}>{employee.phone ?? "—"}</Fact>
+                  <Fact label={t("common.field.email")}>{employee.email ?? "—"}</Fact>
+                  <Fact label={t("employees.shared.hired")}>{dateLabel(employee.hire_date, lang)}</Fact>
                 </dl>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Sign-in</CardTitle>
+                <CardTitle>{t("employees.shared.signIn")}</CardTitle>
                 <CardDescription>
-                  {employee.has_login ? "Can sign in and check in." : "Can't sign in or check in yet."}
+                  {employee.has_login ? t("employees.profilePage.canSignIn") : t("employees.profilePage.cantSignIn")}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {employee.has_login ? (
                   <div className="flex flex-col gap-3">
                     <Badge variant="success" className="self-start">
-                      Has login
+                      {t("employees.shared.hasLogin")}
                     </Badge>
                     {employee.login && (
                       <dl className="divide-y divide-border text-sm">
-                        <Fact label="Signs in with">{employee.login.method === "email" ? "Email" : "Employee ID"}</Fact>
-                                                <Fact label={employee.login.method === "email" ? "Email" : "Employee ID"}>{employee.login.identifier ?? "—"}</Fact>
+                        <Fact label={t("employees.profilePage.signsInWith")}>
+                          {employee.login.method === "email" ? t("common.field.email") : t("employees.shared.employeeId")}
+                        </Fact>
+                        <Fact label={employee.login.method === "email" ? t("common.field.email") : t("employees.shared.employeeId")}>{employee.login.identifier ?? "—"}</Fact>
                       </dl>
                     )}
                     {employee.login?.method === "employee_id" && (
                       <div className="flex flex-col gap-2">
-                        <p className="text-sm text-muted-foreground">Share this link so they don&apos;t have to type the company code:</p>
+                        <p className="text-sm text-muted-foreground">{t("employees.profilePage.shareLink")}</p>
                         <LoginLink />
                       </div>
                     )}
@@ -336,10 +338,10 @@ export default function EmployeePage() {
                 ) : canManage ? (
                   <Button variant="outline" onClick={() => setLoginOpen(true)}>
                     <KeyRound className="size-4" />
-                    Create login
+                    {t("employees.shared.createLogin")}
                   </Button>
                 ) : (
-                  <Badge variant="secondary">No login</Badge>
+                  <Badge variant="secondary">{t("employees.shared.noLogin")}</Badge>
                 )}
               </CardContent>
             </Card>
@@ -347,13 +349,13 @@ export default function EmployeePage() {
             {canExportAttendance && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Attendance report</CardTitle>
-                  <CardDescription>Download {employee.name}&apos;s check-ins and check-outs as a CSV file.</CardDescription>
+                  <CardTitle>{t("employees.profilePage.attendanceTitle")}</CardTitle>
+                  <CardDescription>{t("employees.profilePage.attendanceHint", { name: employee.name })}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button variant="outline" onClick={() => setExportOpen(true)}>
                     <Download className="size-4" />
-                    Export attendance
+                    {t("employees.profilePage.exportAttendance")}
                   </Button>
                 </CardContent>
               </Card>
@@ -362,17 +364,17 @@ export default function EmployeePage() {
             {canPrintCard && (
               <Card>
                 <CardHeader>
-                  <CardTitle>ID card</CardTitle>
-                  <CardDescription>A printable badge with {employee.name}&apos;s photo, ID, and a scannable QR code.</CardDescription>
+                  <CardTitle>{t("employees.profilePage.cardTitle")}</CardTitle>
+                  <CardDescription>{t("employees.profilePage.cardHint", { name: employee.name })}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-2">
                   <Button variant="outline" onClick={() => handleCard("view")} disabled={cardAction !== null}>
                     <Eye className="size-4" />
-                    {cardAction === "view" ? "Preparing…" : "View"}
+                    {cardAction === "view" ? t("employees.shared.preparing") : t("common.action.view")}
                   </Button>
                   <Button variant="outline" onClick={() => handleCard("download")} disabled={cardAction !== null}>
                     <IdCard className="size-4" />
-                    {cardAction === "download" ? "Preparing…" : "Download"}
+                    {cardAction === "download" ? t("employees.shared.preparing") : t("common.action.download")}
                   </Button>
                 </CardContent>
               </Card>
@@ -381,7 +383,7 @@ export default function EmployeePage() {
             {canManage && (
               <Button variant="destructive" onClick={handleDelete}>
                 <Trash2 className="size-4" />
-                Delete employee
+                {t("employees.profilePage.deleteEmployee")}
               </Button>
             )}
           </div>
@@ -390,20 +392,20 @@ export default function EmployeePage() {
           <div className="flex min-w-0 flex-col gap-6">
             {tabs.length > 1 && (
               <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
-                {tabs.map((t) => (
+                {tabs.map((item) => (
                   <button
-                    key={t.id}
+                    key={item.id}
                     type="button"
                     role="tab"
-                    aria-selected={activeTab === t.id}
-                    onClick={() => setTab(t.id)}
+                    aria-selected={activeTab === item.id}
+                    onClick={() => setTab(item.id)}
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
-                      activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      activeTab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    <t.icon className="size-4" />
-                    {t.label}
+                    <item.icon className="size-4" />
+                    {item.label}
                   </button>
                 ))}
               </div>
@@ -424,23 +426,23 @@ export default function EmployeePage() {
                       selfId={employee?.id}
                       currentManager={employee?.manager}
                       emailDisabled={emailIsSignIn}
-                      emailHint={emailIsSignIn ? "This is their sign-in email — change it from Users." : undefined}
+                      emailHint={emailIsSignIn ? t("employees.profilePage.emailIsSignIn") : undefined}
                       codeDisabled={idIsSignIn}
-                      codeHint={idIsSignIn ? "This is their sign-in ID, so it can't be changed here." : undefined}
+                      codeHint={idIsSignIn ? t("employees.profilePage.idIsSignIn") : undefined}
                       salary={salaryAccess}
                     />
                   </CardContent>
                 </Card>
                 <p className="-mt-2 text-xs text-muted-foreground">
-                  Moving someone to another branch also moves where they&apos;re allowed to check in.
+                  {t("employees.profilePage.branchMoveHint")}
                 </p>
                 {error && <Alert variant="destructive">{error}</Alert>}
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setForm(formFromEmployee(employee))} disabled={saving}>
-                    Reset
+                    {t("employees.profilePage.reset")}
                   </Button>
                   <Button type="submit" disabled={saving || !form.name.trim()}>
-                    {saving ? "Saving…" : "Save changes"}
+                    {saving ? t("employees.profilePage.saving") : t("employees.profilePage.saveChanges")}
                   </Button>
                 </div>
               </form>
@@ -449,16 +451,18 @@ export default function EmployeePage() {
             {activeTab === "profile" && !canManage && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Details</CardTitle>
+                  <CardTitle>{t("employees.profilePage.details")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <dl className="divide-y divide-border">
-                    <Fact label="Employment type">{employee.employment_type ? labelFor(EMPLOYMENT_TYPES, employee.employment_type) : "—"}</Fact>
-                    <Fact label="Job title">{employee.job_title ?? "—"}</Fact>
-                    <Fact label="Hired">{dateLabel(employee.hire_date)}</Fact>
+                    <Fact label={t("employees.profilePage.employmentType")}>
+                      {employee.employment_type ? labelIn(lang, "type", employee.employment_type) : "—"}
+                    </Fact>
+                    <Fact label={t("employees.shared.jobTitle")}>{employee.job_title ?? "—"}</Fact>
+                    <Fact label={t("employees.shared.hired")}>{dateLabel(employee.hire_date, lang)}</Fact>
                     {/* Only present when the API sent it, i.e. the viewer has salary.view. */}
                     {employee.base_salary !== undefined && (
-                      <Fact label="Base salary">{formatSalary(employee.base_salary, employee.salary_currency)}</Fact>
+                      <Fact label={t("employees.profilePage.baseSalary")}>{formatSalary(employee.base_salary, employee.salary_currency)}</Fact>
                     )}
                   </dl>
                 </CardContent>
@@ -472,7 +476,7 @@ export default function EmployeePage() {
                 {/* Their regular hours over time; the roster below is for one-off days. */}
                 <EmployeeScheduleAssignments employee={employee} canManage={me?.permissions.includes("schedules.manage") ?? false} />
                 <div className="flex flex-col gap-2">
-                  <h2 className="text-base font-semibold">One-off changes</h2>
+                  <h2 className="text-base font-semibold">{t("employees.profilePage.oneOffChanges")}</h2>
                   <RosterView employee={employee} />
                 </div>
               </div>

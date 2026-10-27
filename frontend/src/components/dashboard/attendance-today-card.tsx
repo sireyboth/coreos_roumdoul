@@ -10,19 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
 import { api, ApiError, type AttendanceToday } from "@/lib/api";
+import { translateNow, useLang, useT } from "@/lib/i18n";
 import { withLocationRetry } from "@/lib/location";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { clock, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
-
-const KIND_LABEL: Record<AttendanceToday["kind"], string> = {
-  work: "",
-  holiday: "Holiday",
-  day_off: "Day off",
-  weekly_off: "Your day off",
-  leave: "You're on leave today",
-  unscheduled: "No work schedule today",
-};
 
 /**
  * The signed-in person's day: what their schedule expects, what they've
@@ -30,6 +22,8 @@ const KIND_LABEL: Record<AttendanceToday["kind"], string> = {
  * is an IN or an OUT.
  */
 export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
+  const t = useT();
+  const lang = useLang();
   const [today, setToday] = useState<AttendanceToday | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloads, setReloads] = useState(0);
@@ -74,11 +68,15 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
     try {
       const result = await withLocationRetry(api.attendance.scan, data);
       setMessage(result.message);
-      notifySuccess(result.slot ? `${result.slot.type === "in" ? "IN" : "OUT"} recorded` : "Scan recorded", result.message);
+      // translateNow, not t: handleQr keeps the first render's submit.
+      notifySuccess(
+        translateNow(result.slot ? (result.slot.type === "in" ? "attendance.today.recordedIn" : "attendance.today.recordedOut") : "attendance.today.recordedScan"),
+        result.message,
+      );
       setReloads((n) => n + 1);
       onScanned();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.somethingWrong"));
       notifyError(err);
     } finally {
       setWorking(false);
@@ -94,14 +92,14 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
   function handleGps() {
     setError(null);
     if (!navigator.geolocation) {
-      setError("Your browser doesn't support location — scan the QR code instead.");
+      setError(t("attendance.today.noGeolocation"));
       return;
     }
     setWorking(true);
     navigator.geolocation.getCurrentPosition(
       (position) => submit({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
       () => {
-        setError("Couldn't get your location — check browser permissions, or scan the QR code instead.");
+        setError(t("attendance.today.locationFailed"));
         setWorking(false);
       },
       { enableHighAccuracy: true, timeout: 10000 },
@@ -111,32 +109,33 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
   const next = today?.next ?? null;
   const done = today && today.slots.length > 0 && !next;
   const day = today?.day ?? null;
+  const slotName = (type: "in" | "out") => t(type === "in" ? "attendance.today.in" : "attendance.today.out");
 
   return (
     <Card className="lg:col-span-2">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          Today
+          {t("common.time.today")}
           {today?.schedule && <Badge variant="outline">{today.schedule}</Badge>}
-          {today && today.kind !== "work" && <Badge variant="secondary">{today.label ?? KIND_LABEL[today.kind]}</Badge>}
+          {today && today.kind !== "work" && <Badge variant="secondary">{today.label ?? t(`attendance.today.kind.${today.kind}`)}</Badge>}
         </CardTitle>
         <CardDescription>
           {!today
-            ? "Loading your day…"
+            ? t("attendance.today.loading")
             : today.auto
-              ? "Your attendance is recorded automatically — no need to scan."
+              ? t("attendance.today.auto")
               : next
-              ? `Next: ${next.type === "in" ? "IN" : "OUT"} at ${clock(next.expected_at)}`
+              ? t("attendance.today.next", { slot: slotName(next.type), time: clock(next.expected_at) })
               : done
-                ? "Every scan for today is done."
+                ? t("attendance.today.allDone")
                 : today.kind === "work"
-                  ? "Scan when you arrive."
-                  : "Nothing is scheduled — scans today still count as worked time."}
+                  ? t("attendance.today.scanOnArrival")
+                  : t("attendance.today.nothingScheduled")}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        {loadError && <Alert variant="warning">Couldn&apos;t load today&apos;s schedule. You can still scan.</Alert>}
+        {loadError && <Alert variant="warning">{t("attendance.today.loadFailed")}</Alert>}
 
         {!today && !loadError && <Skeleton className="h-16 w-full" />}
 
@@ -162,13 +161,19 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
                         slot.actual_at ? (slot.status === "ok" ? "text-success" : "text-warning") : slot.status === "missing" ? "text-destructive" : "text-muted-foreground",
                       )}
                     />
-                    <span className={slot.type === "in" ? "text-success" : "text-destructive"}>{slot.type.toUpperCase()}</span>
+                    <span className={slot.type === "in" ? "text-success" : "text-destructive"}>{slotName(slot.type)}</span>
                     <span className="tabular-nums text-muted-foreground">{clock(slot.expected_at)}</span>
                   </span>
                   <span className="mt-0.5 text-sm tabular-nums">
-                    {slot.actual_at ? clock(slot.actual_at) : slot.status === "missing" ? "Missed" : isNext ? "Next" : "—"}
-                    {slot.late_minutes > 0 && <span className="text-xs text-warning"> · {slot.late_minutes}m late</span>}
-                    {slot.early_minutes > 0 && <span className="text-xs text-warning"> · {slot.early_minutes}m early</span>}
+                    {slot.actual_at
+                      ? clock(slot.actual_at)
+                      : slot.status === "missing"
+                        ? t("attendance.today.missed")
+                        : isNext
+                          ? t("attendance.today.nextSlot")
+                          : "—"}
+                    {slot.late_minutes > 0 && <span className="text-xs text-warning"> · {t("attendance.today.lateBy", { n: slot.late_minutes })}</span>}
+                    {slot.early_minutes > 0 && <span className="text-xs text-warning"> · {t("attendance.today.earlyBy", { n: slot.early_minutes })}</span>}
                   </span>
                 </li>
               );
@@ -180,11 +185,15 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setScannerOpen(true)} disabled={working} size="lg">
               <QrCode className="size-4" />
-              {working ? "Recording…" : next ? `Scan QR — ${next.type === "in" ? "IN" : "OUT"}` : "Scan QR"}
+              {working
+                ? t("attendance.today.recording")
+                : next
+                  ? t("attendance.today.scanQrSlot", { slot: slotName(next.type) })
+                  : t("attendance.today.scanQr")}
             </Button>
             <Button onClick={handleGps} disabled={working} variant="outline" size="lg">
               <MapPin className="size-4" />
-              Use GPS instead
+              {t("attendance.today.useGps")}
             </Button>
           </div>
         )}
@@ -194,11 +203,11 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
 
         {day && (day.worked_minutes > 0 || day.exceptions.length > 0) && (
           <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-            <span>Worked {formatMinutes(day.worked_minutes)}</span>
-            {day.overtime_minutes > 0 && <span>· {formatMinutes(day.overtime_minutes)} overtime</span>}
+            <span>{t("attendance.today.worked", { time: formatMinutes(day.worked_minutes, lang) })}</span>
+            {day.overtime_minutes > 0 && <span>· {t("attendance.today.overtime", { time: formatMinutes(day.overtime_minutes, lang) })}</span>}
             {day.exceptions.map((code) => (
               <Badge key={code} variant={EXCEPTIONS[code].tone}>
-                {EXCEPTIONS[code].label}
+                {t(`attendance.status.exception.${code}`)}
               </Badge>
             ))}
           </div>
@@ -206,7 +215,7 @@ export function AttendanceTodayCard({ onScanned }: { onScanned: () => void }) {
 
         {!today?.auto && (
           <Link href="/dashboard/scan" className="text-sm text-muted-foreground underline">
-            Open instant-scan mode →
+            {t("attendance.today.openInstant")}
           </Link>
         )}
       </CardContent>

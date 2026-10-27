@@ -1,0 +1,136 @@
+import type { Dictionary } from "../../en";
+
+// Activity log page (app/dashboard/audit/page.tsx) — same keys as en/access/auditPage.ts.
+
+export const auditPage: Dictionary["access"]["auditPage"] = {
+  // ── Header ───────────────────────────────────────────────────────
+  title: "កំណត់ហេតុសកម្មភាព",
+  description: "រាល់ការផ្លាស់ប្តូរក្នុងក្រុមហ៊ុន — អ្នកណាជាអ្នកធ្វើ អ្វីដែលបានផ្លាស់ប្តូរ នៅពេលណា និងពីទីណា។ លោកអ្នកមើលឃើញតែសកម្មភាពក្នុងសាខាដែលលោកអ្នកមានសិទ្ធិប៉ុណ្ណោះ។",
+  refresh: "ផ្ទុកឡើងវិញ",
+
+  // ── Filters ──────────────────────────────────────────────────────
+  search: "ស្វែងរកតាមឈ្មោះ សកម្មភាព មូលហេតុ ឬអាសយដ្ឋាន IP…",
+  searchLabel: "ស្វែងរកក្នុងកំណត់ហេតុសកម្មភាព",
+  who: "អ្នកធ្វើ",
+  anyone: "គ្រប់គ្នា",
+  allBranches: "គ្រប់សាខា",
+  area: "ផ្នែក",
+  allAreas: "គ្រប់ផ្នែក",
+  action: "សកម្មភាព",
+  anyAction: "គ្រប់សកម្មភាព",
+  created: "បានបង្កើត",
+  updated: "បានកែប្រែ",
+  deleted: "បានលុប",
+  clearFilters: "សម្អាតតម្រង",
+
+  // ── Areas (module codes from the API) ────────────────────────────
+  module: {
+    people: "បុគ្គលិក និងរចនាសម្ព័ន្ធ",
+    attendance: "វត្តមាន",
+    schedules: "កាលវិភាគ និងថ្ងៃឈប់សម្រាក",
+    requests: "ច្បាប់ឈប់សម្រាក និងសំណើ",
+    salary: "ប្រាក់បៀវត្សរ៍បុគ្គលិក",
+    payroll: "ប្រាក់បៀវត្សរ៍",
+    access: "អ្នកប្រើប្រាស់ និងតួនាទី",
+    company: "ក្រុមហ៊ុន",
+  },
+
+  // ── Event names: "<entity>.<action>" codes from the API ──────────
+  // Unknown codes fall back to the code itself, made readable.
+  entity: {
+    attendance: "វត្តមាន",
+    attendance_correction: "ការកែតម្រូវវត្តមាន",
+    attendance_event: "ការស្កេនវត្តមាន",
+    attendance_period: "បញ្ជីវត្តមានប្រចាំខែ",
+    branch: "សាខា",
+    company: "ក្រុមហ៊ុន",
+    company_module_entitlement: "មុខងាររបស់ក្រុមហ៊ុន",
+    day_off: "ថ្ងៃសម្រាក",
+    department: "នាយកដ្ឋាន",
+    employee: "បុគ្គលិក",
+    employee_pay_group: "ក្រុមបើកប្រាក់បៀវត្សរ៍របស់បុគ្គលិក",
+    employee_pay_item: "ធាតុប្រាក់បៀវត្សរ៍របស់បុគ្គលិក",
+    employee_pay_profile: "ព័ត៌មានប្រាក់បៀវត្សរ៍របស់បុគ្គលិក",
+    employee_request: "សំណើ",
+    employee_salary: "ប្រាក់បៀវត្សរ៍បុគ្គលិក",
+    employee_schedule_assignment: "កាលវិភាគការងាររបស់បុគ្គលិក",
+    holiday: "ថ្ងៃឈប់សម្រាក",
+    leave_adjustment: "ការកែសម្រួលថ្ងៃច្បាប់នៅសល់",
+    leave_type: "ប្រភេទច្បាប់ឈប់សម្រាក",
+    pay_component: "ធាតុប្រាក់បៀវត្សរ៍",
+    pay_group: "ក្រុមបើកប្រាក់បៀវត្សរ៍",
+    pay_run: "ការបើកប្រាក់បៀវត្សរ៍",
+    payroll_adjustment: "ការកែសម្រួលប្រាក់បៀវត្សរ៍",
+    payroll_policy: "ការកំណត់ប្រាក់បៀវត្សរ៍",
+    request: "សំណើ",
+    request_type_setting: "ប្រភេទសំណើ",
+    role: "តួនាទី",
+    schedule: "តារាងវេនការងារ",
+    statutory_rate: "អត្រាតាមច្បាប់",
+    subscription: "ការជាវ",
+    support_access: "ការចូលជំនួយបច្ចេកទេស",
+    tax_exchange_rate: "អត្រាប្តូរប្រាក់សម្រាប់ពន្ធ",
+    team: "ក្រុម",
+    user: "អ្នកប្រើប្រាស់",
+    work_location: "ទីតាំងការងារ",
+    work_schedule: "កាលវិភាគការងារ",
+  },
+  // Each action reads with the entity's name, e.g. "Employee created".
+  eventAction: {
+    created: "បានបង្កើត{entity}",
+    updated: "បានកែប្រែ{entity}",
+    deleted: "បានលុប{entity}",
+    removed: "បានលុប{entity}",
+    approved: "បានអនុម័ត{entity}",
+    rejected: "បានបដិសេធ{entity}",
+    reopened: "បានបើក{entity}ឡើងវិញ",
+    invited: "បានអញ្ជើញ{entity}",
+    deactivated: "បានបិទដំណើរការ{entity}",
+    reactivated: "បានបើកដំណើរការ{entity}ឡើងវិញ",
+    started: "បានចាប់ផ្តើម{entity}",
+    ended: "បានបញ្ចប់{entity}",
+    bulk_created: "បានបង្កើត{entity}ច្រើនក្នុងពេលតែមួយ",
+    settings_updated: "បានកែប្រែការកំណត់{entity}",
+    day_deleted: "បានលុបថ្ងៃ{entity}",
+    overtime_approved: "បានអនុម័តម៉ោងបន្ថែម",
+    overtime_rejected: "បានបដិសេធម៉ោងបន្ថែម",
+    role_changed: "បានប្តូរតួនាទី{entity}",
+    branch_access_changed: "បានប្តូរសិទ្ធិមើលសាខារបស់{entity}",
+  },
+
+  // ── Table ────────────────────────────────────────────────────────
+  when: "ពេលវេលា",
+  what: "សកម្មភាព",
+  record: "កំណត់ត្រា",
+  where: "ពីទីណា",
+  companyWide: "ទូទាំងក្រុមហ៊ុន",
+  by: "ដោយ {name}",
+  deviceOn: "{browser} លើ {os}",
+  otherDevice: "ឧបករណ៍ផ្សេង",
+  yes: "បាទ/ចាស",
+  no: "ទេ",
+
+  // ── Empty ────────────────────────────────────────────────────────
+  noMatches: "គ្មានទិន្នន័យត្រូវនឹងតម្រងទាំងនេះ",
+  noMatchesHint: "សូមពង្រីកចន្លោះកាលបរិច្ឆេទ ឬសម្អាតតម្រងណាមួយ។",
+  empty: "មិនទាន់មានសកម្មភាព",
+  emptyHint: "ការផ្លាស់ប្តូរដែលអ្នកប្រើប្រាស់ធ្វើ នឹងបង្ហាញនៅទីនេះភ្លាមៗ។",
+
+  // ── Paging ───────────────────────────────────────────────────────
+  newer: "ថ្មីជាង",
+  older: "ចាស់ជាង",
+  pageOf: "ទំព័រ {page} នៃ {pages}",
+
+  // ── Detail dialog ────────────────────────────────────────────────
+  whenAt: "{date} ម៉ោង {time}",
+  device: "ឧបករណ៍",
+  ipAddress: "អាសយដ្ឋាន IP",
+  automatic: "ស្វ័យប្រវត្តិ (គ្មានសំណើពីអ្នកប្រើប្រាស់)",
+  savedValues: "តម្លៃដែលបានរក្សាទុក",
+  valuesBeforeDelete: "តម្លៃមុនពេលលុប",
+  changes: "ការផ្លាស់ប្តូរ",
+  noDetails: "មិនមានការកត់ត្រាព័ត៌មានលម្អិតសម្រាប់សកម្មភាពនេះទេ។",
+  field: "ចំណុច",
+  before: "មុន",
+  after: "ក្រោយ",
+};

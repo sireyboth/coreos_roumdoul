@@ -41,6 +41,7 @@ const GRID = [
 ];
 const CHIPS = [
   "/dashboard/holidays",
+  "/dashboard/birthdays",
   "/dashboard/branches",
   "/dashboard/teams",
   "/dashboard/attendance/corrections",
@@ -55,9 +56,9 @@ const glass = "bg-white/15 ring-1 ring-white/20 backdrop-blur";
 
 function greetingKey(): TKey {
   const hour = new Date().getHours();
-  if (hour < 12) return "greeting.morning";
-  if (hour < 18) return "greeting.afternoon";
-  return "greeting.evening";
+  if (hour < 12) return "home.greeting.morning";
+  if (hour < 18) return "home.greeting.afternoon";
+  return "home.greeting.evening";
 }
 
 function useItems(hrefs: string[]): NavItem[] {
@@ -102,7 +103,7 @@ function LangSwitch() {
   const lang = useLang();
   const t = useT();
   return (
-    <div role="group" aria-label={t("home.language")} className={cn("flex shrink-0 rounded-full p-0.5 text-[11px] font-semibold", glass)}>
+    <div role="group" aria-label={t("home.menu.language")} className={cn("flex shrink-0 rounded-full p-0.5 text-[11px] font-semibold", glass)}>
       {(["km", "en"] as const).map((value) => (
         <button
           key={value}
@@ -154,47 +155,48 @@ function HeroCard({ badge, children, actions }: { badge: string; children: React
 
 function TodayCard() {
   const t = useT();
+  const lang = useLang();
   const { data: today, error } = useApi(() => api.attendance.today(), []);
 
   const scanned = today?.slots.filter((s) => s.actual_at) ?? [];
   const last = scanned.at(-1) ?? null;
   const next = today?.next ?? null;
-  const slotName = (type: "in" | "out") => t(type === "in" ? "today.in" : "today.out");
+  const slotName = (type: "in" | "out") => t(type === "in" ? "home.today.in" : "home.today.out");
 
   const headline = !today
     ? null
     : today.kind !== "work" && !last
-      ? (today.label ?? t("today.noWork"))
+      ? (today.label ?? t("home.today.noWork"))
       : last
-        ? `${t(last.type === "in" ? "today.checkedIn" : "today.checkedOut")} · ${clock(last.actual_at)}`
-        : t("today.notCheckedIn");
+        ? `${t(last.type === "in" ? "home.today.checkedIn" : "home.today.checkedOut")} · ${clock(last.actual_at)}`
+        : t("home.today.notCheckedIn");
 
   const detail = !today
     ? null
     : today.auto
-      ? t("today.auto")
+      ? t("home.today.auto")
       : next
-        ? t("today.next", { slot: slotName(next.type), time: clock(next.expected_at) })
+        ? t("home.today.next", { slot: slotName(next.type), time: clock(next.expected_at) })
         : last
-          ? t("today.allDone")
+          ? t("home.today.allDone")
           : today.schedule;
 
   const checkedIn = last?.type === "in";
 
   return (
     <HeroCard
-      badge={t("today.badge")}
+      badge={t("home.today.badge")}
       actions={[
-        { href: "/dashboard/scan", label: t("common.scan"), icon: QrCode },
-        { href: "/dashboard/requests", label: t("today.request"), icon: Send },
-        { href: "/dashboard/attendance/corrections", label: t("today.correction"), icon: FileClock },
+        { href: "/dashboard/scan", label: t("common.action.scan"), icon: QrCode },
+        { href: "/dashboard/requests", label: t("home.today.request"), icon: Send },
+        { href: "/dashboard/attendance/corrections", label: t("home.today.correction"), icon: FileClock },
       ]}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {today?.schedule && <p className="mt-2 truncate text-xs text-muted-foreground">{today.schedule}</p>}
           {error ? (
-            <p className="mt-3 text-lg font-semibold">{t("common.loadFailed")}</p>
+            <p className="mt-3 text-lg font-semibold">{t("common.message.loadFailed")}</p>
           ) : headline === null ? (
             <Skeleton className="mt-3 h-7 w-44" />
           ) : (
@@ -213,7 +215,7 @@ function TodayCard() {
         {!today?.auto && (
           <Link
             href="/dashboard/scan"
-            aria-label={t("today.scanAttendance")}
+            aria-label={t("home.today.scanAttendance")}
             className="relative -mt-6 flex size-16 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/30 transition-transform active:scale-95"
           >
             <span aria-hidden className="absolute inset-0 rounded-2xl ring-4 ring-emerald-500/15" />
@@ -225,8 +227,8 @@ function TodayCard() {
       {today && today.slots.length > 0 && (
         <div className="mt-4">
           <div className="flex justify-between text-[11px] text-muted-foreground">
-            <span>{t("today.scansDone", { done: scanned.length, total: today.slots.length })}</span>
-            {today.day && today.day.worked_minutes > 0 && <span>{t("today.worked", { time: formatMinutes(today.day.worked_minutes) })}</span>}
+            <span>{t("home.today.scansDone", { done: scanned.length, total: today.slots.length })}</span>
+            {today.day && today.day.worked_minutes > 0 && <span>{t("home.today.worked", { time: formatMinutes(today.day.worked_minutes, lang) })}</span>}
           </div>
           <div className="mt-1.5 flex gap-1">
             {today.slots.map((slot) => (
@@ -256,29 +258,29 @@ function TeamCard() {
   const percent = att && staff ? Math.min(100, Math.round((att.checked_in_today / staff) * 100)) : 0;
 
   const stats = [
-    { label: t("team.late"), value: att?.late_today, tone: "text-warning" },
-    { label: t("team.corrections"), value: att?.pending_corrections, tone: "text-info" },
-    { label: t("team.overtime"), value: att?.pending_overtime, tone: "text-primary" },
+    { label: t("home.team.late"), value: att?.late_today, tone: "text-warning" },
+    { label: t("home.team.corrections"), value: att?.pending_corrections, tone: "text-info" },
+    { label: t("home.team.overtime"), value: att?.pending_overtime, tone: "text-primary" },
   ].filter((s) => s.value !== null && s.value !== undefined);
 
   return (
     <HeroCard
-      badge={t("team.badge")}
+      badge={t("home.team.badge")}
       actions={[
         { href: "/dashboard/attendance", label: navLabel(lang, "/dashboard/attendance"), icon: Clock3 },
-        { href: "/dashboard/attendance/corrections", label: t("team.corrections"), icon: FileClock },
+        { href: "/dashboard/attendance/corrections", label: t("home.team.corrections"), icon: FileClock },
         { href: "/dashboard/employees", label: navLabel(lang, "/dashboard/employees"), icon: Users },
       ]}
     >
       {error ? (
-        <p className="mt-3 text-lg font-semibold">{t("common.loadFailed")}</p>
+        <p className="mt-3 text-lg font-semibold">{t("common.message.loadFailed")}</p>
       ) : !summary ? (
         <Skeleton className="mt-3 h-9 w-36" />
       ) : (
         <p className="mt-2 flex items-baseline gap-1.5">
           <span className="text-4xl font-bold tracking-tight tabular-nums">{att?.checked_in_today ?? 0}</span>
           {staff !== null && <span className="text-lg font-medium text-muted-foreground tabular-nums">/ {staff}</span>}
-          <span className="ml-1 text-sm text-muted-foreground">{t("team.checkedIn")}</span>
+          <span className="ml-1 text-sm text-muted-foreground">{t("home.team.checkedIn")}</span>
         </p>
       )}
       {staff !== null && (
@@ -355,10 +357,10 @@ function ScanBanner() {
         <rect width="100%" height="100%" fill={`url(#${id}-grid)`} />
       </svg>
       <div className="relative min-w-0 flex-1">
-        <p className="text-base font-bold">{t("scanBanner.title")}</p>
-        <p className="mt-0.5 text-sm text-white/80">{t("scanBanner.body")}</p>
+        <p className="text-base font-bold">{t("home.scanBanner.title")}</p>
+        <p className="mt-0.5 text-sm text-white/80">{t("home.scanBanner.body")}</p>
         <span className={cn("mt-3 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold", glass)}>
-          {t("scanBanner.cta")}
+          {t("home.scanBanner.cta")}
           <ArrowRight className="size-3.5" />
         </span>
       </div>
@@ -423,8 +425,8 @@ export default function MobileHomePage() {
 
         {grid.length > 0 && (
           <section className="flex flex-col gap-3">
-            <SectionTitle>{t("home.services")}</SectionTitle>
-            <nav aria-label={t("home.services")} className="grid grid-cols-3 gap-3">
+            <SectionTitle>{t("home.menu.services")}</SectionTitle>
+            <nav aria-label={t("home.menu.services")} className="grid grid-cols-3 gap-3">
               {grid.map((item) => (
                 <Tile key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
               ))}
@@ -434,8 +436,8 @@ export default function MobileHomePage() {
 
         {chips.length > 0 && (
           <section className="flex flex-col gap-3">
-            <SectionTitle>{t("home.more")}</SectionTitle>
-            <nav aria-label={t("home.more")} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
+            <SectionTitle>{t("home.menu.more")}</SectionTitle>
+            <nav aria-label={t("home.menu.more")} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
               {chips.map((item) => (
                 <Chip key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
               ))}

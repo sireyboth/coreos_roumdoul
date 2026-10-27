@@ -23,6 +23,7 @@ import {
   type ImportSpec,
   type ParsedRow,
 } from "@/lib/excel-import";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export function ExcelImportDialog<Ctx>({
   onOpenChange: (open: boolean) => void;
   onImported: () => void;
 }) {
+  const t = useT();
   const [stage, setStage] = useState<Stage>({ step: "upload" });
   const [settings, setSettings] = useState<Record<string, boolean>>(() =>
     Object.fromEntries((spec.settings ?? []).map((s) => [s.key, s.default])),
@@ -119,12 +121,12 @@ export function ExcelImportDialog<Ctx>({
       const missing = spec.fields.filter((f) => f.required && !columns[f.key]).map((f) => `"${f.header}"`);
       if (missing.length > 0) {
         throw new WorkbookError(
-          `The file has no ${missing.join(", ")} column${missing.length === 1 ? "" : "s"}. Start from the template so the headers match.`,
+          t(missing.length === 1 ? "app.excelImport.file.missingColumnOne" : "app.excelImport.file.missingColumnOther", { columns: missing.join(", ") }),
         );
       }
-      if (rows.length === 0) throw new WorkbookError(`The file has a header row but no ${many} under it.`);
+      if (rows.length === 0) throw new WorkbookError(t("app.excelImport.file.noRows", { many }));
       if (rows.length > MAX_ROWS) {
-        throw new WorkbookError(`The file has ${rows.length.toLocaleString()} rows. Import at most ${MAX_ROWS.toLocaleString()} at a time — split it into smaller files.`);
+        throw new WorkbookError(t("app.excelImport.file.tooManyRows", { n: rows.length.toLocaleString(), max: MAX_ROWS.toLocaleString() }));
       }
 
       const used = new Set(Object.values(columns));
@@ -132,7 +134,7 @@ export function ExcelImportDialog<Ctx>({
 
       setStage({ step: "review", fileName: file.name, rows: parseRows(spec.fields, columns, rows), ignored });
     } catch (err) {
-      setError(err instanceof WorkbookError ? err.message : "That file couldn't be read.");
+      setError(err instanceof WorkbookError ? err.message : t("app.excelImport.file.unreadable"));
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -165,7 +167,7 @@ export function ExcelImportDialog<Ctx>({
 
     for (let i = 0; i < ready.length; i++) {
       if (stopRequested.current) {
-        stoppedBecause = "You stopped the import.";
+        stoppedBecause = t("app.excelImport.running.stopped");
         notRun = ready.length - i;
         break;
       }
@@ -190,8 +192,10 @@ export function ExcelImportDialog<Ctx>({
     const saved = counts.created + counts.updated;
     if (saved > 0) {
       notifySuccess(
-        `${saved.toLocaleString()} ${saved === 1 ? one : many} imported`,
-        failures.length > 0 ? `${failures.length} row${failures.length === 1 ? "" : "s"} need attention.` : undefined,
+        t(saved === 1 ? "app.excelImport.done.importedOne" : "app.excelImport.done.importedOther", { n: saved.toLocaleString(), noun: saved === 1 ? one : many }),
+        failures.length > 0
+          ? t(failures.length === 1 ? "app.excelImport.done.needAttentionOne" : "app.excelImport.done.needAttentionOther", { n: failures.length })
+          : undefined,
       );
     }
   }
@@ -225,9 +229,9 @@ export function ExcelImportDialog<Ctx>({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" showCloseButton={!running}>
         <DialogHeader>
-          <DialogTitle>Import {many} from Excel</DialogTitle>
+          <DialogTitle>{t("app.excelImport.title", { many })}</DialogTitle>
           <DialogDescription>
-            Add {many} in bulk from a spreadsheet. Each row is checked exactly as if it were entered by hand.
+            {t("app.excelImport.description", { many })}
           </DialogDescription>
         </DialogHeader>
 
@@ -235,9 +239,9 @@ export function ExcelImportDialog<Ctx>({
           <div className="flex flex-col gap-4">
             <ol className="grid gap-3 sm:grid-cols-3">
               {[
-                { title: "Download the template", body: "Headers, dropdowns and instructions are ready." },
-                { title: `Add your ${many}`, body: "One row each. Blue headers are required." },
-                { title: "Upload it here", body: "Review the rows before anything is saved." },
+                { title: t("app.excelImport.upload.templateTitle"), body: t("app.excelImport.upload.templateBody") },
+                { title: t("app.excelImport.upload.fillTitle", { many }), body: t("app.excelImport.upload.fillBody") },
+                { title: t("app.excelImport.upload.uploadTitle"), body: t("app.excelImport.upload.uploadBody") },
               ].map((item, i) => (
                 <li key={item.title} className="flex gap-3 rounded-lg border border-border bg-muted/30 p-3">
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
@@ -253,7 +257,7 @@ export function ExcelImportDialog<Ctx>({
 
             <Button variant="outline" onClick={handleTemplate} disabled={busy} className="self-start">
               <Download className="size-4" />
-              Download template
+              {t("app.excelImport.upload.downloadTemplate")}
             </Button>
 
             <label
@@ -276,8 +280,8 @@ export function ExcelImportDialog<Ctx>({
               <span className="flex size-11 items-center justify-center rounded-xl bg-success/12 text-success">
                 <FileSpreadsheet className="size-5" />
               </span>
-              <span className="text-sm font-medium">{busy ? "Reading file…" : "Drop your Excel file here, or click to browse"}</span>
-              <span className="text-xs text-muted-foreground">Excel workbook (.xlsx), up to {MAX_ROWS.toLocaleString()} rows</span>
+              <span className="text-sm font-medium">{t(busy ? "app.excelImport.upload.reading" : "app.excelImport.upload.drop")}</span>
+              <span className="text-xs text-muted-foreground">{t("app.excelImport.upload.fileHint", { max: MAX_ROWS.toLocaleString() })}</span>
               <input
                 ref={fileInput}
                 type="file"
@@ -288,7 +292,7 @@ export function ExcelImportDialog<Ctx>({
             </label>
 
             {error && <Alert variant="destructive">{error}</Alert>}
-            <Alert variant="info">{spec.matching} Blank cells on an existing record leave that detail unchanged.</Alert>
+            <Alert variant="info">{spec.matching} {t("app.excelImport.upload.blankCells")}</Alert>
           </div>
         )}
 
@@ -308,17 +312,17 @@ export function ExcelImportDialog<Ctx>({
           <div className="flex flex-col gap-4 py-2">
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">
-                Importing {many}… {stage.done.toLocaleString()} of {stage.total.toLocaleString()}
+                {t("app.excelImport.running.progress", { many, done: stage.done.toLocaleString(), total: stage.total.toLocaleString() })}
               </span>
               <span className="text-muted-foreground">{stage.total ? Math.round((stage.done / stage.total) * 100) : 0}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={stage.total} aria-valuenow={stage.done}>
               <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${stage.total ? (stage.done / stage.total) * 100 : 0}%` }} />
             </div>
-            <p className="text-xs text-muted-foreground">Keep this window open until it finishes.</p>
+            <p className="text-xs text-muted-foreground">{t("app.excelImport.running.keepOpen")}</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => (stopRequested.current = true)}>
-                Stop after this row
+                {t("app.excelImport.running.stopAfterRow")}
               </Button>
             </DialogFooter>
           </div>
@@ -327,16 +331,16 @@ export function ExcelImportDialog<Ctx>({
         {stage.step === "done" && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Added" value={stage.created} tone="success" />
-              <Stat label="Updated" value={stage.updated} tone="info" />
-              <Stat label="Unchanged" value={stage.skipped} tone="muted" />
-              <Stat label="Failed" value={stage.failures.length} tone={stage.failures.length ? "destructive" : "muted"} />
+              <Stat label={t("app.excelImport.done.added")} value={stage.created} tone="success" />
+              <Stat label={t("app.excelImport.done.updated")} value={stage.updated} tone="info" />
+              <Stat label={t("app.excelImport.done.unchanged")} value={stage.skipped} tone="muted" />
+              <Stat label={t("app.excelImport.done.failed")} value={stage.failures.length} tone={stage.failures.length ? "destructive" : "muted"} />
             </div>
 
             {stage.stoppedBecause && (
-              <Alert variant="warning" title="The import stopped early">
+              <Alert variant="warning" title={t("app.excelImport.done.stoppedEarly")}>
                 {stage.stoppedBecause}
-                {stage.notRun > 0 && ` ${stage.notRun.toLocaleString()} row${stage.notRun === 1 ? " was" : "s were"} not attempted.`}
+                {stage.notRun > 0 && ` ${t(stage.notRun === 1 ? "app.excelImport.done.notRunOne" : "app.excelImport.done.notRunOther", { n: stage.notRun.toLocaleString() })}`}
               </Alert>
             )}
 
@@ -345,21 +349,21 @@ export function ExcelImportDialog<Ctx>({
                 <ProblemList items={stage.failures.map((f) => ({ rowNumber: f.rowNumber, text: f.error }))} />
                 <Button variant="outline" className="self-start" onClick={() => handleFailureReport(stage.failures)}>
                   <Download className="size-4" />
-                  Download rows that need fixing
+                  {t("app.excelImport.done.downloadFailures")}
                 </Button>
               </>
             ) : (
               !stage.stoppedBecause && (
-                <Alert variant="success">Every row was imported.</Alert>
+                <Alert variant="success">{t("app.excelImport.done.allImported")}</Alert>
               )
             )}
 
             <DialogFooter>
               <Button variant="outline" onClick={reset}>
                 <RefreshCw className="size-4" />
-                Import another file
+                {t("app.excelImport.done.importAnother")}
               </Button>
-              <Button onClick={() => handleOpenChange(false)}>Done</Button>
+              <Button onClick={() => handleOpenChange(false)}>{t("app.excelImport.done.done")}</Button>
             </DialogFooter>
           </div>
         )}
@@ -385,6 +389,7 @@ function ReviewStep<Ctx>({
   onImport: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const ready = stage.rows.filter((r) => r.problems.length === 0);
   const invalid = stage.rows.filter((r) => r.problems.length > 0);
   // The first few columns are enough to recognise a row.
@@ -398,20 +403,20 @@ function ReviewStep<Ctx>({
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{stage.fileName}</span>
         <Button variant="ghost" size="sm" onClick={onChangeFile}>
           <Upload className="size-3.5" />
-          Choose another file
+          {t("app.excelImport.review.chooseAnother")}
         </Button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Rows found" value={stage.rows.length} tone="muted" />
-        <Stat label="Ready" value={ready.length} tone="success" />
-        <Stat label="Need fixing" value={invalid.length} tone={invalid.length ? "destructive" : "muted"} />
+        <Stat label={t("app.excelImport.review.rowsFound")} value={stage.rows.length} tone="muted" />
+        <Stat label={t("app.excelImport.review.ready")} value={ready.length} tone="success" />
+        <Stat label={t("app.excelImport.review.needFixing")} value={invalid.length} tone={invalid.length ? "destructive" : "muted"} />
       </div>
 
       {invalid.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-muted-foreground">
-            These rows will be skipped. Fix them in the file and upload it again, or import the rest now.
+            {t("app.excelImport.review.skippedHint")}
           </p>
           <ProblemList items={invalid.map((r) => ({ rowNumber: r.rowNumber, text: r.problems.join(" ") }))} />
         </div>
@@ -419,7 +424,7 @@ function ReviewStep<Ctx>({
 
       {stage.ignored.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Not imported (not a column this page uses): {stage.ignored.join(", ")}.
+          {t("app.excelImport.review.ignored", { columns: stage.ignored.join(", ") })}
         </p>
       )}
 
@@ -429,7 +434,7 @@ function ReviewStep<Ctx>({
             <table className="w-full text-left text-xs">
               <thead className="sticky top-0 bg-muted text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Row</th>
+                  <th className="px-3 py-2 font-medium">{t("app.excelImport.review.row")}</th>
                   {previewFields.map((f) => (
                     <th key={f.key} className="px-3 py-2 font-medium whitespace-nowrap">
                       {f.header}
@@ -445,7 +450,7 @@ function ReviewStep<Ctx>({
                       <td key={f.key} className="max-w-48 truncate px-3 py-1.5">
                         {r.row.text(f.key) === undefined
                           ? <span className="text-muted-foreground">—</span>
-                          : f.options?.find((o) => o.value === r.row.text(f.key))?.label ?? displayValue(r.row.text(f.key)!)}
+                          : f.options?.find((o) => o.value === r.row.text(f.key))?.label ?? displayValue(r.row.text(f.key)!, t)}
                       </td>
                     ))}
                   </tr>
@@ -455,7 +460,7 @@ function ReviewStep<Ctx>({
           </div>
           {ready.length > 100 && (
             <p className="border-t border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
-              Showing the first 100 of {ready.length.toLocaleString()} rows.
+              {t("app.excelImport.review.showingFirst", { n: ready.length.toLocaleString() })}
             </p>
           )}
         </div>
@@ -478,20 +483,20 @@ function ReviewStep<Ctx>({
 
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
-          Cancel
+          {t("common.action.cancel")}
         </Button>
         <Button onClick={onImport} disabled={ready.length === 0}>
           <Upload className="size-4" />
-          Import {ready.length.toLocaleString()} {ready.length === 1 ? one : many}
+          {t(ready.length === 1 ? "app.excelImport.review.importOne" : "app.excelImport.review.importOther", { n: ready.length.toLocaleString(), noun: ready.length === 1 ? one : many })}
         </Button>
       </DialogFooter>
     </div>
   );
 }
 
-function displayValue(value: string): string {
-  if (value === "true") return "Yes";
-  if (value === "false") return "No";
+function displayValue(value: string, t: ReturnType<typeof useT>): string {
+  if (value === "true") return t("app.excelImport.review.yes");
+  if (value === "false") return t("app.excelImport.review.no");
   return value;
 }
 
@@ -500,12 +505,13 @@ function capitalise(text: string): string {
 }
 
 function ProblemList({ items }: { items: { rowNumber: number; text: string }[] }) {
+  const t = useT();
   return (
     <ul className="max-h-44 divide-y divide-border overflow-y-auto rounded-lg border border-destructive/25 bg-destructive/5 text-sm">
       {items.map((item, i) => (
         <li key={`${item.rowNumber}-${i}`} className="flex gap-3 px-3 py-2">
           <Badge variant="destructive" className="shrink-0 tabular-nums">
-            Row {item.rowNumber}
+            {t("app.excelImport.review.rowN", { n: item.rowNumber })}
           </Badge>
           <span className="min-w-0 text-foreground/90">{item.text}</span>
         </li>

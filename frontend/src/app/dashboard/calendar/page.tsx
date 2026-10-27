@@ -14,7 +14,7 @@ import {
   parseDate,
   shiftMonth,
   TYPE_STYLES,
-  WEEKDAYS,
+  WEEKDAY_KEYS,
   HalfDayShade,
   halfDayLabel,
   halfDayLeave,
@@ -27,12 +27,15 @@ import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
 import { dayOffImport, exportMonthCalendar } from "@/lib/excel-specs/time";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { formatMinutes, slotsSummary } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 export default function CalendarPage() {
   const { me } = useMe();
+  const t = useT();
+  const lang = useLang();
   const canManage = me?.permissions.includes("schedules.manage") ?? false;
 
   const [month, setMonth] = useState(currentMonth);
@@ -63,30 +66,30 @@ export default function CalendarPage() {
       ? () => api.calendar.month(month, effectiveEmployeeId ? Number(effectiveEmployeeId) : undefined)
       : null,
     [month, effectiveEmployeeId, reloads],
-    { errorMessage: "Couldn't load the calendar.", keepPrevious: true },
+    { errorMessage: t("calendar.page.loadFailed"), keepPrevious: true },
   );
   const reload = () => setReloads((n) => n + 1);
 
   const leadingBlanks = data ? parseDate(data.days[0].date).getDay() : 0;
-  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" });
   const showTeam = activeView === "team";
   const tabs = [
-    ...(canManage ? [{ id: "team", label: "Team", icon: Users }] as const : []),
-    { id: "individual", label: canManage ? "Individual" : "My month", icon: CalendarDays },
-    { id: "agenda", label: "Agenda", icon: ListChecks },
+    ...(canManage ? [{ id: "team", label: t("calendar.page.tab.team"), icon: Users }] as const : []),
+    { id: "individual", label: canManage ? t("calendar.page.tab.individual") : t("calendar.page.tab.myMonth"), icon: CalendarDays },
+    { id: "agenda", label: t("calendar.page.tab.agenda"), icon: ListChecks },
   ] as const;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Calendar"
+          title={t("calendar.page.title")}
           description={
             showTeam
-              ? "Everyone's month at a glance — schedules, days off and attendance."
+              ? t("calendar.page.descTeam")
               : activeView === "agenda"
-                ? "Only the days something happens — holidays, leave, days off and absences — for the whole range."
-                : "Work days, holidays and days off — and how each day actually went."
+                ? t("calendar.page.descAgenda")
+                : t("calendar.page.descIndividual")
           }
           action={
             <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +115,7 @@ export default function CalendarPage() {
               {canManage && (
                 <Button variant="outline" render={<Link href="/dashboard/work-schedules" />} nativeButton={false}>
                   <Settings2 className="size-4" />
-                  Work schedules
+                  {t("calendar.page.workSchedules")}
                 </Button>
               )}
             </div>
@@ -126,15 +129,15 @@ export default function CalendarPage() {
         {activeView === "individual" && (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label={t("common.time.previousMonth")}>
                 <ChevronLeft className="size-4" />
               </Button>
               <h2 className="min-w-40 text-center text-base font-semibold">{monthLabel}</h2>
-              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+              <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={t("common.time.nextMonth")}>
                 <ChevronRight className="size-4" />
               </Button>
               <Button variant="outline" onClick={() => setMonth(currentMonth())}>
-                Today
+                {t("common.time.today")}
               </Button>
 
               <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -142,10 +145,10 @@ export default function CalendarPage() {
                   <select
                     value={effectiveEmployeeId}
                     onChange={(e) => setEmployeeId(e.target.value)}
-                    aria-label="Employee"
+                    aria-label={t("common.field.employee")}
                     className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
                   >
-                    {hasOwnCalendar && <option value="">My calendar</option>}
+                    {hasOwnCalendar && <option value="">{t("calendar.page.myCalendar")}</option>}
                     {employees.map((employee) => (
                       <option key={employee.id} value={employee.id}>
                         {employee.name}
@@ -162,22 +165,22 @@ export default function CalendarPage() {
             </div>
 
             {needsPick && employees.length === 0 && (
-              <Alert variant="info">There are no employees yet. Add one from the Employees page to see their calendar.</Alert>
+              <Alert variant="info">{t("calendar.page.noEmployees")}</Alert>
             )}
 
             {error && <Alert variant="warning">{error}</Alert>}
 
             {data && (
               <div className="flex flex-wrap gap-2 text-sm">
-                <Badge variant="info">{data.summary.work_days} work days</Badge>
-                <Badge variant="outline">{data.summary.holidays} holidays</Badge>
-                <Badge variant="warning">{data.summary.days_off} days off</Badge>
-                <Badge variant="success">{data.summary.present} present</Badge>
-                <Badge variant="warning">{data.summary.late} late</Badge>
-                <Badge variant="destructive">{data.summary.absent} absent</Badge>
-                {data.summary.incomplete > 0 && <Badge variant="warning">{data.summary.incomplete} missing a scan</Badge>}
-                <Badge variant="outline">{formatMinutes(data.summary.worked_minutes)} worked</Badge>
-                {data.summary.overtime_minutes > 0 && <Badge variant="info">{formatMinutes(data.summary.overtime_minutes)} overtime</Badge>}
+                <Badge variant="info">{t("calendar.page.summary.workDays", { n: data.summary.work_days })}</Badge>
+                <Badge variant="outline">{t("calendar.page.summary.holidays", { n: data.summary.holidays })}</Badge>
+                <Badge variant="warning">{t("calendar.page.summary.daysOff", { n: data.summary.days_off })}</Badge>
+                <Badge variant="success">{t("calendar.page.summary.present", { n: data.summary.present })}</Badge>
+                <Badge variant="warning">{t("calendar.page.summary.late", { n: data.summary.late })}</Badge>
+                <Badge variant="destructive">{t("calendar.page.summary.absent", { n: data.summary.absent })}</Badge>
+                {data.summary.incomplete > 0 && <Badge variant="warning">{t("calendar.page.summary.incomplete", { n: data.summary.incomplete })}</Badge>}
+                <Badge variant="outline">{t("calendar.page.summary.worked", { time: formatMinutes(data.summary.worked_minutes, lang) })}</Badge>
+                {data.summary.overtime_minutes > 0 && <Badge variant="info">{t("calendar.page.summary.overtime", { time: formatMinutes(data.summary.overtime_minutes, lang) })}</Badge>}
               </div>
             )}
 
@@ -187,13 +190,13 @@ export default function CalendarPage() {
               <div className="flex flex-col gap-3">
                 {canManage && (
                   <p className="text-sm text-muted-foreground">
-                    Showing {data.employee.name}. Click a day to see details or mark a day off.
+                    {t("calendar.page.showing", { name: data.employee.name })}
                   </p>
                 )}
                 <div className="grid grid-cols-7 gap-1 sm:gap-2">
-                  {WEEKDAYS.map((name) => (
-                    <div key={name} className="pb-1 text-center text-xs font-medium text-muted-foreground">
-                      {name}
+                  {WEEKDAY_KEYS.map((key) => (
+                    <div key={key} className="pb-1 text-center text-xs font-medium text-muted-foreground">
+                      {t(`calendar.shared.weekday.short.${key}`)}
                     </div>
                   ))}
                   {Array.from({ length: leadingBlanks }).map((_, i) => (
@@ -224,11 +227,11 @@ export default function CalendarPage() {
                             {Number(day.date.slice(8))}
                           </span>
                           <span className="flex items-center gap-1">
-                            {khmer.isSil && <Moon className="size-3 text-muted-foreground" aria-label="Sil day" />}
+                            {khmer.isSil && <Moon className="size-3 text-muted-foreground" aria-label={t("calendar.shared.silDay")} />}
                             {day.attendance && (
                               <span
                                 className={cn("size-2 rounded-full", ATTENDANCE[day.attendance].dot)}
-                                title={ATTENDANCE[day.attendance].label}
+                                title={t(`calendar.shared.attendance.${day.attendance}`)}
                               />
                             )}
                           </span>
@@ -236,23 +239,23 @@ export default function CalendarPage() {
                         <span className="text-[10px] leading-tight text-muted-foreground">{khmer.short}</span>
                         {day.label && <span className="hidden w-full truncate sm:block">{day.label}</span>}
                         {halfDay && (
-                          <span className="hidden w-full truncate font-medium text-violet-700 sm:block dark:text-violet-300" title={halfDayLabel(halfDay)}>
-                            {halfDayLabel(halfDay)}
+                          <span className="hidden w-full truncate font-medium text-violet-700 sm:block dark:text-violet-300" title={halfDayLabel(halfDay, lang)}>
+                            {halfDayLabel(halfDay, lang)}
                           </span>
                         )}
                         {/* A Khmer holiday the company hasn't added yet: shown for reference, not as a day off. */}
                         {khmerHoliday && day.type !== "holiday" && (
-                          <span className="hidden w-full truncate text-[10px] font-medium text-destructive sm:block" title={khmerHoliday.nameKm}>
-                            {khmerHoliday.nameEn}
+                          <span className="hidden w-full truncate text-[10px] font-medium text-destructive sm:block" title={lang === "km" ? khmerHoliday.nameEn : khmerHoliday.nameKm}>
+                            {lang === "km" ? khmerHoliday.nameKm : khmerHoliday.nameEn}
                           </span>
                         )}
                         {day.schedule && (
                           <span className="hidden truncate text-muted-foreground sm:block" title={day.schedule.name}>
-                            {slotsSummary(day.schedule.slots)}
+                            {slotsSummary(day.schedule.slots, lang)}
                           </span>
                         )}
                         {day.attendance && (
-                          <span className="hidden text-muted-foreground sm:block">{ATTENDANCE[day.attendance].label}</span>
+                          <span className="hidden text-muted-foreground sm:block">{t(`calendar.shared.attendance.${day.attendance}`)}</span>
                         )}
                       </button>
                     );
@@ -263,24 +266,24 @@ export default function CalendarPage() {
                   {(Object.keys(TYPE_STYLES) as CalendarDayType[]).map((type) => (
                     <span key={type} className="flex items-center gap-1.5">
                       <span className={cn("size-3 rounded-sm", TYPE_STYLES[type].swatch)} />
-                      {TYPE_STYLES[type].label}
+                      {t(`calendar.shared.dayType.${type}`)}
                     </span>
                   ))}
                     <span className="flex items-center gap-1.5">
                       <span className="relative size-3 overflow-hidden rounded-sm bg-info/40">
                         <span className="absolute inset-y-0 left-0 w-1/2 bg-violet-500/60" />
                       </span>
-                      Half-day leave
+                      {t("calendar.shared.halfDayLegend")}
                     </span>
                   {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
                     <span key={status} className="flex items-center gap-1.5">
                       <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />
-                      {ATTENDANCE[status].label}
+                      {t(`calendar.shared.attendance.${status}`)}
                     </span>
                   ))}
                   <span className="flex items-center gap-1.5">
                     <Moon className="size-3" />
-                    Sil day (ថ្ងៃសីល)
+                    {t("calendar.shared.silDayLegend")}
                   </span>
                 </div>
               </div>

@@ -28,6 +28,7 @@ import { slotsOn, slotsSummary, weekSummary } from "@/lib/schedule";
 import { dateOnly } from "@/lib/date";
 import { exportRoster, rosterImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { dateLocale, translateNow, useLang, useT } from "@/lib/i18n";
 
 /** Edits one existing roster entry. New entries go through the bulk dialog. */
 function ScheduleFormDialog({
@@ -45,6 +46,8 @@ function ScheduleFormDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [employeeId, setEmployeeId] = useState(schedule ? String(schedule.employee.id) : "");
   const [scheduleId, setScheduleId] = useState(schedule ? String(schedule.work_schedule.id) : "");
   const [date, setDate] = useState(schedule ? dateOnly(schedule.date) : "");
@@ -64,13 +67,13 @@ function ScheduleFormDialog({
     try {
       if (schedule) {
         await api.schedules.update(schedule.id, payload);
-        notifySuccess("Roster entry updated");
+        notifySuccess(translateNow("schedules.roster.updated"));
       }
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -80,12 +83,12 @@ function ScheduleFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit roster entry</DialogTitle>
-          <DialogDescription>On this date the person follows this schedule instead of their usual one.</DialogDescription>
+          <DialogTitle>{t("schedules.roster.editTitle")}</DialogTitle>
+          <DialogDescription>{t("schedules.roster.editText")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="employee">Employee</Label>
+            <Label htmlFor="employee">{t("common.field.employee")}</Label>
             <select
               id="employee"
               required
@@ -94,7 +97,7 @@ function ScheduleFormDialog({
               className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
             >
               <option value="" disabled>
-                Select…
+                {t("schedules.roster.select")}
               </option>
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
@@ -104,7 +107,7 @@ function ScheduleFormDialog({
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="shift">Work schedule</Label>
+            <Label htmlFor="shift">{t("schedules.roster.schedule")}</Label>
             <select
               id="shift"
               required
@@ -113,24 +116,24 @@ function ScheduleFormDialog({
               className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
             >
               <option value="" disabled>
-                Select…
+                {t("schedules.roster.select")}
               </option>
               {selectableSchedules.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} — {weekSummary(s)}
+                  {s.name} — {weekSummary(s, lang)}
                 </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="date">Date</Label>
+            <Label htmlFor="date">{t("common.field.date")}</Label>
             <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? t("schedules.roster.saving") : t("schedules.roster.saveChanges")}
             </Button>
           </DialogFooter>
         </form>
@@ -145,6 +148,8 @@ function ScheduleFormDialog({
  */
 export function RosterView({ employee }: { employee?: Employee }) {
   const { me } = useMe();
+  const t = useT();
+  const lang = useLang();
   const confirm = useConfirm();
   const [month, setMonth] = useState(currentMonth);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -191,16 +196,16 @@ export function RosterView({ employee }: { employee?: Employee }) {
 
   async function handleDelete(schedule: Schedule) {
     const ok = await confirm({
-      title: "Remove this roster entry?",
-      description: `${schedule.employee.name} will no longer be scheduled for ${dateOnly(schedule.date)}.`,
-      confirmLabel: "Remove",
+      title: t("schedules.roster.removeTitle"),
+      description: t("schedules.roster.removeText", { name: schedule.employee.name, date: dateOnly(schedule.date) }),
+      confirmLabel: t("common.action.remove"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.schedules.remove(schedule.id);
-      notifySuccess("Roster entry removed");
+      notifySuccess(translateNow("schedules.roster.removed"));
     } catch (err) {
       notifyError(err);
     }
@@ -213,7 +218,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
       : [
           {
             id: "employee",
-            header: "Employee",
+            header: t("common.field.employee"),
             primary: true,
             cell: (schedule: Schedule) => <span className="font-medium">{schedule.employee.name}</span>,
             sortValue: (schedule: Schedule) => schedule.employee.name,
@@ -222,23 +227,23 @@ export function RosterView({ employee }: { employee?: Employee }) {
         ]),
     {
       id: "date",
-      header: "Date",
+      header: t("common.field.date"),
       primary: Boolean(employee),
       cell: (schedule) => (
         <Badge variant="outline">
-          {parseDate(dateOnly(schedule.date)).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })}
+          {parseDate(dateOnly(schedule.date)).toLocaleDateString(dateLocale(lang) ?? [], { weekday: "short", day: "numeric", month: "short" })}
         </Badge>
       ),
       sortValue: (schedule) => dateOnly(schedule.date),
     },
     {
       id: "shift",
-      header: "Schedule that day",
+      header: t("schedules.roster.scheduleThatDay"),
       cell: (schedule) => (
         <div className="flex flex-col">
           <span className="font-medium">{schedule.work_schedule.name}</span>
           <span className="text-xs text-muted-foreground">
-            {slotsSummary(slotsOn(schedule.work_schedule, parseDate(dateOnly(schedule.date)).getDay()))}
+            {slotsSummary(slotsOn(schedule.work_schedule, parseDate(dateOnly(schedule.date)).getDay()), lang)}
           </span>
         </div>
       ),
@@ -247,28 +252,28 @@ export function RosterView({ employee }: { employee?: Employee }) {
     },
     {
       id: "location",
-      header: "Location",
+      header: t("schedules.roster.location"),
       hideOnMobile: true,
-      cell: (schedule) => <span className="text-muted-foreground">{schedule.work_location?.name ?? "Own branch"}</span>,
+      cell: (schedule) => <span className="text-muted-foreground">{schedule.work_location?.name ?? t("schedules.roster.ownBranch")}</span>,
       searchValue: (schedule) => schedule.work_location?.name,
-      sortValue: (schedule) => schedule.work_location?.name ?? "Own branch",
+      sortValue: (schedule) => schedule.work_location?.name ?? t("schedules.roster.ownBranch"),
     },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label={t("common.time.previousMonth")}>
           <ChevronLeft className="size-4" />
         </Button>
         <h2 className="min-w-40 text-center text-base font-semibold">
-          {parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+          {parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" })}
         </h2>
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={t("common.time.nextMonth")}>
           <ChevronRight className="size-4" />
         </Button>
         <Button variant="outline" onClick={() => setMonth(currentMonth())}>
-          Today
+          {t("common.time.today")}
         </Button>
 
         <div className="ml-auto flex flex-wrap gap-2">
@@ -281,7 +286,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
           {canManage && (
             <Button onClick={openBulk}>
               <Plus className="size-4" />
-              {employee ? `Schedule ${employee.name.split(" ")[0]}` : "Add to roster"}
+              {employee ? t("schedules.roster.scheduleOne", { name: employee.name.split(" ")[0] }) : t("schedules.roster.addToRoster")}
             </Button>
           )}
         </div>
@@ -289,8 +294,7 @@ export function RosterView({ employee }: { employee?: Employee }) {
 
       {truncated && result && (
         <Alert variant="warning">
-          This month has {result.total.toLocaleString()} roster entries; showing the first {result.data.length.toLocaleString()}. Open a single
-          employee to see all of theirs.
+          {t("schedules.roster.truncated", { total: result.total.toLocaleString(), shown: result.data.length.toLocaleString() })}
         </Alert>
       )}
 
@@ -298,16 +302,16 @@ export function RosterView({ employee }: { employee?: Employee }) {
         data={schedules}
         getRowId={(schedule) => schedule.id}
         columns={columns}
-        searchPlaceholder="Search roster…"
+        searchPlaceholder={t("schedules.roster.search")}
         initialSort={{ columnId: "date", direction: "asc" }}
         emptyState={{
           icon: CalendarRange,
-          title: "No one-off changes this month",
+          title: t("schedules.roster.emptyTitle"),
           description: canManage
             ? employee
-              ? `${employee.name.split(" ")[0]} follows their assigned work schedule. Use “Schedule ${employee.name.split(" ")[0]}” for one-off changes on specific days.`
-              : "Everyone follows their assigned work schedule. Use “Add to roster” for one-off changes on specific days."
-            : "Check back once you're scheduled.",
+              ? t("schedules.roster.emptyOne", { name: employee.name.split(" ")[0] })
+              : t("schedules.roster.emptyAll")
+            : t("schedules.roster.emptyViewer"),
         }}
         rowActions={
           canManage
@@ -315,11 +319,11 @@ export function RosterView({ employee }: { employee?: Employee }) {
                 <>
                   <Button variant="outline" size="sm" onClick={() => openForm(schedule)}>
                     <Pencil className="size-3.5" />
-                    Edit
+                    {t("common.action.edit")}
                   </Button>
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(schedule)}>
                     <Trash2 className="size-3.5" />
-                    Delete
+                    {t("common.action.delete")}
                   </Button>
                 </>
               )

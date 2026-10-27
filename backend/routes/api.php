@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AttendanceCorrectionController;
 use App\Http\Controllers\Api\AttendanceReviewController;
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BirthdayController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CalendarController;
 use App\Http\Controllers\Api\CompanySettingsController;
@@ -154,6 +155,10 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
 
     Route::middleware('company_permission:branches.manage')->group(function () {
         Route::post('/branches/{branch}/regenerate-qr', [BranchController::class, 'regenerateQrCode']);
+    });
+
+    Route::middleware(['module:birthdays', 'company_permission:employees.view'])->group(function () {
+        Route::get('/birthdays', [BirthdayController::class, 'index']);
     });
 
     Route::middleware(['module:id_cards', 'company_permission:employees.view'])->group(function () {

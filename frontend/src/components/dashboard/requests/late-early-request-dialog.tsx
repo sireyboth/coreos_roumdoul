@@ -18,7 +18,9 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError, type EmployeeRequest, type LateEarlyPreview } from "@/lib/api";
+import { translateNow, useLang, useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { requestLabel } from "@/lib/requests";
 import { cn } from "@/lib/utils";
 
 type Kind = "late" | "early";
@@ -47,6 +49,8 @@ export function LateEarlyRequestDialog({
   selfEmployeeId: number | null;
   people?: { id: number; name: string }[];
 }) {
+  const t = useT();
+  const lang = useLang();
   const [employeeId, setEmployeeId] = useState<string>(selfEmployeeId ? String(selfEmployeeId) : "");
   const [kind, setKind] = useState<Kind>("late");
   const [date, setDate] = useState(todayIso);
@@ -71,7 +75,7 @@ export function LateEarlyRequestDialog({
       api.requests
         .previewLateEarly(input)
         .then((data) => !cancelled && setPreview({ key: inputKey, data, error: null }))
-        .catch((err) => !cancelled && setPreview({ key: inputKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't check this." }));
+        .catch((err) => !cancelled && setPreview({ key: inputKey, data: null, error: err instanceof ApiError ? err.message : translateNow("leave.lateEarlyDialog.checkFailed") }));
     }, 300);
     return () => {
       cancelled = true;
@@ -93,9 +97,14 @@ export function LateEarlyRequestDialog({
         { ...input, reason: reason.trim(), approve: forSomeoneElse && approveNow ? true : undefined },
         file,
       );
+      const label = requestLabel(created, lang);
       notifySuccess(
-        created.status === "approved" ? `${created.label} recorded` : `${created.label} request sent`,
-        created.waiting_on ? `${created.waiting_on.name} will review it.` : created.status === "approved" ? undefined : "An approver will review it.",
+        created.status === "approved" ? t("leave.lateEarlyDialog.recorded", { label }) : t("leave.lateEarlyDialog.sent", { label }),
+        created.waiting_on
+          ? t("leave.shared.willReview", { name: created.waiting_on.name })
+          : created.status === "approved"
+            ? undefined
+            : t("leave.shared.approverWillReview"),
       );
       onCreated(created);
       onOpenChange(false);
@@ -116,34 +125,34 @@ export function LateEarlyRequestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Late arrival / Early leave</DialogTitle>
-          <DialogDescription>Ask before (or on) the day. Once approved, you won&apos;t be marked late or early for it.</DialogDescription>
+          <DialogTitle>{t("leave.shared.lateEarly")}</DialogTitle>
+          <DialogDescription>{t("leave.lateEarlyDialog.description")}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {people && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="le-employee">For</Label>
+              <Label htmlFor="le-employee">{t("leave.shared.for")}</Label>
               <SearchableSelect
                 id="le-employee"
                 options={[
-                  ...(selfEmployeeId ? [{ value: String(selfEmployeeId), label: "Myself" }] : []),
+                  ...(selfEmployeeId ? [{ value: String(selfEmployeeId), label: t("leave.shared.myself") }] : []),
                   ...people.filter((p) => p.id !== selfEmployeeId).map((p) => ({ value: String(p.id), label: p.name })),
                 ]}
                 value={employeeId}
                 onChange={setEmployeeId}
-                placeholder="Choose a person"
+                placeholder={t("leave.shared.choosePerson")}
                 clearable={false}
                 className="h-9 w-full rounded-md"
               />
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label="Late or early">
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label={t("leave.lateEarlyDialog.lateOrEarly")}>
             {(
               [
-                ["late", "Arrive late"],
-                ["early", "Leave early"],
+                ["late", t("leave.lateEarlyDialog.arriveLate")],
+                ["early", t("leave.lateEarlyDialog.leaveEarly")],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -164,11 +173,11 @@ export function LateEarlyRequestDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="le-date">Date</Label>
+              <Label htmlFor="le-date">{t("common.field.date")}</Label>
               <Input id="le-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="le-time">{kind === "late" ? "I'll arrive at" : "I'll leave at"}</Label>
+              <Label htmlFor="le-time">{kind === "late" ? t("leave.lateEarlyDialog.arriveAt") : t("leave.lateEarlyDialog.leaveAt")}</Label>
               <Input id="le-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
             </div>
           </div>
@@ -177,7 +186,7 @@ export function LateEarlyRequestDialog({
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm" aria-live="polite">
               {checking || !current ? (
                 <p className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="size-3.5 animate-spin" /> Checking…
+                  <Loader2 className="size-3.5 animate-spin" /> {t("leave.lateEarlyDialog.checking")}
                 </p>
               ) : current.error ? (
                 <p className="text-destructive">{current.error}</p>
@@ -186,13 +195,17 @@ export function LateEarlyRequestDialog({
                   {d.minutes > 0 && (
                     <p className="flex items-center gap-2 font-medium">
                       <AlarmClock className="size-4 text-primary" />
-                      {d.minutes} min {kind === "late" ? "late" : "early"}
-                      {d.expected && <span className="font-normal text-muted-foreground">(usual {kind === "late" ? "start" : "end"} {d.expected})</span>}
+                      {t(kind === "late" ? "leave.lateEarlyDialog.minutesLate" : "leave.lateEarlyDialog.minutesEarly", { n: d.minutes })}
+                      {d.expected && (
+                        <span className="font-normal text-muted-foreground">
+                          {t(kind === "late" ? "leave.lateEarlyDialog.usualStart" : "leave.lateEarlyDialog.usualEnd", { time: d.expected })}
+                        </span>
+                      )}
                     </p>
                   )}
                   {d.monthly_limit !== null && (
                     <p className="text-xs text-muted-foreground">
-                      {d.used_this_month} of {d.monthly_limit} used this month
+                      {t("leave.lateEarlyDialog.usedThisMonth", { used: d.used_this_month, limit: d.monthly_limit })}
                     </p>
                   )}
                 </div>
@@ -201,7 +214,7 @@ export function LateEarlyRequestDialog({
           )}
 
           {problems.length > 0 && (
-            <Alert variant="warning" title="Can't send this yet">
+            <Alert variant="warning" title={t("leave.shared.cantSendYet")}>
               <ul className="list-disc pl-4">
                 {problems.map((message) => (
                   <li key={message}>{message}</li>
@@ -211,15 +224,22 @@ export function LateEarlyRequestDialog({
           )}
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="le-reason">Reason</Label>
-            <Textarea id="le-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={1000} placeholder="e.g. Taking my child to the hospital" required />
+            <Label htmlFor="le-reason">{t("common.field.reason")}</Label>
+            <Textarea
+              id="le-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={1000}
+              placeholder={t("leave.lateEarlyDialog.reasonPlaceholder")}
+              required
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="le-file">Document (optional)</Label>
+            <Label htmlFor="le-file">{t("leave.shared.documentOptional")}</Label>
             <label htmlFor="le-file" className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2 text-sm text-muted-foreground">
               <Paperclip className="size-4" />
-              <span className="truncate">{file ? file.name : "Choose a file or take a photo"}</span>
+              <span className="truncate">{file ? file.name : t("leave.shared.chooseFile")}</span>
             </label>
             <input
               id="le-file"
@@ -234,16 +254,16 @@ export function LateEarlyRequestDialog({
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-0.5" checked={approveNow} onChange={(e) => setApproveNow(e.target.checked)} />
               <span>
-                Approve it now
-                <span className="block text-xs text-muted-foreground">For one you are recording for them, e.g. they called in this morning.</span>
+                {t("leave.shared.approveNow")}
+                <span className="block text-xs text-muted-foreground">{t("leave.lateEarlyDialog.approveNowHint")}</span>
               </span>
             </label>
           )}
 
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={!canSend}>
-              {saving ? "Sending…" : forSomeoneElse && approveNow ? "Record it" : "Send request"}
+              {saving ? t("leave.shared.sending") : forSomeoneElse && approveNow ? t("leave.lateEarlyDialog.record") : t("leave.shared.sendRequest")}
             </Button>
           </DialogFooter>
         </form>

@@ -3,12 +3,12 @@ import { en, type Dictionary } from "./en";
 import { km } from "./km";
 
 // The app's language (Khmer by default), chosen per device and kept in
-// localStorage. Only the phone home screen, tab bar and Home button are
-// translated so far — add keys to en.ts/km.ts as more pages follow.
+// localStorage. Strings live in en/<module>.ts and km/<module>.ts; keys read
+// "module.section.key". Approved wording is in GLOSSARY.md.
 //
 //   const t = useT();
-//   t("today.badge")                          → "ថ្ងៃនេះ" / "Today"
-//   t("today.worked", { time: "3h 20m" })     → fills {time}
+//   t("home.today.badge")                     → "ថ្ងៃនេះ" / "Today"
+//   t("home.today.worked", { time: "3h 20m" })→ fills {time}
 //   navLabel(lang, "/dashboard/attendance")   → that page's name
 
 export type Lang = "km" | "en";
@@ -51,20 +51,34 @@ export function useLang(): Lang {
 type Paths<T, P extends string = ""> = {
   [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Paths<T[K], `${P}${K}.`>;
 }[keyof T & string];
-export type TKey = Exclude<Paths<Dictionary>, `nav.${string}`>;
+export type TKey = Exclude<Paths<Dictionary>, `nav.${string}` | `sidebar.items.${string}`>;
 
 export function translate(lang: Lang, key: TKey, vars?: Record<string, string | number>): string {
-  const [section, name] = key.split(".") as [keyof Dictionary, string];
-  const text = (DICTIONARIES[lang][section] as Record<string, string>)[name];
+  const text = key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], DICTIONARIES[lang]) as string;
   return vars ? text.replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? `{${v}}`)) : text;
 }
 
-/** A page's name by URL, or `fallback` when the dictionary doesn't have it. */
+/** A page's short name by URL (phone tiles, tab bar), else its full name, else `fallback`. */
 export function navLabel(lang: Lang, href: string, fallback = href): string {
-  return (DICTIONARIES[lang].nav as Record<string, string>)[href] ?? fallback;
+  return (DICTIONARIES[lang].nav as Record<string, string>)[href] ?? pageLabel(lang, href, fallback);
+}
+
+/** A page's full name by URL (sidebar), or `fallback` when the dictionary doesn't have it. */
+export function pageLabel(lang: Lang, href: string, fallback = href): string {
+  return (DICTIONARIES[lang].sidebar.items as Record<string, string>)[href] ?? fallback;
 }
 
 export function useT() {
   const lang = useLang();
   return useCallback((key: TKey, vars?: Record<string, string | number>) => translate(lang, key, vars), [lang]);
+}
+
+/** Outside React (toasts, helpers): the string in the language chosen right now. */
+export function translateNow(key: TKey, vars?: Record<string, string | number>): string {
+  return translate(read(), key, vars);
+}
+
+/** The locale for toLocaleDateString / toLocaleString. Khmer keeps Western digits (GLOSSARY.md). */
+export function dateLocale(lang: Lang): string | undefined {
+  return lang === "km" ? "km" : undefined;
 }

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "reac
 import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { beginPageLoad, isPageLoading, subscribeBusy } from "@/lib/busy";
+import { useT } from "@/lib/i18n";
 
 // The page is locked at once; the veil and spinner only show if loading takes
 // longer than this, so a fast (or cached) page never flashes.
@@ -21,6 +22,7 @@ export function PageLoadGate({ children }: { children: React.ReactNode }) {
   const loading = useSyncExternalStore(subscribeBusy, isPageLoading, () => false);
   const [visible, setVisible] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
+  const t = useT();
 
   // A layout effect runs before any page's useEffect, so the page's first
   // reads already fall inside the window.
@@ -55,7 +57,7 @@ export function PageLoadGate({ children }: { children: React.ReactNode }) {
         <div
           role="status"
           aria-live="polite"
-          aria-label="Loading"
+          aria-label={t("common.table.loading")}
           className={`absolute inset-0 z-40 cursor-progress transition-colors duration-200 ${visible ? "bg-background/45" : "bg-transparent"}`}
         >
           {visible && (
@@ -66,7 +68,7 @@ export function PageLoadGate({ children }: { children: React.ReactNode }) {
               <div className="flex justify-center pt-6">
                 <div className="flex items-center gap-2.5 rounded-lg bg-popover px-4 py-2.5 text-sm font-medium text-popover-foreground shadow-lg ring-1 ring-foreground/10">
                   <Loader2 className="size-4 animate-spin text-primary" />
-                  Loading…
+                  {t("common.message.loading")}
                 </div>
               </div>
             </div>

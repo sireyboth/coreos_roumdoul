@@ -1,18 +1,19 @@
+"use client"
+
 import * as React from "react"
 import { Input as InputPrimitive } from "@base-ui/react/input"
 import { cn } from "cn"
+import { useLang, useT, type Lang } from "@/lib/i18n"
 
-const dateLabel = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  calendar: "gregory",
-  timeZone: "UTC",
-})
+// "1 Sep 2026" in English; Khmer month names with Western digits (GLOSSARY.md).
+const dateLabels: Record<Lang, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", calendar: "gregory", timeZone: "UTC" }),
+  km: new Intl.DateTimeFormat("km", { day: "numeric", month: "short", year: "numeric", calendar: "gregory", numberingSystem: "latn", timeZone: "UTC" }),
+}
 
-function formatDate(value: unknown): string | null {
+function formatDate(value: unknown, lang: Lang): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-  return dateLabel.format(new Date(`${value}T00:00:00Z`))
+  return dateLabels[lang].format(new Date(`${value}T00:00:00Z`))
 }
 
 // Phones draw native date boxes themselves: iOS ignores the width (so two side by side
@@ -20,7 +21,8 @@ function formatDate(value: unknown): string | null {
 // show our own label and lay the real input invisibly on top, so a tap still opens the
 // phone's picker. Mouse users keep the normal native box.
 function DateInput({ className, value, ...props }: React.ComponentProps<"input">) {
-  const label = formatDate(value)
+  const t = useT()
+  const label = formatDate(value, useLang())
 
   return (
     <div
@@ -37,7 +39,7 @@ function DateInput({ className, value, ...props }: React.ComponentProps<"input">
           !label && "text-muted-foreground"
         )}
       >
-        {label ?? "Select date"}
+        {label ?? t("app.ui.selectDate")}
       </span>
       <InputPrimitive
         type="date"

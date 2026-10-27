@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import jsQR from "jsqr";
+import { translateNow } from "@/lib/i18n";
 
 /**
  * Shared camera + decode loop behind both the QR scan dialog and the
@@ -25,7 +26,7 @@ export function useQrScanner(active: boolean, onScan: (token: string) => void) {
 
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError("Your browser doesn't support camera access.");
+        setError(translateNow("common.camera.unsupported"));
         return;
       }
 
@@ -44,7 +45,7 @@ export function useQrScanner(active: boolean, onScan: (token: string) => void) {
         }
         scanLoop();
       } catch {
-        setError("Couldn't access the camera — check browser permissions.");
+        setError(translateNow("common.camera.denied"));
       }
     }
 

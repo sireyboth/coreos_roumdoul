@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/card";
 import { api, ApiError, setToken } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
+import { translateNow, useT } from "@/lib/i18n";
 
 export default function SignupPage() {
   const router = useRouter();
+  const t = useT();
   const [companyName, setCompanyName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -36,7 +38,7 @@ export default function SignupPage() {
       setToken(token);
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.somethingWrong"));
     } finally {
       setLoading(false);
     }
@@ -46,13 +48,13 @@ export default function SignupPage() {
     <AuthLayout>
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-xl">Create your company</CardTitle>
-          <CardDescription>Start a free 14-day trial on Business OS.</CardDescription>
+          <CardTitle className="text-xl">{t("app.auth.signUp.title")}</CardTitle>
+          <CardDescription>{t("app.auth.signUp.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="company_name">Company name</Label>
+              <Label htmlFor="company_name">{t("app.auth.signUp.companyName")}</Label>
               <Input
                 id="company_name"
                 required
@@ -61,11 +63,11 @@ export default function SignupPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Your name</Label>
+              <Label htmlFor="name">{t("app.auth.signUp.yourName")}</Label>
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("app.auth.signIn.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -76,7 +78,7 @@ export default function SignupPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("app.auth.signIn.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -89,13 +91,13 @@ export default function SignupPage() {
             </div>
             {error && <Alert variant="destructive">{error}</Alert>}
             <Button type="submit" disabled={loading} className="mt-1">
-              {loading ? "Creating…" : "Create account"}
+              {loading ? t("app.auth.signUp.submitting") : t("app.auth.signUp.submit")}
             </Button>
           </form>
           <p className="mt-5 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("app.auth.signUp.haveAccount")}{" "}
             <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
+              {t("common.action.signIn")}
             </Link>
           </p>
         </CardContent>

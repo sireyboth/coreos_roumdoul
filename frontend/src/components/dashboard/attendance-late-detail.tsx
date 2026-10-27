@@ -4,33 +4,30 @@ import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, FileDown, FileText, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { daysWith, duration, ISSUES, type IssueKind, type PersonInsight, type ReportDay } from "@/lib/attendance-insights";
+import { daysWith, ISSUES, type IssueKind, type PersonInsight, type ReportDay } from "@/lib/attendance-insights";
 import { useMe } from "@/contexts/me-context";
+import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { printAttendancePdf } from "@/lib/attendance-pdf";
 import { exportLateDetail } from "@/lib/excel-specs/time";
+import { formatMinutes } from "@/lib/schedule";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
-const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
 type SortKey = "lateDays" | "lateMinutes" | "latePct" | "bradford" | "name";
 
-const SORTS: { key: SortKey; label: string }[] = [
-  { key: "lateDays", label: "Late days" },
-  { key: "lateMinutes", label: "Total late" },
-  { key: "latePct", label: "Late %" },
-  { key: "bradford", label: "Bradford score" },
-  { key: "name", label: "Name" },
-];
+// Labels in attendance.lateDetail.sort.<key>.
+const SORTS: SortKey[] = ["lateDays", "lateMinutes", "latePct", "bradford", "name"];
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
 /** "Wed 04 Jun" — one line, with the weekday. */
-const shortDate = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
+const shortDate = (date: string, lang: Lang) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString(dateLocale(lang), { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
 
-const monthName = (month: string) =>
-  new Date(`${month}-01T00:00:00Z`).toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+const monthName = (month: string, lang: Lang) =>
+  new Date(`${month}-01T00:00:00Z`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric", timeZone: "UTC" });
 
 /** Lateness gets darker as it gets worse; the shade differs too, so it still reads printed in black and white. */
 function lateChip(minutes: number): string {
@@ -58,6 +55,7 @@ export function AttendanceLateDetail({
   onMinLate,
   range,
   periodLabel,
+  periodTitle = periodLabel,
   scope,
   onOpenDay,
 }: {
@@ -65,12 +63,16 @@ export function AttendanceLateDetail({
   minLate: number;
   onMinLate: (minutes: number) => void;
   range: { from: string; to: string };
+  /** The period in English, for the PDF's header. */
   periodLabel: string;
+  /** The period in the chosen language, for the heading on screen (defaults to `periodLabel`). */
+  periodTitle?: string;
   /** Who the report covers, e.g. "All employees · Branch: HQ" — printed in the PDF's header. */
   scope: string;
   /** Opens the day's details; only offered when the person's id is known. */
   onOpenDay?: (person: PersonInsight, date: string) => void;
 }) {
+  const t = useT();
   const [kinds, setKinds] = useState<IssueKind[]>(["late"]);
   const [sort, setSort] = useState<SortKey>("lateDays");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -95,7 +97,10 @@ export function AttendanceLateDetail({
       return next;
     });
 
-  const filterText = [kinds.map((k) => ISSUES.find((i) => i.kind === k)!.label).join(", "), kinds.includes("late") ? `late ≥ ${minLate} min` : null]
+  const filterText = [
+    kinds.map((k) => t(ISSUES.find((i) => i.kind === k)!.key)).join(", "),
+    kinds.includes("late") ? t("attendance.lateDetail.heading.lateFilter", { n: minLate }) : null,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -105,7 +110,7 @@ export function AttendanceLateDetail({
         ranked.map((entry) => entry.person),
         { kinds, minLate, ...range },
       );
-      notifySuccess("Excel file downloaded", filename);
+      notifySuccess(t("common.excel.downloaded"), filename);
     } catch (err) {
       notifyError(err);
     }
@@ -134,15 +139,15 @@ export function AttendanceLateDetail({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-        <span className="text-sm font-medium">Show</span>
+        <span className="text-sm font-medium">{t("attendance.lateDetail.toolbar.show")}</span>
         {ISSUES.map((issue) => (
           <label key={issue.kind} className="flex items-center gap-1.5 text-sm">
             <input type="checkbox" checked={kinds.includes(issue.kind)} onChange={() => toggleKind(issue.kind)} className="size-4 rounded border-input" />
-            {issue.label}
+            {t(issue.key)}
           </label>
         ))}
         <label className="flex items-center gap-1.5 text-sm">
-          Late ≥
+          {t("attendance.lateDetail.toolbar.lateFrom")}
           <Input
             type="number"
             min={1}
@@ -150,16 +155,16 @@ export function AttendanceLateDetail({
             value={minLate}
             onChange={(e) => onMinLate(Math.max(1, Number(e.target.value) || 1))}
             className="h-8 w-16"
-            aria-label="Count lateness from this many minutes"
+            aria-label={t("attendance.lateDetail.toolbar.lateFromAria")}
           />
-          min
+          {t("attendance.lateDetail.toolbar.min")}
         </label>
         <label className="flex items-center gap-1.5 text-sm">
-          Sort by
+          {t("attendance.lateDetail.toolbar.sortBy")}
           <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={SELECT_CLASS}>
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
+            {SORTS.map((key) => (
+              <option key={key} value={key}>
+                {t(`attendance.lateDetail.sort.${key}`)}
               </option>
             ))}
           </select>
@@ -167,25 +172,26 @@ export function AttendanceLateDetail({
         <div className="ml-auto flex gap-2">
           <Button variant="outline" onClick={handleExport} disabled={ranked.length === 0}>
             <FileDown className="size-4" />
-            Excel
+            {t("attendance.lateDetail.toolbar.excel")}
           </Button>
           <Button variant="outline" onClick={pdf} disabled={ranked.length === 0}>
             <FileText className="size-4" />
-            PDF
+            {t("attendance.lateDetail.toolbar.pdf")}
           </Button>
         </div>
       </div>
 
       <div>
-        <h3 className="text-base font-semibold">Attendance detail · {periodLabel}</h3>
+        <h3 className="text-base font-semibold">{t("attendance.lateDetail.heading.title", { period: periodTitle })}</h3>
         <p className="text-xs text-muted-foreground">
-          {filterText || "Nothing selected"} · {ranked.length} {ranked.length === 1 ? "person" : "people"}
+          {filterText || t("attendance.lateDetail.heading.nothingSelected")} ·{" "}
+          {t(ranked.length === 1 ? "attendance.lateDetail.heading.personOne" : "attendance.lateDetail.heading.personMany", { n: ranked.length })}
         </p>
       </div>
 
       {ranked.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-          {kinds.length === 0 ? "Pick at least one thing to show." : "No one matches — a clean record for this period."}
+          {kinds.length === 0 ? t("attendance.lateDetail.heading.pickOne") : t("attendance.lateDetail.heading.clean")}
         </p>
       ) : (
         <>
@@ -212,27 +218,30 @@ function Overview({ entries }: { entries: { person: PersonInsight; days: ReportD
   const th = "border-b border-border bg-muted px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
   const td = "border-b border-border px-2 py-1.5 tabular-nums";
   const num = (n: number) => (n ? n : <span className="text-muted-foreground">·</span>);
+  const t = useT();
+  const lang = useLang();
+  const duration = (minutes: number) => formatMinutes(minutes, lang);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
       <table className="w-full border-separate border-spacing-0 text-sm">
         <thead>
           <tr>
-            <th className={th}>Employee</th>
-            <th className={cn(th, "text-right")}>Work days</th>
-            <th className={cn(th, "text-right")}>Late days</th>
-            <th className={cn(th, "text-right")}>Late %</th>
-            <th className={cn(th, "text-right")}>Total late</th>
-            <th className={cn(th, "text-right")}>Avg</th>
-            <th className={cn(th, "text-right")}>Longest</th>
-            <th className={cn(th, "text-right")}>Early</th>
-            <th className={cn(th, "text-right")}>Missed</th>
-            <th className={cn(th, "text-right")}>Absent</th>
-            <th className={cn(th, "text-right")}>Absence %</th>
-            <th className={cn(th, "text-right")} title="Separate absence spells² × days absent. Many short absences score higher than one long one — worth a conversation, not a verdict.">
-              Bradford
+            <th className={th}>{t("common.field.employee")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.workDays")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.lateDays")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.latePct")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.totalLate")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.avg")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.longest")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.early")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.missed")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.absent")}</th>
+            <th className={cn(th, "text-right")}>{t("attendance.lateDetail.overview.absencePct")}</th>
+            <th className={cn(th, "text-right")} title={t("attendance.lateDetail.overview.bradfordHint")}>
+              {t("attendance.lateDetail.overview.bradford")}
             </th>
-            <th className={th}>Pattern</th>
+            <th className={th}>{t("attendance.lateDetail.overview.pattern")}</th>
           </tr>
         </thead>
         <tbody>
@@ -262,7 +271,12 @@ function Overview({ entries }: { entries: { person: PersonInsight; days: ReportD
                 {p.bradford ? <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{p.bradford}</span> : num(0)}
               </td>
               <td className={cn(td, "text-xs text-muted-foreground")}>
-                {p.lateWeekday ? `Mostly ${WEEKDAY_NAMES[p.lateWeekday.weekday]} (${p.lateWeekday.count}×)` : ""}
+                {p.lateWeekday
+                  ? t("attendance.lateDetail.overview.mostly", {
+                      day: t(`attendance.lateDetail.weekday.${WEEKDAY_KEYS[p.lateWeekday.weekday]}`),
+                      n: p.lateWeekday.count,
+                    })
+                  : ""}
               </td>
             </tr>
           ))}
@@ -298,13 +312,26 @@ function PersonSection({
     return [...groups];
   }, [days]);
 
+  const t = useT();
+  const lang = useLang();
+  const duration = (minutes: number) => formatMinutes(minutes, lang);
+
   const countedLate = (list: ReportDay[]) => list.filter((d) => d.late >= minLate);
   const stats = [
-    `${person.workDays} work days`,
-    person.lateDays ? `late ${person.lateDays} (${person.latePct}%) · ${duration(person.lateMinutes)} · avg ${duration(Math.round(person.lateMinutes / person.lateDays))}` : "never late",
-    person.missedDays ? `${person.missedDays} missed ${person.missedDays === 1 ? "scan" : "scans"}` : null,
-    person.absentDays ? `${person.absentDays} absent` : null,
-    person.leaveDays ? `${person.leaveDays} leave` : null,
+    t("attendance.lateDetail.person.workDays", { n: person.workDays }),
+    person.lateDays
+      ? t("attendance.lateDetail.person.late", {
+          n: person.lateDays,
+          pct: person.latePct,
+          total: duration(person.lateMinutes),
+          avg: duration(Math.round(person.lateMinutes / person.lateDays)),
+        })
+      : t("attendance.lateDetail.person.neverLate"),
+    person.missedDays
+      ? t(person.missedDays === 1 ? "attendance.lateDetail.person.missedOne" : "attendance.lateDetail.person.missedMany", { n: person.missedDays })
+      : null,
+    person.absentDays ? t("attendance.lateDetail.person.absent", { n: person.absentDays }) : null,
+    person.leaveDays ? t("attendance.lateDetail.person.leave", { n: person.leaveDays }) : null,
   ].filter(Boolean);
 
   const th = "border-b border-border px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
@@ -330,13 +357,13 @@ function PersonSection({
         <table className="w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
-              <th className={cn(th, "pl-4")}>Date</th>
-              <th className={th}>Schedule</th>
-              <th className={th}>In</th>
-              <th className={th}>Out</th>
-              <th className={th}>Late</th>
-              <th className={th}>Issue</th>
-              <th className={cn(th, "w-full")}>Note</th>
+              <th className={cn(th, "pl-4")}>{t("common.field.date")}</th>
+              <th className={th}>{t("attendance.lateDetail.day.schedule")}</th>
+              <th className={th}>{t("attendance.lateDetail.day.in")}</th>
+              <th className={th}>{t("attendance.lateDetail.day.out")}</th>
+              <th className={th}>{t("attendance.lateDetail.day.late")}</th>
+              <th className={th}>{t("attendance.lateDetail.day.issue")}</th>
+              <th className={cn(th, "w-full")}>{t("attendance.lateDetail.day.note")}</th>
             </tr>
           </thead>
           {months.map(([month, list]) => {
@@ -345,15 +372,17 @@ function PersonSection({
               <tbody key={month}>
                 <tr>
                   <td colSpan={7} className="bg-muted/50 px-4 py-1 text-xs font-semibold">
-                    {monthName(month)}
+                    {monthName(month, lang)}
                     <span className="ml-2 font-normal text-muted-foreground">
                       {[
-                        late.length ? `${late.length} late · ${duration(late.reduce((n, d) => n + d.late, 0))}` : null,
+                        late.length
+                          ? t("attendance.lateDetail.day.monthLate", { n: late.length, time: duration(late.reduce((n, d) => n + d.late, 0)) })
+                          : null,
                         list.filter((d) => d.issues.includes("missed")).length && kinds.includes("missed")
-                          ? `${list.filter((d) => d.issues.includes("missed")).length} missed`
+                          ? t("attendance.lateDetail.day.monthMissed", { n: list.filter((d) => d.issues.includes("missed")).length })
                           : null,
                         list.filter((d) => d.issues.includes("absent")).length && kinds.includes("absent")
-                          ? `${list.filter((d) => d.issues.includes("absent")).length} absent`
+                          ? t("attendance.lateDetail.day.monthAbsent", { n: list.filter((d) => d.issues.includes("absent")).length })
                           : null,
                       ]
                         .filter(Boolean)
@@ -367,14 +396,14 @@ function PersonSection({
                     onClick={onOpenDay ? () => onOpenDay(day.date) : undefined}
                     className={cn(onOpenDay && "cursor-pointer hover:bg-accent/40")}
                   >
-                    <td className="whitespace-nowrap border-b border-border/60 py-1.5 pl-4 pr-2 font-medium">{shortDate(day.date)}</td>
+                    <td className="whitespace-nowrap border-b border-border/60 py-1.5 pl-4 pr-2 font-medium">{shortDate(day.date, lang)}</td>
                     <td className="whitespace-nowrap border-b border-border/60 px-2 py-1.5 tabular-nums text-muted-foreground">
                       {day.expectedIn ? `${day.expectedIn}–${day.expectedOut ?? ""}` : dash}
                     </td>
                     <td className="whitespace-nowrap border-b border-border/60 px-2 py-1.5 tabular-nums">{day.in ?? dash}</td>
                     <td className="whitespace-nowrap border-b border-border/60 px-2 py-1.5 tabular-nums">
                       {day.out ?? dash}
-                      {day.edited && <Pencil className="ml-1 inline size-3 text-muted-foreground" aria-label="A scan was added or changed" />}
+                      {day.edited && <Pencil className="ml-1 inline size-3 text-muted-foreground" aria-label={t("attendance.lateDetail.day.edited")} />}
                     </td>
                     <td className="whitespace-nowrap border-b border-border/60 px-2 py-1.5">
                       {day.late > 0 ? (
@@ -391,7 +420,7 @@ function PersonSection({
                           .filter((k): k is Exclude<IssueKind, "late"> => k !== "late" && kinds.includes(k))
                           .map((k) => (
                             <span key={k} className={cn("rounded px-1.5 py-0.5 text-[11px] font-medium", ISSUE_BADGE[k])}>
-                              {k === "early" ? `Early ${duration(day.early)}` : ISSUES.find((i) => i.kind === k)!.label}
+                              {k === "early" ? t("attendance.lateDetail.day.early", { time: duration(day.early) }) : t(ISSUES.find((i) => i.kind === k)!.key)}
                             </span>
                           ))}
                       </span>

@@ -16,10 +16,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { hasLeft } from "@/components/dashboard/employee-form";
-import { WEEKDAYS } from "@/components/dashboard/calendar-shared";
+import { WEEKDAY_KEYS } from "@/components/dashboard/calendar-shared";
 import { api, ApiError, Employee, ScheduleBulkInput, ScheduleBulkResult, WorkLocation, WorkSchedule } from "@/lib/api";
 import { weekSummary } from "@/lib/schedule";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { translate, translateNow, useLang, useT, type Lang } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
@@ -53,19 +54,19 @@ function range(kind: "this-week" | "next-week" | "this-month" | "next-month"): {
 }
 
 const QUICK_RANGES = [
-  { id: "this-week", label: "This week" },
-  { id: "next-week", label: "Next week" },
-  { id: "this-month", label: "This month" },
-  { id: "next-month", label: "Next month" },
+  { id: "this-week", label: "schedules.bulk.thisWeek" },
+  { id: "next-week", label: "schedules.bulk.nextWeek" },
+  { id: "this-month", label: "schedules.bulk.thisMonth" },
+  { id: "next-month", label: "schedules.bulk.nextMonth" },
 ] as const;
 
-function skippedText(skipped: ScheduleBulkResult["skipped"]): string {
+function skippedText(skipped: ScheduleBulkResult["skipped"], lang: Lang): string {
   return [
-    skipped.holiday > 0 && `${skipped.holiday} on holidays`,
-    skipped.day_off > 0 && `${skipped.day_off} on days off`,
-    skipped.already_scheduled > 0 && `${skipped.already_scheduled} already scheduled`,
-    skipped.employee_left > 0 && `${skipped.employee_left} for people who have left`,
-    skipped.no_hours > 0 && `${skipped.no_hours} on weekdays the schedule has no hours`,
+    skipped.holiday > 0 && translate(lang, "schedules.bulk.skipped.holiday", { n: skipped.holiday }),
+    skipped.day_off > 0 && translate(lang, "schedules.bulk.skipped.dayOff", { n: skipped.day_off }),
+    skipped.already_scheduled > 0 && translate(lang, "schedules.bulk.skipped.already", { n: skipped.already_scheduled }),
+    skipped.employee_left > 0 && translate(lang, "schedules.bulk.skipped.left", { n: skipped.employee_left }),
+    skipped.no_hours > 0 && translate(lang, "schedules.bulk.skipped.noHours", { n: skipped.no_hours }),
   ]
     .filter(Boolean)
     .join(", ");
@@ -98,6 +99,8 @@ export function BulkScheduleDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const roster = useMemo(() => employees.filter((e) => !hasLeft(e.employment_status)), [employees]);
   const activeSchedules = useMemo(() => schedules.filter((s) => s.is_active), [schedules]);
 
@@ -122,13 +125,13 @@ export function BulkScheduleDialog({
   const days = dates.from && dates.to && dates.to >= dates.from ? Math.round((parse(dates.to).getTime() - parse(dates.from).getTime()) / 86_400_000) + 1 : 0;
   const rangeProblem =
     !dates.from || !dates.to
-      ? "Pick a start and an end date."
+      ? t("schedules.bulk.pickDates")
       : dates.to < dates.from
-        ? "The end date is before the start date."
+        ? t("schedules.bulk.endBefore")
         : days > MAX_DAYS
-          ? `Pick at most ${MAX_DAYS} days at a time.`
+          ? t("schedules.bulk.maxDays", { n: MAX_DAYS })
           : weekdays.length === 0
-            ? "Tick at least one day of the week."
+            ? t("schedules.bulk.tickDay")
             : null;
 
   const payload: ScheduleBulkInput | null =
@@ -154,7 +157,7 @@ export function BulkScheduleDialog({
       api.schedules
         .bulk({ ...payload, dry_run: true })
         .then((data) => !cancelled && setPreview({ key: previewKey, data, error: null }))
-        .catch((err) => !cancelled && setPreview({ key: previewKey, data: null, error: err instanceof ApiError ? err.message : "Couldn't check that." }));
+        .catch((err) => !cancelled && setPreview({ key: previewKey, data: null, error: err instanceof ApiError ? err.message : translateNow("schedules.bulk.checkFailed") }));
     }, 350);
 
     return () => {
@@ -200,16 +203,16 @@ export function BulkScheduleDialog({
 
     try {
       const res = await api.schedules.bulk(payload);
-      const skipped = skippedText(res.skipped);
+      const skipped = skippedText(res.skipped, lang);
       notifySuccess(
-        `${res.created} roster ${res.created === 1 ? "day" : "days"} added`,
-        skipped ? `Skipped: ${skipped}.` : undefined,
+        translateNow(res.created === 1 ? "schedules.bulk.addedOne" : "schedules.bulk.addedMany", { n: res.created }),
+        skipped ? translateNow("schedules.bulk.skippedHint", { list: skipped }) : undefined,
       );
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -219,11 +222,9 @@ export function BulkScheduleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Add to roster</DialogTitle>
+          <DialogTitle>{t("schedules.bulk.title")}</DialogTitle>
           <DialogDescription>
-            {fixedEmployee
-              ? `Pick a work schedule and a date range. On each chosen weekday in the range, ${fixedEmployee.name} follows that schedule instead of their usual one. A single day works too — set both dates the same.`
-              : "Pick people, a work schedule and a date range. On each chosen weekday in the range, they follow that schedule instead of their usual one. A single day works too — just set both dates the same."}
+            {fixedEmployee ? t("schedules.bulk.descOne", { name: fixedEmployee.name }) : t("schedules.bulk.descMany")}
           </DialogDescription>
         </DialogHeader>
 
@@ -233,25 +234,25 @@ export function BulkScheduleDialog({
             {!fixedEmployee && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <Label>Employees</Label>
-                <span className="text-xs text-muted-foreground">{picked.size} selected</span>
+                <Label>{t("schedules.bulk.employees")}</Label>
+                <span className="text-xs text-muted-foreground">{t("common.table.selected", { n: picked.size })}</span>
               </div>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search…"
-                  aria-label="Search employees"
+                  placeholder={t("common.table.search")}
+                  aria-label={t("schedules.bulk.searchEmployees")}
                   className="pl-8"
                 />
               </div>
               <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
                 <label className="flex cursor-pointer items-center gap-2.5 border-b border-border bg-muted/50 px-3 py-2 text-sm font-medium">
                   <input type="checkbox" checked={allShownPicked} onChange={toggleAllShown} className="size-4 rounded border-input" />
-                  {term ? "Select everyone shown" : "Select everyone"}
+                  {term ? t("schedules.bulk.selectShown") : t("schedules.bulk.selectAll")}
                 </label>
-                {shown.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No one matches.</p>}
+                {shown.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t("schedules.bulk.noMatch")}</p>}
                 <ul className="divide-y divide-border">
                   {shown.map((employee) => (
                     <li key={employee.id}>
@@ -279,14 +280,14 @@ export function BulkScheduleDialog({
             {/* What and when */}
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="bulk-shift">Work schedule</Label>
+                <Label htmlFor="bulk-shift">{t("schedules.bulk.schedule")}</Label>
                 <select id="bulk-shift" required value={scheduleId} onChange={(e) => setScheduleId(e.target.value)} className={SELECT_CLASS}>
                   <option value="" disabled>
-                    Select…
+                    {t("schedules.bulk.select")}
                   </option>
                   {activeSchedules.map((schedule) => (
                     <option key={schedule.id} value={schedule.id}>
-                      {schedule.name} — {weekSummary(schedule)}
+                      {schedule.name} — {weekSummary(schedule, lang)}
                     </option>
                   ))}
                 </select>
@@ -294,38 +295,38 @@ export function BulkScheduleDialog({
 
               {locations.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="bulk-location">Work location (optional)</Label>
+                  <Label htmlFor="bulk-location">{t("schedules.bulk.location")}</Label>
                   <select id="bulk-location" value={locationId} onChange={(e) => setLocationId(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Their own branch</option>
+                    <option value="">{t("schedules.bulk.ownBranch")}</option>
                     {locations.map((location) => (
                       <option key={location.id} value={location.id}>
                         {location.name}
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-muted-foreground">Only set this to send people to a different site.</p>
+                  <p className="text-xs text-muted-foreground">{t("schedules.bulk.locationHint")}</p>
                 </div>
               )}
 
               <div className="flex flex-col gap-2">
-                <Label>Dates</Label>
+                <Label>{t("schedules.bulk.dates")}</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {QUICK_RANGES.map((quick) => (
                     <Button key={quick.id} type="button" variant="outline" size="sm" onClick={() => setDates(range(quick.id))}>
-                      {quick.label}
+                      {t(quick.label)}
                     </Button>
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="bulk-from" className="text-xs text-muted-foreground">
-                      From
+                      {t("common.field.from")}
                     </Label>
                     <Input id="bulk-from" type="date" required value={dates.from} onChange={(e) => setDates({ ...dates, from: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="bulk-to" className="text-xs text-muted-foreground">
-                      To
+                      {t("common.field.to")}
                     </Label>
                     <Input id="bulk-to" type="date" required value={dates.to} min={dates.from} onChange={(e) => setDates({ ...dates, to: e.target.value })} />
                   </div>
@@ -333,11 +334,11 @@ export function BulkScheduleDialog({
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label>Days of the week</Label>
+                <Label>{t("schedules.bulk.weekdays")}</Label>
                 <div className="grid grid-cols-7 gap-1">
-                  {WEEKDAYS.map((name, index) => (
+                  {WEEKDAY_KEYS.map((key, index) => (
                     <button
-                      key={name}
+                      key={key}
                       type="button"
                       aria-pressed={weekdays.includes(index)}
                       onClick={() => toggleWeekday(index)}
@@ -346,25 +347,25 @@ export function BulkScheduleDialog({
                         weekdays.includes(index) ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground hover:bg-muted",
                       )}
                     >
-                      {name}
+                      {t(`calendar.shared.weekday.short.${key}`)}
                     </button>
                   ))}
                 </div>
                 {weeklyOffDays.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Your company&apos;s weekly days off ({weeklyOffDays.map((d) => WEEKDAYS[d]).join(", ")}) start un-ticked.
+                    {t("schedules.bulk.companyOff", {
+                      days: weeklyOffDays.map((d) => t(`calendar.shared.weekday.short.${WEEKDAY_KEYS[d]}`)).join(", "),
+                    })}
                   </p>
                 )}
               </div>
 
               {overtimeOnly ? (
-                <Alert title="Overtime-only schedule">
-                  Every hour worked on these days counts as overtime — holiday overtime on a public holiday. Holidays are included.
-                </Alert>
+                <Alert title={t("schedules.bulk.overtimeOnlyTitle")}>{t("schedules.bulk.overtimeOnlyText")}</Alert>
               ) : (
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={skipHolidays} onChange={(e) => setSkipHolidays(e.target.checked)} className="size-4 rounded border-input" />
-                  Skip public holidays
+                  {t("schedules.bulk.skipHolidays")}
                 </label>
               )}
             </div>
@@ -375,24 +376,38 @@ export function BulkScheduleDialog({
             {rangeProblem && picked.size > 0 && scheduleId ? (
               <span className="text-destructive">{rangeProblem}</span>
             ) : !payload ? (
-              <span className="text-muted-foreground">Pick at least one employee and a work schedule to see what will be created.</span>
+              <span className="text-muted-foreground">{t("schedules.bulk.previewPick")}</span>
             ) : !previewReady ? (
-              <span className="text-muted-foreground">Checking…</span>
+              <span className="text-muted-foreground">{t("schedules.bulk.checking")}</span>
             ) : preview?.error ? (
               <span className="text-destructive">{preview.error}</span>
             ) : result ? (
               <span>
-                <strong>{result.created}</strong> roster {result.created === 1 ? "day" : "days"} will be added
-                {skippedText(result.skipped) && <span className="text-muted-foreground"> · skipping {skippedText(result.skipped)}</span>}
+                {/* The count is bold wherever the language puts it. */}
+                {t(result.created === 1 ? "schedules.bulk.willAddOne" : "schedules.bulk.willAddMany")
+                  .split("{n}")
+                  .map((part, i) => (
+                    <span key={i}>
+                      {i > 0 && <strong>{result.created}</strong>}
+                      {part}
+                    </span>
+                  ))}
+                {skippedText(result.skipped, lang) && (
+                  <span className="text-muted-foreground">{t("schedules.bulk.skipping", { list: skippedText(result.skipped, lang) })}</span>
+                )}
               </span>
             ) : null}
           </div>
 
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !previewReady || !result || result.created === 0}>
-              {saving ? "Adding…" : result ? `Add ${result.created} roster ${result.created === 1 ? "day" : "days"}` : "Add to roster"}
+              {saving
+                ? t("schedules.bulk.adding")
+                : result
+                  ? t(result.created === 1 ? "schedules.bulk.addOne" : "schedules.bulk.addMany", { n: result.created })
+                  : t("schedules.bulk.title")}
             </Button>
           </DialogFooter>
         </form>

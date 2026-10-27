@@ -1,5 +1,6 @@
 import { ACCOUNT_BLOCKED_CODES, ApiError } from "@/lib/api";
 import { headerKey, type SheetRow, type TemplateColumn } from "@/lib/excel";
+import { translateNow } from "@/lib/i18n";
 
 /**
  * The shared rules behind every "Import from Excel": what a column holds, how
@@ -152,34 +153,34 @@ function parseValue(field: ImportField, text: string): { value?: RowValue; probl
     const option = matchOption(field.options, text);
     return option
       ? { value: option.value }
-      : { problem: `${field.header} "${text}" isn't valid. Use one of: ${field.options.map((o) => o.label).join(", ")}.` };
+      : { problem: translateNow("app.excelImport.check.invalidOption", { field: field.header, text, options: field.options.map((o) => o.label).join(", ") }) };
   }
 
   switch (field.type) {
     case "integer": {
       const n = Number(text);
-      return Number.isInteger(n) ? { value: n } : { problem: `${field.header} must be a whole number.` };
+      return Number.isInteger(n) ? { value: n } : { problem: translateNow("app.excelImport.check.wholeNumber", { field: field.header }) };
     }
     case "number": {
       const n = Number(text.replace(/,/g, ""));
-      return Number.isFinite(n) ? { value: n } : { problem: `${field.header} must be a number.` };
+      return Number.isFinite(n) ? { value: n } : { problem: translateNow("app.excelImport.check.number", { field: field.header }) };
     }
     case "date": {
       const date = parseDate(text);
-      return date ? { value: date } : { problem: `${field.header} must be a date like 2026-09-01.` };
+      return date ? { value: date } : { problem: translateNow("app.excelImport.check.date", { field: field.header }) };
     }
     case "time": {
       const time = parseTime(text);
-      return time ? { value: time } : { problem: `${field.header} must be a time like 08:30.` };
+      return time ? { value: time } : { problem: translateNow("app.excelImport.check.time", { field: field.header }) };
     }
     case "boolean": {
       const word = text.toLowerCase();
       if (YES.includes(word)) return { value: true };
       if (NO.includes(word)) return { value: false };
-      return { problem: `${field.header} must be Yes or No.` };
+      return { problem: translateNow("app.excelImport.check.yesNo", { field: field.header }) };
     }
     case "email":
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text) ? { value: text.toLowerCase() } : { problem: `${field.header} isn't a valid email address.` };
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text) ? { value: text.toLowerCase() } : { problem: translateNow("app.excelImport.check.email", { field: field.header }) };
     default:
       return { value: text };
   }
@@ -212,7 +213,7 @@ export function parseRows(fields: ImportField[], columns: Record<string, string 
       const text = column ? (cells[column] ?? "").trim() : "";
 
       if (text === "") {
-        if (field.required) problems.push(`${field.header} is required.`);
+        if (field.required) problems.push(translateNow("app.excelImport.check.required", { field: field.header }));
         continue;
       }
 
@@ -245,7 +246,7 @@ export function errorText(err: unknown): string {
     return details.length > 0 ? details.join(" ") : err.message;
   }
   if (err instanceof Error) return err.message;
-  return "Something went wrong.";
+  return translateNow("common.message.somethingWrong");
 }
 
 /**
@@ -306,10 +307,10 @@ export class Lookup<T> {
   /** Like find(), but a name that matches nothing is the row's error. */
   require(value: string): T {
     if (this.ambiguous.has(norm(value))) {
-      throw new RowError(`More than one ${this.what} is called "${value}". Use a code or ID instead of the name.`);
+      throw new RowError(translateNow("app.excelImport.check.ambiguous", { what: this.what, value }));
     }
     const item = this.find(value);
-    if (!item) throw new RowError(`No ${this.what} called "${value}" was found.`);
+    if (!item) throw new RowError(translateNow("app.excelImport.check.notFound", { what: this.what, value }));
     return item;
   }
 

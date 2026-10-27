@@ -16,16 +16,15 @@ import { useMe } from "@/contexts/me-context";
 import { api, type WorkSchedule } from "@/lib/api";
 import { assignmentImport, exportAssignments, exportWorkSchedules, workScheduleImport } from "@/lib/excel-specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { daysOffText, formatMinutes, slotsOn, WEEK_ORDER, WEEKDAY_SHORT, slotsSummary } from "@/lib/schedule";
+import { daysOffText, formatMinutes, slotsOn, WEEK_ORDER, weekdayShort, slotsSummary } from "@/lib/schedule";
+import { useLang, useT } from "@/lib/i18n";
 
-const OVERTIME_LABEL: Record<WorkSchedule["overtime_mode"], string> = {
-  off: "No overtime",
-  after_last_out: "After last OUT",
-  above_scheduled: "Above scheduled hours",
-};
+// Overtime rule labels are schedules.page.overtime.<mode>.
 
 /** The week as a compact grid: one cell per day, Monday first. */
 function WeekStrip({ schedule }: { schedule: WorkSchedule }) {
+  const t = useT();
+  const lang = useLang();
   return (
     <div className="grid grid-cols-7 gap-0.5">
       {WEEK_ORDER.map((weekday) => {
@@ -34,15 +33,15 @@ function WeekStrip({ schedule }: { schedule: WorkSchedule }) {
         return (
           <div
             key={weekday}
-            title={`${WEEKDAY_SHORT[weekday]}: ${slotsSummary(slots)}`}
+            title={`${weekdayShort(weekday, lang)}: ${slotsSummary(slots, lang)}`}
             className={
               slots.length === 0
                 ? "rounded border border-dashed border-border px-0.5 py-0.5 text-center text-[10px] leading-tight text-muted-foreground"
                 : "rounded border border-primary/25 bg-primary/8 px-0.5 py-0.5 text-center text-[10px] leading-tight font-medium text-primary"
             }
           >
-            <div className="whitespace-nowrap">{WEEKDAY_SHORT[weekday]}</div>
-            <div className="whitespace-nowrap font-normal tabular-nums opacity-80">{slots.length === 0 ? "off" : stretches > 1 ? `${stretches}×` : slots[0].time.slice(0, 5)}</div>
+            <div className="whitespace-nowrap">{weekdayShort(weekday, lang)}</div>
+            <div className="whitespace-nowrap font-normal tabular-nums opacity-80">{slots.length === 0 ? t("schedules.page.dayOff") : stretches > 1 ? `${stretches}×` : slots[0].time.slice(0, 5)}</div>
           </div>
         );
       })}
@@ -52,6 +51,8 @@ function WeekStrip({ schedule }: { schedule: WorkSchedule }) {
 
 export default function WorkSchedulesPage() {
   const { me } = useMe();
+  const t = useT();
+  const lang = useLang();
   const confirm = useConfirm();
   const [schedules, setSchedules] = useState<WorkSchedule[] | null>(null);
   const [editing, setEditing] = useState<WorkSchedule | null>(null);
@@ -82,16 +83,15 @@ export default function WorkSchedulesPage() {
 
   async function handleDelete(schedule: WorkSchedule) {
     const ok = await confirm({
-      title: `Delete "${schedule.name}"?`,
-      description:
-        "Days already worked keep their own record of these hours. If anyone still follows it, move them to another schedule first — or just set it to inactive.",
+      title: t("schedules.page.deleteTitle", { name: schedule.name }),
+      description: t("schedules.page.deleteText"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.workSchedules.remove(schedule.id);
-      notifySuccess(`"${schedule.name}" deleted`);
+      notifySuccess(t("schedules.page.deleted", { name: schedule.name }));
     } catch (err) {
       notifyError(err);
     }
@@ -101,7 +101,7 @@ export default function WorkSchedulesPage() {
   const columns: DataTableColumn<WorkSchedule>[] = [
     {
       id: "name",
-      header: "Schedule",
+      header: t("schedules.page.column.schedule"),
       primary: true,
       cell: (s) => (
         <div className="flex min-w-0 flex-col">
@@ -115,48 +115,48 @@ export default function WorkSchedulesPage() {
     displayOrderColumn<WorkSchedule>(),
     {
       id: "week",
-      header: "Week",
+      header: t("schedules.page.column.week"),
       cell: (s) => <WeekStrip schedule={s} />,
       className: "min-w-56",
       fullWidthOnMobile: true,
     },
     {
       id: "hours",
-      header: "Hours / week",
-      cell: (s) => <span className="tabular-nums">{formatMinutes(s.weekly_minutes)}</span>,
+      header: t("schedules.page.column.hours"),
+      cell: (s) => <span className="tabular-nums">{formatMinutes(s.weekly_minutes, lang)}</span>,
       sortValue: (s) => s.weekly_minutes,
     },
     {
       id: "rules",
-      header: "Rules",
+      header: t("schedules.page.column.rules"),
       cell: (s) => (
         <div className="flex flex-col text-xs text-muted-foreground">
-          <span>Late after {s.late_grace_minutes} min</span>
-          <span>{OVERTIME_LABEL[s.overtime_mode]}{s.overtime_mode !== "off" && s.overtime_requires_approval ? " · needs approval" : ""}</span>
+          <span>{t("schedules.page.lateAfter", { n: s.late_grace_minutes })}</span>
+          <span>{t(`schedules.page.overtime.${s.overtime_mode}`)}{s.overtime_mode !== "off" && s.overtime_requires_approval ? t("schedules.page.needsApproval") : ""}</span>
         </div>
       ),
       hideOnMobile: true,
       // By how many minutes late is tolerated.
       sortValue: (s) => s.late_grace_minutes,
-      sortLabels: ["Strictest first", "Most lenient first"],
+      sortLabels: [t("schedules.page.sortStrictest"), t("schedules.page.sortLenient")],
     },
     {
       id: "people",
-      header: "People",
+      header: t("schedules.page.column.people"),
       cell: (s) => (
         <div className="flex flex-col text-xs">
           <span className="font-medium tabular-nums text-foreground">{s.assigned_count ?? 0}</span>
-          <span className="whitespace-nowrap text-muted-foreground">off {daysOffText(s.default_days_off)}</span>
+          <span className="whitespace-nowrap text-muted-foreground">{t("schedules.page.offDays", { days: daysOffText(s.default_days_off, lang) })}</span>
         </div>
       ),
       sortValue: (s) => s.assigned_count ?? 0,
     },
     {
       id: "status",
-      header: "Status",
-      cell: (s) => <Badge variant={s.is_active ? "success" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge>,
+      header: t("common.field.status"),
+      cell: (s) => <Badge variant={s.is_active ? "success" : "secondary"}>{s.is_active ? t("common.status.active") : t("common.status.inactive")}</Badge>,
       sortValue: (s) => (s.is_active ? 1 : 0),
-      sortLabels: ["Inactive first", "Active first"],
+      sortLabels: [t("schedules.page.sortInactive"), t("schedules.page.sortActive")],
     },
   ];
 
@@ -164,14 +164,14 @@ export default function WorkSchedulesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Work Schedules"
-          description="When people should scan in and out — two scans a day or more. Assign a schedule to people from a date; their days off are set per person."
+          title={t("schedules.page.title")}
+          description={t("schedules.page.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportWorkSchedules} importSpec={canManage ? workScheduleImport : undefined} onImported={load} />
               {/* Who follows which schedule, from when — the bulk version of "Assign". */}
               <ExcelActions
-                subject="assignments"
+                subject={t("schedules.page.assignments")}
                 onExport={exportAssignments}
                 importSpec={canAssign ? assignmentImport : undefined}
                 onImported={load}
@@ -179,7 +179,7 @@ export default function WorkSchedulesPage() {
               {canManage && (
                 <Button onClick={() => openForm(null)}>
                   <Plus className="size-4" />
-                  New schedule
+                  {t("schedules.page.newSchedule")}
                 </Button>
               )}
             </div>
@@ -190,15 +190,15 @@ export default function WorkSchedulesPage() {
           data={schedules}
           getRowId={(s) => s.id}
           columns={columns}
-          searchPlaceholder="Search schedules…"
+          searchPlaceholder={t("schedules.page.search")}
           emptyState={{
             icon: CalendarClock,
-            title: "No work schedules yet",
-            description: "Create one — for example 08:00–17:00, or a split shift 08:00–12:00 and 13:00–17:00 — then assign it to people.",
+            title: t("schedules.page.emptyTitle"),
+            description: t("schedules.page.emptyText"),
             action: canManage ? (
               <Button onClick={() => openForm(null)}>
                 <Plus className="size-4" />
-                New schedule
+                {t("schedules.page.newSchedule")}
               </Button>
             ) : undefined,
           }}
@@ -209,25 +209,25 @@ export default function WorkSchedulesPage() {
                     {canSeePeople && (
                       <Button variant="outline" size="sm" onClick={() => setViewingPeople(s)}>
                         <Users className="size-3.5" />
-                        People ({s.assigned_count ?? 0})
+                        {t("schedules.page.people", { n: s.assigned_count ?? 0 })}
                       </Button>
                     )}
                     {canAssign && s.is_active && (
                       <Button variant="outline" size="sm" onClick={() => setAssigning(s)}>
                         <UserPlus className="size-3.5" />
-                        Assign
+                        {t("schedules.page.assign")}
                       </Button>
                     )}
                     {canManage && (
                       <Button variant="outline" size="sm" onClick={() => openForm(s)}>
                         <Pencil className="size-3.5" />
-                        Edit
+                        {t("common.action.edit")}
                       </Button>
                     )}
                     {canManage && (
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(s)}>
                         <Trash2 className="size-3.5" />
-                        Delete
+                        {t("common.action.delete")}
                       </Button>
                     )}
                   </>

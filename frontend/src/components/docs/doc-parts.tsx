@@ -1,15 +1,45 @@
+"use client";
+
 import { Alert } from "@/components/ui/alert";
+import { useLang, useT } from "@/lib/i18n";
+import { en, type Dictionary } from "@/lib/i18n/en";
+import { km } from "@/lib/i18n/km";
 import { cn } from "@/lib/utils";
 
-/* Building blocks for the public docs pages: plain, readable, printable. */
+/*
+ * Building blocks for the public docs pages: plain, readable, printable.
+ * They are client components so the text follows the language chosen on this device.
+ */
+
+/** The docs dictionary in the current language — typed, so tables and lists can map over rows. */
+export function useDoc(): Dictionary["docs"] {
+  return useLang() === "en" ? en.docs : km.docs;
+}
+
+const MARK = /<(b|i|path)>(.*?)<\/\1>/g;
+
+/** Dictionary prose with inline marks: <b>bold</b>, <i>italic</i>, <path>where to click</path>. */
+export function rich(text: string): React.ReactNode {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(MARK)) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const key = out.length;
+    out.push(m[1] === "b" ? <b key={key}>{m[2]}</b> : m[1] === "i" ? <i key={key}>{m[2]}</i> : <Path key={key}>{m[2]}</Path>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out.length === 1 ? out[0] : out;
+}
 
 export type TocEntry = { id: string; title: string; step?: number };
 
 /** The contents list: a sticky sidebar on wide screens, a box at the top on phones. */
 export function Toc({ entries }: { entries: TocEntry[] }) {
+  const t = useT();
   return (
-    <nav aria-label="Contents" className="text-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">On this page</p>
+    <nav aria-label={t("docs.chrome.contents")} className="text-sm">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("docs.chrome.onThisPage")}</p>
       <ol className="flex flex-col gap-1">
         {entries.map((e) => (
           <li key={e.id}>
@@ -25,10 +55,11 @@ export function Toc({ entries }: { entries: TocEntry[] }) {
 }
 
 export function Section({ id, step, title, intro, children }: { id: string; step?: number; title: string; intro?: React.ReactNode; children: React.ReactNode }) {
+  const t = useT();
   return (
     <section id={id} className="scroll-mt-20 border-t border-border pt-10 first:border-t-0 first:pt-0">
       <h2 className="flex items-baseline gap-3 text-2xl font-semibold tracking-tight">
-        {step !== undefined && <span className="rounded-md bg-primary/10 px-2 py-0.5 text-base tabular-nums text-primary">Step {step}</span>}
+        {step !== undefined && <span className="rounded-md bg-primary/10 px-2 py-0.5 text-base tabular-nums text-primary">{t("docs.chrome.step", { n: step })}</span>}
         {title}
       </h2>
       {intro && <p className="mt-2 text-muted-foreground">{intro}</p>}

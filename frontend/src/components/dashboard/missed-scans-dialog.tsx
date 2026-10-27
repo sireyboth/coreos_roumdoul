@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type AttendanceDay } from "@/lib/api";
+import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 const ALL = "";
@@ -19,7 +20,8 @@ const ALL = "";
 // expected_at / actual_at are written in the company's time zone, so the clock part is the local time.
 const clockOf = (iso: string) => iso.slice(11, 16);
 
-const monthLabel = (month: string) => parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+const monthLabel = (month: string, lang: Lang) =>
+  parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" });
 
 function monthRange(month: string): { from: string; to: string } {
   const [year, m] = month.split("-").map(Number);
@@ -28,9 +30,14 @@ function monthRange(month: string): { from: string; to: string } {
 }
 
 /** "IN 1", "OUT 1", "IN 2"… for each slot of a day, by sequence. */
-function slotLabels(day: AttendanceDay): Map<number, string> {
+function slotLabels(day: AttendanceDay, t: ReturnType<typeof useT>): Map<number, string> {
   const counts = { in: 0, out: 0 };
-  return new Map(day.slots.map((slot) => [slot.sequence, `${slot.type.toUpperCase()} ${++counts[slot.type]}`]));
+  return new Map(
+    day.slots.map((slot) => [
+      slot.sequence,
+      t(slot.type === "in" ? "attendance.fillMissed.slotIn" : "attendance.fillMissed.slotOut", { n: ++counts[slot.type] }),
+    ]),
+  );
 }
 
 const isMissing = (slot: AttendanceDay["slots"][number]) => slot.scan_id === null && slot.status === "missing";
@@ -51,6 +58,8 @@ export function MissedScansDialog({
   initialMonth: string;
   onChanged: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [month, setMonth] = useState(initialMonth);
   const [employeeId, setEmployeeId] = useState(ALL);
   const [people, setPeople] = useState<{ value: string; label: string }[]>([]);
@@ -76,7 +85,8 @@ export function MissedScansDialog({
     if (!open) return;
     api.employees
       .all()
-      .then((list) => setPeople([{ value: ALL, label: "All employees" }, ...list.map((e) => ({ value: String(e.id), label: e.name }))]))
+      // "All employees" is added at render, so it follows the language.
+      .then((list) => setPeople(list.map((e) => ({ value: String(e.id), label: e.name }))))
       .catch(notifyError);
   }, [open]);
 
@@ -119,7 +129,7 @@ export function MissedScansDialog({
       for (const group of groups.values()) {
         filled += (await api.attendance.fillMissed(group.ids, reason.trim(), group.times ?? undefined)).filled;
       }
-      notifySuccess(`Missed scans saved on ${filled} ${filled === 1 ? "day" : "days"}`, reason.trim());
+      notifySuccess(t(filled === 1 ? "attendance.missedScans.savedOne" : "attendance.missedScans.savedOther", { n: filled }), reason.trim());
       reload();
       onChanged();
     } catch (err) {
@@ -136,31 +146,37 @@ export function MissedScansDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="flex max-h-[92vh] flex-col gap-4 sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Missed scans</DialogTitle>
-          <DialogDescription>Days where someone worked but didn&apos;t scan. Check the times, then save to complete their record.</DialogDescription>
+          <DialogTitle>{t("attendance.missedScans.title")}</DialogTitle>
+          <DialogDescription>{t("attendance.missedScans.description")}</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="missed-employee">Employee</Label>
+            <Label htmlFor="missed-employee">{t("common.field.employee")}</Label>
             <SearchableSelect
               id="missed-employee"
-              options={people}
+              options={people.length ? [{ value: ALL, label: t("attendance.missedScans.allEmployees") }, ...people] : people}
               value={employeeId}
               onChange={(value) => setEmployeeId(value ?? ALL)}
-              placeholder="All employees"
+              placeholder={t("attendance.missedScans.allEmployees")}
               clearable={false}
               className="h-9 w-full rounded-md"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Month</Label>
+            <Label>{t("common.time.month")}</Label>
             <div className="flex items-center gap-1">
-              <Button type="button" variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setMonth(shiftMonth(month, -1))}
+                aria-label={t("common.time.previousMonth")}
+              >
                 <ChevronLeft className="size-4" />
               </Button>
-              <span className="min-w-32 text-center text-sm font-medium">{monthLabel(month)}</span>
-              <Button type="button" variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+              <span className="min-w-32 text-center text-sm font-medium">{monthLabel(month, lang)}</span>
+              <Button type="button" variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={t("common.time.nextMonth")}>
                 <ChevronRight className="size-4" />
               </Button>
             </div>
@@ -168,7 +184,7 @@ export function MissedScansDialog({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="missed-reason">Reason</Label>
+          <Label htmlFor="missed-reason">{t("common.field.reason")}</Label>
           <Textarea
             id="missed-reason"
             rows={2}
@@ -177,30 +193,30 @@ export function MissedScansDialog({
               setReason(e.target.value);
               setReasonMissing(false);
             }}
-            placeholder="e.g. Scanner was down / Working at a client site"
+            placeholder={t("attendance.missedScans.reasonPlaceholder")}
             maxLength={255}
             aria-invalid={reasonMissing || undefined}
           />
           {reasonMissing ? (
-            <p className="text-xs text-destructive">Add a reason — it&apos;s saved on each day and shown in the export.</p>
+            <p className="text-xs text-destructive">{t("attendance.missedScans.reasonMissing")}</p>
           ) : (
-            <p className="text-xs text-muted-foreground">Saved on each day you save, and shown in the attendance export.</p>
+            <p className="text-xs text-muted-foreground">{t("attendance.missedScans.reasonHint")}</p>
           )}
         </div>
 
         <div className="-mx-6 min-h-40 flex-1 overflow-y-auto border-y border-border px-6">
           {days === null ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">{t("common.message.loading")}</p>
           ) : days.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <CheckCheck className="size-8 text-success" />
-              <p className="font-medium">No missed scans</p>
-              <p className="text-sm text-muted-foreground">Everyone scanned in and out in {monthLabel(month)}.</p>
+              <p className="font-medium">{t("attendance.missedScans.noneTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("attendance.missedScans.noneHint", { month: monthLabel(month, lang) })}</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
               {days.map((day) => {
-                const labels = slotLabels(day);
+                const labels = slotLabels(day, t);
                 const none = day.scan_count === 0;
                 return (
                   <li key={day.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-end">
@@ -208,10 +224,12 @@ export function MissedScansDialog({
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         {showName && <span className="font-medium">{day.employee?.name}</span>}
                         <span className={showName ? "text-sm text-muted-foreground" : "font-medium"}>
-                          {parseDate(day.date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
+                          {parseDate(day.date).toLocaleDateString(dateLocale(lang), { weekday: "short", day: "numeric", month: "short" })}
                         </span>
                         {day.schedule && <span className="text-xs text-muted-foreground">· {day.schedule}</span>}
-                        <Badge variant={none ? "destructive" : "warning"}>{none ? "No scans" : "Missing a scan"}</Badge>
+                        <Badge variant={none ? "destructive" : "warning"}>
+                          {none ? t("attendance.missedScans.noScans") : t("attendance.missedScans.missingScan")}
+                        </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                         {day.slots.map((slot) => (
@@ -220,10 +238,10 @@ export function MissedScansDialog({
                             {isMissing(slot) ? (
                               <Input
                                 type="time"
-                                aria-label={`${labels.get(slot.sequence)} time`}
+                                aria-label={t("attendance.missedScans.slotTime", { slot: labels.get(slot.sequence) ?? "" })}
                                 value={timeFor(day, slot.sequence, slot.expected_at)}
                                 onChange={(e) =>
-                                  setTimes((t) => ({ ...t, [day.id]: { ...t[day.id], [slot.sequence]: e.target.value } }))
+                                  setTimes((all) => ({ ...all, [day.id]: { ...all[day.id], [slot.sequence]: e.target.value } }))
                                 }
                               />
                             ) : (
@@ -237,7 +255,7 @@ export function MissedScansDialog({
                       </div>
                     </div>
                     <Button type="button" variant="outline" size="sm" disabled={saving !== null} onClick={() => save([day], day.id)}>
-                      {saving === day.id ? "Saving…" : "Save"}
+                      {saving === day.id ? t("attendance.missedScans.saving") : t("common.action.save")}
                     </Button>
                   </li>
                 );
@@ -247,11 +265,13 @@ export function MissedScansDialog({
         </div>
 
         <DialogFooter className="sm:items-center">
-          <p className="text-xs text-muted-foreground sm:mr-auto">
-            Grey times were scanned and stay as they are. Times you leave unchanged follow the schedule.
-          </p>
+          <p className="text-xs text-muted-foreground sm:mr-auto">{t("attendance.missedScans.footerHint")}</p>
           <Button type="button" disabled={!days?.length || saving !== null} onClick={() => days && save(days, "all")}>
-            {saving === "all" ? "Saving…" : `Save all${days?.length ? ` (${days.length})` : ""}`}
+            {saving === "all"
+              ? t("attendance.missedScans.saving")
+              : days?.length
+                ? t("attendance.missedScans.saveAllCount", { n: days.length })
+                : t("attendance.missedScans.saveAll")}
           </Button>
         </DialogFooter>
       </DialogContent>

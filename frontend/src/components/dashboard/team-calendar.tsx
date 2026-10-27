@@ -16,12 +16,13 @@ import {
   HalfDayShade,
   halfDayLabel,
   halfDayLeave,
-  WEEKDAYS,
+  WEEKDAY_KEYS,
 } from "@/components/dashboard/calendar-shared";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { useApi } from "@/hooks/use-api";
 import { api, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
 import { dayOffImport, exportTeamCalendar } from "@/lib/excel-specs/time";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { slotsSummary } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,8 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: stri
 }
 
 export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean; refreshKey?: number }) {
+  const t = useT();
+  const lang = useLang();
   const [month, setMonth] = useState(currentMonth);
   const [branchId, setBranchId] = useState("");
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -54,7 +57,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
   const { data, error, loading, reload } = useApi<TeamData>(
     () => api.calendar.team(month, branchId ? Number(branchId) : undefined),
     [month, branchId, refreshKey],
-    { errorMessage: "Couldn't load the team calendar.", keepPrevious: true },
+    { errorMessage: t("calendar.team.loadFailed"), keepPrevious: true },
   );
 
   const employees = useMemo(() => {
@@ -85,20 +88,20 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
   }, [data, employees]);
 
   const dates = data?.employees[0]?.days.map((d) => d.date) ?? [];
-  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const monthLabel = parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" });
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">
+        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))} aria-label={t("common.time.previousMonth")}>
           <ChevronLeft className="size-4" />
         </Button>
         <h2 className="min-w-40 text-center text-base font-semibold">{monthLabel}</h2>
-        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">
+        <Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))} aria-label={t("common.time.nextMonth")}>
           <ChevronRight className="size-4" />
         </Button>
         <Button variant="outline" onClick={() => setMonth(currentMonth())}>
-          Today
+          {t("common.time.today")}
         </Button>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -107,8 +110,8 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search employee…"
-              aria-label="Search employee"
+              placeholder={t("calendar.team.searchPlaceholder")}
+              aria-label={t("calendar.team.searchLabel")}
               className="w-52 pl-8"
             />
           </div>
@@ -116,10 +119,10 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
             <select
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              aria-label="Branch"
+              aria-label={t("common.field.branch")}
               className={SELECT_CLASS}
             >
-              <option value="">All branches</option>
+              <option value="">{t("calendar.team.allBranches")}</option>
               {branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
                   {branch.name}
@@ -139,17 +142,17 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
       {error && <Alert variant="warning">{error}</Alert>}
       {data?.truncated && (
         <Alert variant="warning">
-          Showing the first {data.employees.length} of {data.total} employees. Pick a branch to narrow it down.
+          {t("calendar.team.truncated", { shown: data.employees.length, total: data.total })}
         </Alert>
       )}
 
       {todayStats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <Stat label="Scheduled today" value={todayStats.working} tone="bg-info" />
-          <Stat label="Present" value={todayStats.present} tone="bg-success" />
-          <Stat label="Late" value={todayStats.late} tone="bg-warning" />
-          <Stat label="Absent" value={todayStats.absent} tone="bg-destructive" />
-          <Stat label="Off / holiday" value={todayStats.off} tone="bg-muted-foreground/50" />
+          <Stat label={t("calendar.team.stat.scheduled")} value={todayStats.working} tone="bg-info" />
+          <Stat label={t("calendar.team.stat.present")} value={todayStats.present} tone="bg-success" />
+          <Stat label={t("calendar.team.stat.late")} value={todayStats.late} tone="bg-warning" />
+          <Stat label={t("calendar.team.stat.absent")} value={todayStats.absent} tone="bg-destructive" />
+          <Stat label={t("calendar.team.stat.off")} value={todayStats.off} tone="bg-muted-foreground/50" />
         </div>
       )}
 
@@ -157,7 +160,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
 
       {data && !loading && employees.length === 0 && (
         <p className="rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-          {data.employees.length === 0 ? "No employees to show for this month." : "No one matches your search."}
+          {data.employees.length === 0 ? t("calendar.team.noEmployees") : t("calendar.team.noMatches")}
         </p>
       )}
 
@@ -168,7 +171,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
               <tr>
                 {/* Narrow on a phone so more days fit beside it; names are cut short there. */}
                 <th className="sticky left-0 z-20 min-w-28 border-b border-r border-border bg-muted px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground sm:min-w-44 sm:px-3">
-                  Employee
+                  {t("calendar.team.colEmployee")}
                 </th>
                 {dates.map((date) => {
                   const d = parseDate(date);
@@ -178,14 +181,14 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                   return (
                     <th
                       key={date}
-                      title={[khmer.full, ...khmer.holidays.map((h) => h.nameEn)].join(" — ")}
+                      title={[khmer.full, ...khmer.holidays.map((h) => (lang === "km" ? h.nameKm : h.nameEn))].join(" — ")}
                       className={cn(
                         "border-b border-border bg-muted px-0.5 py-1.5 text-center font-normal",
                         isToday && "bg-primary/10",
                       )}
                     >
                       <div className={cn("text-[10px] uppercase text-muted-foreground", (d.getDay() === 0 || d.getDay() === 6) && "text-foreground/70")}>
-                        {WEEKDAYS[d.getDay()].slice(0, 2)}
+                        {t(`calendar.shared.weekday.min.${WEEKDAY_KEYS[d.getDay()]}`)}
                       </div>
                       <div className={cn("text-sm font-semibold", isToday && "text-primary", khmer.holidays.length > 0 && "text-destructive")}>
                         {d.getDate()}
@@ -195,13 +198,13 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                   );
                 })}
                 <th className="border-b border-l border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground">
-                  Present
+                  {t("calendar.team.colPresent")}
                 </th>
                 <th className="border-b border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground">
-                  Late
+                  {t("calendar.team.colLate")}
                 </th>
                 <th className="border-b border-border bg-muted px-2 text-center text-[10px] font-semibold uppercase text-muted-foreground">
-                  Absent
+                  {t("calendar.team.colAbsent")}
                 </th>
               </tr>
             </thead>
@@ -223,11 +226,11 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                     const halfDay = halfDayLeave(day);
                     const tip = [
                       `${employee.name} · ${day.date}`,
-                      day.label ?? style.label,
-                      halfDay ? halfDayLabel(halfDay) : null,
-                      day.schedule ? `${day.schedule.name} ${slotsSummary(day.schedule.slots)}` : null,
-                      day.scans?.length ? `Scans ${day.scans.join(", ")}` : null,
-                      attendance ? ATTENDANCE[attendance].label : null,
+                      day.label ?? t(`calendar.shared.dayType.${day.type as CalendarDayType}`),
+                      halfDay ? halfDayLabel(halfDay, lang) : null,
+                      day.schedule ? `${day.schedule.name} ${slotsSummary(day.schedule.slots, lang)}` : null,
+                      day.scans?.length ? t("calendar.team.tipScans", { scans: day.scans.join(", ") }) : null,
+                      attendance ? t(`calendar.shared.attendance.${attendance}`) : null,
                     ]
                       .filter(Boolean)
                       .join(" — ");
@@ -274,24 +277,24 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
         {(Object.keys(TYPE_STYLES) as CalendarDayType[]).map((type) => (
           <span key={type} className="flex items-center gap-1.5">
             <span className={cn("size-3 rounded-sm", TYPE_STYLES[type].swatch)} />
-            {TYPE_STYLES[type].label}
+            {t(`calendar.shared.dayType.${type}`)}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
           <span className="relative size-3 overflow-hidden rounded-sm bg-info/40">
             <span className="absolute inset-y-0 left-0 w-1/2 bg-violet-500/60" />
           </span>
-          Half-day leave
+          {t("calendar.shared.halfDayLegend")}
         </span>
         {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
           <span key={status} className="flex items-center gap-1.5">
             <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />
-            {ATTENDANCE[status].label}
+            {t(`calendar.shared.attendance.${status}`)}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
           <span className="font-semibold text-destructive">12</span>
-          Khmer public holiday
+          {t("calendar.team.khmerHoliday")}
         </span>
       </div>
 

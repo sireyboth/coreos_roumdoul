@@ -12,6 +12,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, Employee } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/download";
+import { useT } from "@/lib/i18n";
 import { notifyError } from "@/lib/notify";
 
 /**
@@ -21,6 +22,7 @@ import { notifyError } from "@/lib/notify";
  */
 export default function IdCardsPage() {
   const { me } = useMe();
+  const t = useT();
   const canView = me?.permissions.includes("employees.view") ?? false;
 
   const [employees, setEmployees] = useState<Employee[] | null>(null);
@@ -60,7 +62,7 @@ export default function IdCardsPage() {
   const columns: DataTableColumn<Employee>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (employee) => (
         <div className="flex items-center gap-3">
@@ -76,13 +78,13 @@ export default function IdCardsPage() {
     },
     {
       id: "department",
-      header: "Department",
+      header: t("common.field.department"),
       cell: (employee) => <span className="text-muted-foreground">{employee.department?.name ?? "—"}</span>,
       sortValue: (employee) => employee.department?.name,
     },
     {
       id: "branch",
-      header: "Branch",
+      header: t("common.field.branch"),
       cell: (employee) => <span className="text-muted-foreground">{employee.branch?.name ?? "—"}</span>,
       sortValue: (employee) => employee.branch?.name,
     },
@@ -91,7 +93,7 @@ export default function IdCardsPage() {
   if (!canView) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <Alert variant="destructive">You don&apos;t have permission to view this page.</Alert>
+        <Alert variant="destructive">{t("employees.shared.noPermission")}</Alert>
       </div>
     );
   }
@@ -99,20 +101,20 @@ export default function IdCardsPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
-        <PageHeader title="ID Cards" description="Print a badge for any employee — photo, ID, and a scannable QR code." />
+        <PageHeader title={t("employees.idCards.title")} description={t("employees.idCards.description")} />
 
         {employees === null ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">{t("common.message.loading")}</p>
         ) : (
           <DataTable
             data={employees}
             getRowId={(employee) => employee.id}
             columns={columns}
-            searchPlaceholder="Search by name or employee ID…"
+            searchPlaceholder={t("employees.idCards.search")}
             emptyState={{
               icon: IdCard,
-              title: "No employees yet",
-              description: "Add employees first, then come back here to print their ID cards.",
+              title: t("employees.shared.noEmployees"),
+              description: t("employees.idCards.emptyHint"),
             }}
             rowActions={(employee) => (
               <>
@@ -123,7 +125,7 @@ export default function IdCardsPage() {
                   disabled={busy?.id === employee.id}
                 >
                   <Eye className="size-3.5" />
-                  {busy?.id === employee.id && busy.action === "view" ? "Preparing…" : "View"}
+                  {busy?.id === employee.id && busy.action === "view" ? t("employees.shared.preparing") : t("common.action.view")}
                 </Button>
                 <Button
                   variant="outline"
@@ -132,7 +134,7 @@ export default function IdCardsPage() {
                   disabled={busy?.id === employee.id}
                 >
                   <IdCard className="size-3.5" />
-                  {busy?.id === employee.id && busy.action === "download" ? "Preparing…" : "Print"}
+                  {busy?.id === employee.id && busy.action === "download" ? t("employees.shared.preparing") : t("common.action.print")}
                 </Button>
               </>
             )}

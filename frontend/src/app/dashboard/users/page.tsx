@@ -26,6 +26,7 @@ import { Alert } from "@/components/ui/alert";
 import { exportUsers, userImport } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useT } from "@/lib/i18n";
 
 function BranchAccessDialog({
   user,
@@ -40,6 +41,7 @@ function BranchAccessDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [selected, setSelected] = useState<number[]>(() => user?.branch_ids ?? []);
   const [saving, setSaving] = useState(false);
 
@@ -54,11 +56,10 @@ function BranchAccessDialog({
     setSaving(true);
     try {
       await api.users.setBranchAccess(user.id, selected);
-      notifySuccess("Branch access updated", `${user.name} can now see ${selected.length ? "only the selected branches" : "every branch"}.`);
+      notifySuccess(t("access.usersPage.branchSaved"), t(selected.length ? "access.usersPage.branchSavedSome" : "access.usersPage.branchSavedAll", { name: user.name }));
       onOpenChange(false);
       onSaved();
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     } finally {
       setSaving(false);
@@ -69,10 +70,9 @@ function BranchAccessDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Branch access for {user?.name}</DialogTitle>
+          <DialogTitle>{t("access.usersPage.branchTitle", { name: user?.name ?? "" })}</DialogTitle>
           <DialogDescription>
-            Leave everything unchecked to give them access to every branch. Check specific branches to
-            restrict them to only those.
+            {t("access.usersPage.branchDescription")}
           </DialogDescription>
         </DialogHeader>
         <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
@@ -89,9 +89,9 @@ function BranchAccessDialog({
           ))}
         </div>
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("access.usersPage.saving") : t("common.action.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -128,6 +128,7 @@ function RoleSelect({
 
 export default function UsersPage() {
   const { me } = useMe();
+  const t = useT();
   const confirm = useConfirm();
   const [users, setUsers] = useState<CompanyUser[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -161,7 +162,7 @@ export default function UsersPage() {
 
     try {
       await api.users.invite({ name, email, password, role });
-      notifySuccess("Teammate invited", `${email} can now sign in.`);
+      notifySuccess(t("access.usersPage.invited"), t("access.usersPage.invitedHint", { email }));
       setName("");
       setEmail("");
       setPassword("");
@@ -169,7 +170,7 @@ export default function UsersPage() {
       loadUsers();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -178,9 +179,8 @@ export default function UsersPage() {
   async function handleRoleChange(user: CompanyUser, newRole: string) {
     try {
       await api.users.updateRole(user.id, newRole);
-      notifySuccess(`${user.name} is now ${newRole}`);
+      notifySuccess(t("access.usersPage.roleChanged", { name: user.name, role: newRole }));
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     }
     loadUsers();
@@ -189,9 +189,8 @@ export default function UsersPage() {
   async function handleToggleActive(user: CompanyUser) {
     try {
       await api.users.setActive(user.id, !user.is_active);
-      notifySuccess(`${user.name} ${user.is_active ? "deactivated" : "reactivated"}`);
+      notifySuccess(t(user.is_active ? "access.usersPage.deactivatedToast" : "access.usersPage.reactivatedToast", { name: user.name }));
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     }
     loadUsers();
@@ -199,17 +198,16 @@ export default function UsersPage() {
 
   async function handleRemove(user: CompanyUser) {
     const ok = await confirm({
-      title: `Remove ${user.name}?`,
-      description: "They will lose access immediately. This can't be undone.",
-      confirmLabel: "Remove",
+      title: t("access.usersPage.removeTitle", { name: user.name }),
+      description: t("access.usersPage.removeDescription"),
+      confirmLabel: t("common.action.remove"),
       destructive: true,
     });
     if (!ok) return;
     try {
       await api.users.remove(user.id);
-      notifySuccess(`${user.name} removed`);
+      notifySuccess(t("access.usersPage.removed", { name: user.name }));
     } catch (err) {
-      notifyError(err);
       notifyError(err);
     }
     loadUsers();
@@ -222,11 +220,11 @@ export default function UsersPage() {
   const columns: DataTableColumn<CompanyUser>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (user) => (
         <span className="font-medium">
-          {user.name} {user.id === me?.user.id && <span className="text-muted-foreground">(you)</span>}
+          {user.name} {user.id === me?.user.id && <span className="text-muted-foreground">{t("access.usersPage.you")}</span>}
         </span>
       ),
       sortValue: (user) => user.name,
@@ -234,39 +232,39 @@ export default function UsersPage() {
     },
     {
       id: "login",
-      header: "Email / ID",
+      header: t("access.usersPage.colLogin"),
       cell: (user) => (
         <span className="break-all text-muted-foreground">
-          {user.email ?? (user.login_id ? <span title="Signs in with their employee ID">ID: {user.login_id}</span> : "—")}
+          {user.email ?? (user.login_id ? <span title={t("access.usersPage.signsInById")}>{t("access.usersPage.idPrefix", { id: user.login_id })}</span> : "—")}
         </span>
       ),
       sortValue: (user) => user.email ?? user.login_id,
     },
     {
       id: "role",
-      header: "Role",
+      header: t("access.usersPage.role"),
       cell: (user) =>
         canManage && user.id !== me?.user.id ? (
           <RoleSelect roles={roles} value={user.role ?? ""} onChange={(newRole) => handleRoleChange(user, newRole)} />
         ) : (
-          <Badge variant="outline">{user.role ?? "no role"}</Badge>
+          <Badge variant="outline">{user.role ?? t("access.usersPage.noRole")}</Badge>
         ),
       sortValue: (user) => user.role,
     },
     {
       id: "status",
-      header: "Status",
-      cell: (user) => (user.is_active ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Deactivated</Badge>),
+      header: t("common.field.status"),
+      cell: (user) => (user.is_active ? <Badge variant="success">{t("common.status.active")}</Badge> : <Badge variant="secondary">{t("access.usersPage.deactivated")}</Badge>),
       sortValue: (user) => (user.is_active ? 1 : 0),
-      sortLabels: ["Deactivated first", "Active first"],
+      sortLabels: [t("access.usersPage.sortDeactivatedFirst"), t("access.usersPage.sortActiveFirst")],
     },
     ...(branches.length > 0
       ? [
           {
             id: "branches",
-            header: "Branch access",
+            header: t("access.usersPage.colBranches"),
             sortValue: (user: CompanyUser) =>
-              user.branch_ids?.length ? user.branch_ids.map((id) => branches.find((b) => b.id === id)?.name ?? "").join(", ") : "All branches",
+              user.branch_ids?.length ? user.branch_ids.map((id) => branches.find((b) => b.id === id)?.name ?? "").join(", ") : t("access.usersPage.allBranches"),
             cell: (user: CompanyUser) =>
               user.branch_ids && user.branch_ids.length > 0 ? (
                 <span className="flex flex-wrap gap-1">
@@ -277,7 +275,7 @@ export default function UsersPage() {
                   ))}
                 </span>
               ) : (
-                <Badge variant="outline">All branches</Badge>
+                <Badge variant="outline">{t("access.usersPage.allBranches")}</Badge>
               ),
           },
         ]
@@ -288,11 +286,11 @@ export default function UsersPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Users"
+          title={t("access.usersPage.title")}
           description={
             canManageRoles ? (
               <Link href="/dashboard/roles" className="hover:underline">
-                Manage roles &amp; permissions →
+                {t("access.usersPage.manageRoles")}
               </Link>
             ) : undefined
           }
@@ -305,22 +303,22 @@ export default function UsersPage() {
                     render={
                       <Button>
                         <Plus className="size-4" />
-                        Invite user
+                        {t("access.usersPage.invite")}
                       </Button>
                     }
                   />
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Invite a teammate</DialogTitle>
-                      <DialogDescription>Creates their login and assigns a role.</DialogDescription>
+                      <DialogTitle>{t("access.usersPage.inviteTitle")}</DialogTitle>
+                      <DialogDescription>{t("access.usersPage.inviteDescription")}</DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleInvite} className="flex flex-col gap-4">
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="name">Name</Label>
+                        <Label htmlFor="name">{t("common.field.name")}</Label>
                         <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
                       </div>
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">{t("common.field.email")}</Label>
                         <Input
                           id="email"
                           type="email"
@@ -330,7 +328,7 @@ export default function UsersPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="password">Temporary password</Label>
+                        <Label htmlFor="password">{t("access.usersPage.tempPassword")}</Label>
                         <Input
                           id="password"
                           type="password"
@@ -341,14 +339,14 @@ export default function UsersPage() {
                         />
                       </div>
                       <div className="flex flex-col gap-2">
-                        <Label htmlFor="role">Role</Label>
+                        <Label htmlFor="role">{t("access.usersPage.role")}</Label>
                         <RoleSelect roles={roles} value={role} onChange={setRole} />
                       </div>
                       {error && <Alert variant="destructive">{error}</Alert>}
                       <DialogFooter>
-                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                         <Button type="submit" disabled={saving}>
-                          {saving ? "Inviting…" : "Invite"}
+                          {saving ? t("access.usersPage.inviting") : t("access.usersPage.inviteButton")}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -364,11 +362,11 @@ export default function UsersPage() {
           data={users}
           getRowId={(u) => u.id}
           columns={columns}
-          searchPlaceholder="Search by name, email or ID…"
+          searchPlaceholder={t("access.usersPage.search")}
           emptyState={{
             icon: KeyRound,
-            title: "No users yet",
-            description: "Invite your first teammate to give them access.",
+            title: t("access.usersPage.empty"),
+            description: t("access.usersPage.emptyHint"),
           }}
           rowActions={
             canManage
@@ -377,14 +375,14 @@ export default function UsersPage() {
                     <>
                       {branches.length > 0 && (
                         <Button variant="outline" size="sm" onClick={() => setBranchAccessUser(user)}>
-                          Branch access
+                          {t("access.usersPage.branchAccess")}
                         </Button>
                       )}
                       <Button variant="outline" size="sm" onClick={() => handleToggleActive(user)}>
-                        {user.is_active ? "Deactivate" : "Activate"}
+                        {user.is_active ? t("access.usersPage.deactivate") : t("access.usersPage.activate")}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleRemove(user)}>
-                        Remove
+                        {t("common.action.remove")}
                       </Button>
                     </>
                   )

@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/hooks/use-api";
 import { api, type PayslipBody } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useLang, useT } from "@/lib/i18n";
 import { LINE_SECTIONS, WarningList, dateLabel, money, monthLabel } from "./shared";
 
 function Row({ label, value, strong, muted }: { label: React.ReactNode; value: string; strong?: boolean; muted?: boolean }) {
@@ -23,6 +24,8 @@ function Row({ label, value, strong, muted }: { label: React.ReactNode; value: s
  * the live preview in settings.
  */
 export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?: string }) {
+  const t = useT();
+  const lang = useLang();
   const c = slip.currency;
   const a = slip.inputs.attendance;
   const v = slip.inputs.variables;
@@ -39,15 +42,15 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
 
       <div className="grid grid-cols-3 gap-2">
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-xs text-muted-foreground">Gross</p>
+          <p className="text-xs text-muted-foreground">{t("payroll.payslip.gross")}</p>
           <p className="text-base font-semibold tabular-nums">{money(slip.gross, c)}</p>
         </div>
         <div className="rounded-lg bg-muted/50 p-3">
-          <p className="text-xs text-muted-foreground">NSSF + tax</p>
+          <p className="text-xs text-muted-foreground">{t("payroll.payslip.statutory")}</p>
           <p className="text-base font-semibold tabular-nums">{money(Number(slip.nssf_employee) + Number(slip.tax), c)}</p>
         </div>
         <div className="rounded-lg bg-primary/10 p-3">
-          <p className="text-xs text-muted-foreground">Net pay</p>
+          <p className="text-xs text-muted-foreground">{t("payroll.payslip.net")}</p>
           <p className="text-base font-semibold tabular-nums text-primary">{money(slip.net, c)}</p>
         </div>
       </div>
@@ -57,7 +60,7 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
         if (lines.length === 0) return null;
         return (
           <section key={section.kind}>
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.title}</h3>
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(section.titleKey)}</h3>
             <div className="divide-y divide-border rounded-lg border border-border px-3">
               {lines.map((line, i) => (
                 <div key={`${line.code}-${i}`} className={cn("flex items-start justify-between gap-4 py-2", highlight && line.code === highlight && "-mx-3 bg-primary/5 px-3")}>
@@ -77,38 +80,39 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
       })}
 
       <div className="rounded-lg border border-border px-3 py-1">
-        <Row label="Gross pay" value={money(slip.gross, c)} />
-        <Row label="Net pay" value={money(slip.net, c)} strong />
-        <Row label="Cost to the company" value={money(slip.employer_cost, c)} muted />
+        <Row label={t("payroll.payslip.grossPay")} value={money(slip.gross, c)} />
+        <Row label={t("payroll.payslip.net")} value={money(slip.net, c)} strong />
+        <Row label={t("payroll.payslip.cost")} value={money(slip.employer_cost, c)} muted />
       </div>
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Worked out from</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.payslip.workedFrom")}</h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {fact("Days worked", a.present_days)}
-          {fact("Absent", v.absent_days)}
-          {fact("Missing scan", a.incomplete_days)}
-          {fact("Late arrivals", v.late_count)}
-          {fact("Daily rate", money(slip.daily_rate, c))}
-          {fact("Hourly rate", money(slip.hourly_rate, c))}
-          {fact("Day basis", `${slip.inputs.rate_basis.days} days`)}
-          {fact("Tax rate (KHR)", slip.exchange_rate ? Number(slip.exchange_rate).toLocaleString() : c === "KHR" ? "—" : "Missing")}
+          {fact(t("payroll.payslip.daysWorked"), a.present_days)}
+          {fact(t("payroll.payslip.absent"), v.absent_days)}
+          {fact(t("payroll.payslip.missingScan"), a.incomplete_days)}
+          {fact(t("payroll.payslip.lateArrivals"), v.late_count)}
+          {fact(t("payroll.payslip.dailyRate"), money(slip.daily_rate, c))}
+          {fact(t("payroll.payslip.hourlyRate"), money(slip.hourly_rate, c))}
+          {fact(t("payroll.payslip.dayBasis"), t("payroll.payslip.days", { n: slip.inputs.rate_basis.days }))}
+          {fact(t("payroll.payslip.taxRate"), slip.exchange_rate ? Number(slip.exchange_rate).toLocaleString("en-US") : c === "KHR" ? "—" : t("payroll.payslip.missing"))}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Paid for {dateLabel(slip.inputs.employed.from)} – {dateLabel(slip.inputs.employed.to)} · {slip.pay_type === "daily" ? "Paid per day" : "Monthly salary"}
-          {slip.inputs.exchange_rate_source === "company_fallback" && " · Using your fallback exchange rate"}
+          {t("payroll.payslip.paidFor", { from: dateLabel(slip.inputs.employed.from, lang), to: dateLabel(slip.inputs.employed.to, lang) })} ·{" "}
+          {slip.pay_type === "daily" ? t("payroll.payslip.perDay") : t("payroll.payslip.monthly")}
+          {slip.inputs.exchange_rate_source === "company_fallback" && ` · ${t("payroll.payslip.fallbackRate")}`}
         </p>
       </section>
 
       {(slip.inputs.months?.length ?? 0) > 1 && (
         <section>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gross by month</h3>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("payroll.payslip.byMonth")}</h3>
           <div className="rounded-lg border border-border px-3 py-1">
             {slip.inputs.months!.map((m) => (
-              <Row key={m.month} label={`${monthLabel(m.month)} · ${m.days} ${m.days === 1 ? "day" : "days"}`} value={money(m.gross, c)} muted />
+              <Row key={m.month} label={t(m.days === 1 ? "payroll.payslip.monthDaysOne" : "payroll.payslip.monthDaysOther", { month: monthLabel(m.month, lang), n: m.days })} value={money(m.gross, c)} muted />
             ))}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">This period crosses months: its gross is shared out by day, for monthly reports.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("payroll.payslip.crossMonth")}</p>
         </section>
       )}
     </div>
@@ -117,6 +121,8 @@ export function PayslipView({ slip, highlight }: { slip: PayslipBody; highlight?
 
 /** A saved payslip, opened from a pay run. */
 export function PayslipDialog({ payslipId, onOpenChange }: { payslipId: number | null; onOpenChange: (open: boolean) => void }) {
+  const t = useT();
+  const lang = useLang();
   const { data: slip } = useApi(payslipId ? () => api.payroll.payslip(payslipId) : null, [payslipId], { notify: true });
 
   return (
@@ -124,11 +130,13 @@ export function PayslipDialog({ payslipId, onOpenChange }: { payslipId: number |
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {slip?.employee?.name ?? "Payslip"}
+            {slip?.employee?.name ?? t("payroll.payslip.title")}
             {slip?.employee?.employee_code && <Badge variant="secondary">{slip.employee.employee_code}</Badge>}
           </DialogTitle>
           <DialogDescription>
-            {slip ? `Payslip for ${slip.period_label ?? monthLabel(slip.month)}${slip.pay_group ? ` · ${slip.pay_group.name}` : ""}` : "Loading…"}
+            {slip
+              ? `${t("payroll.payslip.for", { period: slip.period_label ?? monthLabel(slip.month, lang) })}${slip.pay_group ? ` · ${slip.pay_group.name}` : ""}`
+              : t("common.message.loading")}
           </DialogDescription>
         </DialogHeader>
         {slip ? (

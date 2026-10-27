@@ -2,12 +2,13 @@
 
 import { IdCard, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export type SignInMethod = "email" | "employee_id";
 
-const OPTIONS: { value: SignInMethod; label: string; hint: string; icon: typeof Mail }[] = [
-  { value: "email", label: "Email", hint: "They sign in with their email address.", icon: Mail },
-  { value: "employee_id", label: "Employee ID", hint: "They sign in with their employee ID — no email needed.", icon: IdCard },
+const OPTIONS: { value: SignInMethod; labelKey: "email" | "employeeId"; icon: typeof Mail }[] = [
+  { value: "email", labelKey: "email", icon: Mail },
+  { value: "employee_id", labelKey: "employeeId", icon: IdCard },
 ];
 
 /**
@@ -24,9 +25,10 @@ export function SignInMethodPicker({
   onChange: (method: SignInMethod) => void;
   name?: string;
 }) {
+  const t = useT();
   return (
     <fieldset className="grid gap-2 sm:grid-cols-2">
-      <legend className="sr-only">How they sign in</legend>
+      <legend className="sr-only">{t("access.signInMethod.legend")}</legend>
       {OPTIONS.map((option) => {
         const selected = value === option.value;
 
@@ -55,8 +57,8 @@ export function SignInMethodPicker({
               <option.icon className="size-4" />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium">{option.label}</span>
-              <span className="block text-xs text-muted-foreground">{option.hint}</span>
+              <span className="block text-sm font-medium">{t(`access.signInMethod.${option.labelKey}`)}</span>
+              <span className="block text-xs text-muted-foreground">{t(`access.signInMethod.${option.labelKey}Hint`)}</span>
             </span>
           </label>
         );

@@ -26,6 +26,7 @@ import { useMe } from "@/contexts/me-context";
 import { api, ApiError, WorkLocation } from "@/lib/api";
 import { exportWorkLocations, workLocationImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 
 function WorkLocationFormDialog({
   location,
@@ -42,6 +43,7 @@ function WorkLocationFormDialog({
   // strict the geofence is and whether it's active can change here.
   const managedByBranch = location?.branch_id != null;
 
+  const t = useT();
   const [name, setName] = useState(location?.name ?? "");
   const [address, setAddress] = useState(location?.address ?? "");
   const [latitude, setLatitude] = useState(location?.latitude != null ? String(location.latitude) : "");
@@ -58,7 +60,7 @@ function WorkLocationFormDialog({
     setError(null);
 
     if (!navigator.geolocation) {
-      setError("Your browser doesn't support location.");
+      setError(t("org.shared.noGeolocation"));
       return;
     }
 
@@ -70,7 +72,7 @@ function WorkLocationFormDialog({
         setLocating(false);
       },
       () => {
-        setError("Couldn't get your location — check browser permissions.");
+        setError(t("org.shared.locationDenied"));
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 },
@@ -97,7 +99,7 @@ function WorkLocationFormDialog({
               sort_order: toSortOrder(sortOrder),
             };
         await api.workLocations.update(location.id, payload);
-        notifySuccess("Work location updated");
+        notifySuccess(t("org.workLocationsPage.updated"));
       } else {
         await api.workLocations.create({
           name,
@@ -108,13 +110,13 @@ function WorkLocationFormDialog({
           require_location: requireLocation,
           sort_order: toSortOrder(sortOrder),
         });
-        notifySuccess("Work location added");
+        notifySuccess(t("org.workLocationsPage.added"));
       }
       onOpenChange(false);
       onSaved();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -124,26 +126,26 @@ function WorkLocationFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{location ? `Edit "${location.name}"` : "Add a work location"}</DialogTitle>
+          <DialogTitle>{location ? t("org.shared.editTitle", { name: location.name }) : t("org.workLocationsPage.addTitle")}</DialogTitle>
           <DialogDescription>
             {managedByBranch
-              ? "This is a branch's check-in point. Change its name, address or coordinates from the Branches page."
-              : "A check-in point that isn't tied to a branch — e.g. a client site or a company-wide office."}
+              ? t("org.workLocationsPage.branchDescription")
+              : t("org.workLocationsPage.formDescription")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {!managedByBranch && (
             <>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("common.field.name")}</Label>
                 <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="address">Address (optional)</Label>
+                <Label htmlFor="address">{t("org.shared.address")}</Label>
                 <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label>Location</Label>
+                <Label>{t("org.shared.location")}</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -153,33 +155,33 @@ function WorkLocationFormDialog({
                   className="self-start"
                 >
                   <MapPin className="size-3.5" />
-                  {locating ? "Locating…" : "Use my current location"}
+                  {locating ? t("org.shared.locating") : t("org.shared.useMyLocation")}
                 </Button>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="latitude" className="text-xs text-muted-foreground">
-                      Latitude
+                      {t("org.shared.latitude")}
                     </Label>
                     <Input
                       id="latitude"
                       type="number"
                       step="any"
                       required
-                      placeholder="e.g. 11.5564"
+                      placeholder={t("org.shared.latitudeExample")}
                       value={latitude}
                       onChange={(e) => setLatitude(e.target.value)}
                     />
                   </div>
                   <div className="flex flex-col gap-1">
                     <Label htmlFor="longitude" className="text-xs text-muted-foreground">
-                      Longitude
+                      {t("org.shared.longitude")}
                     </Label>
                     <Input
                       id="longitude"
                       type="number"
                       step="any"
                       required
-                      placeholder="e.g. 104.9282"
+                      placeholder={t("org.shared.longitudeExample")}
                       value={longitude}
                       onChange={(e) => setLongitude(e.target.value)}
                     />
@@ -189,7 +191,7 @@ function WorkLocationFormDialog({
             </>
           )}
           <div className="flex flex-col gap-2">
-            <Label htmlFor="radius">Radius (meters)</Label>
+            <Label htmlFor="radius">{t("org.workLocationsPage.radius")}</Label>
             <Input
               id="radius"
               type="number"
@@ -199,8 +201,7 @@ function WorkLocationFormDialog({
               onChange={(e) => setRadius(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              How close someone must be for a check-in to count. QR scans are checked against it too whenever the
-              phone shares its location{managedByBranch ? "" : " — and always, if location is required below"}.
+              {managedByBranch ? t("org.workLocationsPage.radiusHint") : t("org.workLocationsPage.radiusHintRequire")}
             </p>
           </div>
           {!managedByBranch && (
@@ -213,18 +214,18 @@ function WorkLocationFormDialog({
                 className="mt-0.5 size-4 rounded border-input"
               />
               <span>
-                <span className="font-medium">Require location when scanning the QR code</span>
+                <span className="font-medium">{t("org.shared.requireLocation")}</span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {latitude === "" || longitude === ""
-                    ? "Set the latitude and longitude above first."
-                    : "A scan only counts if the phone is inside the radius, so a photo of the poster can't be used from elsewhere."}
+                    ? t("org.workLocationsPage.requireLocationNeedsCoords")
+                    : t("org.workLocationsPage.requireLocationHint")}
                 </span>
               </span>
             </label>
           )}
           {managedByBranch && (
             <p className="text-xs text-muted-foreground">
-              Whether a scan must include the employee&apos;s location is set on the branch itself.
+              {t("org.workLocationsPage.branchSetsLocation")}
             </p>
           )}
           {location && (
@@ -235,15 +236,15 @@ function WorkLocationFormDialog({
                 onChange={(e) => setActive(e.target.checked)}
                 className="size-4 rounded border-input"
               />
-              Active
+              {t("common.status.active")}
             </label>
           )}
-          <DisplayOrderField id="location-order" value={sortOrder} onChange={setSortOrder} example="the main site" />
+          <DisplayOrderField id="location-order" value={sortOrder} onChange={setSortOrder} example={t("org.workLocationsPage.orderExample")} />
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : location ? "Save changes" : "Add location"}
+              {saving ? t("org.shared.saving") : location ? t("org.shared.saveChanges") : t("org.workLocationsPage.add")}
             </Button>
           </DialogFooter>
         </form>
@@ -253,6 +254,7 @@ function WorkLocationFormDialog({
 }
 
 export default function WorkLocationsPage() {
+  const t = useT();
   const { me } = useMe();
   const confirm = useConfirm();
   const [locations, setLocations] = useState<WorkLocation[] | null>(null);
@@ -278,16 +280,15 @@ export default function WorkLocationsPage() {
 
   async function handleDelete(location: WorkLocation) {
     const ok = await confirm({
-      title: `Delete "${location.name}"?`,
-      description:
-        "Past attendance keeps its record of this location. If upcoming schedules use it, you'll need to change those first — or just deactivate it instead.",
+      title: t("org.shared.deleteTitle", { name: location.name }),
+      description: t("org.workLocationsPage.deleteDescription"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.workLocations.remove(location.id);
-      notifySuccess(`"${location.name}" deleted`);
+      notifySuccess(t("org.shared.deleted", { name: location.name }));
     } catch (err) {
       notifyError(err);
     }
@@ -299,7 +300,7 @@ export default function WorkLocationsPage() {
   const columns: DataTableColumn<WorkLocation>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (location) => <span className="font-medium">{location.name}</span>,
       sortValue: (location) => location.name,
@@ -308,37 +309,37 @@ export default function WorkLocationsPage() {
     displayOrderColumn<WorkLocation>(),
     {
       id: "branch",
-      header: "Branch",
+      header: t("common.field.branch"),
       cell: (location) =>
         location.branch ? (
           <span>{location.branch.name}</span>
         ) : (
-          <Badge variant="outline">Company-wide</Badge>
+          <Badge variant="outline">{t("org.shared.companyWide")}</Badge>
         ),
       sortValue: (location) => location.branch?.name ?? "",
       searchValue: (location) => location.branch?.name,
     },
     {
       id: "address",
-      header: "Address",
+      header: t("org.shared.colAddress"),
       hideOnMobile: true,
       cell: (location) => <span className="text-muted-foreground">{location.address ?? "—"}</span>,
       sortValue: (location) => location.address,
     },
     {
       id: "radius",
-      header: "Radius",
-      cell: (location) => <span className="text-muted-foreground">{location.radius_meters}m</span>,
+      header: t("org.workLocationsPage.colRadius"),
+      cell: (location) => <span className="text-muted-foreground">{t("org.workLocationsPage.radiusValue", { n: location.radius_meters })}</span>,
       sortValue: (location) => location.radius_meters,
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (location) => (
-        <Badge variant={location.is_active ? "success" : "secondary"}>{location.is_active ? "Active" : "Inactive"}</Badge>
+        <Badge variant={location.is_active ? "success" : "secondary"}>{location.is_active ? t("common.status.active") : t("common.status.inactive")}</Badge>
       ),
       sortValue: (location) => (location.is_active ? 1 : 0),
-      sortLabels: ["Inactive first", "Active first"],
+      sortLabels: [t("org.shared.inactiveFirst"), t("org.shared.activeFirst")],
     },
   ];
 
@@ -346,15 +347,15 @@ export default function WorkLocationsPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Work Locations"
-          description="Physical check-in points. Each branch has one automatically; add extra ones for client sites or company-wide offices."
+          title={t("org.workLocationsPage.title")}
+          description={t("org.workLocationsPage.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportWorkLocations} importSpec={canManage ? workLocationImport : undefined} onImported={load} />
               {canManage && (
                 <Button onClick={() => openForm(null)}>
                   <Plus className="size-4" />
-                  Add location
+                  {t("org.workLocationsPage.add")}
                 </Button>
               )}
             </div>
@@ -365,11 +366,11 @@ export default function WorkLocationsPage() {
           data={locations}
           getRowId={(location) => location.id}
           columns={columns}
-          searchPlaceholder="Search locations…"
+          searchPlaceholder={t("org.workLocationsPage.search")}
           emptyState={{
             icon: MapPin,
-            title: "No work locations yet",
-            description: "Add a location so employees have somewhere to check in from.",
+            title: t("org.workLocationsPage.emptyTitle"),
+            description: t("org.workLocationsPage.emptyDescription"),
           }}
           rowActions={
             canManage
@@ -377,16 +378,16 @@ export default function WorkLocationsPage() {
                   <>
                     <Button variant="outline" size="sm" onClick={() => setQrLocation(location)}>
                       <QrCode className="size-3.5" />
-                      QR code
+                      {t("org.shared.qrCode")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openForm(location)}>
                       <Pencil className="size-3.5" />
-                      Edit
+                      {t("common.action.edit")}
                     </Button>
                     {location.branch_id == null && (
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(location)}>
                         <Trash2 className="size-3.5" />
-                        Delete
+                        {t("common.action.delete")}
                       </Button>
                     )}
                   </>

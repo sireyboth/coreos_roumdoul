@@ -13,14 +13,17 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { api, ApiError, type EmployeePay, type EmployeePayProfile, type PayCurrency, type PayGroupOption, type SalaryReason } from "@/lib/api";
+import { translateNow, useLang, useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { KIND_LABELS, SALARY_REASONS, SCHEDULE_LABELS, dateLabel, money } from "./shared";
+import { SALARY_REASONS, dateLabel, money } from "./shared";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
 const today = () => new Date().toLocaleDateString("en-CA");
 
 function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employeeId: number; current: EmployeePay["salaries"][number] | undefined; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const t = useT();
+  const lang = useLang();
   const [amount, setAmount] = useState(current ? String(Number(current.amount)) : "");
   const [currency, setCurrency] = useState<PayCurrency>(current?.currency ?? "USD");
   const [payType, setPayType] = useState<"monthly" | "daily">(current?.pay_type ?? "monthly");
@@ -36,11 +39,11 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
     setError(null);
     try {
       await api.employeePay.addSalary(employeeId, { amount: Number(amount), currency, pay_type: payType, effective_from: from, reason, note: note.trim() || null });
-      notifySuccess("Salary saved", `${money(amount, currency)} from ${dateLabel(from)}`);
+      notifySuccess(translateNow("payrollSetup.employeePay.salaryDialog.saved"), translateNow("payrollSetup.employeePay.shared.fromDate", { value: money(amount, currency), date: dateLabel(from, lang) }));
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save.");
+      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -51,18 +54,16 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>{current ? "Change salary" : "Set salary"}</DialogTitle>
-            <DialogDescription>
-              Takes effect from the date you choose. Earlier months keep the salary they had; a future date is applied automatically when it arrives.
-            </DialogDescription>
+            <DialogTitle>{current ? t("payrollSetup.employeePay.salaryDialog.changeTitle") : t("payrollSetup.employeePay.salaryDialog.setTitle")}</DialogTitle>
+            <DialogDescription>{t("payrollSetup.employeePay.salaryDialog.text")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_7rem]">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-amount">Amount</Label>
+              <Label htmlFor="sal-amount">{t("common.field.amount")}</Label>
               <Input id="sal-amount" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-currency">Currency</Label>
+              <Label htmlFor="sal-currency">{t("common.field.currency")}</Label>
               <select id="sal-currency" className={SELECT_CLASS} value={currency} onChange={(e) => setCurrency(e.target.value as PayCurrency)}>
                 <option value="USD">USD</option>
                 <option value="KHR">KHR</option>
@@ -71,38 +72,38 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-type">Paid</Label>
+              <Label htmlFor="sal-type">{t("payrollSetup.employeePay.salaryDialog.paid")}</Label>
               <select id="sal-type" className={SELECT_CLASS} value={payType} onChange={(e) => setPayType(e.target.value as "monthly" | "daily")}>
-                <option value="monthly">Per month</option>
-                <option value="daily">Per day worked</option>
+                <option value="monthly">{t("payrollSetup.employeePay.salaryDialog.perMonth")}</option>
+                <option value="daily">{t("payrollSetup.employeePay.salaryDialog.perDayWorked")}</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-from">From</Label>
+              <Label htmlFor="sal-from">{t("common.field.from")}</Label>
               <Input id="sal-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} required />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-reason">Reason</Label>
+              <Label htmlFor="sal-reason">{t("common.field.reason")}</Label>
               <select id="sal-reason" className={SELECT_CLASS} value={reason} onChange={(e) => setReason(e.target.value as SalaryReason)}>
                 {SALARY_REASONS.map((r) => (
                   <option key={r.value} value={r.value}>
-                    {r.label}
+                    {t(r.labelKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="sal-note">Note</Label>
-              <Input id="sal-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={255} placeholder="Optional" />
+              <Label htmlFor="sal-note">{t("payrollSetup.employeePay.shared.note")}</Label>
+              <Input id="sal-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={255} placeholder={t("payrollSetup.employeePay.shared.optional")} />
             </div>
           </div>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !(Number(amount) > 0) || !from}>
-              {saving ? "Saving…" : "Save salary"}
+              {saving ? t("payrollSetup.employeePay.shared.saving") : t("payrollSetup.employeePay.salaryDialog.saveSalary")}
             </Button>
           </DialogFooter>
         </form>
@@ -112,6 +113,7 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
 }
 
 function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employeeId: number; components: EmployeePay["item_components"]; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const t = useT();
   const active = components.filter((c) => c.is_active);
   const [componentId, setComponentId] = useState(String(active[0]?.id ?? ""));
   const [amount, setAmount] = useState("");
@@ -127,11 +129,11 @@ function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employe
     setError(null);
     try {
       await api.employeePay.addItem(employeeId, { pay_component_id: Number(componentId), amount: Number(amount), effective_from: from, effective_to: to || null, note: note.trim() || null });
-      notifySuccess("Item added");
+      notifySuccess(translateNow("payrollSetup.employeePay.itemDialog.added"));
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save.");
+      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -142,45 +144,45 @@ function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employe
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Add allowance or deduction</DialogTitle>
-            <DialogDescription>A fixed amount every month, in their salary currency, for as long as you choose.</DialogDescription>
+            <DialogTitle>{t("payrollSetup.employeePay.itemDialog.title")}</DialogTitle>
+            <DialogDescription>{t("payrollSetup.employeePay.itemDialog.text")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="item-comp">Item</Label>
+              <Label htmlFor="item-comp">{t("payrollSetup.employeePay.itemDialog.item")}</Label>
               <select id="item-comp" className={SELECT_CLASS} value={componentId} onChange={(e) => setComponentId(e.target.value)}>
                 {active.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} · {KIND_LABELS[c.kind]}
+                    {c.name} · {t(`payroll.shared.kind.${c.kind}`)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="item-amount">Amount a month</Label>
+              <Label htmlFor="item-amount">{t("payrollSetup.employeePay.itemDialog.amountMonth")}</Label>
               <Input id="item-amount" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="item-from">From</Label>
+              <Label htmlFor="item-from">{t("common.field.from")}</Label>
               <Input id="item-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} required />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="item-to">Until</Label>
+              <Label htmlFor="item-to">{t("payrollSetup.employeePay.itemDialog.until")}</Label>
               <Input id="item-to" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Empty = every month from now on.</p>
+              <p className="text-xs text-muted-foreground">{t("payrollSetup.employeePay.itemDialog.untilHint")}</p>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="item-note">Note</Label>
-            <Input id="item-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={255} placeholder="Optional — shown on the payslip" />
+            <Label htmlFor="item-note">{t("payrollSetup.employeePay.shared.note")}</Label>
+            <Input id="item-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={255} placeholder={t("payrollSetup.employeePay.itemDialog.notePlaceholder")} />
           </div>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !componentId || !(Number(amount) > 0)}>
-              {saving ? "Saving…" : "Add"}
+              {saving ? t("payrollSetup.employeePay.shared.saving") : t("common.action.add")}
             </Button>
           </DialogFooter>
         </form>
@@ -190,6 +192,7 @@ function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employe
 }
 
 function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; profile: EmployeePayProfile; canEdit: boolean }) {
+  const t = useT();
   const [form, setForm] = useState(profile);
   const [saving, setSaving] = useState(false);
   const set = (patch: Partial<EmployeePayProfile>) => setForm((f) => ({ ...f, ...patch }));
@@ -199,7 +202,7 @@ function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; pro
     setSaving(true);
     try {
       setForm(await api.employeePay.updateProfile(employeeId, form));
-      notifySuccess("Tax and payment details saved");
+      notifySuccess(translateNow("payrollSetup.employeePay.profile.saved"));
     } catch (err) {
       notifyError(err);
     } finally {
@@ -210,45 +213,51 @@ function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; pro
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tax, NSSF and payment</CardTitle>
-        <CardDescription>Dependents lower tax on salary. Bank and account number are on the Profile tab.</CardDescription>
+        <CardTitle>{t("payrollSetup.employeePay.profile.title")}</CardTitle>
+        <CardDescription>{t("payrollSetup.employeePay.profile.text")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <fieldset disabled={!canEdit} className="contents">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.tax_resident} onChange={(e) => set({ tax_resident: e.target.checked })} />
-              Tax resident of Cambodia
+              {t("payrollSetup.employeePay.profile.taxResident")}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.nssf_enrolled} onChange={(e) => set({ nssf_enrolled: e.target.checked })} />
-              Enrolled in NSSF
+              {t("payrollSetup.employeePay.profile.nssfEnrolled")}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.spouse_dependent} disabled={!form.tax_resident} onChange={(e) => set({ spouse_dependent: e.target.checked })} />
-              Spouse doesn&apos;t work (dependent)
+              {t("payrollSetup.employeePay.profile.spouse")}
             </label>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pp-children">Dependent children</Label>
+              <Label htmlFor="pp-children">{t("payrollSetup.employeePay.profile.children")}</Label>
               <Input id="pp-children" type="number" min={0} max={20} disabled={!form.tax_resident} value={form.child_dependents} onChange={(e) => set({ child_dependents: Number(e.target.value) })} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pp-method">Paid by</Label>
+              <Label htmlFor="pp-method">{t("payrollSetup.employeePay.profile.paidBy")}</Label>
               <select id="pp-method" className={SELECT_CLASS} value={form.payment_method} onChange={(e) => set({ payment_method: e.target.value as "bank" | "cash" })}>
-                <option value="bank">Bank transfer</option>
-                <option value="cash">Cash</option>
+                <option value="bank">{t("payrollSetup.employeePay.profile.bank")}</option>
+                <option value="cash">{t("payrollSetup.employeePay.profile.cash")}</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pp-holder">Account holder name</Label>
-              <Input id="pp-holder" value={form.bank_account_name ?? ""} onChange={(e) => set({ bank_account_name: e.target.value || null })} maxLength={255} placeholder="As on the bank account" />
+              <Label htmlFor="pp-holder">{t("payrollSetup.employeePay.profile.holder")}</Label>
+              <Input
+                id="pp-holder"
+                value={form.bank_account_name ?? ""}
+                onChange={(e) => set({ bank_account_name: e.target.value || null })}
+                maxLength={255}
+                placeholder={t("payrollSetup.employeePay.profile.holderPlaceholder")}
+              />
             </div>
           </fieldset>
-          {!form.tax_resident && <p className="text-xs text-muted-foreground sm:col-span-2">Non-residents pay a flat rate with no dependent allowances.</p>}
+          {!form.tax_resident && <p className="text-xs text-muted-foreground sm:col-span-2">{t("payrollSetup.employeePay.profile.nonResident")}</p>}
           {canEdit && (
             <div className="flex justify-end sm:col-span-2">
               <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? t("payrollSetup.employeePay.shared.saving") : t("common.action.save")}
               </Button>
             </div>
           )}
@@ -259,6 +268,8 @@ function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; pro
 }
 
 function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId: number; pay: EmployeePay; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const t = useT();
+  const lang = useLang();
   const [groups, setGroups] = useState<PayGroupOption[] | null>(null);
   const [groupId, setGroupId] = useState("");
   // The first day after anything already paid.
@@ -286,11 +297,14 @@ function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId
     setError(null);
     try {
       await api.employeePay.setPayGroup(employeeId, { pay_group_id: Number(groupId), effective_from: from });
-      notifySuccess("Pay group changed", `${groups?.find((g) => String(g.id) === groupId)?.name ?? ""} from ${dateLabel(from)}`);
+      notifySuccess(
+        translateNow("payrollSetup.employeePay.groupDialog.changed"),
+        translateNow("payrollSetup.employeePay.shared.fromDate", { value: groups?.find((g) => String(g.id) === groupId)?.name ?? "", date: dateLabel(from, lang) }),
+      );
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save.");
+      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -301,36 +315,34 @@ function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Change pay group</DialogTitle>
-            <DialogDescription>
-              From the date you choose, this person is paid on the new group&apos;s schedule and rules. A period they were only partly in pays its share of days.
-            </DialogDescription>
+            <DialogTitle>{t("payrollSetup.employeePay.groupDialog.title")}</DialogTitle>
+            <DialogDescription>{t("payrollSetup.employeePay.groupDialog.text")}</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pg-group">Pay group</Label>
+            <Label htmlFor="pg-group">{t("payrollSetup.employeePay.groupDialog.group")}</Label>
             <select id="pg-group" className={SELECT_CLASS} value={groupId} onChange={(e) => setGroupId(e.target.value)} disabled={groups === null}>
               {groups?.map((g) => (
                 <option key={g.id} value={g.id} disabled={g.id === pay.pay_group?.id}>
-                  {g.name} — {SCHEDULE_LABELS[g.schedule]}
-                  {g.id === pay.pay_group?.id ? " (now)" : ""}
+                  {g.name} — {t(`payroll.shared.schedule.${g.schedule}`)}
+                  {g.id === pay.pay_group?.id ? t("payrollSetup.employeePay.groupDialog.nowSuffix") : ""}
                 </option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pg-from">From</Label>
+            <Label htmlFor="pg-from">{t("common.field.from")}</Label>
             <Input id="pg-from" type="date" min={earliest} value={from} onChange={(e) => setFrom(e.target.value)} required />
-            <p className="text-xs text-muted-foreground">
-              The first day they are paid with the new group. To include them in a pay run that has already started, pick that run&apos;s first day (or earlier).
-            </p>
-            {pay.paid_through && <p className="text-xs text-muted-foreground">Already paid through {dateLabel(pay.paid_through)}, so the change can start the day after at the earliest.</p>}
-            {from > today() && <p className="text-xs text-warning">This date is in the future: until then they stay in {pay.pay_group?.name ?? "their current group"}.</p>}
+            <p className="text-xs text-muted-foreground">{t("payrollSetup.employeePay.groupDialog.fromHint")}</p>
+            {pay.paid_through && <p className="text-xs text-muted-foreground">{t("payrollSetup.employeePay.groupDialog.paidThrough", { date: dateLabel(pay.paid_through, lang) })}</p>}
+            {from > today() && (
+              <p className="text-xs text-warning">{t("payrollSetup.employeePay.groupDialog.future", { group: pay.pay_group?.name ?? t("payrollSetup.employeePay.groupDialog.currentGroup") })}</p>
+            )}
           </div>
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !groupId || !from}>
-              {saving ? "Saving…" : "Change group"}
+              {saving ? t("payrollSetup.employeePay.shared.saving") : t("payrollSetup.employeePay.groupDialog.changeGroup")}
             </Button>
           </DialogFooter>
         </form>
@@ -341,6 +353,8 @@ function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId
 
 /** The Pay tab: pay group, salary history, tax and NSSF details, and recurring allowances and deductions. */
 export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; canEdit: boolean }) {
+  const t = useT();
+  const lang = useLang();
   const confirm = useConfirm();
   const [pay, setPay] = useState<EmployeePay | null>(null);
   const [reloads, setReloads] = useState(0);
@@ -366,7 +380,12 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
 
   async function removeSalary() {
     if (!latest) return;
-    const ok = await confirm({ title: "Remove the latest salary?", description: `${money(latest.amount, latest.currency)} from ${dateLabel(latest.effective_from)}. The salary before it applies again.`, confirmLabel: "Remove", destructive: true });
+    const ok = await confirm({
+      title: t("payrollSetup.employeePay.salaryCard.removeTitle"),
+      description: t("payrollSetup.employeePay.salaryCard.removeText", { amount: money(latest.amount, latest.currency), date: dateLabel(latest.effective_from, lang) }),
+      confirmLabel: t("common.action.remove"),
+      destructive: true,
+    });
     if (!ok) return;
     try {
       await api.employeePay.removeSalary(employeeId, latest.id);
@@ -381,9 +400,12 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
   async function removeGroupChange() {
     if (!latestGroup) return;
     const ok = await confirm({
-      title: "Undo the latest pay group change?",
-      description: `${latestGroup.pay_group?.name ?? "The group"} from ${dateLabel(latestGroup.effective_from)}. The group before it applies again.`,
-      confirmLabel: "Undo",
+      title: t("payrollSetup.employeePay.groupCard.undoTitle"),
+      description: t("payrollSetup.employeePay.groupCard.undoText", {
+        group: latestGroup.pay_group?.name ?? t("payrollSetup.employeePay.groupCard.theGroup"),
+        date: dateLabel(latestGroup.effective_from, lang),
+      }),
+      confirmLabel: t("payrollSetup.employeePay.groupCard.undo"),
       destructive: true,
     });
     if (!ok) return;
@@ -396,7 +418,12 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
   }
 
   async function removeItem(id: number, name: string) {
-    const ok = await confirm({ title: `Remove ${name}?`, description: "It stops appearing on future payslips. Approved payslips keep it.", confirmLabel: "Remove", destructive: true });
+    const ok = await confirm({
+      title: t("payrollSetup.employeePay.itemsCard.removeTitle", { name }),
+      description: t("payrollSetup.employeePay.itemsCard.removeText"),
+      confirmLabel: t("common.action.remove"),
+      destructive: true,
+    });
     if (!ok) return;
     try {
       await api.employeePay.removeItem(employeeId, id);
@@ -411,38 +438,42 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Pay group</CardTitle>
-            <CardDescription>When this person is paid, and by which group&apos;s rules.</CardDescription>
+            <CardTitle>{t("payrollSetup.employeePay.groupCard.title")}</CardTitle>
+            <CardDescription>{t("payrollSetup.employeePay.groupCard.text")}</CardDescription>
           </div>
           {canEdit && (
             <Button size="sm" variant="outline" onClick={() => setDialog("group")}>
               <Users className="size-4" />
-              Change group
+              {t("payrollSetup.employeePay.groupDialog.changeGroup")}
             </Button>
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm">
             <span className="font-medium">{pay.pay_group?.name ?? "—"}</span>
-            {pay.pay_group && <span className="text-muted-foreground"> · {SCHEDULE_LABELS[pay.pay_group.schedule]}</span>}
-            {pay.paid_through && <span className="text-muted-foreground"> · paid through {dateLabel(pay.paid_through)}</span>}
+            {pay.pay_group && <span className="text-muted-foreground"> · {t(`payroll.shared.schedule.${pay.pay_group.schedule}`)}</span>}
+            {pay.paid_through && <span className="text-muted-foreground"> · {t("payrollSetup.employeePay.groupCard.paidThrough", { date: dateLabel(pay.paid_through, lang) })}</span>}
           </p>
-          {pay.pay_groups.length === 0 && <p className="text-xs text-muted-foreground">Never moved — paid with the company&apos;s default group.</p>}
+          {pay.pay_groups.length === 0 && <p className="text-xs text-muted-foreground">{t("payrollSetup.employeePay.groupCard.neverMoved")}</p>}
           {pay.pay_groups.length > 0 && (
             <ol className="flex flex-col divide-y divide-border">
               {pay.pay_groups.map((g) => (
                 <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                   <span>
-                    {g.pay_group?.name ?? "Group"}
-                    {g.effective_from > todayStr && <Badge variant="info" className="ml-2">Upcoming</Badge>}
+                    {g.pay_group?.name ?? t("payrollSetup.employeePay.groupCard.group")}
+                    {g.effective_from > todayStr && (
+                      <Badge variant="info" className="ml-2">
+                        {t("payrollSetup.employeePay.shared.upcoming")}
+                      </Badge>
+                    )}
                     {g.created_by && <span className="text-xs text-muted-foreground"> · {g.created_by.name}</span>}
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {dateLabel(g.effective_from)} – {g.effective_to ? dateLabel(g.effective_to) : "now"}
+                      {dateLabel(g.effective_from, lang)} – {g.effective_to ? dateLabel(g.effective_to, lang) : t("payrollSetup.employeePay.shared.now")}
                     </span>
                     {canEdit && g.id === latestGroup?.id && (
-                      <Button variant="ghost" size="icon" aria-label="Undo this change" onClick={removeGroupChange}>
+                      <Button variant="ghost" size="icon" aria-label={t("payrollSetup.employeePay.groupCard.undoChange")} onClick={removeGroupChange}>
                         <Trash2 className="size-4" />
                       </Button>
                     )}
@@ -457,27 +488,29 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Salary</CardTitle>
-            <CardDescription>Every change is kept, so each pay period is paid at the salary it had.</CardDescription>
+            <CardTitle>{t("payrollSetup.employeePay.salaryCard.title")}</CardTitle>
+            <CardDescription>{t("payrollSetup.employeePay.salaryCard.text")}</CardDescription>
           </div>
           {canEdit && (
             <Button size="sm" onClick={() => setDialog("salary")}>
               <TrendingUp className="size-4" />
-              {pay.salaries.length ? "Change salary" : "Set salary"}
+              {pay.salaries.length ? t("payrollSetup.employeePay.salaryDialog.changeTitle") : t("payrollSetup.employeePay.salaryDialog.setTitle")}
             </Button>
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {current ? (
             <div className="rounded-lg bg-primary/5 p-4">
-              <p className="text-xs text-muted-foreground">Current salary</p>
+              <p className="text-xs text-muted-foreground">{t("payrollSetup.employeePay.salaryCard.current")}</p>
               <p className="text-2xl font-semibold tabular-nums">
                 {money(current.amount, current.currency)}
-                <span className="ml-1 text-sm font-normal text-muted-foreground">{current.pay_type === "daily" ? "per day" : "per month"}</span>
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  {current.pay_type === "daily" ? t("payrollSetup.employeePay.salaryCard.perDay") : t("payrollSetup.employeePay.salaryCard.perMonth")}
+                </span>
               </p>
             </div>
           ) : (
-            <Alert variant="info">No salary yet — this person is left out of pay runs until one is set.</Alert>
+            <Alert variant="info">{t("payrollSetup.employeePay.salaryCard.none")}</Alert>
           )}
           {pay.salaries.length > 0 && (
             <ol className="flex flex-col divide-y divide-border">
@@ -485,21 +518,28 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
                 <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium tabular-nums">
-                      {money(s.amount, s.currency)} {s.pay_type === "daily" ? "/ day" : "/ month"}
-                      {s.effective_from > todayStr && <Badge variant="info" className="ml-2">Upcoming</Badge>}
+                      {money(s.amount, s.currency)} {s.pay_type === "daily" ? t("payrollSetup.employeePay.salaryCard.slashDay") : t("payrollSetup.employeePay.salaryCard.slashMonth")}
+                      {s.effective_from > todayStr && (
+                        <Badge variant="info" className="ml-2">
+                          {t("payrollSetup.employeePay.shared.upcoming")}
+                        </Badge>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {SALARY_REASONS.find((r) => r.value === s.reason)?.label ?? s.reason}
+                      {(() => {
+                        const reason = SALARY_REASONS.find((r) => r.value === s.reason);
+                        return reason ? t(reason.labelKey) : s.reason;
+                      })()}
                       {s.note ? ` · ${s.note}` : ""}
                       {s.created_by ? ` · ${s.created_by.name}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground tabular-nums">
-                      {dateLabel(s.effective_from)} – {s.effective_to ? dateLabel(s.effective_to) : "now"}
+                      {dateLabel(s.effective_from, lang)} – {s.effective_to ? dateLabel(s.effective_to, lang) : t("payrollSetup.employeePay.shared.now")}
                     </span>
                     {canEdit && s.id === latest?.id && (
-                      <Button variant="ghost" size="icon" aria-label="Remove this salary" onClick={removeSalary}>
+                      <Button variant="ghost" size="icon" aria-label={t("payrollSetup.employeePay.salaryCard.removeThis")} onClick={removeSalary}>
                         <Trash2 className="size-4" />
                       </Button>
                     )}
@@ -514,43 +554,51 @@ export function EmployeePayPanel({ employeeId, canEdit }: { employeeId: number; 
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Allowances and deductions</CardTitle>
-            <CardDescription>Fixed monthly amounts: transport, phone, a loan repayment… Paid twice a month or weekly, each period pays its share.</CardDescription>
+            <CardTitle>{t("payrollSetup.employeePay.itemsCard.title")}</CardTitle>
+            <CardDescription>{t("payrollSetup.employeePay.itemsCard.text")}</CardDescription>
           </div>
           {canEdit && pay.item_components.some((c) => c.is_active) && (
             <Button size="sm" variant="outline" onClick={() => setDialog("item")}>
               <Plus className="size-4" />
-              Add
+              {t("common.action.add")}
             </Button>
           )}
         </CardHeader>
         <CardContent>
           {pay.item_components.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              No allowance or deduction types yet. Create them in{" "}
+              {t("payrollSetup.employeePay.itemsCard.noTypesBefore")}{" "}
               <Link href="/dashboard/payroll/settings" className="text-primary underline-offset-4 hover:underline">
-                Payroll Settings
+                {t("payrollSetup.employeePay.itemsCard.settingsLink")}
               </Link>{" "}
-              (amount set on each employee).
+              {t("payrollSetup.employeePay.itemsCard.noTypesAfter")}
             </p>
           )}
-          {pay.item_components.length > 0 && pay.items.length === 0 && <p className="text-sm text-muted-foreground">None.</p>}
+          {pay.item_components.length > 0 && pay.items.length === 0 && <p className="text-sm text-muted-foreground">{t("payrollSetup.employeePay.itemsCard.none")}</p>}
           {pay.items.length > 0 && (
             <ul className="flex flex-col divide-y divide-border">
               {pay.items.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium">
-                      {item.component?.name ?? "Item"}{" "}
-                      <span className="tabular-nums text-muted-foreground">· {Number(item.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })} a month</span>
+                      {item.component?.name ?? t("payrollSetup.employeePay.itemsCard.item")}{" "}
+                      <span className="tabular-nums text-muted-foreground">
+                        · {t("payrollSetup.employeePay.itemsCard.aMonth", { amount: Number(item.amount).toLocaleString("en-US", { maximumFractionDigits: 2 }) })}
+                      </span>
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {item.component ? KIND_LABELS[item.component.kind] : ""} · {dateLabel(item.effective_from)} – {item.effective_to ? dateLabel(item.effective_to) : "ongoing"}
+                      {item.component ? t(`payroll.shared.kind.${item.component.kind}`) : ""} · {dateLabel(item.effective_from, lang)} –{" "}
+                      {item.effective_to ? dateLabel(item.effective_to, lang) : t("payrollSetup.employeePay.itemsCard.ongoing")}
                       {item.note ? ` · ${item.note}` : ""}
                     </p>
                   </div>
                   {canEdit && (
-                    <Button variant="ghost" size="icon" aria-label="Remove" onClick={() => removeItem(item.id, item.component?.name ?? "this item")}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t("common.action.remove")}
+                      onClick={() => removeItem(item.id, item.component?.name ?? t("payrollSetup.employeePay.itemsCard.thisItem"))}
+                    >
                       <Trash2 className="size-4" />
                     </Button>
                   )}

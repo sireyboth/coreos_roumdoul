@@ -12,13 +12,14 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
 import { ExcelActions } from "@/components/dashboard/excel-actions";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelFor, statusVariant } from "@/components/dashboard/employee-form";
+import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelIn, optionsIn, statusVariant } from "@/components/dashboard/employee-form";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, Branch, Department, Employee, PayItemComponent, Team } from "@/lib/api";
 import { employeeImport, exportEmployees } from "@/lib/excel-specs/people";
+import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ function EmployeesPageContent() {
   const confirm = useConfirm();
   const router = useRouter();
   const pathname = usePathname();
+  const t = useT();
+  const lang = useLang();
 
   const canPeople = me?.permissions.includes("employees.view") ?? false;
   const canRoster = me?.permissions.includes("schedules.view") ?? false;
@@ -86,12 +89,11 @@ function EmployeesPageContent() {
     window.history.replaceState(null, "", next === "roster" ? `${pathname}?tab=roster` : pathname);
   }
 
-  const DELETE_WARNING =
-    "This can't be undone: their attendance, schedules and login are deleted too. If they've only left, set their status to Terminated instead.";
+  const DELETE_WARNING = t("employees.shared.deleteWarning");
 
   async function handleDelete(employee: Employee) {
     const ok = await confirm({
-      title: `Delete ${employee.name}?`,
+      title: t("employees.shared.deleteTitle", { name: employee.name }),
       description: DELETE_WARNING,
       destructive: true,
     });
@@ -99,7 +101,7 @@ function EmployeesPageContent() {
 
     try {
       await api.employees.remove(employee.id);
-      notifySuccess(`${employee.name} deleted`);
+      notifySuccess(t("employees.shared.deleted", { name: employee.name }));
       refresh();
     } catch (err) {
       notifyError(err);
@@ -109,7 +111,10 @@ function EmployeesPageContent() {
 
   async function handleBulkDelete(selected: Employee[], clearSelection: () => void) {
     const ok = await confirm({
-      title: selected.length === 1 ? `Delete ${selected[0].name}?` : `Delete ${selected.length} employees?`,
+      title:
+        selected.length === 1
+          ? t("employees.shared.deleteTitle", { name: selected[0].name })
+          : t("employees.listPage.deleteManyTitle", { n: selected.length }),
       description: DELETE_WARNING,
       destructive: true,
     });
@@ -117,7 +122,7 @@ function EmployeesPageContent() {
 
     try {
       const { deleted } = await api.employees.removeMany(selected.map((employee) => employee.id));
-      notifySuccess(`${deleted} ${deleted === 1 ? "employee" : "employees"} deleted`);
+      notifySuccess(deleted === 1 ? t("employees.listPage.deletedOne") : t("employees.listPage.deletedOther", { n: deleted }));
       clearSelection();
       refresh();
     } catch (err) {
@@ -132,7 +137,7 @@ function EmployeesPageContent() {
   const columns: DataTableColumn<Employee>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (employee) => (
         <div className="flex items-center gap-3">
@@ -159,24 +164,24 @@ function EmployeesPageContent() {
     },
     {
       id: "order",
-      header: "Order",
+      header: t("common.order.column"),
       // The display order every list follows (lowest first). Set on the employee's profile.
       cell: (employee) => <span className="tabular-nums text-muted-foreground">{employee.sort_order ?? "—"}</span>,
       sortValue: (employee) => employee.sort_order,
-      sortLabels: ["Lowest first", "Highest first"],
+      sortLabels: [t("common.order.lowestFirst"), t("common.order.highestFirst")],
       hideOnMobile: true,
       className: "hidden xl:table-cell w-20",
     },
     {
       id: "branch",
-      header: "Branch",
+      header: t("common.field.branch"),
       cell: (employee) => <span className="text-muted-foreground">{employee.branch?.name ?? "—"}</span>,
       sortValue: (employee) => employee.branch?.name,
       searchValue: (employee) => employee.branch?.name,
     },
     {
       id: "department",
-      header: "Department",
+      header: t("common.field.department"),
       cell: (employee) =>
         employee.department || employee.team ? (
           <div className="flex flex-col leading-tight">
@@ -191,14 +196,14 @@ function EmployeesPageContent() {
     },
     {
       id: "job_title",
-      header: "Job title",
+      header: t("employees.shared.jobTitle"),
       cell: (employee) => <span className="text-muted-foreground">{employee.job_title ?? "—"}</span>,
       sortValue: (employee) => employee.job_title,
       searchValue: (employee) => employee.job_title,
     },
     {
       id: "phone",
-      header: "Phone",
+      header: t("common.field.phone"),
       hideOnMobile: true,
       // Only on very wide screens — the table has many columns. Still searchable, and on the employee page.
       className: "hidden 2xl:table-cell",
@@ -208,10 +213,10 @@ function EmployeesPageContent() {
     },
     {
       id: "type",
-      header: "Type",
+      header: t("common.field.type"),
       cell: (employee) =>
         employee.employment_type ? (
-          <Badge variant="info">{labelFor(EMPLOYMENT_TYPES, employee.employment_type)}</Badge>
+          <Badge variant="info">{labelIn(lang, "type", employee.employment_type)}</Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
         ),
@@ -219,11 +224,11 @@ function EmployeesPageContent() {
     },
     {
       id: "hired",
-      header: "Hired",
+      header: t("employees.shared.hired"),
       cell: (employee) => (
         <span className="text-muted-foreground">
           {employee.hire_date
-            ? new Date(employee.hire_date.slice(0, 10) + "T00:00:00").toLocaleDateString([], {
+            ? new Date(employee.hire_date.slice(0, 10) + "T00:00:00").toLocaleDateString(dateLocale(lang), {
                 year: "numeric",
                 month: "short",
                 day: "numeric",
@@ -235,24 +240,24 @@ function EmployeesPageContent() {
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (employee) => (
         <Badge variant={statusVariant(employee.employment_status)}>
-          {labelFor(EMPLOYMENT_STATUSES, employee.employment_status)}
+          {labelIn(lang, "status", employee.employment_status)}
         </Badge>
       ),
       sortValue: (employee) => employee.employment_status,
     },
     {
       id: "login",
-      header: "Login",
+      header: t("employees.listPage.colLogin"),
       // Very wide screens only in the table; always on the phone card and in the Login filter.
       className: "hidden 2xl:table-cell",
       sortValue: (employee) => (employee.has_login ? 1 : 0),
-      sortLabels: ["No login first", "Has login first"],
+      sortLabels: [t("employees.listPage.sortNoLoginFirst"), t("employees.listPage.sortHasLoginFirst")],
       cell: (employee) =>
         employee.has_login ? (
-          <Badge variant="outline">Has login</Badge>
+          <Badge variant="outline">{t("employees.shared.hasLogin")}</Badge>
         ) : canManage ? (
           <Button
             variant="outline"
@@ -264,10 +269,10 @@ function EmployeesPageContent() {
             }}
           >
             <KeyRound className="size-3.5" />
-            Create login
+            {t("employees.shared.createLogin")}
           </Button>
         ) : (
-          <span className="text-muted-foreground">No login</span>
+          <span className="text-muted-foreground">{t("employees.shared.noLogin")}</span>
         ),
     },
   ];
@@ -276,16 +281,22 @@ function EmployeesPageContent() {
     {
       type: "select",
       id: "status",
-      label: "Status",
-      options: EMPLOYMENT_STATUSES,
+      label: t("common.field.status"),
+      options: optionsIn(lang, "status", EMPLOYMENT_STATUSES),
       getValue: (e) => e.employment_status,
       searchable: true,
     },
-    { type: "select", id: "type", label: "Type", options: EMPLOYMENT_TYPES, getValue: (e) => e.employment_type },
+    {
+      type: "select",
+      id: "type",
+      label: t("common.field.type"),
+      options: optionsIn(lang, "type", EMPLOYMENT_TYPES),
+      getValue: (e) => e.employment_type,
+    },
     {
       type: "select",
       id: "branch",
-      label: "Branch",
+      label: t("common.field.branch"),
       options: branches.map((branch) => ({ value: String(branch.id), label: branch.name })),
       getValue: (employee) => (employee.branch ? String(employee.branch.id) : null),
     },
@@ -294,7 +305,7 @@ function EmployeesPageContent() {
           {
             type: "select" as const,
             id: "department",
-            label: "Department",
+            label: t("common.field.department"),
             options: departments.map((d) => ({ value: String(d.id), label: d.name })),
             getValue: (employee: Employee) => (employee.department ? String(employee.department.id) : null),
           },
@@ -305,8 +316,8 @@ function EmployeesPageContent() {
           {
             type: "select" as const,
             id: "team",
-            label: "Team",
-            options: teams.map((t) => ({ value: String(t.id), label: t.name })),
+            label: t("common.field.team"),
+            options: teams.map((team) => ({ value: String(team.id), label: team.name })),
             getValue: (employee: Employee) => (employee.team ? String(employee.team.id) : null),
           },
         ]
@@ -314,31 +325,31 @@ function EmployeesPageContent() {
     {
       type: "select",
       id: "login",
-      label: "Login",
+      label: t("employees.listPage.colLogin"),
       options: [
-        { value: "yes", label: "Has login" },
-        { value: "no", label: "No login yet" },
+        { value: "yes", label: t("employees.shared.hasLogin") },
+        { value: "no", label: t("employees.listPage.noLoginYet") },
       ],
       getValue: (employee) => (employee.has_login ? "yes" : "no"),
     },
   ];
 
   const tabs = [
-    { id: "people" as const, label: "People", icon: Users, visible: canPeople },
-    { id: "roster" as const, label: "Roster", icon: CalendarRange, visible: canRoster },
-  ].filter((t) => t.visible);
+    { id: "people" as const, label: t("employees.listPage.tabPeople"), icon: Users, visible: canPeople },
+    { id: "roster" as const, label: t("employees.listPage.tabRoster"), icon: CalendarRange, visible: canRoster },
+  ].filter((tab) => tab.visible);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Employees"
+          title={t("employees.listPage.title")}
           description={
             activeTab === "roster"
               ? canManageRoster
-                ? "Who works which shift, and when."
-                : "Your shifts."
-              : "Your team's records, photos and details."
+                ? t("employees.listPage.descriptionRoster")
+                : t("employees.listPage.descriptionOwnShifts")
+              : t("employees.listPage.descriptionPeople")
           }
           action={
             activeTab === "people" && (
@@ -357,12 +368,12 @@ function EmployeesPageContent() {
                   (atEmployeeLimit ? (
                     <Button disabled>
                       <Plus className="size-4" />
-                      Add employee
+                      {t("employees.shared.addEmployee")}
                     </Button>
                   ) : (
                     <Button render={<Link href="/dashboard/employees/new" />} nativeButton={false}>
                       <Plus className="size-4" />
-                      Add employee
+                      {t("employees.shared.addEmployee")}
                     </Button>
                   ))}
               </div>
@@ -372,20 +383,20 @@ function EmployeesPageContent() {
 
         {tabs.length > 1 && (
           <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5 shadow-sm" role="tablist">
-            {tabs.map((t) => (
+            {tabs.map((tab) => (
               <button
-                key={t.id}
+                key={tab.id}
                 type="button"
                 role="tab"
-                aria-selected={activeTab === t.id}
-                onClick={() => switchTab(t.id)}
+                aria-selected={activeTab === tab.id}
+                onClick={() => switchTab(tab.id)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
-                  activeTab === t.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  activeTab === tab.id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <t.icon className="size-4" />
-                {t.label}
+                <tab.icon className="size-4" />
+                {tab.label}
               </button>
             ))}
           </div>
@@ -395,13 +406,13 @@ function EmployeesPageContent() {
           <>
             {canManage && branches.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                You need a branch before adding employees.{" "}
+                {t("employees.shared.needBranch")}{" "}
                 {canManageBranches ? (
                   <Link href="/dashboard/branches" className="font-medium text-primary hover:underline">
-                    Create one first →
+                    {t("employees.shared.createBranch")} →
                   </Link>
                 ) : (
-                  "Ask a company admin to create one."
+                  t("employees.shared.askAdmin")
                 )}
               </p>
             )}
@@ -410,8 +421,7 @@ function EmployeesPageContent() {
 
             {employees && employeeTotal > employees.length && (
               <Alert variant="warning">
-                You have {employeeTotal.toLocaleString()} employees; showing the first {employees.length.toLocaleString()}. Filter by branch or
-                department to narrow the list.
+                {t("employees.listPage.tooMany", { total: employeeTotal.toLocaleString(), shown: employees.length.toLocaleString() })}
               </Alert>
             )}
 
@@ -420,33 +430,33 @@ function EmployeesPageContent() {
               getRowId={(employee) => employee.id}
               columns={columns}
               filters={filters}
-              searchPlaceholder="Search by name, code, email, phone, branch or job title…"
+              searchPlaceholder={t("employees.listPage.search")}
               onRowClick={open}
               bulkActions={
                 canManage
                   ? (selected, clearSelection) => (
                       <Button variant="destructive" size="sm" onClick={() => handleBulkDelete(selected, clearSelection)}>
                         <Trash2 className="size-3.5" />
-                        Delete {selected.length}
+                        {t("employees.listPage.deleteN", { n: selected.length })}
                       </Button>
                     )
                   : undefined
               }
               emptyState={{
                 icon: Users,
-                title: "No employees yet",
-                description: "Add your first employee to start building your team directory.",
+                title: t("employees.shared.noEmployees"),
+                description: t("employees.listPage.emptyHint"),
               }}
               rowActions={(employee) => (
                 <>
                   <Button variant="outline" size="sm" onClick={() => open(employee)}>
                     <Pencil className="size-3.5" />
-                    {canManage ? "Edit" : "View"}
+                    {canManage ? t("common.action.edit") : t("common.action.view")}
                   </Button>
                   {canManage && (
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(employee)}>
                       <Trash2 className="size-3.5" />
-                      Delete
+                      {t("common.action.delete")}
                     </Button>
                   )}
                 </>

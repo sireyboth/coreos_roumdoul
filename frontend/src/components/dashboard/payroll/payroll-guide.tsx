@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /*
  * Plain-language help for payroll: a Guide button on every payroll page that
@@ -16,15 +17,7 @@ import { cn } from "@/lib/utils";
 
 export type GuideTopic = "start" | "groups" | "salary" | "run" | "adjustments" | "locks" | "faq";
 
-const TOPICS: { key: GuideTopic; title: string }[] = [
-  { key: "start", title: "Getting started" },
-  { key: "groups", title: "Pay groups & periods" },
-  { key: "salary", title: "How pay is worked out" },
-  { key: "run", title: "Running payroll" },
-  { key: "adjustments", title: "Adjustments" },
-  { key: "locks", title: "Approving & fixing mistakes" },
-  { key: "faq", title: "Questions" },
-];
+const TOPICS: GuideTopic[] = ["start", "groups", "salary", "run", "adjustments", "locks", "faq"];
 
 function Steps({ items }: { items: React.ReactNode[] }) {
   return (
@@ -44,7 +37,7 @@ function Example({ title, rows, note }: { title: string; rows: [string, string][
     <div className="rounded-lg border border-border bg-muted/30 p-3">
       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
       {rows.map(([label, value]) => (
-        <div key={label} className="flex items-baseline justify-between gap-4 py-0.5 text-sm">
+        <div key={`${label}|${value}`} className="flex items-baseline justify-between gap-4 py-0.5 text-sm">
           <span>{label}</span>
           <span className="shrink-0 tabular-nums">{value}</span>
         </div>
@@ -63,224 +56,208 @@ function P({ children }: { children: React.ReactNode }) {
 }
 
 function Topic({ topic }: { topic: GuideTopic }) {
+  const t = useT();
   switch (topic) {
     case "start":
       return (
         <div className="flex flex-col gap-4">
-          <P>Set things up once, then each pay period is: calculate → check → approve → pay.</P>
+          <P>{t("payroll.guide.start.intro")}</P>
           <Steps
             items={[
               <>
-                <b>Pay groups</b> (Payroll Settings): one group per way of paying people — e.g. &ldquo;Office&rdquo; once a month, &ldquo;Factory&rdquo; twice a month. Everyone
-                starts in the default &ldquo;Monthly&rdquo; group.
+                <b>{t("payroll.guide.start.groupsB")}</b> {t("payroll.guide.start.groupsText")}
               </>,
               <>
-                <b>Rules</b> (Payroll Settings): how lateness, absence and overtime are charged. A preset (Office / Factory) fills them in for you.
+                <b>{t("payroll.guide.start.rulesB")}</b> {t("payroll.guide.start.rulesText")}
               </>,
               <>
-                <b>Each employee</b> (their Pay tab): salary, pay group, tax/NSSF details, and fixed monthly allowances.
+                <b>{t("payroll.guide.start.employeeB")}</b> {t("payroll.guide.start.employeeText")}
               </>,
               <>
-                <b>Each period</b> (Pay runs): start a run for a group and period, check the payslips, approve, then mark as paid.
+                <b>{t("payroll.guide.start.periodB")}</b> {t("payroll.guide.start.periodText")}
               </>,
             ]}
           />
         </div>
       );
-    case "groups":
+    case "groups": {
+      const periods = t("payroll.guide.groups.periods");
       return (
         <div className="flex flex-col gap-4">
-          <P>A pay group is a set of people paid on the same days, by the same rules. Each run pays one group for one period.</P>
+          <P>{t("payroll.guide.groups.intro")}</P>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Example
-              title="Once a month, cut-off 31"
+              title={t("payroll.guide.groups.ex1")}
               rows={[
-                ["Periods", "1 Sep – 30 Sep"],
-                ["", "1 Oct – 31 Oct"],
+                [periods, t("payroll.guide.groups.ex1a")],
+                ["", t("payroll.guide.groups.ex1b")],
               ]}
             />
             <Example
-              title="Once a month, cut-off 20"
+              title={t("payroll.guide.groups.ex2")}
               rows={[
-                ["Periods", "21 Aug – 20 Sep"],
-                ["", "21 Sep – 20 Oct"],
+                [periods, t("payroll.guide.groups.ex2a")],
+                ["", t("payroll.guide.groups.ex2b")],
               ]}
-              note="Crosses the month — that's fine. Any day from 1 to 31 works: 20, 25, 28…"
+              note={t("payroll.guide.groups.ex2Note")}
             />
             <Example
-              title="Twice a month, cut-offs 15 & 31"
+              title={t("payroll.guide.groups.ex3")}
               rows={[
-                ["Periods", "1 – 15 Sep"],
-                ["", "16 – 30 Sep"],
+                [periods, t("payroll.guide.groups.ex3a")],
+                ["", t("payroll.guide.groups.ex3b")],
               ]}
             />
             <Example
-              title="Twice a month, cut-offs 5 & 20"
+              title={t("payroll.guide.groups.ex4")}
               rows={[
-                ["Periods", "21 Aug – 5 Sep"],
-                ["", "6 – 20 Sep"],
+                [periods, t("payroll.guide.groups.ex4a")],
+                ["", t("payroll.guide.groups.ex4b")],
               ]}
-              note="Both cut-offs are free to choose, at least a week apart."
+              note={t("payroll.guide.groups.ex4Note")}
             />
             <Example
-              title="Every week, from a Monday"
+              title={t("payroll.guide.groups.ex5")}
               rows={[
-                ["Periods", "28 Sep – 4 Oct"],
-                ["", "5 Oct – 11 Oct"],
+                [periods, t("payroll.guide.groups.ex5a")],
+                ["", t("payroll.guide.groups.ex5b")],
               ]}
             />
           </div>
+          <P>{t("payroll.guide.groups.shortMonths")}</P>
+          <H>{t("payroll.guide.groups.moveTitle")}</H>
           <P>
-            Short months: a cut-off of 29, 30 or 31 ends on the last day of February instead, and the next period starts on 1 March. Pick &ldquo;Last day of the month&rdquo; for 1st →
-            end-of-month periods.
+            {t("payroll.guide.groups.moveBefore")} <b>{t("payroll.guide.groups.moveB")}</b> {t("payroll.guide.groups.moveAfter")}
           </P>
-          <H>Moving someone to another group</H>
-          <P>
-            On their Pay tab, choose <b>Change group</b> and a start date. If the date falls inside a period, each group pays only its own days — nobody is paid twice or missed.
-            Days already paid by an approved run can&apos;t be moved.
-          </P>
-          <H>A group&apos;s own rules</H>
-          <P>
-            A group can use its own daily rate, missing-scan rule, or its own version of a rule (e.g. stricter lateness for the factory). Anything left as &ldquo;Company
-            setting&rdquo; follows Payroll Settings.
-          </P>
+          <H>{t("payroll.guide.groups.ownTitle")}</H>
+          <P>{t("payroll.guide.groups.ownText")}</P>
         </div>
       );
-    case "salary":
+    }
+    case "salary": {
+      const each = (amount: string) => t("payroll.guide.salary.eachPeriod", { amount });
       return (
         <div className="flex flex-col gap-4">
-          <P>A monthly salary is a fixed amount per period — it does not change with 28, 30 or 31 days.</P>
+          <P>{t("payroll.guide.salary.intro")}</P>
           <Example
-            title="Salary $520 a month"
+            title={t("payroll.guide.salary.ex1")}
             rows={[
-              ["Once a month", "$520.00 each period"],
-              ["Twice a month", "$260.00 each period (1/2)"],
-              ["Every week", "$120.00 each period (12/52)"],
-              ["Every 2 weeks", "$240.00 each period (12/26)"],
+              [t("payroll.shared.schedule.monthly"), each("$520.00")],
+              [t("payroll.shared.schedule.semi_monthly"), `${each("$260.00")} (1/2)`],
+              [t("payroll.shared.schedule.weekly"), `${each("$120.00")} (12/52)`],
+              [t("payroll.shared.schedule.biweekly"), `${each("$240.00")} (12/26)`],
             ]}
           />
           <Example
-            title="Deductions — daily rate $520 ÷ 26 = $20"
+            title={t("payroll.guide.salary.ex2")}
             rows={[
-              ["1 absent day", "− $20.00"],
-              ["2 days unpaid leave", "− $40.00"],
-              ["Half day of a 50%-paid leave", "− $5.00"],
-              ["45 min late (per-minute rule)", "− $1.88"],
+              [t("payroll.guide.salary.absentDay"), "− $20.00"],
+              [t("payroll.guide.salary.unpaidDays"), "− $40.00"],
+              [t("payroll.guide.salary.halfLeave"), "− $5.00"],
+              [t("payroll.guide.salary.lateMinutes"), "− $1.88"],
             ]}
-            note="Hourly rate = daily rate ÷ hours in a work day; overtime is paid at 150% on work days, 200% on days off and holidays."
+            note={t("payroll.guide.salary.ex2Note")}
           />
-          <Example
-            title="Joined on day 11 of a 30-day period"
-            rows={[["$520 × 20/30 days", "$346.67"]]}
-            note="Days only count when someone joins, leaves, changes group or gets a raise inside the period."
-          />
-          <H>Daily-paid staff</H>
-          <P>Paid for days worked + public holidays + paid leave, in any period. They are never charged for absence — they simply aren&apos;t paid for the day.</P>
-          <H>Tax and NSSF</H>
-          <P>
-            Worked out for 1st → end-of-month periods only, for now. Other periods show &ldquo;Tax and NSSF not included&rdquo; — handle them outside payroll until this is added.
-          </P>
+          <Example title={t("payroll.guide.salary.ex3")} rows={[[t("payroll.guide.salary.ex3Row"), "$346.67"]]} note={t("payroll.guide.salary.ex3Note")} />
+          <H>{t("payroll.guide.salary.dailyTitle")}</H>
+          <P>{t("payroll.guide.salary.dailyText")}</P>
+          <H>{t("payroll.guide.salary.taxTitle")}</H>
+          <P>{t("payroll.guide.salary.taxText")}</P>
         </div>
       );
+    }
     case "run":
       return (
         <div className="flex flex-col gap-4">
           <Steps
             items={[
               <>
-                <b>New pay run</b> → pick the pay group and the period. Pay is calculated right away from salary, attendance, leave and the rules.
+                <b>{t("payroll.guide.run.newB")}</b> {t("payroll.guide.run.newText")}
               </>,
               <>
-                <b>Check</b> the payslips. &ldquo;Needs fixing&rdquo; means something blocks approval — usually a missing scan. Open the payslip to see why, fix it in Attendance.
+                <b>{t("payroll.guide.run.checkB")}</b> {t("payroll.guide.run.checkText")}
               </>,
               <>
-                <b>Recalculate</b>. When only some people changed, the run lists them — recalculate just those people, everyone else stays as is.
+                <b>{t("payroll.guide.run.recalcB")}</b>
+                {t("payroll.guide.run.recalcText")}
               </>,
               <>
-                <b>Approve</b> once the period is over. The run is frozen and the attendance it used is locked. Only roles with Payroll &ldquo;Approve&rdquo; see this button — HR can
-                prepare runs while a manager approves them.
+                <b>{t("payroll.guide.run.approveB")}</b> {t("payroll.guide.run.approveText")}
               </>,
               <>
-                <b>Export CSV</b> for the bank or accountant, pay your staff, then <b>Mark as paid</b>.
+                <b>{t("payroll.guide.run.exportB")}</b> {t("payroll.guide.run.exportText")} <b>{t("payroll.guide.run.paidB")}</b>
+                {t("payroll.guide.run.end")}
               </>,
             ]}
           />
-          <H>Before approving, check</H>
+          <H>{t("payroll.guide.run.checkTitle")}</H>
           <ul className="list-disc pl-5 text-sm text-muted-foreground">
-            <li>Missing scans are fixed and overtime is approved (pending overtime is not paid).</li>
-            <li>Leave requests for the period are approved.</li>
-            <li>New joiners have a salary — people without one are listed at the top and left out.</li>
-            <li>Bonuses and penalties for the period are added as adjustments.</li>
+            <li>{t("payroll.guide.run.check1")}</li>
+            <li>{t("payroll.guide.run.check2")}</li>
+            <li>{t("payroll.guide.run.check3")}</li>
+            <li>{t("payroll.guide.run.check4")}</li>
           </ul>
         </div>
       );
     case "adjustments":
       return (
         <div className="flex flex-col gap-4">
-          <P>For one-off amounts the rules don&apos;t cover: a bonus, commission, penalty, back pay or an advance.</P>
+          <P>{t("payroll.guide.adjustments.intro")}</P>
           <Example
-            title="Which run an adjustment goes into"
+            title={t("payroll.guide.adjustments.exTitle")}
             rows={[
-              ["Dated 20 Sep, cut-off-25 group", "26 Aug – 25 Sep run"],
-              ["Dated 27 Sep, cut-off-25 group", "26 Sep – 25 Oct run"],
+              [t("payroll.guide.adjustments.row1"), t("payroll.guide.adjustments.row1Run")],
+              [t("payroll.guide.adjustments.row2"), t("payroll.guide.adjustments.row2Run")],
             ]}
-            note="The date decides the period, in each person's own pay group."
+            note={t("payroll.guide.adjustments.exNote")}
           />
-          <H>Types</H>
+          <H>{t("payroll.guide.adjustments.typesTitle")}</H>
           <ul className="list-disc pl-5 text-sm text-muted-foreground">
             <li>
-              <b>Earning</b> — added to pay (bonus, commission).
+              <b>{t("payroll.shared.kind.earning")}</b> {t("payroll.guide.adjustments.earningText")}
             </li>
             <li>
-              <b>Deduction</b> — taken off before tax (penalty).
+              <b>{t("payroll.shared.kind.deduction")}</b> {t("payroll.guide.adjustments.deductionText")}
             </li>
             <li>
-              <b>After-tax deduction</b> — taken off the net pay (salary advance, loan).
+              <b>{t("payroll.shared.kind.net_deduction")}</b> {t("payroll.guide.adjustments.netText")}
             </li>
           </ul>
-          <P>Add one for a person, a branch or everyone, or import many from Excel. Recalculate the run afterwards so it is included.</P>
+          <P>{t("payroll.guide.adjustments.outro")}</P>
         </div>
       );
     case "locks":
       return (
         <div className="flex flex-col gap-4">
-          <P>Approving a run freezes its payslips and locks the attendance it used — only for the people in that run, only for its days.</P>
-          <H>After approval you can&apos;t</H>
+          <P>{t("payroll.guide.locks.intro")}</P>
+          <H>{t("payroll.guide.locks.cantTitle")}</H>
           <ul className="list-disc pl-5 text-sm text-muted-foreground">
-            <li>change scans, corrections, leave or rosters on those days for those people;</li>
-            <li>change their salary or pay group on or before the last paid day;</li>
-            <li>add adjustments dated in that period.</li>
+            <li>{t("payroll.guide.locks.cant1")}</li>
+            <li>{t("payroll.guide.locks.cant2")}</li>
+            <li>{t("payroll.guide.locks.cant3")}</li>
           </ul>
-          <H>Found a mistake after approving?</H>
+          <H>{t("payroll.guide.locks.mistakeTitle")}</H>
           <P>
-            Add an <b>adjustment</b> dated in the next period — e.g. &ldquo;Back pay: overtime 12 Sep&rdquo; as an earning, or &ldquo;Overpaid in September&rdquo; as a deduction.
-            Before approving, just fix the cause and recalculate.
+            {t("payroll.guide.locks.mistakeBefore")} <b>{t("payroll.guide.locks.mistakeB")}</b> {t("payroll.guide.locks.mistakeAfter")}
           </P>
         </div>
       );
     case "faq":
       return (
         <div className="flex flex-col gap-4">
-          {[
+          {(
             [
-              "Why is someone missing from a run?",
-              "They have no salary for that period, they're in another pay group for those days, or they weren't employed yet / had already left.",
-            ],
-            [
-              "Why does a payslip say “Needs fixing”?",
-              "Usually a day with a missing scan (when the rule is “must be fixed”), or deductions larger than the pay. Open the payslip to see the reason.",
-            ],
-            [
-              "Someone took more leave than they have?",
-              "Paid leave can't go over the balance — the request is refused. Extra days are taken as Unpaid leave and deducted (days × daily rate).",
-            ],
-            ["Why is a run marked as changed?", "Something it uses changed after it was calculated: attendance, a salary, an adjustment or a rule. Recalculate to include it."],
-            ["Can a period cross two months?", "Yes, e.g. 26 Aug – 25 Sep. The payslip shows how the gross splits between the months."],
-            ["Can we run payroll twice a month?", "Yes: put those people in a “Twice a month” pay group. Each half pays half the monthly salary."],
-          ].map(([q, a]) => (
+              ["payroll.guide.faq.q1", "payroll.guide.faq.a1"],
+              ["payroll.guide.faq.q2", "payroll.guide.faq.a2"],
+              ["payroll.guide.faq.q3", "payroll.guide.faq.a3"],
+              ["payroll.guide.faq.q4", "payroll.guide.faq.a4"],
+              ["payroll.guide.faq.q5", "payroll.guide.faq.a5"],
+              ["payroll.guide.faq.q6", "payroll.guide.faq.a6"],
+            ] as const
+          ).map(([q, a]) => (
             <div key={q}>
-              <H>{q}</H>
-              <P>{a}</P>
+              <H>{t(q)}</H>
+              <P>{t(a)}</P>
             </div>
           ))}
         </div>
@@ -290,17 +267,18 @@ function Topic({ topic }: { topic: GuideTopic }) {
 
 /** The whole guide, opening on one topic. */
 export function PayrollGuideDialog({ open, onOpenChange, topic = "start" }: { open: boolean; onOpenChange: (o: boolean) => void; topic?: GuideTopic }) {
+  const t = useT();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="size-4" /> Payroll guide
+            <BookOpen className="size-4" /> {t("payroll.guide.title")}
           </DialogTitle>
           <DialogDescription>
-            How payroll works here, in plain words.{" "}
+            {t("payroll.guide.description")}{" "}
             <Link href="/docs-cthh5ueij8/payroll" target="_blank" className="text-primary underline-offset-4 hover:underline">
-              Full step-by-step docs ↗
+              {t("payroll.guide.docs")}
             </Link>
           </DialogDescription>
         </DialogHeader>
@@ -312,24 +290,25 @@ export function PayrollGuideDialog({ open, onOpenChange, topic = "start" }: { op
 }
 
 function GuideBody({ topic }: { topic: GuideTopic }) {
+  const t = useT();
   const [current, setCurrent] = useState(topic);
 
   return (
     <>
       <div className="flex flex-wrap gap-1.5" role="tablist">
-        {TOPICS.map((t) => (
+        {TOPICS.map((key) => (
           <button
-            key={t.key}
+            key={key}
             type="button"
             role="tab"
-            aria-selected={current === t.key}
-            onClick={() => setCurrent(t.key)}
+            aria-selected={current === key}
+            onClick={() => setCurrent(key)}
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              current === t.key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground",
+              current === key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground",
             )}
           >
-            {t.title}
+            {t(`payroll.guide.topic.${key}`)}
           </button>
         ))}
       </div>
@@ -342,12 +321,13 @@ function GuideBody({ topic }: { topic: GuideTopic }) {
 
 /** A "Guide" button for a page header, opening on that page's topic. */
 export function PayrollGuideButton({ topic }: { topic: GuideTopic }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
         <BookOpen className="size-4" />
-        Guide
+        {t("payroll.guide.button")}
       </Button>
       <PayrollGuideDialog open={open} onOpenChange={setOpen} topic={topic} />
     </>
@@ -369,6 +349,7 @@ function readDismissed(): boolean {
  * until the first run is approved, or until it is dismissed on this device.
  */
 export function GettingStartedCard({ groupsCount, hasRuns, hasApprovedRun }: { groupsCount: number; hasRuns: boolean; hasApprovedRun: boolean }) {
+  const t = useT();
   // Hidden while rendering on the server (no storage there), then whatever this device chose.
   const stored = useSyncExternalStore(
     (onChange) => {
@@ -401,36 +382,36 @@ export function GettingStartedCard({ groupsCount, hasRuns, hasApprovedRun }: { g
     topic: GuideTopic;
   }[] = [
     {
-      title: "Set up pay groups",
-      text: "Who is paid once a month, twice a month or weekly.",
+      title: t("payroll.guide.card.groupsTitle"),
+      text: t("payroll.guide.card.groupsText"),
       href: "/dashboard/payroll/settings",
-      link: "Payroll Settings",
+      link: t("payroll.guide.card.settingsLink"),
       done: groupsCount > 1,
       topic: "groups",
     },
     {
-      title: "Check the pay rules",
-      text: "Lateness, absence, overtime — or apply a preset.",
+      title: t("payroll.guide.card.rulesTitle"),
+      text: t("payroll.guide.card.rulesText"),
       href: "/dashboard/payroll/settings",
-      link: "Payroll Settings",
+      link: t("payroll.guide.card.settingsLink"),
       topic: "salary",
     },
     {
-      title: "Set each employee's salary and group",
-      text: "On every employee's Pay tab.",
+      title: t("payroll.guide.card.employeeTitle"),
+      text: t("payroll.guide.card.employeeText"),
       href: "/dashboard/employees",
-      link: "Employees",
+      link: t("payroll.guide.card.employeesLink"),
       topic: "groups",
     },
     {
-      title: "Start your first pay run",
-      text: "Pick a group and a period, then check the payslips.",
+      title: t("payroll.guide.card.runTitle"),
+      text: t("payroll.guide.card.runText"),
       done: hasRuns,
       topic: "run",
     },
     {
-      title: "Approve and pay",
-      text: "Approve, export for the bank, mark as paid.",
+      title: t("payroll.guide.card.payTitle"),
+      text: t("payroll.guide.card.payText"),
       done: hasApprovedRun,
       topic: "locks",
     },
@@ -440,17 +421,17 @@ export function GettingStartedCard({ groupsCount, hasRuns, hasApprovedRun }: { g
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div className="flex flex-col gap-1.5">
-          <CardTitle>Getting started with payroll</CardTitle>
-          <CardDescription>Five steps to your first pay run. Click &ldquo;How?&rdquo; on any step for an explanation.</CardDescription>
+          <CardTitle>{t("payroll.guide.card.title")}</CardTitle>
+          <CardDescription>{t("payroll.guide.card.description")}</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" aria-label="Hide getting started" onClick={dismiss}>
+        <Button variant="ghost" size="icon" aria-label={t("payroll.guide.card.hide")} onClick={dismiss}>
           <X className="size-4" />
         </Button>
       </CardHeader>
       <CardContent>
         <ol className="flex flex-col divide-y divide-border">
           {steps.map((s, i) => (
-            <li key={s.title} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+            <li key={s.topic + i} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
               <span
                 className={cn(
                   "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
@@ -474,7 +455,7 @@ export function GettingStartedCard({ groupsCount, hasRuns, hasApprovedRun }: { g
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setGuide(s.topic)}>
-                How?
+                {t("payroll.guide.card.how")}
               </Button>
             </li>
           ))}

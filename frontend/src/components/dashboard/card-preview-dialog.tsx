@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { saveBlob } from "@/lib/download";
+import { useT } from "@/lib/i18n";
 
 /**
  * Shows a generated PDF (an ID card) in-place, in the browser's own PDF
@@ -22,6 +23,7 @@ export function CardPreviewDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   // Derived straight from `blob`, not stored in state — the effect below
   // only handles revoking it (a cleanup concern, not a render concern).
   const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
@@ -36,16 +38,16 @@ export function CardPreviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>ID card preview</DialogTitle>
+          <DialogTitle>{t("employees.idCards.preview")}</DialogTitle>
         </DialogHeader>
         <div className="h-[70vh] overflow-hidden rounded-lg border border-border bg-muted">
-          {url && <iframe src={url} title="ID card preview" className="h-full w-full" />}
+          {url && <iframe src={url} title={t("employees.idCards.preview")} className="h-full w-full" />}
         </div>
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.close")}</DialogClose>
           <Button type="button" onClick={() => blob && saveBlob(blob, filename)} disabled={!blob}>
             <Download className="size-4" />
-            Download
+            {t("common.action.download")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -27,12 +27,14 @@ import { Alert } from "@/components/ui/alert";
 import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
 import { dateOnly } from "@/lib/date";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 
+// Labels are common.status.<key>.
 const STATUS = {
-  pending: { label: "Pending", variant: "warning" },
-  approved: { label: "Approved", variant: "success" },
-  rejected: { label: "Rejected", variant: "destructive" },
-  cancelled: { label: "Cancelled", variant: "secondary" },
+  pending: { variant: "warning" },
+  approved: { variant: "success" },
+  rejected: { variant: "destructive" },
+  cancelled: { variant: "secondary" },
 } as const;
 
 /**
@@ -53,6 +55,8 @@ function CorrectionReviewDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [remark, setRemark] = useState("");
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -81,8 +85,12 @@ function CorrectionReviewDialog({
       else if (action === "reject") await api.attendanceCorrections.reject(c.id, text);
       else await api.attendanceCorrections.cancel(c.id, text);
       notifySuccess(
-        action === "approve" ? "Correction approved" : action === "reject" ? "Correction rejected" : "Correction cancelled",
-        action === "approve" ? "The scans were added and the day recalculated." : undefined,
+        action === "approve"
+          ? t("attendance.corrections.approved")
+          : action === "reject"
+            ? t("attendance.corrections.rejected")
+            : t("attendance.corrections.cancelled"),
+        action === "approve" ? t("attendance.corrections.approvedHint") : undefined,
       );
       close();
       onDone();
@@ -100,29 +108,37 @@ function CorrectionReviewDialog({
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                Correction <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>
+                {t("attendance.corrections.title")} <Badge variant={STATUS[c.status].variant}>{t(`common.status.${c.status}`)}</Badge>
               </DialogTitle>
               <DialogDescription>
                 {c.employee.name} ·{" "}
-                {new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                {new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString(dateLocale(lang), {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
               </DialogDescription>
             </DialogHeader>
 
             <div className="flex flex-col gap-3 text-sm">
               <p>
-                Add: <span className="font-medium tabular-nums">{c.requested_times.map(formatTime).join(" · ") || "—"}</span>
+                {t("attendance.corrections.add")}{" "}
+                <span className="font-medium tabular-nums">{c.requested_times.map((time) => formatTime(time, lang)).join(" · ") || "—"}</span>
               </p>
               <p className="rounded-md bg-muted/50 px-3 py-2">{c.reason}</p>
               {c.reviewed_by && (
                 <p className="text-xs text-muted-foreground">
-                  {STATUS[c.status].label} by {c.reviewed_by.name}
+                  {t("attendance.corrections.decidedBy", { status: t(`common.status.${c.status}`), name: c.reviewed_by.name })}
                   {c.review_notes ? ` — “${c.review_notes}”` : ""}
                 </p>
               )}
 
               {(canDecide || canCancel) && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="correction-remark">{canDecide ? "Remark to the employee" : isOwn ? "Reason (optional)" : "Remark to the employee"}</Label>
+                  <Label htmlFor="correction-remark">
+                    {canDecide ? t("attendance.corrections.remark") : isOwn ? t("attendance.corrections.reasonOptional") : t("attendance.corrections.remark")}
+                  </Label>
                   <Textarea
                     id="correction-remark"
                     value={remark}
@@ -132,9 +148,9 @@ function CorrectionReviewDialog({
                     }}
                     maxLength={500}
                     aria-invalid={missing}
-                    placeholder={canDecide ? "Optional when approving, needed when rejecting" : ""}
+                    placeholder={canDecide ? t("attendance.corrections.remarkPlaceholder") : ""}
                   />
-                  {missing && <p className="text-xs text-destructive">Add a remark — the employee will see it.</p>}
+                  {missing && <p className="text-xs text-destructive">{t("attendance.corrections.remarkMissing")}</p>}
                 </div>
               )}
             </div>
@@ -143,16 +159,16 @@ function CorrectionReviewDialog({
               <DialogFooter>
                 {canCancel && (
                   <Button variant="outline" onClick={() => act("cancel")} disabled={busy} className="sm:mr-auto">
-                    Cancel request
+                    {t("attendance.corrections.cancelRequest")}
                   </Button>
                 )}
                 {canDecide && (
                   <>
                     <Button variant="outline" onClick={() => act("reject")} disabled={busy}>
-                      Reject
+                      {t("common.action.reject")}
                     </Button>
                     <Button onClick={() => act("approve")} disabled={busy}>
-                      Approve
+                      {t("common.action.approve")}
                     </Button>
                   </>
                 )}
@@ -165,8 +181,8 @@ function CorrectionReviewDialog({
   );
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function formatTime(iso: string, lang: Lang): string {
+  return new Date(iso).toLocaleTimeString(dateLocale(lang), { hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -202,6 +218,8 @@ export function AttendanceCorrections({
   onChanged?: () => void;
   initialStatus?: string;
 }) {
+  const t = useT();
+  const lang = useLang();
   const { me } = useMe();
   // Kept with the month it answers; a different month means it is still loading.
   const [result, setResult] = useState<{ month: string; data: AttendanceCorrection[] } | null>(null);
@@ -238,7 +256,7 @@ export function AttendanceCorrections({
 
     try {
       await api.attendanceCorrections.create({ date, reason, scans: scansFor(date, times) });
-      notifySuccess("Correction requested", "Your manager will review it.");
+      notifySuccess(t("attendance.corrections.requested"), t("attendance.corrections.requestedHint"));
       setDate("");
       setReason("");
       setTimes([""]);
@@ -246,7 +264,7 @@ export function AttendanceCorrections({
       reload();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -261,7 +279,7 @@ export function AttendanceCorrections({
       ? [
           {
             id: "employee",
-            header: "Employee",
+            header: t("common.field.employee"),
             primary: true,
             cell: (c: AttendanceCorrection) => <span className="font-medium">{c.employee.name}</span>,
             sortValue: (c: AttendanceCorrection) => c.employee.name,
@@ -272,23 +290,25 @@ export function AttendanceCorrections({
       : []),
     {
       id: "date",
-      header: "Date",
+      header: t("common.field.date"),
       primary: !canManage,
       className: "whitespace-nowrap",
       cell: (c) =>
-        new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }),
+        new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString(dateLocale(lang), { year: "numeric", month: "short", day: "numeric" }),
       sortValue: (c) => dateOnly(c.date),
     },
     {
       id: "scans",
-      header: "Scans to add",
-      cell: (c) => <span className="tabular-nums text-muted-foreground">{c.requested_times.map(formatTime).join(" · ") || "—"}</span>,
+      header: t("attendance.corrections.colScans"),
+      cell: (c) => (
+        <span className="tabular-nums text-muted-foreground">{c.requested_times.map((time) => formatTime(time, lang)).join(" · ") || "—"}</span>
+      ),
       sortValue: (c) => c.requested_times[0],
-      sortLabels: ["Earliest first", "Latest first"],
+      sortLabels: [t("attendance.corrections.sortEarliest"), t("attendance.corrections.sortLatest")],
     },
     {
       id: "reason",
-      header: "Reason",
+      header: t("common.field.reason"),
       // Truncated in the table; wraps in full on a phone card.
       className: "max-w-48 truncate",
       cell: (c) => <span className="text-muted-foreground">{c.reason}</span>,
@@ -297,11 +317,11 @@ export function AttendanceCorrections({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (c) => (
         <div className="flex flex-col items-start gap-0.5">
-          <Badge variant={STATUS[c.status].variant}>{STATUS[c.status].label}</Badge>
-          {c.reviewed_by && <span className="text-xs text-muted-foreground">by {c.reviewed_by.name}</span>}
+          <Badge variant={STATUS[c.status].variant}>{t(`common.status.${c.status}`)}</Badge>
+          {c.reviewed_by && <span className="text-xs text-muted-foreground">{t("attendance.corrections.reviewedBy", { name: c.reviewed_by.name })}</span>}
           {/* The remark the employee reads. */}
           {c.review_notes && <span className="max-w-56 text-xs italic text-muted-foreground">“{c.review_notes}”</span>}
         </div>
@@ -331,34 +351,31 @@ export function AttendanceCorrections({
                 render={
                   <Button>
                     <Plus className="size-4" />
-                    Request correction
+                    {t("attendance.corrections.request")}
                   </Button>
                 }
               />
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Request a correction</DialogTitle>
-                  <DialogDescription>Your manager will need to approve this.</DialogDescription>
+                  <DialogTitle>{t("attendance.corrections.formTitle")}</DialogTitle>
+                  <DialogDescription>{t("attendance.corrections.formDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreate} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="date">Date</Label>
+                    <Label htmlFor="date">{t("common.field.date")}</Label>
                     <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label>Scans you missed</Label>
-                    <p className="-mt-1 text-xs text-muted-foreground">
-                      Only the ones you forgot — e.g. just 12:00 if you didn&apos;t scan out for lunch. Your schedule
-                      decides whether each is an IN or an OUT.
-                    </p>
+                    <Label>{t("attendance.corrections.missedScans")}</Label>
+                    <p className="-mt-1 text-xs text-muted-foreground">{t("attendance.corrections.missedScansHint")}</p>
                     {times.map((time, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <Input
                           type="time"
                           required
-                          aria-label={`Scan ${i + 1}`}
+                          aria-label={t("attendance.corrections.scanN", { n: i + 1 })}
                           value={time}
-                          onChange={(e) => setTimes((all) => all.map((t, j) => (j === i ? e.target.value : t)))}
+                          onChange={(e) => setTimes((all) => all.map((v, j) => (j === i ? e.target.value : v)))}
                           className="w-32"
                         />
                         {times.length > 1 && (
@@ -366,7 +383,7 @@ export function AttendanceCorrections({
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            aria-label="Remove this time"
+                            aria-label={t("attendance.corrections.removeTime")}
                             onClick={() => setTimes((all) => all.filter((_, j) => j !== i))}
                           >
                             <X className="size-3.5" />
@@ -377,19 +394,19 @@ export function AttendanceCorrections({
                     {times.length < 8 && (
                       <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => setTimes((all) => [...all, ""])}>
                         <Plus className="size-3.5" />
-                        Add another time
+                        {t("attendance.corrections.addTime")}
                       </Button>
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="reason">Reason</Label>
+                    <Label htmlFor="reason">{t("common.field.reason")}</Label>
                     <Input id="reason" required value={reason} onChange={(e) => setReason(e.target.value)} />
                   </div>
                   {error && <Alert variant="destructive">{error}</Alert>}
                   <DialogFooter>
-                    <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                    <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                     <Button type="submit" disabled={saving}>
-                      {saving ? "Submitting…" : "Submit request"}
+                      {saving ? t("attendance.corrections.submitting") : t("attendance.corrections.submit")}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -408,8 +425,8 @@ export function AttendanceCorrections({
           {
             type: "select",
             id: "status",
-            label: "Status",
-            options: Object.entries(STATUS).map(([value, s]) => ({ value, label: s.label })),
+            label: t("common.field.status"),
+            options: (Object.keys(STATUS) as (keyof typeof STATUS)[]).map((value) => ({ value, label: t(`common.status.${value}`) })),
             getValue: (correction) => correction.status,
           },
           ...(canManage
@@ -417,22 +434,22 @@ export function AttendanceCorrections({
                 {
                   type: "select" as const,
                   id: "employee",
-                  label: "Employee",
+                  label: t("common.field.employee"),
                   options: employeeOptions,
                   getValue: (correction: AttendanceCorrection) => String(correction.employee.id),
                 },
               ]
             : []),
-          { type: "date-range", id: "date", label: "Date", getValue: (correction) => dateOnly(correction.date) },
+          { type: "date-range", id: "date", label: t("common.field.date"), getValue: (correction) => dateOnly(correction.date) },
         ]}
-        searchPlaceholder={canManage ? "Search by employee or reason…" : "Search by reason…"}
+        searchPlaceholder={canManage ? t("attendance.corrections.searchManager") : t("attendance.corrections.searchOwn")}
         initialFilters={initialStatus && initialStatus in STATUS ? { status: initialStatus } : undefined}
-        emptyState={{ icon: FileEdit, title: "No correction requests", description: "Nothing to review right now." }}
+        emptyState={{ icon: FileEdit, title: t("attendance.corrections.empty"), description: t("attendance.corrections.emptyHint") }}
         onRowClick={setReviewing}
         rowActions={(correction) =>
           correction.status === "pending" && (canManage || isOwn(correction)) ? (
             <Button variant="outline" size="sm" onClick={() => setReviewing(correction)}>
-              {canManage && !isOwn(correction) ? "Review" : "Open"}
+              {canManage && !isOwn(correction) ? t("attendance.corrections.review") : t("attendance.corrections.open")}
             </Button>
           ) : null
         }

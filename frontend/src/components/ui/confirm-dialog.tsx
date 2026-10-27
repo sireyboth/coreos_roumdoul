@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,7 @@ const ConfirmContext = createContext<ConfirmFn | null>(null);
  *   if (!(await confirm({ title: "Delete this?", destructive: true }))) return;
  */
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const [pending, setPending] = useState<{ options: ConfirmOptions; resolve: (result: boolean) => void } | null>(null);
 
   const confirm = useCallback<ConfirmFn>(
@@ -66,10 +68,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => settle(false)}>
-              {options?.cancelLabel ?? "Cancel"}
+              {options?.cancelLabel ?? t("common.action.cancel")}
             </Button>
             <Button type="button" variant={options?.destructive ? "destructive" : "default"} onClick={() => settle(true)} autoFocus>
-              {options?.confirmLabel ?? (options?.destructive ? "Delete" : "Confirm")}
+              {options?.confirmLabel ?? t(options?.destructive ? "common.action.delete" : "common.action.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

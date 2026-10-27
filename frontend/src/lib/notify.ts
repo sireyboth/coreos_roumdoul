@@ -1,11 +1,12 @@
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { translateNow } from "@/lib/i18n";
 
 /** One place that turns any failure into a toast a person can act on. */
-export function notifyError(err: unknown, fallback = "Something went wrong. Please try again.") {
+export function notifyError(err: unknown, fallback = translateNow("common.message.somethingWrong")) {
   if (err instanceof ApiError) {
     if (err.code === "plan_limit_reached") {
-      toast.error("Plan limit reached", { description: err.message });
+      toast.error(translateNow("common.message.planLimit"), { description: err.message });
       return;
     }
     toast.error(err.message || fallback);
@@ -16,7 +17,7 @@ export function notifyError(err: unknown, fallback = "Something went wrong. Plea
   // any other TypeError is a bug in the page, and calling it a network problem
   // sends people checking their Wi-Fi instead of reporting it.
   if (err instanceof TypeError && /failed to fetch|networkerror|load failed/i.test(err.message)) {
-    toast.error("Can't reach the server", { description: "Check your internet connection and try again." });
+    toast.error(translateNow("common.message.offline"), { description: translateNow("common.message.offlineHint") });
     return;
   }
 

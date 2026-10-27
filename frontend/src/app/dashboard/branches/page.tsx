@@ -25,6 +25,7 @@ import { api, ApiError, Branch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { exportBranches, branchImport } from "@/lib/excel-specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
+import { useT } from "@/lib/i18n";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { QrCodeDialog } from "@/components/dashboard/qr-code-dialog";
@@ -58,6 +59,7 @@ function BranchFormFields({
   form: BranchFormState;
   onChange: (form: BranchFormState) => void;
 }) {
+  const t = useT();
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -66,7 +68,7 @@ function BranchFormFields({
     setLocating(true);
 
     if (!navigator.geolocation) {
-      setLocationError("Your browser doesn't support location.");
+      setLocationError(t("org.shared.noGeolocation"));
       setLocating(false);
       return;
     }
@@ -81,7 +83,7 @@ function BranchFormFields({
         setLocating(false);
       },
       () => {
-        setLocationError("Couldn't get your location — check browser permissions.");
+        setLocationError(t("org.shared.locationDenied"));
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 },
@@ -91,7 +93,7 @@ function BranchFormFields({
   return (
     <>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="name">{t("common.field.name")}</Label>
         <Input
           id="name"
           required
@@ -100,11 +102,11 @@ function BranchFormFields({
         />
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="code">Code (optional)</Label>
+        <Label htmlFor="code">{t("org.shared.code")}</Label>
         <Input id="code" value={form.code} onChange={(e) => onChange({ ...form, code: e.target.value })} />
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="address">Address (optional)</Label>
+        <Label htmlFor="address">{t("org.shared.address")}</Label>
         <Input
           id="address"
           value={form.address}
@@ -112,43 +114,43 @@ function BranchFormFields({
         />
       </div>
       <div className="flex flex-col gap-2">
-        <Label>Location</Label>
+        <Label>{t("org.shared.location")}</Label>
         <Button type="button" variant="outline" size="sm" onClick={handleUseCurrentLocation} disabled={locating} className="self-start">
           <MapPin className="size-3.5" />
-          {locating ? "Locating…" : "Use my current location"}
+          {locating ? t("org.shared.locating") : t("org.shared.useMyLocation")}
         </Button>
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
             <Label htmlFor="latitude" className="text-xs text-muted-foreground">
-              Latitude
+              {t("org.shared.latitude")}
             </Label>
             <Input
               id="latitude"
               type="number"
               step="any"
               required
-              placeholder="e.g. 11.5564"
+              placeholder={t("org.shared.latitudeExample")}
               value={form.latitude}
               onChange={(e) => onChange({ ...form, latitude: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="longitude" className="text-xs text-muted-foreground">
-              Longitude
+              {t("org.shared.longitude")}
             </Label>
             <Input
               id="longitude"
               type="number"
               step="any"
               required
-              placeholder="e.g. 104.9282"
+              placeholder={t("org.shared.longitudeExample")}
               value={form.longitude}
               onChange={(e) => onChange({ ...form, longitude: e.target.value })}
             />
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Required — this is what lets Attendance check whether a check-in is actually near this branch.
+          {t("org.branchesPage.locationHint")}
         </p>
         {locationError && <p className="text-xs text-destructive">{locationError}</p>}
       </div>
@@ -160,19 +162,19 @@ function BranchFormFields({
           className="mt-0.5 size-4 rounded border-input"
         />
         <span>
-          <span className="font-medium">Require location when scanning the QR code</span>
+          <span className="font-medium">{t("org.shared.requireLocation")}</span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            Employees must be at the branch (within its radius) for a scan to count, so a photo of the poster can&apos;t
-            be used from home. Leave it off for indoor branches where phones can&apos;t get a GPS signal.
+            {t("org.branchesPage.requireLocationHint")}
           </span>
         </span>
       </label>
-      <DisplayOrderField id="branch-order" value={form.sort_order} onChange={(value) => onChange({ ...form, sort_order: value })} example="head office" />
+      <DisplayOrderField id="branch-order" value={form.sort_order} onChange={(value) => onChange({ ...form, sort_order: value })} example={t("org.branchesPage.orderExample")} />
     </>
   );
 }
 
 export default function BranchesPage() {
+  const t = useT();
   const { me, refresh } = useMe();
   const confirm = useConfirm();
   const [branches, setBranches] = useState<Branch[] | null>(null);
@@ -217,14 +219,14 @@ export default function BranchesPage() {
 
     try {
       await api.branches.create(toPayload(createForm));
-      notifySuccess("Branch added");
+      notifySuccess(t("org.branchesPage.added"));
       refresh();
       setCreateForm(EMPTY_FORM);
       setCreateOpen(false);
       load();
     } catch (err) {
       notifyError(err);
-      setCreateError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setCreateError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setCreating(false);
     }
@@ -232,16 +234,15 @@ export default function BranchesPage() {
 
   async function handleDelete(branch: Branch) {
     const ok = await confirm({
-      title: `Delete "${branch.name}"?`,
-      description:
-        "Its check-in location and QR code are removed too. Past attendance keeps its history. If employees are still assigned here, move them first — or just deactivate the branch instead.",
+      title: t("org.shared.deleteTitle", { name: branch.name }),
+      description: t("org.branchesPage.deleteDescription"),
       destructive: true,
     });
     if (!ok) return;
 
     try {
       await api.branches.remove(branch.id);
-      notifySuccess(`"${branch.name}" deleted`);
+      notifySuccess(t("org.shared.deleted", { name: branch.name }));
       refresh();
     } catch (err) {
       notifyError(err);
@@ -272,12 +273,12 @@ export default function BranchesPage() {
 
     try {
       await api.branches.update(editingBranch.id, toPayload(editForm));
-      notifySuccess("Branch updated");
+      notifySuccess(t("org.branchesPage.updated"));
       setEditingBranch(null);
       load();
     } catch (err) {
       notifyError(err);
-      setEditError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setEditError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSavingEdit(false);
     }
@@ -288,7 +289,7 @@ export default function BranchesPage() {
   const columns: DataTableColumn<Branch>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("common.field.name"),
       primary: true,
       cell: (branch) => <span className="font-medium">{branch.name}</span>,
       sortValue: (branch) => branch.name,
@@ -297,19 +298,19 @@ export default function BranchesPage() {
     displayOrderColumn<Branch>(),
     {
       id: "code",
-      header: "Code",
+      header: t("org.shared.colCode"),
       cell: (branch) => <span className="text-muted-foreground">{branch.code ?? "—"}</span>,
       sortValue: (branch) => branch.code,
       searchValue: (branch) => branch.code,
     },
     {
       id: "location",
-      header: "Location",
+      header: t("org.shared.location"),
       cell: (branch) =>
         branch.latitude != null ? (
           <Badge variant="outline">
             <MapPin className="size-3" />
-            GPS set
+            {t("org.branchesPage.gpsSet")}
           </Badge>
         ) : (
           <span className="text-muted-foreground">—</span>
@@ -317,24 +318,24 @@ export default function BranchesPage() {
     },
     {
       id: "verify",
-      header: "QR check-in",
+      header: t("org.branchesPage.colQrCheckIn"),
       cell: (branch) =>
         branch.require_location ? (
-          <Badge variant="success">Location required</Badge>
+          <Badge variant="success">{t("org.branchesPage.locationRequired")}</Badge>
         ) : (
-          <Badge variant="warning">QR only</Badge>
+          <Badge variant="warning">{t("org.branchesPage.qrOnly")}</Badge>
         ),
       sortValue: (branch) => (branch.require_location ? 1 : 0),
-      sortLabels: ["QR only first", "Location required first"],
+      sortLabels: [t("org.branchesPage.qrOnlyFirst"), t("org.branchesPage.locationRequiredFirst")],
     },
     {
       id: "status",
-      header: "Status",
+      header: t("common.field.status"),
       cell: (branch) => (
-        <Badge variant={branch.is_active ? "success" : "secondary"}>{branch.is_active ? "Active" : "Inactive"}</Badge>
+        <Badge variant={branch.is_active ? "success" : "secondary"}>{branch.is_active ? t("common.status.active") : t("common.status.inactive")}</Badge>
       ),
       sortValue: (branch) => (branch.is_active ? 1 : 0),
-      sortLabels: ["Inactive first", "Active first"],
+      sortLabels: [t("org.shared.inactiveFirst"), t("org.shared.activeFirst")],
     },
   ];
   const atBranchLimit = me?.plan?.max_branches != null && (me.usage?.branches ?? 0) >= me.plan.max_branches;
@@ -343,8 +344,8 @@ export default function BranchesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Branches"
-          description="Physical or virtual locations your employees belong to."
+          title={t("org.branchesPage.title")}
+          description={t("org.branchesPage.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportBranches} importSpec={canManage ? branchImport : undefined} onImported={load} />
@@ -354,24 +355,24 @@ export default function BranchesPage() {
                     render={
                       <Button disabled={atBranchLimit}>
                         <Plus className="size-4" />
-                        Add branch
+                        {t("org.branchesPage.add")}
                       </Button>
                     }
                   />
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Add a branch</DialogTitle>
+                      <DialogTitle>{t("org.branchesPage.addTitle")}</DialogTitle>
                       <DialogDescription>
-                        Adding a location makes it a real check-in point for Attendance.
+                        {t("org.branchesPage.addDescription")}
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleCreate} className="flex flex-col gap-4">
                       <BranchFormFields form={createForm} onChange={setCreateForm} />
                       {createError && <Alert variant="destructive">{createError}</Alert>}
                       <DialogFooter>
-                        <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                        <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                         <Button type="submit" disabled={creating}>
-                          {creating ? "Adding…" : "Add branch"}
+                          {creating ? t("org.shared.adding") : t("org.branchesPage.add")}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -388,11 +389,11 @@ export default function BranchesPage() {
           data={branches}
           getRowId={(branch) => branch.id}
           columns={columns}
-          searchPlaceholder="Search branches…"
+          searchPlaceholder={t("org.branchesPage.search")}
           emptyState={{
             icon: Building2,
-            title: "No branches yet",
-            description: "Add your first branch to start organizing your team.",
+            title: t("org.branchesPage.emptyTitle"),
+            description: t("org.branchesPage.emptyDescription"),
           }}
           rowActions={
             canManage
@@ -400,15 +401,15 @@ export default function BranchesPage() {
                   <>
                     <Button variant="outline" size="sm" onClick={() => setQrBranch(branch)}>
                       <QrCode className="size-3.5" />
-                      QR code
+                      {t("org.shared.qrCode")}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openEdit(branch)}>
                       <Pencil className="size-3.5" />
-                      Edit
+                      {t("common.action.edit")}
                     </Button>
                     <Button variant="destructive" size="sm" onClick={() => handleDelete(branch)}>
                       <Trash2 className="size-3.5" />
-                      Delete
+                      {t("common.action.delete")}
                     </Button>
                   </>
                 )
@@ -419,8 +420,8 @@ export default function BranchesPage() {
         <Dialog open={!!editingBranch} onOpenChange={(open) => !open && setEditingBranch(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit &quot;{editingBranch?.name}&quot;</DialogTitle>
-              <DialogDescription>Updating coordinates keeps its check-in point in sync.</DialogDescription>
+              <DialogTitle>{t("org.shared.editTitle", { name: editingBranch?.name ?? "" })}</DialogTitle>
+              <DialogDescription>{t("org.branchesPage.editDescription")}</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
               <BranchFormFields form={editForm} onChange={setEditForm} />
@@ -431,13 +432,13 @@ export default function BranchesPage() {
                   onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
                   className="size-4 rounded border-input"
                 />
-                Active
+                {t("common.status.active")}
               </label>
               {editError && <Alert variant="destructive">{editError}</Alert>}
               <DialogFooter>
-                <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+                <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                 <Button type="submit" disabled={savingEdit}>
-                  {savingEdit ? "Saving…" : "Save changes"}
+                  {savingEdit ? t("org.shared.saving") : t("org.shared.saveChanges")}
                 </Button>
               </DialogFooter>
             </form>

@@ -1,5 +1,6 @@
 import {
   Building2,
+  Cake,
   CalendarClock,
   CalendarDays,
   CalendarHeart,
@@ -37,14 +38,19 @@ export type NavItem = {
   hidden?: boolean;
 };
 
-export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+export type NavGroupId = "overview" | "time" | "payroll" | "organization" | "access";
+
+// `label` is the English fallback; the sidebar shows t(`sidebar.group.${id}`).
+export const NAV_GROUPS: { id: NavGroupId; label: string; items: NavItem[] }[] = [
   {
+    id: "overview",
     label: "Overview",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "from-indigo-500 to-violet-500", permission: "dashboard.view" },
     ],
   },
   {
+    id: "time",
     label: "Time & Attendance",
     items: [
       { href: "/dashboard/attendance", label: "Attendance", icon: Clock, tone: "from-emerald-500 to-teal-500", permission: "attendance.view", module: "attendance" },
@@ -56,6 +62,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    id: "payroll",
     label: "Payroll",
     items: [
       { href: "/dashboard/payroll", label: "Pay Runs", icon: Wallet, tone: "from-emerald-500 to-green-600", permission: "payroll.view", module: "payroll" },
@@ -64,6 +71,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    id: "organization",
     label: "Organization",
     items: [
       { href: "/dashboard/employees", label: "Employees", icon: Users, tone: "from-violet-500 to-fuchsia-500", anyPermission: ["employees.view", "schedules.view"] },
@@ -72,9 +80,11 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/dashboard/branches", label: "Branches", icon: Building2, tone: "from-cyan-500 to-sky-500", permission: "branches.view" },
       { href: "/dashboard/work-locations", label: "Work Locations", icon: MapPin, tone: "from-lime-500 to-emerald-500", permission: "work_locations.view" },
       { href: "/dashboard/id-cards", label: "ID Cards", icon: IdCard, tone: "from-rose-500 to-orange-500", permission: "employees.view", module: "id_cards" },
+      { href: "/dashboard/birthdays", label: "Birthdays", icon: Cake, tone: "from-pink-500 to-fuchsia-500", permission: "employees.view", module: "birthdays" },
     ],
   },
   {
+    id: "access",
     label: "Access",
     items: [
       { href: "/dashboard/users", label: "Users", icon: KeyRound, tone: "from-orange-500 to-red-500", permission: "users.view" },

@@ -17,22 +17,31 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
+import { LanguageToggle } from "@/components/language-toggle";
 import { useMe } from "@/contexts/me-context";
+import { pageLabel, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-const MODULES: Record<string, { label: string; icon: LucideIcon }> = {
-  attendance: { label: "Attendance", icon: Clock },
-  hr: { label: "HR", icon: UserCog },
-  payroll: { label: "Payroll", icon: Calculator },
-  pos: { label: "POS", icon: ShoppingCart },
-  inventory: { label: "Inventory", icon: Warehouse },
-  crm: { label: "CRM", icon: Contact },
-  accounting: { label: "Accounting", icon: Calculator },
+// Labels come from t(`sidebar.module.${key}`).
+const MODULES: Record<string, LucideIcon> = {
+  attendance: Clock,
+  hr: UserCog,
+  payroll: Calculator,
+  pos: ShoppingCart,
+  inventory: Warehouse,
+  crm: Contact,
+  accounting: Calculator,
 };
+
+const MODULE_KEYS = ["attendance", "hr", "payroll", "pos", "inventory", "crm", "accounting"] as const;
+type ModuleKey = (typeof MODULE_KEYS)[number];
+const isModuleKey = (key: string): key is ModuleKey => (MODULE_KEYS as readonly string[]).includes(key);
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { me } = useMe();
+  const t = useT();
+  const lang = useLang();
   // One highlight that glides to whichever item is hovered. Plain CSS (a moving,
   // transitioned element) instead of an animation library, which would add ~75 KB
   // to every page just for this effect.
@@ -61,9 +70,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         style={{ height: pill?.height ?? 0, transform: `translateY(${pill?.top ?? 0}px)` }}
       />
       {groups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-0.5">
+        <div key={group.id} className="flex flex-col gap-0.5">
           <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-            {group.label}
+            {t(`sidebar.group.${group.id}`)}
           </p>
           {group.items.map((item) => {
             // Corrections etc. live under a nav item's URL — keep the parent lit.
@@ -103,7 +112,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   >
                     <Icon className="size-3.5" />
                   </span>
-                  {item.label}
+                  {pageLabel(lang, item.href, item.label)}
                 </span>
               </Link>
             );
@@ -117,6 +126,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { me, logout } = useMe();
+  const t = useT();
 
   const initials = me?.user.name
     ?.split(" ")
@@ -133,7 +143,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
         <div className="min-w-0 leading-tight">
           <p className="truncate text-sm font-semibold tracking-tight">Business OS</p>
-          <p className="truncate text-[11px] text-sidebar-foreground/50">{me?.company?.name ?? "Workspace"}</p>
+          <p className="truncate text-[11px] text-sidebar-foreground/50">{me?.company?.name ?? t("sidebar.workspace")}</p>
         </div>
       </Link>
 
@@ -142,12 +152,11 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
         <div className="flex flex-col gap-1">
           <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-            Modules
+            {t("sidebar.modules")}
           </p>
           {me &&
             Object.entries(me.modules).map(([key, enabled]) => {
-              const mod = MODULES[key];
-              const Icon = mod?.icon ?? Lock;
+              const Icon = MODULES[key] ?? Lock;
 
               return (
                 <div key={key} className="flex items-center justify-between rounded-md px-3 py-1 text-[13px]">
@@ -158,7 +167,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                     )}
                   >
                     <Icon className="size-3.5 shrink-0" />
-                    {mod?.label ?? key}
+                    {isModuleKey(key) ? t(`sidebar.module.${key}`) : key}
                   </span>
                   {enabled ? (
                     <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px] shadow-emerald-400/70" />
@@ -171,7 +180,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-1.5">
+      <LanguageToggle showIcon className="w-full" />
+
+      <div className="-mt-2 flex items-center gap-1 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-1.5">
         <Link
           href="/dashboard/profile"
           onClick={onNavigate}
@@ -186,15 +197,15 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{me?.user.name}</p>
             <p className="truncate text-[11px] capitalize text-sidebar-foreground/50">
-              {me?.roles[0] ?? "Member"}
+              {me?.roles[0] ?? t("sidebar.member")}
             </p>
           </div>
         </Link>
         <button
           type="button"
           onClick={logout}
-          aria-label="Sign out"
-          title="Sign out"
+          aria-label={t("sidebar.signOut")}
+          title={t("sidebar.signOut")}
           className="flex size-8 shrink-0 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:hover:bg-red-500/15 dark:hover:text-red-300"
         >
           <LogOut className="size-4" />

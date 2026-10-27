@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
 /**
@@ -37,6 +38,7 @@ export function QrCodeDialog({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const confirm = useConfirm();
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -66,9 +68,9 @@ export function QrCodeDialog({
 
   async function handleRegenerate() {
     const ok = await confirm({
-      title: "Generate a new QR code?",
-      description: "The old poster will stop working immediately, so you'll need to print and replace it.",
-      confirmLabel: "Generate new code",
+      title: t("employees.qrCode.regenerateTitle"),
+      description: t("employees.qrCode.regenerateHint"),
+      confirmLabel: t("employees.qrCode.regenerateConfirm"),
       destructive: true,
     });
     if (!ok) return;
@@ -76,7 +78,7 @@ export function QrCodeDialog({
     setRegenerating(true);
     try {
       await onRegenerate();
-      notifySuccess("New QR code generated", "The old poster no longer works.");
+      notifySuccess(t("employees.qrCode.regenerated"), t("employees.qrCode.regeneratedHint"));
     } catch (err) {
       notifyError(err);
     } finally {
@@ -88,30 +90,30 @@ export function QrCodeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader className="pr-8">
-          <DialogTitle className="leading-snug wrap-break-word">Check-in QR code for &quot;{name}&quot;</DialogTitle>
+          <DialogTitle className="leading-snug wrap-break-word">{t("employees.qrCode.title", { name: name ?? "" })}</DialogTitle>
           <DialogDescription>
-            Print this and place it where employees check in. Scanning it checks them in here — no GPS needed.
+            {t("employees.qrCode.description")}
           </DialogDescription>
         </DialogHeader>
         {/* Always on white, so it scans in dark mode too. Shrinks to fit narrow phones. */}
         <div className="mx-auto aspect-square w-full max-w-72 rounded-lg border border-border bg-white p-3">
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt={`QR code for ${name}`} className="size-full" />
+            <img src={imageUrl} alt={t("employees.qrCode.alt", { name: name ?? "" })} className="size-full" />
           ) : (
-            <div className="flex size-full items-center justify-center text-sm text-neutral-500">Loading…</div>
+            <div className="flex size-full items-center justify-center text-sm text-neutral-500">{t("common.message.loading")}</div>
           )}
         </div>
         <DialogFooter className="sm:justify-between">
           <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={handleRegenerate} disabled={regenerating}>
             <RefreshCw className={regenerating ? "size-4 animate-spin" : "size-4"} />
-            {regenerating ? "Regenerating…" : "Regenerate"}
+            {regenerating ? t("employees.qrCode.regenerating") : t("employees.qrCode.regenerate")}
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <DialogClose render={<Button type="button" variant="outline" className="w-full sm:w-auto" />}>Done</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" className="w-full sm:w-auto" />}>{t("employees.qrCode.done")}</DialogClose>
             <Button type="button" className="w-full sm:w-auto" onClick={handleDownload} disabled={!imageUrl}>
               <Download className="size-4" />
-              Download QR
+              {t("employees.qrCode.download")}
             </Button>
           </div>
         </DialogFooter>

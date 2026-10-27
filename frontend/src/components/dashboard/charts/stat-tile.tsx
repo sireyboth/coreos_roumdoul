@@ -1,5 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type StatDelta = {
@@ -31,6 +32,7 @@ export function StatTile({ label, value, hint, delta, emphasis }: { label: strin
 }
 
 function DeltaLine({ delta }: { delta: StatDelta }) {
+  const t = useT();
   const { change, previous, vs, upIs, format } = delta;
   const flat = Math.abs(change) < 0.005;
   const pct = previous !== 0 ? Math.round((change / Math.abs(previous)) * 1000) / 10 : null;
@@ -48,7 +50,7 @@ function DeltaLine({ delta }: { delta: StatDelta }) {
         )}
       >
         <Icon className="size-3.5" aria-hidden />
-        {flat ? "No change" : `${change > 0 ? "+" : "−"}${format(Math.abs(change))}${pct !== null ? ` (${change > 0 ? "+" : "−"}${Math.abs(pct)}%)` : ""}`}
+        {flat ? t("app.charts.noChange") : `${change > 0 ? "+" : "−"}${format(Math.abs(change))}${pct !== null ? ` (${change > 0 ? "+" : "−"}${Math.abs(pct)}%)` : ""}`}
       </span>
       <span>{vs}</span>
     </p>

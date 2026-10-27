@@ -15,9 +15,11 @@ import { api, PermissionGroup, Role } from "@/lib/api";
 import { exportRoles, roleImport } from "@/lib/excel-specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useT } from "@/lib/i18n";
 
 export default function RolesPage() {
   const { me, refresh } = useMe();
+  const t = useT();
   const confirm = useConfirm();
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
@@ -35,14 +37,14 @@ export default function RolesPage() {
 
   async function handleDelete(role: Role) {
     const ok = await confirm({
-      title: `Delete the "${role.name}" role?`,
-      description: "This can't be undone. A role that's still assigned to someone can't be deleted.",
+      title: t("access.rolesPage.deleteTitle", { name: role.name }),
+      description: t("access.rolesPage.deleteDescription"),
       destructive: true,
     });
     if (!ok) return;
     try {
       await api.roles.remove(role.id);
-      notifySuccess(`"${role.name}" role deleted`);
+      notifySuccess(t("access.rolesPage.deleted", { name: role.name }));
       load();
     } catch (err) {
       notifyError(err);
@@ -57,7 +59,7 @@ export default function RolesPage() {
     setSavingSelfApproval(true);
     try {
       await api.companySettings.update({ allow_self_approval: allow });
-      notifySuccess(allow ? "People can now approve their own items" : "Self-approval is now blocked");
+      notifySuccess(allow ? t("access.rolesPage.selfOn") : t("access.rolesPage.selfOff"));
       refresh();
     } catch (err) {
       notifyError(err);
@@ -70,12 +72,12 @@ export default function RolesPage() {
   const columns: DataTableColumn<Role>[] = [
     {
       id: "name",
-      header: "Role",
+      header: t("access.rolesPage.colRole"),
       primary: true,
       cell: (role) => (
         <div className="flex items-center gap-2 font-medium">
           {role.name}
-          {role.protected && <Badge variant="secondary">Protected</Badge>}
+          {role.protected && <Badge variant="secondary">{t("access.rolesPage.protected")}</Badge>}
         </div>
       ),
       sortValue: (role) => role.name,
@@ -84,10 +86,10 @@ export default function RolesPage() {
     displayOrderColumn<Role>(),
     {
       id: "permissions",
-      header: "Permissions",
+      header: t("access.rolesPage.colPermissions"),
       cell: (role) => (
         <span className="text-muted-foreground">
-          {role.permissions.length} of {totalPermissions}
+          {t("access.rolesPage.permissionCount", { n: role.permissions.length, total: totalPermissions })}
         </span>
       ),
       sortValue: (role) => role.permissions.length,
@@ -98,15 +100,15 @@ export default function RolesPage() {
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
         <PageHeader
-          title="Roles & Permissions"
-          description="Define what each position at your company can see and do."
+          title={t("access.rolesPage.title")}
+          description={t("access.rolesPage.description")}
           action={
             <div className="flex flex-wrap gap-2">
               <ExcelActions onExport={exportRoles} importSpec={canManage ? roleImport : undefined} onImported={load} />
               {canManage && (
                 <Button onClick={() => setDialog({ role: null })}>
                   <Plus className="size-4" />
-                  Create role
+                  {t("access.rolesPage.create")}
                 </Button>
               )}
             </div>
@@ -117,22 +119,22 @@ export default function RolesPage() {
           data={roles}
           getRowId={(role) => role.id}
           columns={columns}
-          searchPlaceholder="Search roles…"
-          emptyState={{ icon: ShieldCheck, title: "No roles yet", description: "Create a role to control what your team can access." }}
+          searchPlaceholder={t("access.rolesPage.search")}
+          emptyState={{ icon: ShieldCheck, title: t("access.rolesPage.empty"), description: t("access.rolesPage.emptyHint") }}
           rowActions={
             canManage
               ? (role) =>
                   role.protected ? (
                     <Button variant="outline" size="sm" onClick={() => setDialog({ role })}>
-                      Edit order
+                      {t("access.rolesPage.editOrder")}
                     </Button>
                   ) : (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setDialog({ role })}>
-                        Edit
+                        {t("common.action.edit")}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleDelete(role)}>
-                        Delete
+                        {t("common.action.delete")}
                       </Button>
                     </>
                   )
@@ -143,11 +145,9 @@ export default function RolesPage() {
         {canManageCompany && me?.company && (
           <Card>
             <CardHeader>
-              <CardTitle>Self-approval</CardTitle>
+              <CardTitle>{t("access.rolesPage.selfTitle")}</CardTitle>
               <CardDescription>
-                By default nobody approves or changes their own attendance, overtime, leave balance or pay, or approves a
-                pay run they prepared — someone else with the permission has to. Turn this on only if one person runs
-                everything.
+                {t("access.rolesPage.selfDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -158,7 +158,7 @@ export default function RolesPage() {
                   disabled={savingSelfApproval}
                   onChange={(e) => setSelfApproval(e.target.checked)}
                 />
-                Allow people to approve their own items
+                {t("access.rolesPage.selfLabel")}
               </label>
             </CardContent>
           </Card>

@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { useT } from "@/lib/i18n";
 
 /**
  * The dashboard's chart kit, on shadcn's chart wrapper around Recharts.
@@ -53,8 +54,9 @@ export function BarListChart({
   color?: string;
   max?: number;
 }) {
+  const t = useT();
   const sorted = [...data].sort((a, b) => b.value - a.value);
-  const rows = sorted.length > max ? [...sorted.slice(0, max - 1), { label: `Other (${sorted.length - max + 1})`, value: sorted.slice(max - 1).reduce((t, d) => t + d.value, 0) }] : sorted;
+  const rows = sorted.length > max ? [...sorted.slice(0, max - 1), { label: t("app.charts.other", { n: sorted.length - max + 1 }), value: sorted.slice(max - 1).reduce((t, d) => t + d.value, 0) }] : sorted;
   const config = { value: { label: valueLabel, color } } satisfies ChartConfig;
   const longest = Math.max(...rows.map((r) => Math.min(r.label.length, 22)));
 

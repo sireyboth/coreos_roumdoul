@@ -14,7 +14,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ExcelImportDialog } from "@/components/dashboard/excel-import-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
-import { KIND_HINTS, KIND_LABELS, currentMonth, dateInMonth, dateLabel, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
+import { currentMonth, dateInMonth, dateLabel, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type PayKind, type PayrollAdjustment } from "@/lib/api";
@@ -22,6 +22,7 @@ import { adjustmentImport } from "@/lib/excel-specs/payroll";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { LEFT_STATUSES } from "@/components/dashboard/employee-form";
+import { useLang, useT } from "@/lib/i18n";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none";
 
@@ -30,7 +31,10 @@ type Person = { value: string; label: string; currency: string | null; branchId:
 /** Who an adjustment goes to: one person, everyone in a branch, or everyone. */
 type Target = "one" | "branch" | "all";
 
+const KINDS: PayKind[] = ["earning", "deduction", "net_deduction"];
+
 function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChange: (o: boolean) => void; onSaved: () => void }) {
+  const t = useT();
   const [people, setPeople] = useState<Person[]>([]);
   const [target, setTarget] = useState<Target>("one");
   const [employeeId, setEmployeeId] = useState("");
@@ -70,15 +74,18 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
     try {
       if (target === "one") {
         await api.payroll.createAdjustment({ ...base, employee_id: Number(employeeId) });
-        notifySuccess("Adjustment added", name.trim());
+        notifySuccess(t("payroll.adjustments.dialog.added"), name.trim());
       } else {
         const { created } = await api.payroll.createAdjustments({ ...base, employee_ids: recipients.map((p) => Number(p.value)) });
-        notifySuccess("Adjustments added", `${name.trim()} for ${created} ${created === 1 ? "person" : "people"}`);
+        notifySuccess(
+          t("payroll.adjustments.dialog.addedMany"),
+          t(created === 1 ? "payroll.adjustments.dialog.addedManyOne" : "payroll.adjustments.dialog.addedManyOther", { name: name.trim(), n: created }),
+        );
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save.");
+      setError(err instanceof ApiError ? err.message : t("payroll.adjustments.dialog.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -89,18 +96,18 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Add adjustment</DialogTitle>
-            <DialogDescription>A one-off amount — a bonus, commission, penalty or back pay. It goes on the payslip of the pay period that holds its date.</DialogDescription>
+            <DialogTitle>{t("payroll.adjustments.add")}</DialogTitle>
+            <DialogDescription>{t("payroll.adjustments.dialog.description")}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Apply to</Label>
+            <Label>{t("payroll.adjustments.dialog.applyTo")}</Label>
             <div className="inline-flex self-start rounded-lg border border-border bg-card p-0.5" role="radiogroup">
               {(
                 [
-                  ["one", "One employee"],
-                  ["branch", "A branch"],
-                  ["all", "Everyone"],
+                  ["one", t("payroll.adjustments.dialog.one")],
+                  ["branch", t("payroll.adjustments.dialog.branch")],
+                  ["all", t("payroll.adjustments.dialog.all")],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -121,59 +128,59 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
           </div>
 
           {target === "one" && (
-            <SearchableSelect options={people} value={employeeId} onChange={setEmployeeId} placeholder="Choose an employee" className="h-9 w-full rounded-md" />
+            <SearchableSelect options={people} value={employeeId} onChange={setEmployeeId} placeholder={t("payroll.adjustments.dialog.chooseEmployee")} className="h-9 w-full rounded-md" />
           )}
           {target === "branch" && (
-            <SearchableSelect options={branches} value={branchId} onChange={setBranchId} placeholder="Choose a branch" className="h-9 w-full rounded-md" />
+            <SearchableSelect options={branches} value={branchId} onChange={setBranchId} placeholder={t("payroll.adjustments.dialog.chooseBranch")} className="h-9 w-full rounded-md" />
           )}
           {target !== "one" && (
             <p className="-mt-2 text-xs text-muted-foreground">
-              {recipients.length} {recipients.length === 1 ? "person" : "people"} will each get this amount. Each one can still be removed on its own.
+              {t(recipients.length === 1 ? "payroll.adjustments.dialog.recipientsOne" : "payroll.adjustments.dialog.recipientsOther", { n: recipients.length })}
             </p>
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="adj-kind">Type</Label>
+              <Label htmlFor="adj-kind">{t("common.field.type")}</Label>
               <select id="adj-kind" className={SELECT_CLASS} value={kind} onChange={(e) => setKind(e.target.value as PayKind)}>
-                {(Object.keys(KIND_LABELS) as PayKind[]).map((k) => (
+                {KINDS.map((k) => (
                   <option key={k} value={k}>
-                    {KIND_LABELS[k]}
+                    {t(`payroll.shared.kind.${k}`)}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-muted-foreground">{KIND_HINTS[kind]}</p>
+              <p className="text-xs text-muted-foreground">{t(`payroll.shared.kindHint.${kind}`)}</p>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="adj-amount">Amount{currencies.length === 1 ? ` (${currencies[0]})` : ""}</Label>
+              <Label htmlFor="adj-amount">{currencies.length === 1 ? t("payroll.adjustments.dialog.amountIn", { currency: currencies[0] ?? "" }) : t("common.field.amount")}</Label>
               <Input id="adj-amount" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-              {currencies.length > 1 && <p className="text-xs text-warning">Some are paid in USD and some in KHR: each gets this number in their own currency.</p>}
+              {currencies.length > 1 && <p className="text-xs text-warning">{t("payroll.adjustments.dialog.mixedCurrency")}</p>}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="adj-date">Date</Label>
+            <Label htmlFor="adj-date">{t("common.field.date")}</Label>
             <Input id="adj-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="sm:max-w-48" />
-            <p className="text-xs text-muted-foreground">Paid with the pay run whose period holds this date, in each person&apos;s own pay group.</p>
+            <p className="text-xs text-muted-foreground">{t("payroll.adjustments.dialog.dateHint")}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="adj-name">Name on payslip</Label>
-            <Input id="adj-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Khmer New Year bonus" required />
+            <Label htmlFor="adj-name">{t("payroll.adjustments.dialog.name")}</Label>
+            <Input id="adj-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder={t("payroll.adjustments.dialog.namePlaceholder")} required />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="adj-reason">Reason</Label>
-            <Input id="adj-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} placeholder="Optional — shown on the payslip" />
+            <Label htmlFor="adj-reason">{t("common.field.reason")}</Label>
+            <Input id="adj-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={255} placeholder={t("payroll.adjustments.dialog.reasonPlaceholder")} />
           </div>
           {kind === "earning" && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={taxable} onChange={(e) => setTaxable(e.target.checked)} />
-              Subject to tax on salary and NSSF
+              {t("payroll.adjustments.dialog.taxable")}
             </label>
           )}
           {error && <Alert variant="destructive">{error}</Alert>}
           <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || recipients.length === 0 || !date || !name.trim() || !(Number(amount) > 0)}>
-              {saving ? "Saving…" : target === "one" ? "Add" : `Add for ${recipients.length}`}
+              {saving ? t("payroll.adjustments.dialog.saving") : target === "one" ? t("common.action.add") : t("payroll.adjustments.dialog.addFor", { n: recipients.length })}
             </Button>
           </DialogFooter>
         </form>
@@ -184,6 +191,8 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
 
 export default function PayrollAdjustmentsPage() {
   const confirm = useConfirm();
+  const t = useT();
+  const lang = useLang();
   const { me } = useMe();
   const canManage = me?.permissions.includes("payroll.manage") ?? false;
   const [month, setMonth] = useState(previousMonth);
@@ -195,7 +204,12 @@ export default function PayrollAdjustmentsPage() {
   const rows = data ?? (error ? [] : null);
 
   async function remove(a: PayrollAdjustment) {
-    const ok = await confirm({ title: `Remove “${a.name}”?`, description: `For ${a.employee?.name ?? "this employee"}, ${dateLabel(a.date)}.`, confirmLabel: "Remove", destructive: true });
+    const ok = await confirm({
+      title: t("payroll.adjustments.removeTitle", { name: a.name }),
+      description: t("payroll.adjustments.removeText", { employee: a.employee?.name ?? t("payroll.adjustments.thisEmployee"), date: dateLabel(a.date, lang) }),
+      confirmLabel: t("common.action.remove"),
+      destructive: true,
+    });
     if (!ok) return;
     try {
       await api.payroll.removeAdjustment(a.id);
@@ -208,7 +222,7 @@ export default function PayrollAdjustmentsPage() {
   const columns: DataTableColumn<PayrollAdjustment>[] = [
     {
       id: "employee",
-      header: "Employee",
+      header: t("common.field.employee"),
       primary: true,
       cell: (a) => (
         <div className="flex flex-col">
@@ -219,11 +233,11 @@ export default function PayrollAdjustmentsPage() {
       searchValue: (a) => [a.employee?.name, a.employee?.employee_code, a.name].filter(Boolean).join(" "),
       sortValue: (a) => a.employee?.name ?? "",
     },
-    { id: "date", header: "Date", cell: (a) => <span className="tabular-nums">{dateLabel(a.date)}</span>, sortValue: (a) => a.date },
-    { id: "name", header: "Item", cell: (a) => <div className="flex flex-col"><span>{a.name}</span>{a.reason && <span className="text-xs text-muted-foreground">{a.reason}</span>}</div> },
-    { id: "kind", header: "Type", cell: (a) => <Badge variant={a.kind === "earning" ? "success" : "secondary"}>{KIND_LABELS[a.kind]}</Badge> },
-    { id: "amount", header: "Amount", cell: (a) => <span className="tabular-nums">{a.kind === "earning" ? "+" : "−"} {Number(a.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>, sortValue: (a) => Number(a.amount) },
-    { id: "by", header: "Added by", hideOnMobile: true, cell: (a) => <span className="text-muted-foreground">{a.created_by?.name ?? "—"}</span> },
+    { id: "date", header: t("common.field.date"), cell: (a) => <span className="tabular-nums">{dateLabel(a.date, lang)}</span>, sortValue: (a) => a.date },
+    { id: "name", header: t("payroll.adjustments.colItem"), cell: (a) => <div className="flex flex-col"><span>{a.name}</span>{a.reason && <span className="text-xs text-muted-foreground">{a.reason}</span>}</div> },
+    { id: "kind", header: t("common.field.type"), cell: (a) => <Badge variant={a.kind === "earning" ? "success" : "secondary"}>{t(`payroll.shared.kind.${a.kind}`)}</Badge> },
+    { id: "amount", header: t("common.field.amount"), cell: (a) => <span className="tabular-nums">{a.kind === "earning" ? "+" : "−"} {Number(a.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })}</span>, sortValue: (a) => Number(a.amount) },
+    { id: "by", header: t("payroll.adjustments.colAddedBy"), hideOnMobile: true, cell: (a) => <span className="text-muted-foreground">{a.created_by?.name ?? "—"}</span> },
     {
       id: "actions",
       header: "",
@@ -231,7 +245,7 @@ export default function PayrollAdjustmentsPage() {
       cell: (a) =>
         canManage && (
           <Button variant="ghost" size="sm" className="text-destructive" onClick={() => remove(a)}>
-            Remove
+            {t("common.action.remove")}
           </Button>
         ),
     },
@@ -240,8 +254,8 @@ export default function PayrollAdjustmentsPage() {
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <PageHeader
-        title="Adjustments"
-        description="One-off amounts — anything your rules don't cover. Each goes into the pay run whose period holds its date; recalculate that run to include it."
+        title={t("payroll.adjustments.title")}
+        description={t("payroll.adjustments.description")}
         action={
           <div className="flex flex-wrap gap-2">
             <PayrollGuideButton topic="adjustments" />
@@ -249,11 +263,11 @@ export default function PayrollAdjustmentsPage() {
               <>
                 <Button variant="outline" onClick={() => setImporting(true)}>
                   <FileSpreadsheet className="size-4" />
-                  Import from Excel
+                  {t("payroll.adjustments.importExcel")}
                 </Button>
                 <Button onClick={() => setAdding(true)}>
                   <Plus className="size-4" />
-                  Add adjustment
+                  {t("payroll.adjustments.add")}
                 </Button>
               </>
             )}
@@ -261,17 +275,17 @@ export default function PayrollAdjustmentsPage() {
         }
       />
       <div className="flex max-w-xs flex-col gap-1.5">
-        <Label htmlFor="adj-month">Month</Label>
+        <Label htmlFor="adj-month">{t("payroll.adjustments.month")}</Label>
         <Input id="adj-month" type="month" value={month} max={currentMonth()} onChange={(e) => e.target.value && setMonth(e.target.value)} />
       </div>
       <DataTable
         data={rows}
         getRowId={(a) => a.id}
         columns={columns}
-        searchPlaceholder="Search adjustments…"
-        emptyState={{ icon: HandCoins, title: `No adjustments for ${monthLabel(month)}`, description: "Add a bonus, commission or penalty, or import a spreadsheet." }}
+        searchPlaceholder={t("payroll.adjustments.search")}
+        emptyState={{ icon: HandCoins, title: t("payroll.adjustments.emptyTitle", { month: monthLabel(month, lang) }), description: t("payroll.adjustments.emptyText") }}
       />
-      <p className="text-xs text-muted-foreground">Amounts are in each employee&apos;s salary currency (e.g. {money(35, "USD")} or {money(140000, "KHR")}).</p>
+      <p className="text-xs text-muted-foreground">{t("payroll.adjustments.currencyNote", { usd: money(35, "USD"), khr: money(140000, "KHR") })}</p>
 
       {adding && <AddDialog month={month} onOpenChange={setAdding} onSaved={reload} />}
       <ExcelImportDialog spec={spec} open={importing} onOpenChange={setImporting} onImported={reload} />

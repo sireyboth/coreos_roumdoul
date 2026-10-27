@@ -3,8 +3,17 @@
 import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { useMe } from "@/contexts/me-context";
+import { translate, useT, type Lang, type TKey } from "@/lib/i18n";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Company status codes with a label in app.shell.companyStatus; any other code shows as is.
+const COMPANY_STATUSES = ["trial", "active", "suspended", "cancelled"];
+
+/** The company's account status (trial, active…) in the chosen language. */
+export function companyStatusLabel(lang: Lang, status: string): string {
+  return COMPANY_STATUSES.includes(status) ? translate(lang, `app.shell.companyStatus.${status}` as TKey) : status;
+}
 
 /**
  * The messages nobody should be able to miss: the account is locked, or the
@@ -12,13 +21,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  */
 export function AccountBanner() {
   const { me, blocked } = useMe();
+  const t = useT();
   // Read the clock once per mount — day-level precision is all this needs.
   const [now] = useState(() => Date.now());
 
   if (blocked) {
     return (
-      <Alert variant="destructive" title="Your account is restricted">
-        {blocked.message} Most actions are unavailable until this is resolved.
+      <Alert variant="destructive" title={t("app.account.restrictedTitle")}>
+        {blocked.message} {t("app.account.restrictedText")}
       </Alert>
     );
   }
@@ -31,8 +41,8 @@ export function AccountBanner() {
 
   if (msLeft <= 0) {
     return (
-      <Alert variant="destructive" title="Your free trial has ended">
-        Upgrade your plan to keep using Business OS. Contact support to switch to a paid plan.
+      <Alert variant="destructive" title={t("app.account.trialEndedTitle")}>
+        {t("app.account.trialEndedText")}
       </Alert>
     );
   }
@@ -42,9 +52,9 @@ export function AccountBanner() {
   return (
     <Alert
       variant="warning"
-      title={daysLeft <= 1 ? "Your free trial ends today" : `Your free trial ends in ${daysLeft} days`}
+      title={daysLeft <= 1 ? t("app.account.trialEndsToday") : t("app.account.trialEndsIn", { n: daysLeft })}
     >
-      Upgrade before it ends so your team doesn&apos;t lose access. Contact support to switch to a paid plan.
+      {t("app.account.trialEndingText")}
     </Alert>
   );
 }

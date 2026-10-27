@@ -158,6 +158,36 @@ class BirthdayNotificationTest extends TestCase
         $this->assertCount(1, $this->birthdayAlerts($colleague));
     }
 
+    public function test_birthdays_page_lists_upcoming_without_the_year(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-10 09:00', 'Asia/Phnom_Penh'));
+        $this->employee('Later', $this->branchA, '1990-01-05');
+        $this->employee('Today', $this->branchA, '1995-10-10');
+        $this->employee('Passed', $this->branchB, '1988-10-09');
+        $this->employee('Leap', $this->branchB, '2000-02-29');
+        $this->employee('No date', $this->branchA);
+        $this->employee('Former', $this->branchA, '1995-10-11', status: 'resigned');
+
+        $response = $this->actingAs($this->company->users()->first())->getJson('/api/birthdays')->assertOk();
+
+        $this->assertSame('2026-10-10', $response->json('today'));
+        $this->assertSame(['Today', 'Later', 'Leap', 'Passed'], $response->json('data.*.employee.name'));
+        $this->assertSame([0, 87, 141, 364], $response->json('data.*.days_until'));
+        $this->assertSame('2027-02-28', $response->json('data.2.next_date'));
+        $this->assertSame(['month' => 2, 'day' => 29], [
+            'month' => $response->json('data.2.month'), 'day' => $response->json('data.2.day'),
+        ]);
+        $this->assertStringNotContainsString('1995', $response->getContent());
+        $this->assertStringNotContainsString('date_of_birth', $response->getContent());
+    }
+
+    public function test_birthdays_page_needs_the_module(): void
+    {
+        $this->enableModule(false);
+
+        $this->actingAs($this->company->users()->first())->getJson('/api/birthdays')->assertForbidden();
+    }
+
     public function test_command_runs(): void
     {
         $this->artisan('birthdays:notify')->assertSuccessful();

@@ -18,7 +18,7 @@ export function HomeButton({ className }: { className?: string }) {
     >
       <ChevronLeft className="size-4" />
       <House className="size-4" />
-      {t("common.home")}
+      {t("common.action.home")}
     </Link>
   );
 }

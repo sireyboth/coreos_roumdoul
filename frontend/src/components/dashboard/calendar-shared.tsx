@@ -18,13 +18,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, ApiError, CalendarAttendance, CalendarDay, CalendarDayType } from "@/lib/api";
+import { dateLocale, translate, useLang, useT, type Lang } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { EXCEPTIONS, formatMinutes, slotsSummary } from "@/lib/schedule";
 
+// English names, kept for code that hasn't moved to keys. On screen use
+// t(`calendar.shared.weekday.short.${WEEKDAY_KEYS[day]}`) (also .min and .full).
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 
-// Full class strings so Tailwind can see them.
+// Full class strings so Tailwind can see them. `label` is English; on screen use
+// t(`calendar.shared.dayType.${type}`).
 export const TYPE_STYLES: Record<CalendarDayType, { cell: string; label: string; swatch: string }> = {
   work: { cell: "border-info/30 bg-info/10", label: "Work day", swatch: "bg-info/40" },
   holiday: { cell: "border-destructive/30 bg-destructive/10", label: "Holiday", swatch: "bg-destructive/40" },
@@ -39,7 +44,11 @@ export function halfDayLeave(day: Pick<CalendarDay, "leave">): { type: string; p
   return day.leave && day.leave.part !== "full" ? { type: day.leave.type, part: day.leave.part } : null;
 }
 
-export const halfDayLabel = (leave: { type: string; part: "am" | "pm" }) => `½ ${leave.type} · ${leave.part === "am" ? "morning" : "afternoon"}`;
+export const halfDayLabel = (leave: { type: string; part: "am" | "pm" }, lang: Lang = "en") =>
+  translate(lang, "calendar.shared.halfDay", {
+    type: leave.type,
+    part: translate(lang, leave.part === "am" ? "calendar.shared.morning" : "calendar.shared.afternoon"),
+  });
 
 /** Shades the half of a cell taken as leave: left for the morning, right for the afternoon. */
 export function HalfDayShade({ part, className }: { part: "am" | "pm"; className?: string }) {
@@ -51,6 +60,7 @@ export function HalfDayShade({ part, className }: { part: "am" | "pm"; className
   );
 }
 
+// `label` is English; on screen use t(`calendar.shared.attendance.${status}`).
 export const ATTENDANCE: Record<CalendarAttendance, { label: string; dot: string; variant: "success" | "warning" | "destructive" }> = {
   present: { label: "Present", dot: "bg-success", variant: "success" },
   late: { label: "Late", dot: "bg-warning", variant: "warning" },
@@ -83,19 +93,21 @@ export function monthBounds(month: string): { from: string; to: string } {
 
 /** ‹ October 2026 › Today — the month a list shows. */
 export function MonthBar({ month, onChange }: { month: string; onChange: (month: string) => void }) {
+  const t = useT();
+  const lang = useLang();
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, -1))} aria-label="Previous month">
+      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, -1))} aria-label={t("common.time.previousMonth")}>
         <ChevronLeft className="size-4" />
       </Button>
       <h2 className="min-w-40 text-center text-base font-semibold">
-        {parseDate(`${month}-01`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+        {parseDate(`${month}-01`).toLocaleDateString(dateLocale(lang), { month: "long", year: "numeric" })}
       </h2>
-      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, 1))} aria-label="Next month">
+      <Button variant="outline" size="icon" onClick={() => onChange(shiftMonth(month, 1))} aria-label={t("common.time.nextMonth")}>
         <ChevronRight className="size-4" />
       </Button>
       <Button variant="outline" onClick={() => onChange(currentMonth())}>
-        Today
+        {t("common.time.today")}
       </Button>
     </div>
   );
@@ -114,6 +126,8 @@ export function DayDialog({
   onOpenChange: (open: boolean) => void;
   onChanged: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -125,12 +139,12 @@ export function DayDialog({
 
     try {
       await api.daysOff.create({ employee_id: employee.id, date: day.date, reason: reason || null });
-      notifySuccess("Day off added");
+      notifySuccess(t("calendar.shared.dialog.added"));
       onOpenChange(false);
       onChanged();
     } catch (err) {
       notifyError(err);
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : t("common.message.somethingWrong"));
     } finally {
       setSaving(false);
     }
@@ -142,7 +156,7 @@ export function DayDialog({
 
     try {
       await api.daysOff.remove(day.day_off_id);
-      notifySuccess("Day off removed");
+      notifySuccess(t("calendar.shared.dialog.removed"));
       onOpenChange(false);
       onChanged();
     } catch (err) {
@@ -155,7 +169,7 @@ export function DayDialog({
   const khmer = day ? khmerDay(day.date) : null;
 
   const heading = day
-    ? parseDate(day.date).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    ? parseDate(day.date).toLocaleDateString(dateLocale(lang), { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "";
 
   return (
@@ -172,22 +186,21 @@ export function DayDialog({
               {khmer.isSil && (
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Moon className="size-3.5" />
-                  ថ្ងៃសីល · Buddhist observance day
+                  {t("calendar.shared.dialog.silNote")}
                 </span>
               )}
               {khmer.holidays.map((holiday) => (
                 <div key={holiday.date} className="flex flex-col">
-                  <span className="font-medium text-destructive">{holiday.nameEn}</span>
-                  <span className="text-xs text-muted-foreground">{holiday.nameKm}</span>
+                  <span className="font-medium text-destructive">{lang === "km" ? holiday.nameKm : holiday.nameEn}</span>
+                  <span className="text-xs text-muted-foreground">{lang === "km" ? holiday.nameEn : holiday.nameKm}</span>
                 </div>
               ))}
               {khmer.holidays.length > 0 && day.type !== "holiday" && (
                 <p className="text-xs text-muted-foreground">
-                  A Cambodian holiday, but not in your company&apos;s holiday list, so it doesn&apos;t change anyone&apos;s
-                  schedule.{" "}
+                  {t("calendar.shared.dialog.notInList")}{" "}
                   {canManage && (
                     <Link href="/dashboard/holidays" className="font-medium text-primary hover:underline">
-                      Import it from Holidays
+                      {t("calendar.shared.dialog.importLink")}
                     </Link>
                   )}
                 </p>
@@ -195,15 +208,18 @@ export function DayDialog({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{TYPE_STYLES[day.type].label}</Badge>
+              <Badge variant="outline">{t(`calendar.shared.dayType.${day.type}`)}</Badge>
               {day.label && day.type !== "work" && day.type !== "weekly_off" && (
                 <span className="text-muted-foreground">{day.label}</span>
               )}
-              {day.attendance && <Badge variant={ATTENDANCE[day.attendance].variant}>{ATTENDANCE[day.attendance].label}</Badge>}
+              {day.attendance && <Badge variant={ATTENDANCE[day.attendance].variant}>{t(`calendar.shared.attendance.${day.attendance}`)}</Badge>}
               {/* Half a day on leave: still a work day, with only the other half expected. */}
               {day.leave && day.leave.part !== "full" && (
                 <Badge variant="outline" className="border-violet-500/40 text-violet-600 dark:text-violet-400">
-                  {day.leave.type} ({day.leave.part === "am" ? "morning" : "afternoon"})
+                  {t("calendar.shared.dialog.leavePart", {
+                    type: day.leave.type,
+                    part: t(day.leave.part === "am" ? "calendar.shared.morning" : "calendar.shared.afternoon"),
+                  })}
                 </Badge>
               )}
             </div>
@@ -212,12 +228,12 @@ export function DayDialog({
               <div className="flex flex-col gap-0.5">
                 <p>
                   <span className="font-medium">{day.schedule.name}</span>{" "}
-                  <span className="text-muted-foreground">{slotsSummary(day.schedule.slots)}</span>
+                  <span className="text-muted-foreground">{slotsSummary(day.schedule.slots, lang)}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {day.schedule.source === "override" ? "A one-off change on the roster for this day" : "Their usual work schedule"}
-                  {day.work_location && ` · at ${day.work_location}`}
-                  {day.holiday && ` · on the ${day.holiday} holiday`}
+                  {day.schedule.source === "override" ? t("calendar.shared.dialog.overrideSource") : t("calendar.shared.dialog.usualSource")}
+                  {day.work_location && t("calendar.shared.dialog.atLocation", { location: day.work_location })}
+                  {day.holiday && t("calendar.shared.dialog.onHoliday", { holiday: day.holiday })}
                 </p>
               </div>
             )}
@@ -225,13 +241,13 @@ export function DayDialog({
             {day.scans && day.scans.length > 0 && (
               <div className="flex flex-col gap-1.5">
                 <p className="text-muted-foreground">
-                  Scans: <span className="font-medium text-foreground tabular-nums">{day.scans.join(" · ")}</span>
+                  {t("calendar.shared.dialog.scans")} <span className="font-medium text-foreground tabular-nums">{day.scans.join(" · ")}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Worked {formatMinutes(day.worked_minutes)}
-                  {day.late_minutes ? ` · ${day.late_minutes} min late` : ""}
-                  {day.early_leave_minutes ? ` · left ${day.early_leave_minutes} min early` : ""}
-                  {day.overtime_minutes ? ` · ${formatMinutes(day.overtime_minutes)} overtime` : ""}
+                  {t("calendar.shared.dialog.worked", { time: formatMinutes(day.worked_minutes, lang) })}
+                  {day.late_minutes ? t("calendar.shared.dialog.late", { n: day.late_minutes }) : ""}
+                  {day.early_leave_minutes ? t("calendar.shared.dialog.early", { n: day.early_leave_minutes }) : ""}
+                  {day.overtime_minutes ? t("calendar.shared.dialog.overtime", { time: formatMinutes(day.overtime_minutes, lang) }) : ""}
                 </p>
               </div>
             )}
@@ -240,7 +256,7 @@ export function DayDialog({
               <div className="flex flex-wrap gap-1.5">
                 {day.exceptions.map((code) => (
                   <Badge key={code} variant={EXCEPTIONS[code].tone}>
-                    {EXCEPTIONS[code].label}
+                    {t(`attendance.status.exception.${code}`)}
                   </Badge>
                 ))}
               </div>
@@ -248,43 +264,43 @@ export function DayDialog({
 
             {canManage && (day.type === "none" || day.type === "weekly_off" || (day.type === "work" && day.schedule?.source === "assignment")) && (
               <div className="flex flex-col gap-2 rounded-md border border-border p-3">
-                <Label htmlFor="reason">Mark {employee?.name} as off this day</Label>
+                <Label htmlFor="reason">{t("calendar.shared.dialog.markOffLabel", { name: employee?.name ?? "" })}</Label>
                 <Input
                   id="reason"
-                  placeholder="Reason (optional) — e.g. Sick, Family"
+                  placeholder={t("calendar.shared.dialog.reasonPlaceholder")}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
                 {error && <Alert variant="destructive">{error}</Alert>}
                 <Button onClick={markDayOff} disabled={saving} className="self-start">
-                  {saving ? "Saving…" : "Mark as day off"}
+                  {saving ? t("calendar.shared.dialog.saving") : t("calendar.shared.dialog.markOff")}
                 </Button>
               </div>
             )}
 
             {canManage && day.type === "day_off" && day.day_off_id && (
               <Button variant="outline" onClick={removeDayOff} disabled={saving} className="self-start">
-                {saving ? "Removing…" : "Remove this day off"}
+                {saving ? t("calendar.shared.dialog.removing") : t("calendar.shared.dialog.removeOff")}
               </Button>
             )}
 
             {canManage && (day.type === "work" || day.type === "none") && (
               <p className="text-muted-foreground">
                 {day.schedule?.source === "override"
-                  ? "To change or remove this day's change, use the "
+                  ? t("calendar.shared.dialog.rosterOverride")
                   : day.type === "none"
-                    ? "They have no work schedule on this date. Assign one from their profile or Work Schedules, or set this one day on the "
-                    : "To give them different hours on just this day, use the "}
+                    ? t("calendar.shared.dialog.rosterNone")
+                    : t("calendar.shared.dialog.rosterWork")}
                 <Link href="/dashboard/employees?tab=roster" className="font-medium text-primary hover:underline">
-                  Roster
+                  {t("calendar.shared.dialog.roster")}
                 </Link>
-                .
+                {t("calendar.shared.dialog.rosterEnd")}
               </p>
             )}
           </div>
         )}
         <DialogFooter>
-          <DialogClose render={<Button type="button" variant="outline" />}>Close</DialogClose>
+          <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.close")}</DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>

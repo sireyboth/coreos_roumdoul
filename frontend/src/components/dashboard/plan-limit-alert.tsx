@@ -2,10 +2,20 @@
 
 import { Alert } from "@/components/ui/alert";
 import { useMe } from "@/contexts/me-context";
+import { useT } from "@/lib/i18n";
 
+// The messages for each resource the plan limits.
 const LABELS = {
-  employees: { singular: "employee", plural: "employees" },
-  branches: { singular: "branch", plural: "branches" },
+  employees: {
+    reached: "app.account.limitReachedEmployees",
+    nearOne: "app.account.limitNearEmployeesOne",
+    nearOther: "app.account.limitNearEmployeesOther",
+  },
+  branches: {
+    reached: "app.account.limitReachedBranches",
+    nearOne: "app.account.limitNearBranchesOne",
+    nearOther: "app.account.limitNearBranchesOther",
+  },
 } as const;
 
 /**
@@ -15,6 +25,7 @@ const LABELS = {
  */
 export function PlanLimitAlert({ resource }: { resource: keyof typeof LABELS }) {
   const { me } = useMe();
+  const t = useT();
 
   const limit = resource === "employees" ? me?.plan?.max_employees : me?.plan?.max_branches;
   const used = me?.usage?.[resource];
@@ -25,9 +36,8 @@ export function PlanLimitAlert({ resource }: { resource: keyof typeof LABELS }) 
 
   if (used >= limit) {
     return (
-      <Alert variant="destructive" title={`You've reached your ${me.plan.name} plan limit`}>
-        You&apos;re using {used} of {limit} {labels.plural}, so you can&apos;t add another one. Contact support to
-        upgrade your plan.
+      <Alert variant="destructive" title={t("app.account.limitReachedTitle", { plan: me.plan.name })}>
+        {t(labels.reached, { used, limit })}
       </Alert>
     );
   }
@@ -36,9 +46,8 @@ export function PlanLimitAlert({ resource }: { resource: keyof typeof LABELS }) 
     const left = limit - used;
 
     return (
-      <Alert variant="warning" title={`Almost at your ${me.plan.name} plan limit`}>
-        You&apos;re using {used} of {limit} {labels.plural} — only {left} more {left === 1 ? labels.singular : labels.plural}{" "}
-        before you hit the limit. Contact support to upgrade.
+      <Alert variant="warning" title={t("app.account.limitNearTitle", { plan: me.plan.name })}>
+        {t(left === 1 ? labels.nearOne : labels.nearOther, { used, limit, left })}
       </Alert>
     );
   }

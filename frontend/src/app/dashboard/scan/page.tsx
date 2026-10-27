@@ -10,6 +10,7 @@ import { useMe } from "@/contexts/me-context";
 import { useQrScanner } from "@/hooks/use-qr-scanner";
 import { isFreshAppLaunch } from "@/lib/app-launch";
 import { api, ApiError, type AttendanceToday, type ScanResult } from "@/lib/api";
+import { translateNow, useT } from "@/lib/i18n";
 import { withLocationRetry } from "@/lib/location";
 import { clock } from "@/lib/schedule";
 
@@ -25,6 +26,7 @@ type Status =
  * person's work schedule decides whether it was an IN or an OUT.
  */
 export default function ScanPage() {
+  const t = useT();
   const { me } = useMe();
   const router = useRouter();
   // Opened by a home-screen icon added before the Home page existed: go to
@@ -79,7 +81,7 @@ export default function ScanPage() {
         setStatus({ kind: "success", result });
         loadToday();
       } catch (err) {
-        setStatus({ kind: "error", message: err instanceof ApiError ? err.message : "Something went wrong." });
+        setStatus({ kind: "error", message: err instanceof ApiError ? err.message : translateNow("common.message.somethingWrong") });
       }
     },
     [loadToday],
@@ -92,22 +94,21 @@ export default function ScanPage() {
   if (!me?.employee) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          Your account isn&apos;t linked to an employee record, so you can&apos;t scan yourself.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("attendance.page.noEmployee")}</p>
         <Link href="/dashboard/attendance" className="text-sm underline">
-          Go to Attendance
+          {t("attendance.scan.goToAttendance")}
         </Link>
       </div>
     );
   }
 
   const next = today?.next ?? null;
+  const slotName = (type: "in" | "out") => t(type === "in" ? "attendance.today.in" : "attendance.today.out");
 
   return (
     <div className="relative flex h-full flex-col bg-black text-white">
       <HomeButton className="absolute top-4 left-4 z-10 md:hidden" />
-      <Link href="/dashboard/attendance" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white" aria-label="Exit scan mode">
+      <Link href="/dashboard/attendance" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white" aria-label={t("attendance.scan.exit")}>
         <X className="size-5" />
       </Link>
 
@@ -118,11 +119,11 @@ export default function ScanPage() {
           </div>
           <canvas ref={canvasRef} className="hidden" />
           <div className="flex flex-col items-center gap-1 p-6 text-center">
-            <p className="text-lg font-medium">{status.kind === "submitting" ? "Recording…" : "Point your camera at the QR code"}</p>
+            <p className="text-lg font-medium">
+              {status.kind === "submitting" ? t("attendance.today.recording") : t("attendance.scan.pointCamera")}
+            </p>
             {status.kind === "scanning" && next && (
-              <p className="text-sm text-white/70">
-                Next: {next.type === "in" ? "IN" : "OUT"} at {clock(next.expected_at)}
-              </p>
+              <p className="text-sm text-white/70">{t("attendance.today.next", { slot: slotName(next.type), time: clock(next.expected_at) })}</p>
             )}
             {cameraError && <p className="text-sm text-red-400">{cameraError}</p>}
           </div>
@@ -134,20 +135,22 @@ export default function ScanPage() {
           <CheckCircle2 className="size-20 text-green-400" />
           <div className="flex flex-col gap-1">
             <p className="text-2xl font-semibold">
-              {status.result.slot ? (status.result.slot.type === "in" ? "IN recorded" : "OUT recorded") : "Scan recorded"}
+              {status.result.slot
+                ? t(status.result.slot.type === "in" ? "attendance.today.recordedIn" : "attendance.today.recordedOut")
+                : t("attendance.today.recordedScan")}
             </p>
             <p className="text-white/70">{status.result.message}</p>
             {next ? (
               <p className="mt-3 text-sm text-white/60">
-                Next: {next.type === "in" ? "IN" : "OUT"} at {clock(next.expected_at)}. Scan the same QR code then.
+                {t("attendance.scan.nextThen", { slot: slotName(next.type), time: clock(next.expected_at) })}
               </p>
             ) : (
-              today?.slots.length ? <p className="mt-3 text-sm text-white/60">That&apos;s every scan for today.</p> : null
+              today?.slots.length ? <p className="mt-3 text-sm text-white/60">{t("attendance.scan.allDone")}</p> : null
             )}
           </div>
           <Button onClick={() => setStatus({ kind: "scanning" })} variant="secondary" size="lg" className="mt-4">
             <QrCode className="size-4" />
-            Scan again
+            {t("attendance.scan.scanAgain")}
           </Button>
         </div>
       )}
@@ -156,7 +159,7 @@ export default function ScanPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
           <p className="text-lg font-medium text-red-400">{status.message}</p>
           <Button onClick={() => setStatus({ kind: "scanning" })} variant="secondary" size="lg">
-            Try again
+            {t("common.action.retry")}
           </Button>
         </div>
       )}
