@@ -19,6 +19,8 @@ export const auth = {
     showPassword: "Show password",
     hidePassword: "Hide password",
     submitting: "Signing in…",
+    success: "Signed in successfully",
+    redirecting: "Opening your workspace…",
     secureNote: "Secured connection. Access is restricted to authorized users.",
     noAccount: "Don't have an account?",
     createOne: "Register your company",

@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Loader2, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LogoSpinner } from "@/components/ui/loader-card";
 import { PageLoadGate } from "@/components/ui/page-load-gate";
 import { AccountBanner } from "@/components/dashboard/account-banner";
 import { AiAssistant } from "@/components/dashboard/ai-assistant";
@@ -15,20 +16,28 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
 import { findNavItem } from "@/components/dashboard/nav";
+import { GlassBackdrop, glassBar, useGlass } from "@/components/glass";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { companyStatusLabel } from "@/components/dashboard/account-banner";
 import { pageLabel, useLang, useT } from "@/lib/i18n";
 import { MeProvider, useMe } from "@/contexts/me-context";
 import { markAppSessionStarted } from "@/lib/app-launch";
+import { cn } from "@/lib/utils";
 
 function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean }) {
   const { me } = useMe();
   const pathname = usePathname();
   const t = useT();
+  const isGlass = useGlass();
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-border bg-card/80 px-4 py-3 backdrop-blur md:hidden">
+    <header
+      className={cn(
+        "flex items-center justify-between gap-3 border-b px-4 py-3 md:hidden",
+        isGlass ? glassBar : "border-border bg-card/80 backdrop-blur",
+      )}
+    >
       {pathname === "/dashboard/home" ? (
         <p className="truncate text-sm font-semibold">{me?.company?.name ?? "Business OS"}</p>
       ) : (
@@ -67,6 +76,7 @@ function TopBar() {
   const item = findNavItem(pathname);
   const lang = useLang();
   const t = useT();
+  const isGlass = useGlass();
   const initials = me?.user.name
     ?.split(" ")
     .map((part) => part[0])
@@ -75,7 +85,12 @@ function TopBar() {
     .toUpperCase();
 
   return (
-    <header className="hidden h-16 shrink-0 items-center justify-between border-b border-border bg-card/70 px-6 backdrop-blur-md md:flex lg:px-8">
+    <header
+      className={cn(
+        "hidden h-16 shrink-0 items-center justify-between border-b px-6 md:flex lg:px-8",
+        isGlass ? glassBar : "border-border bg-card/70 backdrop-blur-md",
+      )}
+    >
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">{me?.company?.name ?? "Business OS"}</span>
         <span className="text-muted-foreground/50">/</span>
@@ -139,6 +154,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const { loading } = useMe();
   const pathname = usePathname();
   const t = useT();
+  const isGlass = useGlass();
   // Any page but scan means the app is up; the scan page itself decides
   // whether it was opened by an older home-screen icon (lib/app-launch.ts).
   useEffect(() => {
@@ -147,9 +163,10 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin text-primary" />
-        {t("app.shell.loadingWorkspace")}
+      // First load: the big logo loader in the middle of the screen.
+      <div role="status" aria-live="polite" className="flex h-dvh flex-col items-center justify-center gap-6 bg-background px-6 text-center">
+        <LogoSpinner className="size-28 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-90 duration-500" />
+        <p className="text-sm font-medium text-muted-foreground motion-safe:animate-pulse">{t("app.shell.loadingWorkspace")}</p>
       </div>
     );
   }
@@ -165,7 +182,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    // On the glass home screen the shell goes see-through so the backdrop shows.
+    <div className={cn("flex h-screen overflow-hidden", !isGlass && "bg-background")}>
+      {isGlass && <GlassBackdrop />}
       <div className="hidden h-full md:block">
         <Sidebar />
       </div>
@@ -175,6 +194,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
         <TopBar />
         <main className="relative flex-1 overflow-y-auto">
           <div
+            hidden={isGlass}
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-72"
             style={{

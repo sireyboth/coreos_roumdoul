@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Loader2 } from "lucide-react";
+import { LoaderCard } from "@/components/ui/loader-card";
 import { isBusy, subscribeBusy } from "@/lib/busy";
 import { useT } from "@/lib/i18n";
 
@@ -48,12 +48,7 @@ export function BusyOverlay() {
       aria-busy="true"
       className={`fixed inset-0 z-100 flex cursor-wait items-center justify-center bg-background/40 backdrop-blur-[1px] transition-opacity duration-150 ${visible ? "opacity-100" : "opacity-0"}`}
     >
-      {visible && (
-        <div className="flex items-center gap-2.5 rounded-lg bg-popover px-4 py-2.5 text-sm font-medium text-popover-foreground shadow-lg ring-1 ring-foreground/10">
-          <Loader2 className="size-4 animate-spin text-primary" />
-          {t("app.ui.working")}
-        </div>
-      )}
+      {visible && <LoaderCard label={t("app.ui.working")} />}
     </div>
   );
 }

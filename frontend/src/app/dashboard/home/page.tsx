@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -19,12 +18,16 @@ import { canSee, findNavItem, type NavItem } from "@/components/dashboard/nav";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { navLabel, setLang, useLang, useT, type TKey } from "@/lib/i18n";
+import { navLabel, useLang, useT, type TKey } from "@/lib/i18n";
+import { LangSwitch } from "@/components/brand-hero";
+import { pane, well } from "@/components/glass";
 import { clock, formatMinutes } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 
 // The mobile home screen: a launcher in the style of a banking app. It only
 // links to the existing pages — every feature still lives where it always has.
+// Look: "liquid glass" (components/glass) — the dashboard layout draws the
+// backdrop behind this page and turns its header and tab bar to glass.
 
 // Main grid, then the scrolling chip row. Icons and permissions come from the
 // sidebar's nav config so the two never disagree; names from lib/i18n.
@@ -51,9 +54,6 @@ const CHIPS = [
 // The full dashboard sends phones here, so the Overview tile asks to stay.
 const HREF_OVERRIDE: Record<string, string> = { "/dashboard": "/dashboard?view=full" };
 
-// Frosted white-on-gradient surface used by every small control on the hero and banner.
-const glass = "bg-white/15 ring-1 ring-white/20 backdrop-blur";
-
 function greetingKey(): TKey {
   const hour = new Date().getHours();
   if (hour < 12) return "home.greeting.morning";
@@ -68,88 +68,76 @@ function useItems(hrefs: string[]): NavItem[] {
     .filter((item): item is NavItem => Boolean(item && me && canSee(item, me)));
 }
 
-/** Decorative geometry for the hero band: a dot grid plus concentric rings. */
-function HeroPattern() {
-  const id = useId();
+/**
+ * Small spaced-out label ("TODAY", "SERVICES"). Letter-spacing only for
+ * English — spreading Khmer pulls its stacked marks apart.
+ */
+function Eyebrow({ children, dot = false }: { children: React.ReactNode; dot?: boolean }) {
+  const lang = useLang();
   return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 size-full text-white" preserveAspectRatio="none">
-      <defs>
-        <pattern id={`${id}-dots`} width="18" height="18" patternUnits="userSpaceOnUse">
-          <circle cx="2" cy="2" r="1.2" fill="currentColor" opacity="0.18" />
-        </pattern>
-        <radialGradient id={`${id}-fade`} cx="85%" cy="10%" r="80%">
-          <stop offset="0" stopColor="white" stopOpacity="1" />
-          <stop offset="1" stopColor="white" stopOpacity="0" />
-        </radialGradient>
-        <mask id={`${id}-mask`}>
-          <rect width="100%" height="100%" fill={`url(#${id}-fade)`} />
-        </mask>
-      </defs>
-      <rect width="100%" height="100%" fill={`url(#${id}-dots)`} mask={`url(#${id}-mask)`} />
-      <g fill="none" stroke="currentColor" strokeWidth="1.2">
-        {[40, 80, 120, 160, 200].map((r, i) => (
-          <circle key={r} cx="92%" cy="-10" r={r} opacity={0.22 - i * 0.035} />
-        ))}
-        {[60, 110].map((r) => (
-          <circle key={r} cx="-20" cy="100%" r={r} opacity="0.1" />
-        ))}
-      </g>
-    </svg>
+    <span className={cn("inline-flex items-center gap-2 text-[11px] font-semibold text-white/70", lang === "en" && "uppercase tracking-[0.18em]")}>
+      {dot && <span className="size-1.5 rounded-full bg-white/80 shadow-[0_0_8px_rgb(255_255_255/0.8)]" />}
+      {children}
+    </span>
   );
 }
 
-/** ខ្មែរ | EN switch on the hero band. */
-function LangSwitch() {
-  const lang = useLang();
-  const t = useT();
+/** Fades each block up into place on open, one after another. Skipped for reduced motion. */
+function Rise({ index, children }: { index: number; children: React.ReactNode }) {
   return (
-    <div role="group" aria-label={t("home.menu.language")} className={cn("flex shrink-0 rounded-full p-0.5 text-[11px] font-semibold", glass)}>
-      {(["km", "en"] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setLang(value)}
-          aria-pressed={lang === value}
-          className={cn("rounded-full px-2.5 py-1 transition-colors", lang === value ? "bg-white text-violet-700" : "text-white/80")}
-        >
-          {value === "km" ? "ខ្មែរ" : "EN"}
-        </button>
-      ))}
+    <div
+      className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-3 duration-700 ease-out"
+      style={{ animationDelay: `${index * 80}ms`, animationFillMode: "both" }}
+    >
+      {children}
     </div>
   );
 }
 
 type Action = { href: string; label: string; icon: LucideIcon };
 
-/** The floating card under the hero — the banking app's "balance". */
+/** The big glass card under the header — the banking app's "balance". */
 function HeroCard({ badge, children, actions }: { badge: string; children: React.ReactNode; actions: Action[] }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-xl shadow-indigo-950/10 backdrop-blur dark:shadow-black/40">
-      <div aria-hidden className="pointer-events-none absolute -top-16 -right-16 size-40 rounded-full bg-primary/10 blur-2xl" />
-      <div className="relative p-5">
-        <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-          {badge}
-        </span>
+    <section className={cn("overflow-hidden rounded-[28px]", pane)}>
+      <div className="p-5 pt-4">
+        <Eyebrow dot>{badge}</Eyebrow>
         {children}
       </div>
-      <div className="relative grid grid-cols-3 border-t border-border/70 bg-muted/40">
-        {actions.map(({ href, label, icon: Icon }, i) => (
+      <div className="mx-5 h-px bg-linear-to-r from-transparent via-white/30 to-transparent" />
+      <div className="grid grid-cols-3">
+        {actions.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
-            className={cn(
-              "flex flex-col items-center gap-1.5 py-3 text-xs font-medium transition-colors active:bg-muted",
-              i > 0 && "border-l border-border/70",
-            )}
+            className="flex flex-col items-center gap-1.5 py-3.5 text-xs font-medium text-white/90 transition-colors active:bg-white/10"
           >
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary/12 text-primary">
-              <Icon className="size-4" />
+            <span className={cn("flex size-9 items-center justify-center rounded-full", well)}>
+              <Icon className="size-4" strokeWidth={1.75} />
             </span>
             {label}
           </Link>
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * The big QR button in the top-right of a hero card: opens the camera
+ * (/dashboard/scan) to check in. Solid pearl-white so it is the one thing on
+ * the glass that reads as "press me". Shared by the Today and Team cards.
+ */
+function ScanTile() {
+  const t = useT();
+  return (
+    <Link
+      href="/dashboard/scan"
+      aria-label={t("home.today.scanAttendance")}
+      className="flex size-16 shrink-0 items-center justify-center rounded-[20px] bg-linear-to-b from-white to-slate-200 text-slate-800 shadow-[inset_0_-2px_0_rgb(15_23_42/0.08),0_12px_24px_-8px_rgb(2_6_23/0.5)] ring-4 ring-white/20 transition-transform text-shadow-none active:scale-95"
+    >
+      <QrCode className="size-7" strokeWidth={1.75} />
+    </Link>
   );
 }
 
@@ -192,51 +180,48 @@ function TodayCard() {
         { href: "/dashboard/attendance/corrections", label: t("home.today.correction"), icon: FileClock },
       ]}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="mt-3 flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          {today?.schedule && <p className="mt-2 truncate text-xs text-muted-foreground">{today.schedule}</p>}
+          {today?.schedule && <p className="truncate text-xs text-white/65">{today.schedule}</p>}
           {error ? (
-            <p className="mt-3 text-lg font-semibold">{t("common.message.loadFailed")}</p>
+            <p className="mt-2 text-lg font-medium">{t("common.message.loadFailed")}</p>
           ) : headline === null ? (
-            <Skeleton className="mt-3 h-7 w-44" />
+            <Skeleton className="mt-2 h-8 w-48 bg-white/20" />
           ) : (
-            <p className="mt-2 flex items-center gap-2 text-xl font-bold tracking-tight">
+            <p className="mt-1 flex items-center gap-2.5 text-[22px] font-medium tracking-tight">
               {last && (
-                <span className={cn("relative flex size-2.5", checkedIn ? "text-success" : "text-muted-foreground")}>
-                  {checkedIn && <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-60" />}
-                  <span className="relative inline-flex size-2.5 rounded-full bg-current" />
-                </span>
+                <span
+                  className={cn(
+                    "size-2.5 shrink-0 rounded-full",
+                    checkedIn ? "bg-emerald-300 shadow-[0_0_10px_rgb(110_231_183/0.9)]" : "bg-white/50",
+                  )}
+                />
               )}
               <span className="truncate">{headline}</span>
             </p>
           )}
-          {detail && <p className="mt-1 truncate text-sm text-muted-foreground">{detail}</p>}
+          {detail && <p className="mt-1 truncate text-sm text-white/70">{detail}</p>}
         </div>
-        {!today?.auto && (
-          <Link
-            href="/dashboard/scan"
-            aria-label={t("home.today.scanAttendance")}
-            className="relative -mt-6 flex size-16 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-500/30 transition-transform active:scale-95"
-          >
-            <span aria-hidden className="absolute inset-0 rounded-2xl ring-4 ring-emerald-500/15" />
-            <QrCode className="size-7" />
-          </Link>
-        )}
+        {!today?.auto && <ScanTile />}
       </div>
 
       {today && today.slots.length > 0 && (
-        <div className="mt-4">
-          <div className="flex justify-between text-[11px] text-muted-foreground">
+        <div className="mt-5">
+          <div className="flex justify-between text-[11px] text-white/65">
             <span>{t("home.today.scansDone", { done: scanned.length, total: today.slots.length })}</span>
             {today.day && today.day.worked_minutes > 0 && <span>{t("home.today.worked", { time: formatMinutes(today.day.worked_minutes, lang) })}</span>}
           </div>
-          <div className="mt-1.5 flex gap-1">
+          <div className="mt-2 flex gap-1.5">
             {today.slots.map((slot) => (
               <span
                 key={slot.sequence}
                 className={cn(
-                  "h-1.5 flex-1 rounded-full",
-                  slot.actual_at ? "bg-success" : slot.status === "missing" ? "bg-destructive/60" : "bg-muted",
+                  "h-1 flex-1 rounded-full",
+                  slot.actual_at
+                    ? "bg-emerald-300 shadow-[0_0_8px_rgb(110_231_183/0.6)]"
+                    : slot.status === "missing"
+                      ? "bg-rose-300"
+                      : "bg-white/20",
                 )}
               />
             ))}
@@ -257,10 +242,11 @@ function TeamCard() {
   const staff = summary?.employees ?? null;
   const percent = att && staff ? Math.min(100, Math.round((att.checked_in_today / staff) * 100)) : 0;
 
+  // Pale tints: the full-strength theme colours are too dark to read on glass.
   const stats = [
-    { label: t("home.team.late"), value: att?.late_today, tone: "text-warning" },
-    { label: t("home.team.corrections"), value: att?.pending_corrections, tone: "text-info" },
-    { label: t("home.team.overtime"), value: att?.pending_overtime, tone: "text-primary" },
+    { label: t("home.team.late"), value: att?.late_today, tone: "text-amber-200" },
+    { label: t("home.team.corrections"), value: att?.pending_corrections, tone: "text-sky-200" },
+    { label: t("home.team.overtime"), value: att?.pending_overtime, tone: "text-white" },
   ].filter((s) => s.value !== null && s.value !== undefined);
 
   return (
@@ -272,28 +258,34 @@ function TeamCard() {
         { href: "/dashboard/employees", label: navLabel(lang, "/dashboard/employees"), icon: Users },
       ]}
     >
-      {error ? (
-        <p className="mt-3 text-lg font-semibold">{t("common.message.loadFailed")}</p>
-      ) : !summary ? (
-        <Skeleton className="mt-3 h-9 w-36" />
-      ) : (
-        <p className="mt-2 flex items-baseline gap-1.5">
-          <span className="text-4xl font-bold tracking-tight tabular-nums">{att?.checked_in_today ?? 0}</span>
-          {staff !== null && <span className="text-lg font-medium text-muted-foreground tabular-nums">/ {staff}</span>}
-          <span className="ml-1 text-sm text-muted-foreground">{t("home.team.checkedIn")}</span>
-        </p>
-      )}
+      <div className="mt-3 flex items-start justify-between gap-4">
+        {error ? (
+          <p className="mt-2 text-lg font-medium">{t("common.message.loadFailed")}</p>
+        ) : !summary ? (
+          <Skeleton className="mt-2 h-12 w-36 bg-white/20" />
+        ) : (
+          <p className="flex min-w-0 items-baseline gap-1.5">
+            <span className="text-5xl font-light tracking-tight tabular-nums">{att?.checked_in_today ?? 0}</span>
+            {staff !== null && <span className="text-xl font-light text-white/60 tabular-nums">/ {staff}</span>}
+            <span className="ml-1 truncate text-sm text-white/70">{t("home.team.checkedIn")}</span>
+          </p>
+        )}
+        <ScanTile />
+      </div>
       {staff !== null && (
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-linear-to-r from-emerald-400 to-teal-500 transition-[width] duration-700" style={{ width: `${percent}%` }} />
+        <div className="mt-4 h-1 overflow-hidden rounded-full bg-white/15">
+          <div
+            className="h-full rounded-full bg-linear-to-r from-white/70 to-white shadow-[0_0_10px_rgb(255_255_255/0.7)] transition-[width] duration-1000"
+            style={{ width: `${percent}%` }}
+          />
         </div>
       )}
       {stats.length > 0 && (
-        <div className="mt-4 flex gap-5">
+        <div className="mt-5 flex gap-6">
           {stats.map((s) => (
             <div key={s.label}>
-              <p className={cn("text-lg font-semibold tabular-nums", s.tone)}>{s.value}</p>
-              <p className="text-[11px] text-muted-foreground">{s.label}</p>
+              <p className={cn("text-xl font-light tabular-nums", s.tone)}>{s.value}</p>
+              <p className="text-[11px] text-white/65">{s.label}</p>
             </div>
           ))}
         </div>
@@ -302,24 +294,17 @@ function TeamCard() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="px-1 text-[15px] font-semibold tracking-tight">{children}</h2>;
-}
-
 function Tile({ item, label }: { item: NavItem; label: string }) {
   const Icon = item.icon;
   return (
     <Link
       href={HREF_OVERRIDE[item.href] ?? item.href}
-      className="relative flex h-28 flex-col items-center justify-center gap-2.5 overflow-hidden rounded-2xl border border-border/70 bg-card p-2 text-center shadow-sm transition-transform active:scale-95"
+      className={cn("flex h-28 flex-col items-center justify-center gap-2.5 rounded-3xl p-2 text-center transition-transform active:scale-[0.96]", pane)}
     >
-      {/* A faint wash of the tile's own colour in the corner. */}
-      <span aria-hidden className={cn("absolute -top-6 -right-6 size-16 rounded-full bg-linear-to-br opacity-10 blur-md", item.tone)} />
-      <span className={cn("relative flex size-12 items-center justify-center rounded-2xl bg-linear-to-br text-white shadow-md", item.tone)}>
-        <span aria-hidden className="absolute inset-x-1 top-0.5 h-1/2 rounded-t-xl bg-white/20" />
-        <Icon className="relative size-5.5" />
+      <span className={cn("flex size-12 items-center justify-center rounded-2xl", well)}>
+        <Icon className="size-5.5" strokeWidth={1.6} />
       </span>
-      <span className="relative line-clamp-2 text-[13px] font-medium leading-tight">{label}</span>
+      <span className="line-clamp-2 text-[13px] leading-tight text-white/90">{label}</span>
     </Link>
   );
 }
@@ -329,43 +314,31 @@ function Chip({ item, label }: { item: NavItem; label: string }) {
   return (
     <Link
       href={item.href}
-      className="flex shrink-0 items-center gap-2 rounded-full border border-border/70 bg-card py-1.5 pr-4 pl-1.5 text-sm font-medium shadow-sm transition-transform active:scale-95"
+      className={cn("flex shrink-0 items-center gap-2 rounded-full py-1.5 pr-4 pl-1.5 text-sm text-white/90 transition-transform active:scale-95", pane)}
     >
-      <span className={cn("flex size-8 items-center justify-center rounded-full bg-linear-to-br text-white", item.tone)}>
-        <Icon className="size-4" />
+      <span className={cn("flex size-8 items-center justify-center rounded-full", well)}>
+        <Icon className="size-4" strokeWidth={1.75} />
       </span>
       {label}
     </Link>
   );
 }
 
-/** A wide promo-style shortcut to the full-screen scanner. */
+/** A wide shortcut to the full-screen scanner. */
 function ScanBanner() {
-  const id = useId();
   const t = useT();
   return (
-    <Link
-      href="/dashboard/scan"
-      className="relative flex items-center gap-4 overflow-hidden rounded-3xl bg-linear-to-br from-emerald-500 via-teal-500 to-cyan-600 p-5 text-white shadow-lg shadow-teal-500/20 transition-transform active:scale-[0.98]"
-    >
-      <svg aria-hidden className="pointer-events-none absolute inset-0 size-full">
-        <defs>
-          <pattern id={`${id}-grid`} width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
-            <path d="M0 11h22" stroke="white" strokeOpacity="0.12" strokeWidth="1" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill={`url(#${id}-grid)`} />
-      </svg>
-      <div className="relative min-w-0 flex-1">
-        <p className="text-base font-bold">{t("home.scanBanner.title")}</p>
-        <p className="mt-0.5 text-sm text-white/80">{t("home.scanBanner.body")}</p>
-        <span className={cn("mt-3 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold", glass)}>
+    <Link href="/dashboard/scan" className={cn("flex items-center gap-4 rounded-[28px] p-5 transition-transform active:scale-[0.98]", pane)}>
+      <div className="min-w-0 flex-1">
+        <p className="text-lg font-medium tracking-tight">{t("home.scanBanner.title")}</p>
+        <p className="mt-0.5 text-sm text-white/70">{t("home.scanBanner.body")}</p>
+        <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-800 shadow-md text-shadow-none">
           {t("home.scanBanner.cta")}
           <ArrowRight className="size-3.5" />
         </span>
       </div>
-      <div className={cn("relative flex size-20 shrink-0 items-center justify-center rounded-3xl", glass)}>
-        <QrCode className="size-10" />
+      <div className={cn("flex size-20 shrink-0 items-center justify-center rounded-3xl", well)}>
+        <QrCode className="size-10" strokeWidth={1.4} />
       </div>
     </Link>
   );
@@ -381,71 +354,87 @@ export default function MobileHomePage() {
   const hasAttendance = Boolean(me?.modules.attendance);
   const showToday = Boolean(me?.employee) && hasAttendance;
   const showTeam = !me?.employee && hasAttendance && Boolean(me?.permissions.includes("dashboard.view"));
-  const hasCard = showToday || showTeam;
   const date = new Date().toLocaleDateString(lang === "km" ? "km-KH" : [], { weekday: "long", day: "numeric", month: "long" });
 
+  // Blocks in the order they fade in.
+  let step = 0;
+
   return (
-    <div className="mx-auto w-full max-w-md pb-6">
-      {/* Hero band — always the brand gradient, in light and dark alike. */}
-      <header
-        className={cn(
-          "relative overflow-hidden bg-linear-to-br from-indigo-600 via-violet-600 to-fuchsia-600 px-5 pt-5 text-white sm:mt-4 sm:rounded-3xl dark:from-indigo-950 dark:via-violet-950 dark:to-fuchsia-950",
-          hasCard ? "pb-24" : "pb-8",
+    // A faint shadow under the white text keeps it readable where the backdrop is pale.
+    <div className="text-white [text-shadow:0_1px_2px_rgb(2_6_23/0.2)]">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-7 px-4 pt-6 pb-8">
+        <Rise index={step++}>
+          <header className="px-1">
+            <Link href="/dashboard/profile" className="flex items-center gap-3.5">
+              <span className="relative rounded-full p-0.5 glass-edge">
+                <EmployeeAvatar name={name || "?"} className="size-13 text-base" />
+                <span className="absolute right-0 bottom-0 size-3.5 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_8px_rgb(52_211_153/0.8)]" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-white/70">{t(greetingKey())},</p>
+                <p className="truncate text-[28px] leading-tight font-medium tracking-tight">{name}</p>
+              </div>
+              <span className={cn("flex size-10 items-center justify-center rounded-full", pane)}>
+                <ChevronRight className="size-4.5" strokeWidth={1.75} />
+              </span>
+            </Link>
+
+            <div className="mt-5 flex items-center justify-between gap-2 text-xs">
+              <span className={cn("inline-flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-medium", pane)}>
+                <CalendarDays className="size-3.5 shrink-0" strokeWidth={1.75} />
+                <span className="truncate">{date}</span>
+              </span>
+              <LangSwitch activeText="text-slate-800 text-shadow-none" />
+            </div>
+          </header>
+        </Rise>
+
+        {showToday && (
+          <Rise index={step++}>
+            <TodayCard />
+          </Rise>
         )}
-      >
-        <HeroPattern />
-        <div aria-hidden className="pointer-events-none absolute -bottom-20 left-1/3 size-56 rounded-full bg-fuchsia-400/30 blur-3xl dark:bg-fuchsia-500/20" />
-
-        <Link href="/dashboard/profile" className="relative flex items-center gap-3">
-          <span className="relative">
-            <EmployeeAvatar name={name || "?"} className="size-13 text-base ring-2 ring-white/70" />
-            <span className="absolute -right-0.5 -bottom-0.5 size-3.5 rounded-full border-2 border-violet-600 bg-emerald-400 dark:border-violet-950" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-white/75">{t(greetingKey())},</p>
-            <p className="truncate text-xl font-bold tracking-tight">{name}</p>
-          </div>
-          <span className={cn("flex size-9 items-center justify-center rounded-full", glass)}>
-            <ChevronRight className="size-4.5" />
-          </span>
-        </Link>
-
-        <div className="relative mt-5 flex items-center justify-between gap-2 text-xs">
-          <span className={cn("inline-flex min-w-0 items-center gap-1.5 rounded-full px-3 py-1 font-medium", glass)}>
-            <CalendarDays className="size-3.5 shrink-0" />
-            <span className="truncate">{date}</span>
-          </span>
-          <LangSwitch />
-        </div>
-      </header>
-
-      <div className={cn("relative flex flex-col gap-6 px-4", hasCard ? "-mt-16" : "mt-5")}>
-        {showToday && <TodayCard />}
-        {showTeam && <TeamCard />}
+        {showTeam && (
+          <Rise index={step++}>
+            <TeamCard />
+          </Rise>
+        )}
 
         {grid.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <SectionTitle>{t("home.menu.services")}</SectionTitle>
-            <nav aria-label={t("home.menu.services")} className="grid grid-cols-3 gap-3">
-              {grid.map((item) => (
-                <Tile key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
-              ))}
-            </nav>
-          </section>
+          <Rise index={step++}>
+            <section className="flex flex-col gap-3">
+              <h2 className="px-1">
+                <Eyebrow>{t("home.menu.services")}</Eyebrow>
+              </h2>
+              <nav aria-label={t("home.menu.services")} className="grid grid-cols-3 gap-3">
+                {grid.map((item) => (
+                  <Tile key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
+                ))}
+              </nav>
+            </section>
+          </Rise>
         )}
 
         {chips.length > 0 && (
-          <section className="flex flex-col gap-3">
-            <SectionTitle>{t("home.menu.more")}</SectionTitle>
-            <nav aria-label={t("home.menu.more")} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
-              {chips.map((item) => (
-                <Chip key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
-              ))}
-            </nav>
-          </section>
+          <Rise index={step++}>
+            <section className="flex flex-col gap-3">
+              <h2 className="px-1">
+                <Eyebrow>{t("home.menu.more")}</Eyebrow>
+              </h2>
+              <nav aria-label={t("home.menu.more")} className="-mx-4 flex gap-2 overflow-x-auto px-4 pt-1 pb-3 scrollbar-none [&::-webkit-scrollbar]:hidden">
+                {chips.map((item) => (
+                  <Chip key={item.href} item={item} label={navLabel(lang, item.href, item.label)} />
+                ))}
+              </nav>
+            </section>
+          </Rise>
         )}
 
-        {showToday && <ScanBanner />}
+        {showToday && (
+          <Rise index={step++}>
+            <ScanBanner />
+          </Rise>
+        )}
       </div>
     </div>
   );
