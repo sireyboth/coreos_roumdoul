@@ -14,6 +14,7 @@ export const home: Dictionary["home"] = {
   menu: {
     services: "សេវាកម្ម",
     more: "ផ្សេងៗ",
+    resetOrder: "កំណត់លំដាប់ឡើងវិញ",
     language: "ភាសា",
   },
 

@@ -4,8 +4,7 @@ import { useId } from "react";
 import { setLang, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-// Pieces of the phone "app" look. The phone sign-in screen (components/auth-layout)
-// uses them all; the mobile home screen (app/dashboard/home) only LangSwitch.
+// Pieces of the phone "app" look for the phone sign-in screen (components/auth-layout).
 
 /** The brand gradient behind hero bands — the same in light and dark alike (darker in dark mode). */
 export const brandGradient =

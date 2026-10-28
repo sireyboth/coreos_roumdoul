@@ -59,10 +59,11 @@ export function LoaderCard({ label, glass = false }: { label: string; glass?: bo
   return (
     <div
       className={cn(
-        "flex min-w-44 flex-col items-center gap-3.5 rounded-3xl px-7 pt-6 pb-5 text-sm font-medium motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 duration-200",
+        "flex min-w-44 flex-col items-center gap-3.5 rounded-3xl px-7 pt-6 pb-5 text-sm font-medium",
+        // Blurred glass is never animated (costly on budget phones); the solid card fades in.
         glass
-          ? "glass-edge bg-white/15 text-white shadow-[0_24px_48px_-24px_rgb(2_6_23/0.6)] backdrop-blur-2xl backdrop-saturate-150"
-          : "bg-popover/95 text-popover-foreground shadow-xl ring-1 ring-foreground/10 backdrop-blur",
+          ? "glass-surface text-ink"
+          : "bg-popover/95 text-popover-foreground shadow-xl ring-1 ring-foreground/10 backdrop-blur motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 duration-200",
       )}
     >
       <LogoSpinner />

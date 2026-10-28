@@ -17,8 +17,28 @@ const SUGGESTIONS: TKey[] = ["app.assistant.suggestion1", "app.assistant.suggest
 // AiAssistantController::QUESTIONS_PER_CHAT.
 const QUESTIONS_PER_CHAT = 10;
 
-export function AiAssistant() {
+// Fired by the header's Help button on phones (AssistantLauncher); the panel
+// below listens for it, so the two need no shared state.
+const OPEN_EVENT = "ai-assistant:open";
+
+/** Same rule as the server: a paying (active) company whose plan includes the module. Trials never see it. */
+function useAssistantAvailable(): boolean {
   const { me } = useMe();
+  return me?.company?.status === "active" && Boolean(me.modules.ai_assistant);
+}
+
+/** Help as a plain icon button for the phone header — on phones it never floats over content. */
+export function AssistantLauncher() {
+  const t = useT();
+  if (!useAssistantAvailable()) return null;
+  return (
+    <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))} aria-label={t("app.assistant.open")}>
+      <MessageCircleQuestion />
+    </Button>
+  );
+}
+
+export function AiAssistant() {
   const t = useT();
   const [open, setOpen] = useState(false);
   // True while the panel plays its exit animation; it unmounts when that ends.
@@ -34,6 +54,14 @@ export function AiAssistant() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, []);
+
+  const available = useAssistantAvailable();
 
   async function send(text: string) {
     const question = text.trim();
@@ -79,15 +107,14 @@ export function AiAssistant() {
     setClosing(true);
   }
 
-  // Same rule as the server: a paying (active) company whose plan includes the
-  // module. Trials never see the button.
-  if (me?.company?.status !== "active" || !me.modules.ai_assistant) return null;
+  if (!available) return null;
 
   if (!open) {
+    // Desktop only: on phones the header's Help button (AssistantLauncher) opens the panel.
     return (
       <Button
         onClick={() => setOpen(true)}
-        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 h-12 rounded-full shadow-lg transition-transform duration-150 animate-in fade-in-0 zoom-in-90 hover:scale-105 active:scale-95 motion-reduce:animate-none motion-reduce:transition-none"
+        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 hidden h-12 rounded-full shadow-lg transition-transform duration-150 animate-in fade-in-0 zoom-in-90 hover:scale-105 active:scale-95 motion-reduce:animate-none motion-reduce:transition-none md:inline-flex"
         aria-label={t("app.assistant.open")}
       >
         <MessageCircleQuestion className="mr-2 h-5 w-5" />

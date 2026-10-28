@@ -229,7 +229,13 @@ export function NotificationBell() {
           </Badge>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[70vh] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto">
+      {/* Thick glass (glass-surface with --glass-thick, globals.css): the header's glass look, but
+          mostly opaque so the text stays readable over whatever is behind. `!` wins over the
+          menu's own solid background and ring; 20px corners around 6px padding → 14px items. */}
+      <DropdownMenuContent
+        align="end"
+        className="glass-surface! [--glass-bg:var(--glass-thick)] max-h-[70vh] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-[20px] p-1.5 text-ink [&_.text-muted-foreground]:text-ink-muted! [&_[data-highlighted]]:bg-ink/8! [&_[role=menuitem]]:rounded-[14px]"
+      >
         <DropdownMenuGroup>
           <div className="flex items-center justify-between gap-2 pr-1">
             <DropdownMenuLabel>{t("app.notifications.title")}</DropdownMenuLabel>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter, Noto_Sans_Khmer } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { BusyOverlay } from "@/components/ui/busy-overlay";
@@ -40,6 +40,13 @@ export const metadata: Metadata = {
     icon: "/icon.svg",
     apple: "/icon.svg",
   },
+};
+
+// viewport-fit=cover lets the app draw edge to edge (iPhone notch and home
+// indicator, Android punch-hole and gesture bar); the header and tab bar pad
+// themselves with env(safe-area-inset-*) to stay clear of them.
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

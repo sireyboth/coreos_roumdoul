@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LogoSpinner } from "@/components/ui/loader-card";
+import { LoaderCard, LogoSpinner } from "@/components/ui/loader-card";
 import { PageLoadGate } from "@/components/ui/page-load-gate";
 import { AccountBanner } from "@/components/dashboard/account-banner";
-import { AiAssistant } from "@/components/dashboard/ai-assistant";
+import { AiAssistant, AssistantLauncher } from "@/components/dashboard/ai-assistant";
 import { BirthdayCelebration } from "@/components/dashboard/birthday-celebration";
 import { HomeButton } from "@/components/dashboard/home-button";
 import { MobileTabBar } from "@/components/dashboard/mobile-tab-bar";
@@ -16,7 +16,7 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { PushPrompt } from "@/components/dashboard/push-prompt";
 import { Sidebar, SidebarContent } from "@/components/dashboard/sidebar";
 import { findNavItem } from "@/components/dashboard/nav";
-import { GlassBackdrop, glassBar, useGlass } from "@/components/glass";
+import { GlassBackdrop, headerButtons, useGlass } from "@/components/glass";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { companyStatusLabel } from "@/components/dashboard/account-banner";
@@ -25,26 +25,31 @@ import { MeProvider, useMe } from "@/contexts/me-context";
 import { markAppSessionStarted } from "@/lib/app-launch";
 import { cn } from "@/lib/utils";
 
+/**
+ * The phone header: a glass bar stuck to the top of the scrolling area, so
+ * the page slides under it. Clears the notch / punch-hole camera
+ * (safe-area-inset-top). Every button in it is a 48px plain icon (headerButtons).
+ */
 function MobileHeader({ onToggle, open }: { onToggle: () => void; open: boolean }) {
   const { me } = useMe();
   const pathname = usePathname();
   const t = useT();
-  const isGlass = useGlass();
 
   return (
     <header
       className={cn(
-        "flex items-center justify-between gap-3 border-b px-4 py-3 md:hidden",
-        isGlass ? glassBar : "border-border bg-card/80 backdrop-blur",
+        "glass-surface sticky top-0 z-30 flex items-center justify-between gap-2 pt-[max(0.25rem,env(safe-area-inset-top))] pr-[max(0.25rem,env(safe-area-inset-right))] pb-1 pl-[max(1rem,env(safe-area-inset-left))] text-ink md:hidden",
+        headerButtons,
       )}
     >
       {pathname === "/dashboard/home" ? (
-        <p className="truncate text-sm font-semibold">{me?.company?.name ?? "Business OS"}</p>
+        <p className="truncate text-[15px] font-semibold">{me?.company?.name ?? "Business OS"}</p>
       ) : (
         // Every other page gets an obvious way back to the phone home screen.
         <HomeButton />
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center">
+        <AssistantLauncher />
         <NotificationBell />
         <ThemeToggle />
         <Button
@@ -76,7 +81,6 @@ function TopBar() {
   const item = findNavItem(pathname);
   const lang = useLang();
   const t = useT();
-  const isGlass = useGlass();
   const initials = me?.user.name
     ?.split(" ")
     .map((part) => part[0])
@@ -85,12 +89,7 @@ function TopBar() {
     .toUpperCase();
 
   return (
-    <header
-      className={cn(
-        "hidden h-16 shrink-0 items-center justify-between border-b px-6 md:flex lg:px-8",
-        isGlass ? glassBar : "border-border bg-card/70 backdrop-blur-md",
-      )}
-    >
+    <header className="hidden h-16 shrink-0 items-center justify-between border-b border-border bg-card/70 px-6 backdrop-blur-md md:flex lg:px-8">
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">{me?.company?.name ?? "Business OS"}</span>
         <span className="text-muted-foreground/50">/</span>
@@ -162,6 +161,18 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   if (loading) {
+    // Opening on the glass home screen: draw the same backdrop and the same
+    // centred card the page's own loader uses (PageLoadGate), so the handover
+    // from this screen to the page is seamless.
+    if (isGlass) {
+      return (
+        <div role="status" aria-live="polite" className="flex h-dvh items-center justify-center p-6">
+          <GlassBackdrop />
+          <LoaderCard label={t("common.message.loading")} glass />
+        </div>
+      );
+    }
+
     return (
       // First load: the big logo loader in the middle of the screen.
       <div role="status" aria-live="polite" className="flex h-dvh flex-col items-center justify-center gap-6 bg-background px-6 text-center">
@@ -190,9 +201,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
       <MobileSidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <MobileHeader onToggle={() => setMobileOpen((v) => !v)} open={mobileOpen} />
         <TopBar />
         <main className="relative flex-1 overflow-y-auto">
+          <MobileHeader onToggle={() => setMobileOpen((v) => !v)} open={mobileOpen} />
           <div
             hidden={isGlass}
             aria-hidden
@@ -202,12 +213,20 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
                 "radial-gradient(60% 100% at 15% 0%, color-mix(in oklch, var(--primary), transparent 90%), transparent 70%), radial-gradient(45% 80% at 90% 0%, color-mix(in oklch, oklch(0.7 0.15 200), transparent 92%), transparent 70%)",
             }}
           />
-          {/* Bottom padding on phones keeps the last content clear of the tab bar. */}
-          <div className="relative pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+          {/* Bottom padding on phones keeps the last content clear of the floating tab bar. */}
+          <div className="relative pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
             <div className="px-4 pt-4 empty:hidden sm:px-6 lg:px-8">
               <AccountBanner />
             </div>
-            <PageLoadGate>{children}</PageLoadGate>
+            <PageLoadGate>
+              {/* Page entrance: re-keyed on the path, so each new page fades and rises into place
+                  (opacity/transform only). Query changes like ?tab= don't replay it, and the home
+                  screen staggers its own blocks instead. Sits inside the gate so the gate's
+                  fixed loader isn't caught by the transform. */}
+              <div key={pathname} className={cn(!isGlass && "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 duration-300 ease-out")}>
+                {children}
+              </div>
+            </PageLoadGate>
           </div>
         </main>
       </div>

@@ -12,6 +12,7 @@ export const home = {
   menu: {
     services: "Services",
     more: "More",
+    resetOrder: "Reset order",
     language: "Language",
   },
 

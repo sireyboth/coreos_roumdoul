@@ -60,7 +60,7 @@ export function PageLoadGate({ children }: { children: React.ReactNode }) {
           role="status"
           aria-live="polite"
           aria-label={t("common.table.loading")}
-          className={`absolute inset-0 z-40 cursor-progress transition-colors duration-200 ${visible ? (isGlass ? "bg-slate-950/15" : "bg-background/45") : "bg-transparent"}`}
+          className={`absolute inset-0 z-40 cursor-progress transition-colors duration-200 ${visible ? (isGlass ? "bg-background/25" : "bg-background/45") : "bg-transparent"}`}
         >
           {visible && (
             <>
