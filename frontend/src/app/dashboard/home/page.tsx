@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CalendarDays, QrCode, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SortableGrid } from "@/components/ui/sortable-grid";
+import { KbachCorner, KbachPattern, surfaceCard as card } from "@/components/dashboard/kbach";
 import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { canSee, findNavItem, type NavItem } from "@/components/dashboard/nav";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -50,13 +51,6 @@ const CHIPS = [
 const HREF_OVERRIDE: Record<string, string> = { "/dashboard": "/dashboard?view=full" };
 
 /**
- * Solid content card: warm surface, hairline border, soft shadow. 28px corners
- * around 16px padding, so anything rounded inside it uses 28 − 16 = 12px.
- */
-const card =
-  "relative isolate overflow-hidden rounded-[28px] border border-surface-border bg-surface p-4 shadow-[0_1px_2px_rgb(43_27_18/0.05),0_12px_32px_-16px_rgb(43_27_18/0.18)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]";
-
-/**
  * Stat chips: one strong colour per meaning, readable (AA) in light and dark.
  * Corrections is a soft periwinkle — a blue leaning warm, so it sits with the
  * amber and green. In dark mode each chip gets a thin edge of its own colour,
@@ -96,36 +90,6 @@ function Rise({ index, children }: { index: number; children: React.ReactNode })
     >
       {children}
     </div>
-  );
-}
-
-// The Roumdoul kbach flower, used as a mask so it takes the brand colour in
-// either theme (the PNG's own grey lines would vanish on the light surface).
-const KBACH_MASK = {
-  maskImage: "url(/Images/roumdolkbach.png)",
-  WebkitMaskImage: "url(/Images/roumdolkbach.png)",
-  maskSize: "contain",
-  WebkitMaskSize: "contain",
-  maskRepeat: "no-repeat",
-  WebkitMaskRepeat: "no-repeat",
-} as const;
-
-/**
- * Faint kbach flower in a hero card's bottom-right corner, showing only the
- * flower's top-left quarter: the box (shaped like the image, 889×829) is pinned
- * to the corner and pushed half its own width right and half its height down,
- * past the card's clipped edges. Drawn behind the card's content (-z-10 inside
- * the card's `isolate`), so it never sits over text.
- * Light mode needs the higher opacity: the PNG's ~2px lines shrink to under
- * 1px at this size, and thin caramel lines fade into the near-white card.
- */
-function KbachCorner() {
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute right-0 bottom-0 -z-10 aspect-[889/829] w-64 translate-x-[45%] translate-y-[45%] bg-brand opacity-[0.35] dark:opacity-[0.2]"
-      style={KBACH_MASK}
-    />
   );
 }
 
@@ -266,17 +230,17 @@ function TeamCard() {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={t("home.team.checkedIn")}
-          className="mt-4 h-2 overflow-hidden rounded-full bg-ink/10"
+          className="mt-3 h-2 overflow-hidden rounded-full bg-ink/10"
         >
           <div className="h-full rounded-full bg-brand transition-[width] duration-700" style={{ width: `${percent}%` }} />
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         {stats
           .filter((s) => s.value !== null && s.value !== undefined)
           .map((s) => (
-            <Link key={s.key} href={s.href} className={cn("press flex min-h-16 flex-col justify-center rounded-[12px] px-3 py-2", STAT_TONE[s.key])}>
+            <Link key={s.key} href={s.href} className={cn("press flex min-h-14 flex-col justify-center rounded-[12px] px-3 py-1.5", STAT_TONE[s.key])}>
               <span className="text-xl font-semibold tabular-nums">{s.value}</span>
               <span className="truncate text-xs font-medium">{s.label}</span>
             </Link>
@@ -297,8 +261,9 @@ function Tile({ item, label }: { item: NavItem; label: string }) {
   return (
     <Link
       href={HREF_OVERRIDE[item.href] ?? item.href}
-      className="press flex min-h-24 flex-col items-center justify-center gap-2 rounded-[20px] border border-surface-border bg-surface px-2 py-3 text-center shadow-[0_1px_2px_rgb(43_27_18/0.05)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]"
+      className="press relative isolate flex min-h-24 flex-col items-center justify-center gap-2 overflow-hidden rounded-[20px] border border-surface-border bg-surface px-2 py-3 text-center shadow-[0_1px_2px_rgb(43_27_18/0.05)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]"
     >
+      <KbachPattern />
       <Icon className="size-6 shrink-0" />
       <span className={cn("line-clamp-2 text-[13px] font-medium", tight && "leading-snug")}>{label}</span>
     </Link>

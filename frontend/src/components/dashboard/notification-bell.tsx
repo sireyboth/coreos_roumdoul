@@ -224,7 +224,10 @@ export function NotificationBell() {
       >
         <Bell className="size-4" />
         {unread > 0 && (
-          <Badge className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full p-0 text-[10px]">
+          // Pinned to the bell icon (the button's centre), not the button's corner:
+          // the phone header blows the button up to 48px (headerButtons in
+          // components/glass), and a corner badge then floats far off the bell.
+          <Badge className="absolute top-[calc(50%-15px)] left-[calc(50%+2px)] flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white tabular-nums">
             {unread > 9 ? "9+" : unread}
           </Badge>
         )}

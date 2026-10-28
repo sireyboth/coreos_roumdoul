@@ -1,23 +1,82 @@
 "use client";
 
 import { useState } from "react";
+import { IdCard, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
+import { KbachCorner, surfaceCard } from "@/components/dashboard/kbach";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { useT } from "@/lib/i18n";
+import { useLang, useT } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+
+// Same look as the home page (components/dashboard/kbach): a hero card with the
+// person's photo, name and role over the kbach flower, then the two forms on
+// solid surface cards.
+
+/** Who's signed in: photo, name, role at the business, and how they sign in. */
+function ProfileHero() {
+  const { me } = useMe();
+  const t = useT();
+  // Tight line-height suits big Latin headings but clips Khmer's stacked marks.
+  const tight = useLang() === "km" ? undefined : "leading-tight";
+  if (!me) return null;
+
+  const name = me.user.name;
+  const roles = me.roles.join(", ") || t("access.profilePage.noRole");
+  const chip = "inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-surface-border bg-surface/85 px-3 text-[13px] font-medium";
+
+  return (
+    <section className={cn(surfaceCard, "p-5")}>
+      <KbachCorner />
+      <p className="text-[13px] font-semibold text-ink-muted">{t("access.profilePage.title")}</p>
+      <div className="mt-3 flex items-center gap-4">
+        <EmployeeAvatar name={name || "?"} className="size-16 text-lg ring-2 ring-surface" />
+        <div className="min-w-0">
+          <h1 className={cn("truncate text-2xl font-semibold tracking-tight", tight)}>{name}</h1>
+          <p className="truncate text-sm text-ink-muted">
+            {t("access.profilePage.roleAt", {
+              roles,
+              company: me.company?.name ?? "Business OS",
+            })}
+          </p>
+        </div>
+      </div>
+      {(me.user.login_id || me.user.email) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {me.user.login_id && (
+            <span className={chip} title={t("access.signInMethod.employeeId")}>
+              <IdCard className="size-4 shrink-0" aria-label={t("access.signInMethod.employeeId")} />
+              <span className="truncate tabular-nums">{me.user.login_id}</span>
+            </span>
+          )}
+          {me.user.email && (
+            <span className={chip} title={t("common.field.email")}>
+              <Mail className="size-4 shrink-0" aria-label={t("common.field.email")} />
+              <span className="truncate">{me.user.email}</span>
+            </span>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** A form on a solid surface card, with its title and a one-line hint. */
+function FormCard({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <section className={cn(surfaceCard, "p-5")}>
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-0.5 mb-4 text-sm text-ink-muted">{hint}</p>
+      {children}
+    </section>
+  );
+}
 
 export default function ProfilePage() {
   const { me, refresh } = useMe();
@@ -92,22 +151,15 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="flex w-full flex-col gap-6">
-        <PageHeader
-          title={t("access.profilePage.title")}
-          description={t("access.profilePage.roleAt", { roles: me.roles.join(", ") || t("access.profilePage.noRole"), company: me.company?.name ?? "Business OS" })}
-        />
+    <div className="p-4 text-ink sm:p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+        <ProfileHero />
 
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("access.profilePage.accountTitle")}</CardTitle>
-            <CardDescription>
-              {signsInById ? t("access.profilePage.accountHintId") : t("access.profilePage.accountHint")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="grid items-start gap-5 lg:grid-cols-2">
+          <FormCard
+            title={t("access.profilePage.accountTitle")}
+            hint={signsInById ? t("access.profilePage.accountHintId") : t("access.profilePage.accountHint")}
+          >
             <form onSubmit={handleProfileSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="name">{t("common.field.name")}</Label>
@@ -146,21 +198,15 @@ export default function ProfilePage() {
                   <p className="text-xs text-muted-foreground">{t("access.profilePage.emailPasswordHint")}</p>
                 </div>
               )}
-              {profileError &&<Alert variant="destructive">{profileError}</Alert>}
+              {profileError && <Alert variant="destructive">{profileError}</Alert>}
               {profileSaved && <Badge variant="success">{t("common.message.saved")}</Badge>}
               <Button type="submit" disabled={savingProfile} className="self-start">
                 {savingProfile ? t("access.profilePage.saving") : t("access.profilePage.saveChanges")}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </FormCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("access.profilePage.passwordTitle")}</CardTitle>
-            <CardDescription>{t("access.profilePage.passwordHint")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <FormCard title={t("access.profilePage.passwordTitle")} hint={t("access.profilePage.passwordHint")}>
             <form onSubmit={handlePasswordSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="current_password">{t("access.profilePage.currentPassword")}</Label>
@@ -201,8 +247,7 @@ export default function ProfilePage() {
                 {savingPassword ? t("access.profilePage.updating") : t("access.profilePage.updatePassword")}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </FormCard>
         </div>
       </div>
     </div>
