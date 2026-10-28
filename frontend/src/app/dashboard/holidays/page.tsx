@@ -100,7 +100,7 @@ function HolidayFormDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("calendar.holidays.saving") : holiday ? t("calendar.holidays.saveChanges") : t("calendar.holidays.add")}
+              {saving ? t("common.message.saving") : holiday ? t("common.action.saveChanges") : t("calendar.holidays.add")}
             </Button>
           </DialogFooter>
         </form>

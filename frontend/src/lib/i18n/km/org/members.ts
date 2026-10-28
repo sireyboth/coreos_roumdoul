@@ -28,7 +28,6 @@ export const members: Dictionary["org"]["members"] = {
   allInTeam: "បុគ្គលិកទាំងអស់ស្ថិតនៅក្នុងក្រុមនេះរួចហើយ។",
   movesFrom: "ផ្ទេរពី {place}",
   addPeople: "បន្ថែមបុគ្គលិក",
-  adding: "កំពុងបន្ថែម…",
   addOne: "បន្ថែមបុគ្គលិក 1 នាក់",
   addOther: "បន្ថែមបុគ្គលិក {n} នាក់",
   addedOne: "បានបន្ថែមបុគ្គលិក {n} នាក់ទៅ {name}",

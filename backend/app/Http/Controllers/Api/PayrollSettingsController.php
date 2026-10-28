@@ -123,10 +123,12 @@ class PayrollSettingsController extends Controller
     public function destroyComponent(PayComponent $component)
     {
         if ($component->is_system) {
-            throw ValidationException::withMessages(['component' => ['Built-in components can be switched off, not deleted.']]);
+            throw ValidationException::withMessages(['component' => [__('Built-in components can be switched off, not deleted.')]]);
         }
         if (($count = $component->employeeItems()->count()) > 0) {
-            throw ValidationException::withMessages(['component' => ["{$count} ".($count === 1 ? 'employee has' : 'employees have').' this item. Remove it from them first, or switch the component off.']]);
+            throw ValidationException::withMessages(['component' => [$count === 1
+                ? __(':n employee has this item. Remove it from them first, or switch the component off.', ['n' => $count])
+                : __(':n employees have this item. Remove it from them first, or switch the component off.', ['n' => $count])]]);
         }
 
         $component->delete();
@@ -181,7 +183,7 @@ class PayrollSettingsController extends Controller
         $result = $calculator->calculate($ctx, $employee, $attendance, $adjustments);
 
         if (isset($result['skipped'])) {
-            throw ValidationException::withMessages(['employee_id' => ["{$employee->name} has no salary for this period."]]);
+            throw ValidationException::withMessages(['employee_id' => [__(':name has no salary for this period.', ['name' => $employee->name])]]);
         }
 
         return [

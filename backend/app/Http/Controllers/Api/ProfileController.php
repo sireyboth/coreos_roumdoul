@@ -27,7 +27,7 @@ class ProfileController extends Controller
         // one (someone who signs in by employee ID) takes nothing away.
         if ($user->email !== null && ($data['email'] ?? null) !== $user->email && ! Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
             throw ValidationException::withMessages([
-                'current_password' => ['Enter your current password to change your email.'],
+                'current_password' => [__('Enter your current password to change your email.')],
             ]);
         }
 
@@ -47,7 +47,7 @@ class ProfileController extends Controller
 
         if (! Hash::check($data['current_password'], $user->password)) {
             throw ValidationException::withMessages([
-                'current_password' => ['The current password is incorrect.'],
+                'current_password' => [__('The current password is incorrect.')],
             ]);
         }
 
@@ -57,6 +57,6 @@ class ProfileController extends Controller
         $current = $user->currentAccessToken();
         $user->tokens()->when($current instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($current->getKey()))->delete();
 
-        return response()->json(['message' => 'Password updated.']);
+        return response()->json(['message' => __('Password updated.')]);
     }
 }

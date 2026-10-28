@@ -3,8 +3,6 @@
 export const employeePay = {
   // ── Shared words ──────────────────────────────────────────────────
   shared: {
-    saving: "Saving…",
-    saveFailed: "Couldn't save.",
     note: "Note",
     optional: "Optional",
     now: "now",

@@ -92,7 +92,5 @@ export const componentDialog = {
     active: "Active — used in pay runs",
     added: "Component added",
     saved: "Component saved",
-    saveFailed: "Couldn't save.",
-    saving: "Saving…",
   },
 };

@@ -77,8 +77,6 @@ export const roleDialog: Dictionary["access"]["roleDialog"] = {
   // ── Footer ───────────────────────────────────────────────────────
   allPermissions: "សិទ្ធិទាំងអស់",
   permissionCount: "សិទ្ធិ {n} ក្នុងចំណោម {total}",
-  saving: "កំពុងរក្សាទុក…",
-  saveChanges: "រក្សាទុកការផ្លាស់ប្តូរ",
   create: "បង្កើតតួនាទី",
   updated: "បានកែប្រែតួនាទី",
   created: "បានបង្កើតតួនាទី",

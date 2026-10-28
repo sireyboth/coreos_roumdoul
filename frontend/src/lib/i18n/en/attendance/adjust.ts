@@ -18,7 +18,6 @@ export const adjust = {
 
   // ── Reason & save ────────────────────────────────────────────────
   reasonPlaceholder: "e.g. Scanner was down; confirmed with the branch manager",
-  saving: "Saving…",
   save: "Save adjustment",
   saved: "Attendance adjusted",
   savedHint: "The day was recalculated.",

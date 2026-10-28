@@ -273,7 +273,7 @@ export function DayDialog({
                 />
                 {error && <Alert variant="destructive">{error}</Alert>}
                 <Button onClick={markDayOff} disabled={saving} className="self-start">
-                  {saving ? t("calendar.shared.dialog.saving") : t("calendar.shared.dialog.markOff")}
+                  {saving ? t("common.message.saving") : t("calendar.shared.dialog.markOff")}
                 </Button>
               </div>
             )}

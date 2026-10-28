@@ -19,7 +19,6 @@ export const bulk: Dictionary["schedules"]["bulk"] = {
 
   // ── Schedule & location ───────────────────────────────────────────
   schedule: "កាលវិភាគការងារ",
-  select: "ជ្រើសរើស…",
   location: "ទីតាំងការងារ (ស្រេចចិត្ត)",
   ownBranch: "សាខាផ្ទាល់របស់បុគ្គលិក",
   locationHint: "កំណត់តែនៅពេលបញ្ជូនបុគ្គលិកទៅធ្វើការនៅទីតាំងផ្សេង។",
@@ -61,7 +60,6 @@ export const bulk: Dictionary["schedules"]["bulk"] = {
   },
 
   // ── Footer & messages ─────────────────────────────────────────────
-  adding: "កំពុងបន្ថែម…",
   addOne: "បន្ថែម {n} ថ្ងៃទៅតារាងវេនការងារ",
   addMany: "បន្ថែម {n} ថ្ងៃទៅតារាងវេនការងារ",
   addedOne: "បានបន្ថែម {n} ថ្ងៃទៅតារាងវេនការងារ",

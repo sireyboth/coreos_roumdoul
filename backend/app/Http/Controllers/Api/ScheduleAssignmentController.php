@@ -72,7 +72,7 @@ class ScheduleAssignmentController extends Controller
         $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
 
         if ($employees->count() !== count($data['employee_ids'])) {
-            throw ValidationException::withMessages(['employee_ids' => ['Some of those employees couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_ids' => [__('Some of those employees couldn\'t be found.')]]);
         }
 
         $assigned = 0;
@@ -156,7 +156,7 @@ class ScheduleAssignmentController extends Controller
         $schedule = WorkSchedule::query()->findOrFail($id);
 
         if (! $schedule->is_active) {
-            throw ValidationException::withMessages(['work_schedule_id' => ["\"{$schedule->name}\" is inactive. Set it back to active to assign it."]]);
+            throw ValidationException::withMessages(['work_schedule_id' => [__('":name" is inactive. Set it back to active to assign it.', ['name' => $schedule->name])]]);
         }
 
         return $schedule;
@@ -168,7 +168,7 @@ class ScheduleAssignmentController extends Controller
         $employee = Employee::query()->find($id);
 
         if (! $employee) {
-            throw ValidationException::withMessages(['employee_id' => ['That employee couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_id' => [__('That employee couldn\'t be found.')]]);
         }
 
         return $employee;

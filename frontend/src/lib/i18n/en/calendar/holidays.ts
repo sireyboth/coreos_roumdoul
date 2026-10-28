@@ -24,8 +24,6 @@ export const holidays = {
   addTitle: "Add a holiday",
   formText: "Employees won't be scheduled on this date.",
   repeats: "Repeats every year",
-  saving: "Saving…",
-  saveChanges: "Save changes",
   updated: "Holiday updated",
   added: "Holiday added",
 };

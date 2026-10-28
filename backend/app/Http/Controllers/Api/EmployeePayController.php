@@ -218,7 +218,7 @@ class EmployeePayController extends Controller
     private function assertItemComponent(int $id): void
     {
         if (! PayComponent::query()->whereKey($id)->where('method', 'employee_item')->exists()) {
-            throw ValidationException::withMessages(['pay_component_id' => ['Pick an allowance or deduction set up in payroll settings.']]);
+            throw ValidationException::withMessages(['pay_component_id' => [__('Pick an allowance or deduction set up in payroll settings.')]]);
         }
     }
 }

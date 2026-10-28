@@ -54,7 +54,6 @@ export const shared: Dictionary["calendar"]["shared"] = {
     overtime: " · ម៉ោងបន្ថែម {time}",
     markOffLabel: "កំណត់ឱ្យ {name} សម្រាកនៅថ្ងៃនេះ",
     reasonPlaceholder: "មូលហេតុ (ស្រេចចិត្ត) — ឧ. ឈឺ, កិច្ចការគ្រួសារ",
-    saving: "កំពុងរក្សាទុក…",
     markOff: "កំណត់ជាថ្ងៃសម្រាក",
     removing: "កំពុងលុប…",
     removeOff: "លុបថ្ងៃសម្រាកនេះ",

@@ -26,7 +26,6 @@ export const members = {
   allInTeam: "Everyone is already in this team.",
   movesFrom: "Moves from {place}",
   addPeople: "Add people",
-  adding: "Adding…",
   addOne: "Add 1 person",
   addOther: "Add {n} people",
   addedOne: "{n} employee added to {name}",

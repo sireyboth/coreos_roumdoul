@@ -1,6 +1,6 @@
 import { ACCOUNT_BLOCKED_CODES, ApiError } from "@/lib/api";
 import { headerKey, type SheetRow, type TemplateColumn } from "@/lib/excel";
-import { translateNow } from "@/lib/i18n";
+import { translateNow, type TKey } from "@/lib/i18n";
 
 /**
  * The shared rules behind every "Import from Excel": what a column holds, how
@@ -64,15 +64,22 @@ export class Row {
 
 export type SaveResult = "created" | "updated" | "skipped";
 
-export type ImportSetting = { key: string; label: string; description?: string; default: boolean };
+/** A tick box before importing. Label and description are dictionary keys (app.excelSpecs.settings). */
+export type ImportSetting = { key: string; label: TKey; description?: TKey; default: boolean };
 
 export type ImportSpec<Ctx> = {
   /** e.g. { one: "employee", many: "employees" } */
   noun: { one: string; many: string };
   templateFile: string;
   fields: ImportField[];
-  /** How a row that already exists is recognised, in plain words. */
-  matching: string;
+  /**
+   * How a row that already exists is recognised, in plain words: a dictionary key
+   * (app.excelSpecs.matching). Shown in the person's language on screen; the
+   * template file always gets the English.
+   */
+  matching: TKey;
+  /** Values for {placeholders} in the matching sentence. */
+  matchingVars?: Record<string, string | number>;
   /** Extra lines for the template's Instructions sheet. */
   notes?: string[] | ((ctx: Ctx) => string[]);
   /** Tick boxes shown before importing, passed to save(). */

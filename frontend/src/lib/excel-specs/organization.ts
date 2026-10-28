@@ -1,6 +1,7 @@
 import { api, type Branch, type Department, type Team, type WorkLocation } from "@/lib/api";
 import { downloadSheet, today } from "@/lib/excel";
 import { Lookup, optionLabel, RowError, STATUS_OPTIONS, yesNo, type ImportSpec } from "@/lib/excel-import";
+import { translateNow } from "@/lib/i18n";
 
 /*
  * Excel import/export for the organisation structure: branches, departments,
@@ -32,7 +33,7 @@ export async function exportBranches(): Promise<string> {
 export const branchImport: ImportSpec<{ branches: Lookup<Branch> }> = {
   noun: { one: "branch", many: "branches" },
   templateFile: "branches",
-  matching: "A row whose Code (or, without a code, Name) matches an existing branch updates that branch.",
+  matching: "app.excelSpecs.matching.branches",
   notes: ["Latitude and longitude are needed for a new branch — copy them from Google Maps (right-click the spot)."],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The branch's name.", example: "Phnom Penh HQ" },
@@ -61,7 +62,7 @@ export const branchImport: ImportSpec<{ branches: Lookup<Branch> }> = {
     }
 
     if (!row.has("latitude") || !row.has("longitude")) {
-      throw new RowError("A new branch needs a Latitude and Longitude.");
+      throw new RowError(translateNow("app.excelSpecs.row.branchNeedsLocation"));
     }
     ctx.branches.add(await api.branches.create(fields));
     return "created";
@@ -94,7 +95,7 @@ type DepartmentCtx = { departments: Lookup<Department>; branches: Lookup<Branch>
 export const departmentImport: ImportSpec<DepartmentCtx> = {
   noun: { one: "department", many: "departments" },
   templateFile: "departments",
-  matching: "A row whose Name matches an existing department updates that department.",
+  matching: "app.excelSpecs.matching.departments",
   notes: ["A parent department must already exist, or appear on an earlier row of the same file."],
   fields: [
     { key: "name", header: "Name", required: true, hint: "The department's name.", example: "Finance" },
@@ -151,7 +152,7 @@ export async function exportTeams(): Promise<string> {
 export const teamImport: ImportSpec<{ teams: Lookup<Team>; departments: Lookup<Department> }> = {
   noun: { one: "team", many: "teams" },
   templateFile: "teams",
-  matching: "A row whose Name matches an existing team updates that team.",
+  matching: "app.excelSpecs.matching.teams",
   fields: [
     { key: "name", header: "Name", required: true, hint: "The team's name.", example: "Payroll" },
     { key: "sort_order", header: "Display order", type: "number", hint: "Optional. Lowest is listed first, e.g. 1 for the lead team.", example: "1" },
@@ -207,7 +208,7 @@ export async function exportWorkLocations(): Promise<string> {
 export const workLocationImport: ImportSpec<{ locations: Lookup<WorkLocation> }> = {
   noun: { one: "work location", many: "work locations" },
   templateFile: "work-locations",
-  matching: "A row whose Name matches an existing work location updates it.",
+  matching: "app.excelSpecs.matching.workLocations",
   notes: [
     "A branch's own check-in point is managed from the Branches page: here only its Radius and Active columns are applied.",
   ],

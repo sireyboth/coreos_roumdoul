@@ -324,7 +324,7 @@ export function ComponentDialog({
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.componentDialog.dialog.saveFailed"));
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -421,7 +421,7 @@ export function ComponentDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !name.trim() || (method === "template" && !template)}>
-              {saving ? t("payrollSetup.componentDialog.dialog.saving") : t("common.action.save")}
+              {saving ? t("common.message.saving") : t("common.action.save")}
             </Button>
           </DialogFooter>
         </form>

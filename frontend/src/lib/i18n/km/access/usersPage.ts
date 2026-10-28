@@ -47,7 +47,6 @@ export const usersPage: Dictionary["access"]["usersPage"] = {
   // ── Branch access dialog ─────────────────────────────────────────
   branchTitle: "សិទ្ធិមើលសាខារបស់ {name}",
   branchDescription: "សូមទុកឱ្យនៅទទេទាំងអស់ ដើម្បីផ្តល់សិទ្ធិមើលគ្រប់សាខា។ សូមធីកសាខាជាក់លាក់ ដើម្បីកំណត់ឱ្យមើលបានតែសាខាទាំងនោះ។",
-  saving: "កំពុងរក្សាទុក…",
   branchSaved: "បានកែប្រែសិទ្ធិមើលសាខា",
   branchSavedSome: "{name} អាចមើលបានតែសាខាដែលបានជ្រើសរើស។",
   branchSavedAll: "{name} អាចមើលបានគ្រប់សាខា។",

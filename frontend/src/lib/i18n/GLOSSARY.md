@@ -54,6 +54,12 @@ change a term, then update en.ts / km.ts to match.
 | No data | មិនមានទិន្នន័យ |
 | Couldn't load | មិនអាចផ្ទុកទិន្នន័យបានទេ |
 | Saved | បានរក្សាទុក |
+| Save changes | រក្សាទុកការកែប្រែ |
+| Saving… | កំពុងរក្សាទុក… |
+| Adding… | កំពុងបន្ថែម… |
+| Couldn't save. | មិនអាចរក្សាទុកបានទេ។ |
+| Select… (placeholder) | សូមជ្រើសរើស… |
+| Done | រួចរាល់ |
 
 ## 2. Statuses
 
@@ -248,3 +254,11 @@ Rule: the formal word **ប្រាក់បៀវត្សរ៍** is used eve
 1. **Digits:** use Western digits (0–9) for times, dates and money, never Khmer digits (០–៩).
 2. **Employee:** use **បុគ្គលិក** on screens, not the Labour Law term កម្មករនិយោជិត.
 3. **NSSF:** use the abbreviation **ប.ស.ស.** on screens.
+
+## Decisions (2026-10-28)
+
+1. **Shared words live in `common.ts`.** Saving…, Save changes, Couldn't save., Adding…, Select… and Done are `common.*` keys; a screen never keeps its own copy. "Save changes" follows Edit = កែប្រែ (not ការផ្លាស់ប្តូរ), and "Select…" starts with សូម like every instruction.
+2. **Excel column names stay English** inside Khmer messages (e.g. "សូមបំពេញ Employee ID…"), because that is what the header row of the person's file shows. Choice values typed in Excel cells (Monthly, Bank transfer…) stay English too.
+3. **Excel template files stay English**, including the "how rows are matched" sentence; the screen shows it in the chosen language.
+4. **Server messages** come from the backend in the language the app sends with each request (`Accept-Language`); see backend `lang/km`.
+5. **Notifications (bell and push) stay English** for now — the user chose not to translate them.

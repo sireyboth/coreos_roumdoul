@@ -8,7 +8,8 @@ import { assistant } from "./assistant";
 import { account } from "./account";
 import { charts } from "./charts";
 import { excelImport } from "./excelImport";
+import { excelSpecs } from "./excelSpecs";
 import { auth } from "./auth";
 import { ui } from "./ui";
 
-export const app = { shell, dashboard, notifications, pushPrompt, assistant, account, charts, excelImport, auth, ui };
+export const app = { shell, dashboard, notifications, pushPrompt, assistant, account, charts, excelImport, excelSpecs, auth, ui };

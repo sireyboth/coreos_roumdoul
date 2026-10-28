@@ -10,7 +10,6 @@ export const assign = {
   // ── Schedule ──────────────────────────────────────────────────────
   schedule: "Work schedule",
   noActive: "No active schedules yet — create one first",
-  select: "Select…",
 
   // ── Employees ─────────────────────────────────────────────────────
   employees: "Employees",

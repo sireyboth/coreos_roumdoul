@@ -17,7 +17,6 @@ export const bulk = {
 
   // ── Schedule & location ───────────────────────────────────────────
   schedule: "Work schedule",
-  select: "Select…",
   location: "Work location (optional)",
   ownBranch: "Their own branch",
   locationHint: "Only set this to send people to a different site.",
@@ -58,7 +57,6 @@ export const bulk = {
   },
 
   // ── Footer & messages ─────────────────────────────────────────────
-  adding: "Adding…",
   addOne: "Add {n} roster day",
   addMany: "Add {n} roster days",
   addedOne: "{n} roster day added",

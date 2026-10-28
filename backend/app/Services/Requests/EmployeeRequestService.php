@@ -218,14 +218,14 @@ final class EmployeeRequestService
         $today = $this->today($request->employee);
 
         if (! in_array($wasStatus, EmployeeRequest::ACTIVE_STATUSES, true)) {
-            throw ValidationException::withMessages(['status' => ['This request is already '.$wasStatus.'.']]);
+            throw ValidationException::withMessages(['status' => [__('This request is already :status.', ['status' => __($wasStatus)])]]);
         }
 
         $allowed = $covers || ($isOwn && ($wasStatus === 'pending' || $request->start_date->toDateString() > $today));
         if (! $allowed) {
             throw ValidationException::withMessages(['status' => [$isOwn
-                ? 'This leave has already started — ask your manager or HR to cancel it.'
-                : 'You can\'t cancel this request.']]);
+                ? __('This leave has already started — ask your manager or HR to cancel it.')
+                : __('You can\'t cancel this request.')]]);
         }
 
         if ($wasStatus === 'approved') {
@@ -237,7 +237,7 @@ final class EmployeeRequestService
                 'status' => 'cancelled', 'cancelled_by' => $by->id, 'cancelled_at' => now(), 'cancel_reason' => $reason,
             ]);
             if (! $claimed) {
-                throw ValidationException::withMessages(['status' => ['This request was changed a moment ago — reload to see it.']]);
+                throw ValidationException::withMessages(['status' => [__('This request was changed a moment ago — reload to see it.')]]);
             }
 
             $request->refresh();
@@ -266,13 +266,13 @@ final class EmployeeRequestService
         $wasStatus = $request->status;
 
         if ($request->type !== 'leave' || ! in_array($wasStatus, EmployeeRequest::ACTIVE_STATUSES, true)) {
-            throw ValidationException::withMessages(['status' => ['Only waiting or approved leave can change type.']]);
+            throw ValidationException::withMessages(['status' => [__('Only waiting or approved leave can change type.')]]);
         }
         if (! $this->canChangeType($by, $request)) {
-            abort(403, $this->chain->isAbout($by, $request) ? 'You can\'t change your own request.' : 'You can\'t change this request.');
+            abort(403, $this->chain->isAbout($by, $request) ? __('You can\'t change your own request.') : __('You can\'t change this request.'));
         }
         if ($type->id === $request->leave_type_id) {
-            throw ValidationException::withMessages(['leave_type_id' => ["It is already {$type->name}."]]);
+            throw ValidationException::withMessages(['leave_type_id' => [__('It is already :type.', ['type' => $type->name])]]);
         }
 
         return DB::transaction(function () use ($by, $request, $type, $notes, $wasStatus) {
@@ -291,7 +291,7 @@ final class EmployeeRequestService
             $claimed = EmployeeRequest::query()->withoutGlobalScopes()->whereKey($request->id)->where('status', $wasStatus)
                 ->where('leave_type_id', $request->leave_type_id)->exists();
             if (! $claimed) {
-                throw ValidationException::withMessages(['status' => ['This request was changed a moment ago — reload to see it.']]);
+                throw ValidationException::withMessages(['status' => [__('This request was changed a moment ago — reload to see it.')]]);
             }
 
             // Counted again: the new type may count other days (calendar days for maternity).
@@ -331,13 +331,13 @@ final class EmployeeRequestService
         $request->loadMissing(['employee.currentAssignment', 'employee.company', 'leaveType']);
 
         if ($request->status !== 'approved') {
-            throw ValidationException::withMessages(['status' => ['Paid days are chosen when approving — this request is '.$request->status.'.']]);
+            throw ValidationException::withMessages(['status' => [__('Paid days are chosen when approving — this request is :status.', ['status' => __($request->status)])]]);
         }
-        abort_unless($this->canSetPay($by, $request), 403, 'You can\'t change which days are paid.');
+        abort_unless($this->canSetPay($by, $request), 403, __('You can\'t change which days are paid.'));
 
         $own = $request->dates()->pluck('date')->map(fn ($d) => $d->toDateString())->all();
         if ($stray = array_diff($paidDates, $own)) {
-            throw ValidationException::withMessages(['paid_dates' => ['Not a day of this request: '.implode(', ', $stray).'.']]);
+            throw ValidationException::withMessages(['paid_dates' => [__('Not a day of this request: :dates.', ['dates' => implode(', ', $stray)])]]);
         }
         $this->assertMonthsOpen($request->employee, $request->start_date->toDateString(), $request->end_date->toDateString());
 
@@ -493,19 +493,19 @@ final class EmployeeRequestService
         $request->loadMissing(['employee.currentAssignment', 'leaveType', 'approval.steps.approverUser']);
 
         if (! $request->isPending()) {
-            throw ValidationException::withMessages(['status' => ['This request has already been '.$request->status.'.']]);
+            throw ValidationException::withMessages(['status' => [__('This request has already been :status.', ['status' => __($request->status)])]]);
         }
         if (! $this->chain->canDecide($by, $request)) {
-            abort(403, $this->chain->isAbout($by, $request) ? 'You can\'t decide your own request.' : 'You can\'t decide this request.');
+            abort(403, $this->chain->isAbout($by, $request) ? __('You can\'t decide your own request.') : __('You can\'t decide this request.'));
         }
         if ($paidDates !== null) {
-            abort_unless($by->hasCompanyPermission(self::SET_PAY), 403, 'You can\'t change which days are paid.');
+            abort_unless($by->hasCompanyPermission(self::SET_PAY), 403, __('You can\'t change which days are paid.'));
             if ($request->type !== 'leave') {
-                throw ValidationException::withMessages(['paid_dates' => ['Only leave has paid and unpaid days.']]);
+                throw ValidationException::withMessages(['paid_dates' => [__('Only leave has paid and unpaid days.')]]);
             }
             $own = $request->dates()->pluck('date')->map(fn ($d) => $d->toDateString())->all();
             if ($stray = array_diff($paidDates, $own)) {
-                throw ValidationException::withMessages(['paid_dates' => ['Not a day of this request: '.implode(', ', $stray).'.']]);
+                throw ValidationException::withMessages(['paid_dates' => [__('Not a day of this request: :dates.', ['dates' => implode(', ', $stray)])]]);
             }
         }
 
@@ -526,7 +526,7 @@ final class EmployeeRequestService
             'status' => $decision, 'decided_by' => $by->id, 'decided_at' => now(), 'decision_notes' => $notes,
         ]);
         if (! $claimed) {
-            throw ValidationException::withMessages(['status' => ['This request was decided a moment ago — reload to see it.']]);
+            throw ValidationException::withMessages(['status' => [__('This request was decided a moment ago — reload to see it.')]]);
         }
 
         if ($decision === 'approved' && $paidDates !== null) {

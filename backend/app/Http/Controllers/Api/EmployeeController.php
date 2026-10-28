@@ -75,8 +75,8 @@ class EmployeeController extends Controller
             if ($id === $employee->id) {
                 throw ValidationException::withMessages([
                     'manager_employee_id' => [(int) $managerId === $employee->id
-                        ? 'Someone can\'t be their own manager.'
-                        : 'That would make a loop — this person already manages the chosen manager, directly or through someone else.'],
+                        ? __('Someone can\'t be their own manager.')
+                        : __('That would make a loop — this person already manages the chosen manager, directly or through someone else.')],
                 ]);
             }
             $seen[$id] = true;
@@ -106,7 +106,7 @@ class EmployeeController extends Controller
 
         if ($teamDepartment !== null && (int) $teamDepartment !== (int) $departmentId) {
             throw ValidationException::withMessages([
-                'team_id' => ['That team belongs to a different department. Pick a team from the employee\'s department.'],
+                'team_id' => [__('That team belongs to a different department. Pick a team from the employee\'s department.')],
             ]);
         }
     }
@@ -160,7 +160,7 @@ class EmployeeController extends Controller
 
         if ($touchesSalary && ! $request->user()->hasCompanyPermission('salary.manage')) {
             throw ValidationException::withMessages([
-                'base_salary' => ['You don\'t have permission to change salaries or bank details.'],
+                'base_salary' => [__('You don\'t have permission to change salaries or bank details.')],
             ]);
         }
     }
@@ -237,7 +237,7 @@ class EmployeeController extends Controller
     {
         if ($request->user()->company->hasReachedEmployeeLimit()) {
             return response()->json([
-                'message' => 'Your plan\'s employee limit has been reached. Upgrade your plan to add more.',
+                'message' => __('Your plan\'s employee limit has been reached. Upgrade your plan to add more.'),
                 'code' => 'plan_limit_reached',
             ], 422);
         }
@@ -270,7 +270,7 @@ class EmployeeController extends Controller
         $this->assertTeamFitsDepartment($data, null);
         $this->assertMayChangeSalary($request, array_filter(collect($data)->except('pay_group_id')->all(), fn ($value) => $value !== null));
         if (! empty($data['pay_group_id']) && ! $request->user()->hasCompanyPermission('salary.manage')) {
-            throw ValidationException::withMessages(['pay_group_id' => ['You don\'t have permission to set pay.']]);
+            throw ValidationException::withMessages(['pay_group_id' => [__('You don\'t have permission to set pay.')]]);
         }
         $data = $this->withName($data);
 
@@ -307,7 +307,7 @@ class EmployeeController extends Controller
     {
         if ($employee->user_id !== null) {
             throw ValidationException::withMessages([
-                'employee' => ['This employee already has a login.'],
+                'employee' => [__('This employee already has a login.')],
             ]);
         }
 
@@ -325,7 +325,7 @@ class EmployeeController extends Controller
         // An existing code is the ID; it can't be swapped for a different one here.
         if ($method === 'employee_id' && $employee->employee_code && mb_strtolower($employee->employee_code) !== mb_strtolower($data['employee_code'])) {
             throw ValidationException::withMessages([
-                'employee_code' => ["This employee's ID is {$employee->employee_code}. Change it on their profile first if it's wrong."],
+                'employee_code' => [__('This employee\'s ID is :code. Change it on their profile first if it\'s wrong.', ['code' => $employee->employee_code])],
             ]);
         }
 
@@ -357,7 +357,7 @@ class EmployeeController extends Controller
 
         if ($loginId !== null && CompanyUserService::normaliseLoginId((string) $data['employee_code']) !== $loginId) {
             throw ValidationException::withMessages([
-                'employee_code' => ["This employee signs in with the employee ID {$employee->employee_code}, so it can't be changed here."],
+                'employee_code' => [__('This employee signs in with the employee ID :code, so it can\'t be changed here.', ['code' => $employee->employee_code])],
             ]);
         }
     }
@@ -514,7 +514,7 @@ class EmployeeController extends Controller
 
         if ($employees->count() !== count($data['ids'])) {
             throw ValidationException::withMessages([
-                'ids' => ['Some of these employees no longer exist or are outside your branches. Reload and try again.'],
+                'ids' => [__('Some of these employees no longer exist or are outside your branches. Reload and try again.')],
             ]);
         }
 

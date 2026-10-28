@@ -203,7 +203,7 @@ function AddForm({ onSaved, onOpenDay }: { onSaved: (day: AttendanceDay | null) 
           <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button type="submit" disabled={saving || !employeeId || existing !== null || filled.length === 0}>
             <CalendarPlus className="size-4" />
-            {saving ? t("attendance.add.saving") : t("attendance.add.title")}
+            {saving ? t("common.message.saving") : t("attendance.add.title")}
           </Button>
         </DialogFooter>
       </form>

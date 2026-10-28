@@ -1,5 +1,6 @@
 import { api, type Employee, type PayKind } from "@/lib/api";
 import { Lookup, RowError, type ImportSpec, type Row } from "@/lib/excel-import";
+import { translateNow } from "@/lib/i18n";
 
 /*
  * Excel import for payroll adjustments: one-off amounts (commission, bonus,
@@ -20,7 +21,7 @@ function findEmployee(row: Row, ctx: Ctx): Employee {
   const name = row.text("employee");
   if (code) return ctx.byCode.require(code);
   if (name) return ctx.byName.require(name);
-  throw new RowError("Fill in the Employee ID or the employee's name.");
+  throw new RowError(translateNow("app.excelSpecs.row.needEmployee"));
 }
 
 /** Rows without a date of their own go in on `date` (from the month open on the Adjustments page). */
@@ -28,7 +29,8 @@ export function adjustmentImport(date: string): ImportSpec<Ctx> {
   return {
     noun: { one: "adjustment", many: "adjustments" },
     templateFile: `payroll-adjustments-${date.slice(0, 7)}`,
-    matching: `Every row adds a new adjustment, dated ${date} unless the row has its own date. Importing the same file twice adds them twice.`,
+    matching: "app.excelSpecs.matching.adjustments",
+    matchingVars: { date },
     notes: [
       "Amounts are in each employee's salary currency.",
       "Earnings are added to pay; deductions are taken off before tax; after-tax deductions (advances, loans) after it.",
@@ -54,7 +56,7 @@ export function adjustmentImport(date: string): ImportSpec<Ctx> {
     choices: (ctx) => ({ employee: ctx.byName.names() }),
     save: async (row, ctx) => {
       const amount = row.number("amount") ?? 0;
-      if (amount <= 0) throw new RowError("Amount must be more than zero.");
+      if (amount <= 0) throw new RowError(translateNow("app.excelSpecs.row.amountPositive"));
 
       await api.payroll.createAdjustment({
         employee_id: findEmployee(row, ctx).id,

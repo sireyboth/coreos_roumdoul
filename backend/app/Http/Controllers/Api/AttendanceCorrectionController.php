@@ -65,7 +65,7 @@ class AttendanceCorrectionController extends Controller
 
         if ($times === []) {
             throw ValidationException::withMessages([
-                'scans' => ['Add at least one scan time to request.'],
+                'scans' => [__('Add at least one scan time to request.')],
             ]);
         }
 
@@ -73,7 +73,7 @@ class AttendanceCorrectionController extends Controller
 
         if (! $employeeId) {
             throw ValidationException::withMessages([
-                'employee' => ['Your account isn\'t linked to an employee record yet.'],
+                'employee' => [__('Your account isn\'t linked to an employee record yet.')],
             ]);
         }
 
@@ -95,7 +95,7 @@ class AttendanceCorrectionController extends Controller
             $day = Carbon::parse($value, $timezone)->toDateString();
             if ($day !== $date && $day !== $nextDay) {
                 throw ValidationException::withMessages([
-                    'scans' => ["Scan times must be on {$date} (or the next morning for a night shift)."],
+                    'scans' => [__('Scan times must be on :date (or the next morning for a night shift).', ['date' => $date])],
                 ]);
             }
             $recorder->assertUnlocked($employee->company_id, $day, employeeId: $employee->id);
@@ -126,7 +126,7 @@ class AttendanceCorrectionController extends Controller
         SelfApproval::assertNotSelf($request->user(), $correction->employee_id, 'status', 'approve a correction for');
 
         if ($correction->status !== 'pending') {
-            throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+            throw ValidationException::withMessages(['status' => [__('This request has already been reviewed.')]]);
         }
 
         // A remark to the employee: optional when approving.
@@ -143,7 +143,7 @@ class AttendanceCorrectionController extends Controller
         $this->authorizeSameCompany($request, $correction);
 
         if ($correction->status !== 'pending') {
-            throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+            throw ValidationException::withMessages(['status' => [__('This request has already been reviewed.')]]);
         }
 
         // A "no" always says why — the employee reads it.
@@ -151,7 +151,7 @@ class AttendanceCorrectionController extends Controller
 
         // Only if still pending: another manager may have decided it a moment ago.
         if (! $correction->decide('rejected', $request->user()->id, $data['review_notes'])) {
-            throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+            throw ValidationException::withMessages(['status' => [__('This request has already been reviewed.')]]);
         }
 
         $notifier->correctionDecided($correction, $request->user());
@@ -177,8 +177,8 @@ class AttendanceCorrectionController extends Controller
 
         if ($correction->status !== 'pending' || ! $correction->decide('cancelled', $user->id, $data['review_notes'] ?? null)) {
             throw ValidationException::withMessages(['status' => [$correction->status === 'approved'
-                ? 'This correction is already approved — ask a manager to adjust the day instead.'
-                : 'This request has already been '.$correction->status.'.']]);
+                ? __('This correction is already approved — ask a manager to adjust the day instead.')
+                : __('This request has already been :status.', ['status' => __($correction->status)])]]);
         }
 
         $notifier->correctionCancelled($correction, $user);

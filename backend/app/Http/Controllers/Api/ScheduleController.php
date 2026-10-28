@@ -117,7 +117,7 @@ class ScheduleController extends Controller
         $to = CarbonImmutable::createFromFormat('Y-m-d', $data['to'])->startOfDay();
 
         if ($from->diffInDays($to) + 1 > $maxDays) {
-            throw ValidationException::withMessages(['to' => ["Pick a range of at most {$maxDays} days at a time."]]);
+            throw ValidationException::withMessages(['to' => [__('Pick a range of at most :n days at a time.', ['n' => $maxDays])]]);
         }
 
         for ($month = $from->startOfMonth(); $month->lte($to); $month = $month->addMonth()) {
@@ -128,7 +128,7 @@ class ScheduleController extends Controller
         // can't see (or that belong to another company) are rejected.
         $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
         if ($employees->count() !== count($data['employee_ids'])) {
-            throw ValidationException::withMessages(['employee_ids' => ['Some of those employees couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_ids' => [__('Some of those employees couldn\'t be found.')]]);
         }
         foreach ($employees as $employee) {
             $this->recorder->assertNotPaid($employee->id, $from->toDateString(), $to->toDateString(), 'from');
@@ -143,11 +143,11 @@ class ScheduleController extends Controller
         }
 
         if (count($dates) === 0) {
-            throw ValidationException::withMessages(['weekdays' => ['None of the chosen weekdays fall inside that date range.']]);
+            throw ValidationException::withMessages(['weekdays' => [__('None of the chosen weekdays fall inside that date range.')]]);
         }
 
         if (count($dates) * $employees->count() > $maxEntries) {
-            throw ValidationException::withMessages(['employee_ids' => ["That would create more than {$maxEntries} entries at once. Use fewer people or a shorter range."]]);
+            throw ValidationException::withMessages(['employee_ids' => [__('That would create more than :n entries at once. Use fewer people or a shorter range.', ['n' => $maxEntries])]]);
         }
 
         $ids = $employees->pluck('id');
@@ -331,7 +331,7 @@ class ScheduleController extends Controller
         $schedule = WorkSchedule::query()->findOrFail($id);
 
         if (! $schedule->is_active) {
-            throw ValidationException::withMessages(['work_schedule_id' => ["\"{$schedule->name}\" is inactive. Pick an active schedule."]]);
+            throw ValidationException::withMessages(['work_schedule_id' => [__('":name" is inactive. Pick an active schedule.', ['name' => $schedule->name])]]);
         }
 
         return $schedule;
@@ -343,7 +343,7 @@ class ScheduleController extends Controller
         $employee = Employee::query()->find($id);
 
         if (! $employee) {
-            throw ValidationException::withMessages(['employee_id' => ['That employee couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_id' => [__('That employee couldn\'t be found.')]]);
         }
 
         return $employee;
@@ -366,7 +366,7 @@ class ScheduleController extends Controller
 
         if ($exists) {
             throw ValidationException::withMessages([
-                'date' => ['This employee already has a roster entry for that date.'],
+                'date' => [__('This employee already has a roster entry for that date.')],
             ]);
         }
     }
@@ -375,7 +375,7 @@ class ScheduleController extends Controller
     {
         if (DayOff::query()->where('employee_id', $employeeId)->whereDate('date', $date)->exists()) {
             throw ValidationException::withMessages([
-                'date' => ['This employee is marked as off that day. Remove the day off first.'],
+                'date' => [__('This employee is marked as off that day. Remove the day off first.')],
             ]);
         }
     }

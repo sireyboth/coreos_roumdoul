@@ -97,7 +97,7 @@ function ScheduleFormDialog({
               className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
             >
               <option value="" disabled>
-                {t("schedules.roster.select")}
+                {t("common.field.select")}
               </option>
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
@@ -116,7 +116,7 @@ function ScheduleFormDialog({
               className="h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none"
             >
               <option value="" disabled>
-                {t("schedules.roster.select")}
+                {t("common.field.select")}
               </option>
               {selectableSchedules.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -133,7 +133,7 @@ function ScheduleFormDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("schedules.roster.saving") : t("schedules.roster.saveChanges")}
+              {saving ? t("common.message.saving") : t("common.action.saveChanges")}
             </Button>
           </DialogFooter>
         </form>

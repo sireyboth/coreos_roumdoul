@@ -81,7 +81,9 @@ class TeamController extends Controller
 
         if ($members > 0) {
             throw ValidationException::withMessages([
-                'team' => ["This team still has {$members} ".($members === 1 ? 'employee' : 'employees').'. Move them to another team first, or set the team to inactive instead.'],
+                'team' => [$members === 1
+                    ? __('This team still has :n employee. Move them to another team first, or set the team to inactive instead.', ['n' => $members])
+                    : __('This team still has :n employees. Move them to another team first, or set the team to inactive instead.', ['n' => $members])],
             ]);
         }
 
@@ -94,7 +96,7 @@ class TeamController extends Controller
     public function addMembers(Request $request, Team $team)
     {
         if ($team->status !== 'active') {
-            throw ValidationException::withMessages(['team' => ['This team is inactive. Set it back to active before adding people.']]);
+            throw ValidationException::withMessages(['team' => [__('This team is inactive. Set it back to active before adding people.')]]);
         }
 
         $ids = $request->validate([
@@ -105,7 +107,7 @@ class TeamController extends Controller
         $employees = Employee::query()->with('currentAssignment')->whereIn('id', $ids)->get();
 
         if ($employees->count() !== count($ids)) {
-            throw ValidationException::withMessages(['employee_ids' => ['Some of those employees couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_ids' => [__('Some of those employees couldn\'t be found.')]]);
         }
 
         DB::transaction(fn () => $employees->each(fn (Employee $e) => $this->assignments->joinTeam($e, $team)));
@@ -116,7 +118,7 @@ class TeamController extends Controller
     public function removeMember(Team $team, Employee $employee)
     {
         if ($employee->currentAssignment?->team_id !== $team->id) {
-            throw ValidationException::withMessages(['employee' => ['This employee isn\'t in that team.']]);
+            throw ValidationException::withMessages(['employee' => [__('This employee isn\'t in that team.')]]);
         }
 
         $this->assignments->leaveTeam($employee);

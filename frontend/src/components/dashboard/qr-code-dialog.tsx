@@ -110,7 +110,7 @@ export function QrCodeDialog({
             {regenerating ? t("employees.qrCode.regenerating") : t("employees.qrCode.regenerate")}
           </Button>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <DialogClose render={<Button type="button" variant="outline" className="w-full sm:w-auto" />}>{t("employees.qrCode.done")}</DialogClose>
+            <DialogClose render={<Button type="button" variant="outline" className="w-full sm:w-auto" />}>{t("common.action.done")}</DialogClose>
             <Button type="button" className="w-full sm:w-auto" onClick={handleDownload} disabled={!imageUrl}>
               <Download className="size-4" />
               {t("employees.qrCode.download")}

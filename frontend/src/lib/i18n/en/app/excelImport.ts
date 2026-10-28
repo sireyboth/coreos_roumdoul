@@ -30,6 +30,11 @@ export const excelImport = {
     noRows: "The file has a header row but no {many} under it.",
     tooManyRows: "The file has {n} rows. Import at most {max} at a time — split it into smaller files.",
     unreadable: "That file couldn't be read.",
+    oldXls: "That's an old-style .xls file. Open it in Excel and save it as an Excel Workbook (.xlsx) first.",
+    notXlsx: "Choose an Excel workbook (.xlsx).",
+    damaged: "That file couldn't be opened as an Excel workbook. It may be damaged or password-protected.",
+    noSheets: "The workbook has no sheets.",
+    emptySheet: "The first sheet is empty.",
   },
 
   // ── Step 2: review ────────────────────────────────────────────────
@@ -69,7 +74,6 @@ export const excelImport = {
     downloadFailures: "Download rows that need fixing",
     allImported: "Every row was imported.",
     importAnother: "Import another file",
-    done: "Done",
     importedOne: "{n} {noun} imported",
     importedOther: "{n} {noun} imported",
     needAttentionOne: "{n} row needs attention.",

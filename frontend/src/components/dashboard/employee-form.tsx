@@ -439,7 +439,7 @@ export function EmployeeFormFields({
           >
             {form.branch_id === "" && (
               <option value="" disabled>
-                {t("employees.form.select")}
+                {t("common.field.select")}
               </option>
             )}
             {branches.map((branch) => (

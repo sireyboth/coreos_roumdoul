@@ -250,7 +250,7 @@ class AttendanceRecorder
             $month = CarbonImmutable::parse($date)->format('F Y');
 
             throw ValidationException::withMessages([
-                $field => ["{$month} is locked for payroll, so its attendance can't be changed. Ask an admin to reopen it."],
+                $field => [__(':month is locked for payroll, so its attendance can\'t be changed. Ask an admin to reopen it.', ['month' => $month])],
             ]);
         }
 

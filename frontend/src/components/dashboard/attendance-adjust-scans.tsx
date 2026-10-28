@@ -167,7 +167,7 @@ export function AttendanceAdjustScans({
           {t("common.action.cancel")}
         </Button>
         <Button type="submit" disabled={saving || !changed}>
-          {saving ? t("attendance.adjust.saving") : t("attendance.adjust.save")}
+          {saving ? t("common.message.saving") : t("attendance.adjust.save")}
         </Button>
       </div>
     </form>

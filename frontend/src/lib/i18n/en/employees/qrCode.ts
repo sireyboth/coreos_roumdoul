@@ -5,7 +5,6 @@ export const qrCode = {
   title: "Check-in QR code for “{name}”",
   description: "Print this and place it where employees check in. Scanning it checks them in here — no GPS needed.",
   alt: "QR code for {name}",
-  done: "Done",
   download: "Download QR",
 
   // ── Regenerate ───────────────────────────────────────────────────

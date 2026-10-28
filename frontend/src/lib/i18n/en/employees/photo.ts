@@ -12,6 +12,5 @@ export const photo = {
   // ── Crop dialog ──────────────────────────────────────────────────
   cropTitle: "Adjust photo",
   zoom: "Zoom",
-  saving: "Saving…",
   use: "Use photo",
 };

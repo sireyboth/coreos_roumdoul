@@ -5,9 +5,6 @@ export const roster = {
   editTitle: "Edit roster entry",
   editText: "On this date the person follows this schedule instead of their usual one.",
   schedule: "Work schedule",
-  select: "Select…",
-  saving: "Saving…",
-  saveChanges: "Save changes",
   updated: "Roster entry updated",
 
   // ── Toolbar ───────────────────────────────────────────────────────

@@ -35,6 +35,8 @@ export const common: Dictionary["common"] = {
     retry: "ព្យាយាមម្តងទៀត",
     signIn: "ចូលប្រព័ន្ធ",
     signOut: "ចាកចេញ",
+    saveChanges: "រក្សាទុកការកែប្រែ",
+    done: "រួចរាល់",
   },
 
   // ── Statuses ──────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ export const common: Dictionary["common"] = {
     email: "អ៊ីមែល",
     optional: "(ស្រេចចិត្ត)",
     required: "ចាំបាច់",
+    select: "សូមជ្រើសរើស…",
   },
 
   // ── Messages ──────────────────────────────────────────────────────
@@ -86,6 +89,9 @@ export const common: Dictionary["common"] = {
     planLimit: "បានដល់កម្រិតកំណត់នៃគម្រោងសេវាកម្ម",
     offline: "មិនអាចភ្ជាប់ទៅម៉ាស៊ីនមេបានទេ",
     offlineHint: "សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយព្យាយាមម្តងទៀត។",
+    saving: "កំពុងរក្សាទុក…",
+    adding: "កំពុងបន្ថែម…",
+    saveFailed: "មិនអាចរក្សាទុកបានទេ។",
   },
 
   // ── Tables (components/ui/data-table.tsx) ─────────────────────────

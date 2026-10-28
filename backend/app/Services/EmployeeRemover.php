@@ -26,7 +26,7 @@ class EmployeeRemover
         // An admin deleting their own employee record would delete their own login.
         if ($employees->contains(fn (Employee $employee) => $employee->user_id === $actor->id)) {
             throw ValidationException::withMessages([
-                'employee' => ['You cannot delete your own employee record.'],
+                'employee' => [__('You cannot delete your own employee record.')],
             ]);
         }
 
@@ -37,7 +37,7 @@ class EmployeeRemover
 
             if ($privileged) {
                 throw ValidationException::withMessages([
-                    'employee' => ["{$privileged->name} has a login with a {$privileged->user->membership->roles()->value('name')} role. Ask someone who manages users to remove them."],
+                    'employee' => [__(':name has a login with a :role role. Ask someone who manages users to remove them.', ['name' => $privileged->name, 'role' => $privileged->user->membership->roles()->value('name')])],
                 ]);
             }
         }

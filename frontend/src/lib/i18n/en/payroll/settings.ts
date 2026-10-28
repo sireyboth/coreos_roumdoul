@@ -44,7 +44,6 @@ export const settings = {
     holidays: "Pay daily-paid staff for public holidays",
     overtimeMinimums: "Hold overtime to the Labor Law minimums (150% on work days, 200% on days off and holidays)",
     overtimeWarning: "Overtime rates can now be set to any value. Paying below the Labor Law minimums may expose the company to back-pay claims and fines; the company is responsible for its overtime policy.",
-    saving: "Saving…",
     save: "Save settings",
     saved: "Payroll settings saved",
   },

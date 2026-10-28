@@ -15,7 +15,6 @@ export const form = {
 
   // ── Work ─────────────────────────────────────────────────────────
   work: "Work",
-  select: "Select…",
   department: "Department (optional)",
   team: "Team (optional)",
   none: "None",

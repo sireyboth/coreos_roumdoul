@@ -47,7 +47,7 @@ class PayRunService
         $today = $this->today($company);
 
         if ($start->toDateString() > $today) {
-            throw ValidationException::withMessages(['period_start' => ['Payroll can\'t be run for a period that hasn\'t started.']]);
+            throw ValidationException::withMessages(['period_start' => [__('Payroll can\'t be run for a period that hasn\'t started.')]]);
         }
 
         $overlap = PayRun::query()->withoutGlobalScopes()->where('pay_group_id', $group->id)
@@ -55,7 +55,7 @@ class PayRunService
             ->first();
         if ($overlap) {
             throw ValidationException::withMessages(['period_start' => [
-                "{$group->name} already has a pay run for ".self::periodLabel($overlap->period_start, $overlap->period_end).'.',
+                __(':group already has a pay run for :period.', ['group' => $group->name, 'period' => self::periodLabel($overlap->period_start, $overlap->period_end)]),
             ]]);
         }
 
@@ -112,7 +112,7 @@ class PayRunService
         $ctx = $this->context($run);
         $employee = $this->calculator->employees($ctx)->firstWhere('id', $employeeId);
         if (! $employee) {
-            throw ValidationException::withMessages(['employee_id' => ['This person isn\'t in this pay run\'s group for its period. Recalculate the whole run instead.']]);
+            throw ValidationException::withMessages(['employee_id' => [__('This person isn\'t in this pay run\'s group for its period. Recalculate the whole run instead.')]]);
         }
 
         $attendance = $this->calculator->attendance($ctx, collect([$employee]))->get($employee->id);
@@ -159,12 +159,12 @@ class PayRunService
     public function approve(PayRun $run, User $by): PayRun
     {
         if ($run->status !== 'calculated') {
-            throw ValidationException::withMessages(['status' => ['Only a calculated pay run can be approved.']]);
+            throw ValidationException::withMessages(['status' => [__('Only a calculated pay run can be approved.')]]);
         }
 
         // Whoever prepared the run doesn't also sign it off, unless the company allows it.
         if ($run->calculated_by === $by->id && ! SelfApproval::allowed($by)) {
-            throw ValidationException::withMessages(['status' => ['You prepared this pay run, so someone else needs to approve it.']]);
+            throw ValidationException::withMessages(['status' => [__('You prepared this pay run, so someone else needs to approve it.')]]);
         }
 
         // Once more against the final attendance, so what is approved is exactly what was checked.
@@ -207,7 +207,7 @@ class PayRunService
     public function markPaid(PayRun $run, User $by): PayRun
     {
         if ($run->status !== 'approved') {
-            throw ValidationException::withMessages(['status' => ['Only an approved pay run can be marked as paid.']]);
+            throw ValidationException::withMessages(['status' => [__('Only an approved pay run can be marked as paid.')]]);
         }
 
         $run->update(['status' => 'paid', 'paid_at' => now(), 'paid_by' => $by->id]);
@@ -223,7 +223,7 @@ class PayRunService
     public function reopen(PayRun $run, User $by, string $reason): PayRun
     {
         if (! $run->isLocked()) {
-            throw ValidationException::withMessages(['status' => ['Only an approved or paid pay run can be reopened.']]);
+            throw ValidationException::withMessages(['status' => [__('Only an approved or paid pay run can be reopened.')]]);
         }
 
         $before = $run->only(['status', 'approved_at', 'approved_by', 'paid_at', 'paid_by']);
@@ -350,18 +350,18 @@ class PayRunService
             $afterRun = PayRun::query()->withoutGlobalScopes()->where('pay_group_id', $group->id)
                 ->whereDate('period_end', $startDay->subDay()->toDateString())->exists();
             if (! $period[0]->isSameDay($startDay) && ! $afterRun) {
-                throw ValidationException::withMessages(['period_start' => ["{$group->name}'s periods don't start on that day. The period holding it is ".self::periodLabel($period[0], $period[1]).'.']]);
+                throw ValidationException::withMessages(['period_start' => [__(':group\'s periods don\'t start on that day. The period holding it is :period.', ['group' => $group->name, 'period' => self::periodLabel($period[0], $period[1])])]]);
             }
 
             return [$startDay, $period[1]];
         }
 
         if ($end === null) {
-            throw ValidationException::withMessages(['period_end' => ['Pick the last day of the period.']]);
+            throw ValidationException::withMessages(['period_end' => [__('Pick the last day of the period.')]]);
         }
         $endDay = CarbonImmutable::parse($end)->startOfDay();
         if ($endDay->lt($startDay)) {
-            throw ValidationException::withMessages(['period_end' => ['The period can\'t end before it starts.']]);
+            throw ValidationException::withMessages(['period_end' => [__('The period can\'t end before it starts.')]]);
         }
         if ($startDay->diffInDays($endDay) + 1 > PayGroup::MAX_CUSTOM_DAYS) {
             throw ValidationException::withMessages(['period_end' => ['A pay period can be at most '.PayGroup::MAX_CUSTOM_DAYS.' days.']]);
@@ -409,7 +409,7 @@ class PayRunService
 
             $warnings[] = [
                 'code' => 'no_members', 'blocking' => true,
-                'message' => "Nobody is in {$ctx['group']->name} for these dates, so there is no one to pay."
+                'message' => __('Nobody is in :group for these dates, so there is no one to pay.', ['group' => $ctx['group']->name])
                     .($later->isNotEmpty()
                         ? ' '.$later->count().' '.($later->count() === 1 ? 'person was' : 'people were').' moved into it only from '.CarbonImmutable::parse($first)->format('j M Y')
                             .', after this period. On their Pay tab, undo that change and move them again from '.$ctx['start']->format('j M Y').' or earlier, then recalculate.'
@@ -429,11 +429,11 @@ class PayRunService
         if (! $ctx['statutory']) {
             $warnings[] = [
                 'code' => 'no_tax_nssf', 'blocking' => false,
-                'message' => 'Tax on salary and NSSF are not worked out for this pay period yet (only for 1st → end-of-month periods). Handle them outside payroll for now.',
+                'message' => __('Tax on salary and NSSF are not worked out for this pay period yet (only for 1st → end-of-month periods). Handle them outside payroll for now.'),
             ];
         }
         if ($ctx['end']->toDateString() >= $this->today($run->company)) {
-            $warnings[] = ['code' => 'period_not_over', 'blocking' => true, 'message' => 'The period isn\'t over yet, so these numbers are a preview.'];
+            $warnings[] = ['code' => 'period_not_over', 'blocking' => true, 'message' => __('The period isn\'t over yet, so these numbers are a preview.')];
         }
 
         return $warnings;
@@ -529,7 +529,7 @@ class PayRunService
     private function assertEditable(PayRun $run): void
     {
         if ($run->isLocked()) {
-            throw ValidationException::withMessages(['status' => ['This pay run is approved and can no longer change. Add an adjustment to a later period instead.']]);
+            throw ValidationException::withMessages(['status' => [__('This pay run is approved and can no longer change. Add an adjustment to a later period instead.')]]);
         }
     }
 

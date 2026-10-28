@@ -45,7 +45,7 @@ class DepartmentController extends Controller
         while ($cursor !== null && ! in_array($cursor, $seen, true)) {
             if ($cursor === $department->id) {
                 throw ValidationException::withMessages([
-                    'parent_department_id' => ['A department can\'t be placed under itself or one of its own sub-departments.'],
+                    'parent_department_id' => [__('A department can\'t be placed under itself or one of its own sub-departments.')],
                 ]);
             }
 
@@ -127,13 +127,13 @@ class DepartmentController extends Controller
 
         if ($members > 0 || $teams > 0 || $children > 0) {
             $parts = array_filter([
-                $members > 0 ? "{$members} ".($members === 1 ? 'employee' : 'employees') : null,
-                $teams > 0 ? "{$teams} ".($teams === 1 ? 'team' : 'teams') : null,
-                $children > 0 ? "{$children} ".($children === 1 ? 'sub-department' : 'sub-departments') : null,
+                $members > 0 ? ($members === 1 ? __(':n employee', ['n' => $members]) : __(':n employees', ['n' => $members])) : null,
+                $teams > 0 ? ($teams === 1 ? __(':n team', ['n' => $teams]) : __(':n teams', ['n' => $teams])) : null,
+                $children > 0 ? ($children === 1 ? __(':n sub-department', ['n' => $children]) : __(':n sub-departments', ['n' => $children])) : null,
             ]);
 
             throw ValidationException::withMessages([
-                'department' => ['This department still has '.implode(', ', $parts).'. Move them elsewhere first, or set the department to inactive instead.'],
+                'department' => [__('This department still has :list. Move them elsewhere first, or set the department to inactive instead.', ['list' => implode(', ', $parts)])],
             ]);
         }
 
@@ -149,7 +149,7 @@ class DepartmentController extends Controller
     public function addMembers(Request $request, Department $department)
     {
         if ($department->status !== 'active') {
-            throw ValidationException::withMessages(['department' => ['This department is inactive. Set it back to active before adding people.']]);
+            throw ValidationException::withMessages(['department' => [__('This department is inactive. Set it back to active before adding people.')]]);
         }
 
         $ids = $request->validate([
@@ -162,7 +162,7 @@ class DepartmentController extends Controller
         $employees = Employee::query()->with('currentAssignment.team')->whereIn('id', $ids)->get();
 
         if ($employees->count() !== count($ids)) {
-            throw ValidationException::withMessages(['employee_ids' => ['Some of those employees couldn\'t be found.']]);
+            throw ValidationException::withMessages(['employee_ids' => [__('Some of those employees couldn\'t be found.')]]);
         }
 
         DB::transaction(fn () => $employees->each(fn (Employee $e) => $this->assignments->joinDepartment($e, $department)));
@@ -173,7 +173,7 @@ class DepartmentController extends Controller
     public function removeMember(Department $department, Employee $employee)
     {
         if ($employee->currentAssignment?->department_id !== $department->id) {
-            throw ValidationException::withMessages(['employee' => ['This employee isn\'t in that department.']]);
+            throw ValidationException::withMessages(['employee' => [__('This employee isn\'t in that department.')]]);
         }
 
         $employee->loadMissing('currentAssignment.team');

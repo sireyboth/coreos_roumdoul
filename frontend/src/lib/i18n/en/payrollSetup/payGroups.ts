@@ -69,8 +69,6 @@ export const payGroups = {
   save: {
     saved: "Pay group saved",
     added: "Pay group added",
-    failed: "Couldn't save.",
-    saving: "Saving…",
     addGroup: "Add group",
   },
 

@@ -20,6 +20,7 @@ import { barChartImage, type Bar } from "@/lib/chart-image";
 import type { Worksheet } from "exceljs";
 import { downloadSheet, downloadWorkbook, styleHeader, today, type SheetColumn } from "@/lib/excel";
 import { Lookup, Row, RowError, yesNo, type ImportField, type ImportSpec } from "@/lib/excel-import";
+import { translateNow } from "@/lib/i18n";
 import { daysOffText, formatMinutes, slotsOn, slotsSummary, WEEK_ORDER, WEEKDAY_SHORT } from "@/lib/schedule";
 
 /*
@@ -59,7 +60,7 @@ function findEmployee(row: Row, lookups: EmployeeLookups): Employee {
   const name = row.text("employee");
   if (code) return lookups.byCode.require(code);
   if (name) return lookups.byName.require(name);
-  throw new RowError("Fill in the Employee ID or the Employee name.");
+  throw new RowError(translateNow("app.excelSpecs.row.needEmployee"));
 }
 
 // ─────────────────────────── Work schedules ──────────────────────────
@@ -97,12 +98,12 @@ function parseHours(text: string, weekday: string): ScheduleSlot[] {
 
   for (const stretch of value.split(/[,;]/).map((s) => s.trim()).filter(Boolean)) {
     const match = /^(\d{1,2})[:.](\d{2})\s*[-–—]\s*(\d{1,2})[:.](\d{2})$/.exec(stretch);
-    if (!match) throw new RowError(`${weekday}: "${stretch}" isn't a time range like 08:00-12:00.`);
+    if (!match) throw new RowError(translateNow("app.excelSpecs.row.notTimeRange", { day: weekday, text: stretch }));
 
     for (const [type, h, m] of [["in", match[1], match[2]], ["out", match[3], match[4]]] as const) {
       const hours = Number(h);
       const minutes = Number(m);
-      if (hours > 23 || minutes > 59) throw new RowError(`${weekday}: "${stretch}" has an impossible time.`);
+      if (hours > 23 || minutes > 59) throw new RowError(translateNow("app.excelSpecs.row.impossibleTime", { day: weekday, text: stretch }));
       const total = hours * 60 + minutes;
       if (previous >= 0 && total <= previous) nextDay = true;
       previous = total;
@@ -121,7 +122,7 @@ export function parseDaysOff(text: string, column: string): number[] {
     .filter(Boolean)
     .map((name) => {
       const index = WEEKDAY_SHORT.findIndex((d) => d.toLowerCase() === name.slice(0, 3).toLowerCase());
-      if (index < 0) throw new RowError(`"${name}" in ${column} isn't a weekday.`);
+      if (index < 0) throw new RowError(translateNow("app.excelSpecs.row.notWeekday", { text: name, column }));
       return index;
     });
 }
@@ -132,7 +133,7 @@ export function daysOffProblem(text: string, column: string): string | null {
     parseDaysOff(text, column);
     return null;
   } catch (err) {
-    return err instanceof Error ? err.message : "Not a list of weekdays.";
+    return err instanceof Error ? err.message : translateNow("app.excelSpecs.row.invalidWeekdays");
   }
 }
 
@@ -170,7 +171,7 @@ const HOURS_HINT = 'Hours as IN-OUT ranges, e.g. "08:00-17:00" or a split shift 
 export const workScheduleImport: ImportSpec<{ schedules: Lookup<WorkSchedule> }> = {
   noun: { one: "work schedule", many: "work schedules" },
   templateFile: "work-schedules",
-  matching: "A row whose Name matches an existing schedule updates it — its hours are replaced by the row's.",
+  matching: "app.excelSpecs.matching.schedules",
   notes: [
     "Each weekday column holds that day's hours. Add as many IN-OUT ranges as needed, separated by commas.",
     "A range ending earlier than it starts (22:00-06:00) is a night shift ending the next morning.",
@@ -190,7 +191,7 @@ export const workScheduleImport: ImportSpec<{ schedules: Lookup<WorkSchedule> }>
           parseHours(text, WEEKDAY_SHORT[weekday]);
           return null;
         } catch (err) {
-          return err instanceof Error ? err.message : "Not a valid list of hours.";
+          return err instanceof Error ? err.message : translateNow("app.excelSpecs.row.invalidHours");
         }
       },
     })),
@@ -227,7 +228,7 @@ export const workScheduleImport: ImportSpec<{ schedules: Lookup<WorkSchedule> }>
       return "updated";
     }
 
-    if (!payload.days || payload.days.length === 0) throw new RowError("A new schedule needs hours on at least one weekday.");
+    if (!payload.days || payload.days.length === 0) throw new RowError(translateNow("app.excelSpecs.row.scheduleNeedsHours"));
     ctx.schedules.add(await api.workSchedules.create(payload));
     return "created";
   },
@@ -273,8 +274,7 @@ type AssignmentCtx = EmployeeLookups & {
 export const assignmentImport: ImportSpec<AssignmentCtx> = {
   noun: { one: "assignment", many: "assignments" },
   templateFile: "schedule-assignments",
-  matching:
-    "A row for an employee with the same From date as an existing assignment updates it. Otherwise it starts a new one: from that date it replaces the schedule they had.",
+  matching: "app.excelSpecs.matching.assignments",
   notes: [
     "Leave To empty for an ongoing schedule. With a To date it's temporary — afterwards they go back to their usual schedule.",
     'Days off is a list like "Sun" or "Sat, Sun" ("None" for no days off). Left empty, the schedule\'s usual days off are used.',
@@ -303,7 +303,7 @@ export const assignmentImport: ImportSpec<AssignmentCtx> = {
     const schedule = ctx.schedules.require(row.text("work_schedule")!);
     const from = row.text("effective_from")!;
     const to = row.text("effective_to") ?? null;
-    if (to && to < from) throw new RowError("To is before From.");
+    if (to && to < from) throw new RowError(translateNow("app.excelSpecs.row.toBeforeFrom"));
 
     const daysOffText = row.text("days_off");
     const daysOff = daysOffText === undefined ? undefined : parseDaysOff(daysOffText, "Days off");
@@ -360,7 +360,7 @@ export async function exportHolidays(): Promise<string> {
 export const holidayImport: ImportSpec<{ holidays: Lookup<Holiday> }> = {
   noun: { one: "holiday", many: "holidays" },
   templateFile: "holidays",
-  matching: "A row whose Date already has a holiday updates that holiday.",
+  matching: "app.excelSpecs.matching.holidays",
   fields: [
     { key: "name", header: "Name", required: true, hint: "The holiday's name.", example: "Khmer New Year" },
     { key: "date", header: "Date", type: "date", required: true, hint: "YYYY-MM-DD.", example: "2026-04-14" },
@@ -420,7 +420,7 @@ type RosterCtx = EmployeeLookups & {
 export const rosterImport: ImportSpec<RosterCtx> = {
   noun: { one: "roster entry", many: "roster entries" },
   templateFile: "roster",
-  matching: "A row for an employee and date that is already on the roster changes that day's schedule, location or notes.",
+  matching: "app.excelSpecs.matching.roster",
   notes: [
     "Use the roster for one-off changes. For someone's regular hours, assign them a work schedule instead.",
     "A date already marked as that employee's day off is refused — remove the day off first.",
@@ -481,7 +481,7 @@ export const rosterImport: ImportSpec<RosterCtx> = {
 export const dayOffImport: ImportSpec<EmployeeLookups> = {
   noun: { one: "day off", many: "days off" },
   templateFile: "days-off",
-  matching: "A day that is already marked as a day off for that employee is left as it is.",
+  matching: "app.excelSpecs.matching.daysOff",
   notes: ["A date with a one-off roster change is refused — remove that roster entry first."],
   fields: [
     ...EMPLOYEE_FIELDS,
@@ -1048,7 +1048,7 @@ function scanTimes(text: string): string[] {
     .filter(Boolean)
     .map((t) => {
       const match = /^(\d{1,2})[:.](\d{2})$/.exec(t);
-      if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) throw new RowError(`"${t}" in Scans isn't a time like 08:00.`);
+      if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) throw new RowError(translateNow("app.excelSpecs.row.notScanTime", { text: t }));
       return `${match[1].padStart(2, "0")}:${match[2]}`;
     });
 }
@@ -1060,17 +1060,16 @@ function leaveOn(status: string, ctx: AttendanceImportCtx): { type: LeaveType; p
   const name = half ? status.slice(0, half.index).trim() : status;
   const type = ctx.leaveTypes.find(name);
   if (!type) {
-    throw new RowError(`"${status}" in Status isn't Present or a leave type. Use Present, Absent, Off, or one of: ${ctx.leaveList}.`);
+    throw new RowError(translateNow("app.excelSpecs.row.unknownStatus", { text: status, list: ctx.leaveList }));
   }
-  if (part !== "full" && !type.allow_half_day) throw new RowError(`${type.name} can't be taken for half a day.`);
+  if (part !== "full" && !type.allow_half_day) throw new RowError(translateNow("app.excelSpecs.row.noHalfDay", { type: type.name }));
   return { type, part };
 }
 
 export const attendanceImport: ImportSpec<AttendanceImportCtx> = {
   noun: { one: "attendance record", many: "attendance records" },
   templateFile: "attendance",
-  matching:
-    "A present row adds that day's scans as a correction request, so it is reviewed and logged like any other correction; the person's work schedule decides which scan is an IN and which an OUT. A leave row (AL, SL…) records that day as leave and needs no scans.",
+  matching: "app.excelSpecs.matching.attendance",
   notes: (ctx) => [
     'Scans: every scan of the day, in order — e.g. "08:00, 12:00, 13:00, 17:00" for a split shift. Times are on the company\'s clock. The export\'s "IN 08:00, OUT 17:00" works too.',
     "A time earlier than the one before it is read as the next morning (night shifts).",
@@ -1082,8 +1081,8 @@ export const attendanceImport: ImportSpec<AttendanceImportCtx> = {
   settings: [
     {
       key: "approve",
-      label: "Approve imported records right away",
-      description: "Turns each row straight into attendance or approved leave. Untick to leave them as pending requests for review.",
+      label: "app.excelSpecs.settings.approveNow",
+      description: "app.excelSpecs.settings.approveNowHint",
       default: true,
     },
   ],
@@ -1123,9 +1122,9 @@ export const attendanceImport: ImportSpec<AttendanceImportCtx> = {
     let leave: { type: LeaveType; part: DayPart } | null = null;
     if (!isPresent) {
       leave = leaveOn(status, ctx);
-      if (leave.part === "full" && times.length > 0) throw new RowError(`A full day of ${leave.type.name} can't have scans. Clear Scans, or add AM / PM for half a day.`);
+      if (leave.part === "full" && times.length > 0) throw new RowError(translateNow("app.excelSpecs.row.fullDayNoScans", { type: leave.type.name }));
     } else if (times.length === 0) {
-      throw new RowError("Fill in the scan times, or put a leave type (e.g. AL) in Status.");
+      throw new RowError(translateNow("app.excelSpecs.row.fillScans"));
     }
 
     if (leave) {
@@ -1159,8 +1158,8 @@ export const attendanceImport: ImportSpec<AttendanceImportCtx> = {
       try {
         await api.attendanceCorrections.approve(correction.id);
       } catch (err) {
-        const message = err instanceof ApiError ? err.message : "it couldn't be approved";
-        throw new RowError(`Saved as a pending correction, but not approved: ${message}`);
+        const message = err instanceof ApiError ? err.message : translateNow("app.excelSpecs.row.couldntApprove");
+        throw new RowError(translateNow("app.excelSpecs.row.notApproved", { error: message }));
       }
     }
     return "created";

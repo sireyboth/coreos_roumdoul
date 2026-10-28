@@ -201,7 +201,7 @@ export default function ProfilePage() {
               {profileError && <Alert variant="destructive">{profileError}</Alert>}
               {profileSaved && <Badge variant="success">{t("common.message.saved")}</Badge>}
               <Button type="submit" disabled={savingProfile} className="self-start">
-                {savingProfile ? t("access.profilePage.saving") : t("access.profilePage.saveChanges")}
+                {savingProfile ? t("common.message.saving") : t("common.action.saveChanges")}
               </Button>
             </form>
           </FormCard>

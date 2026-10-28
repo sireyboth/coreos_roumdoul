@@ -442,7 +442,7 @@ export default function EmployeePage() {
                     {t("employees.profilePage.reset")}
                   </Button>
                   <Button type="submit" disabled={saving || !form.name.trim()}>
-                    {saving ? t("employees.profilePage.saving") : t("employees.profilePage.saveChanges")}
+                    {saving ? t("common.message.saving") : t("common.action.saveChanges")}
                   </Button>
                 </div>
               </form>

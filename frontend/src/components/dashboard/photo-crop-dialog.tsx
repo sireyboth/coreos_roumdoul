@@ -105,7 +105,7 @@ function CropEditor({
       <DialogFooter>
         <DialogClose render={<Button type="button" variant="outline" disabled={saving} />}>{t("common.action.cancel")}</DialogClose>
         <Button type="button" onClick={handleConfirm} disabled={saving || !area}>
-          {saving ? t("employees.photo.saving") : t("employees.photo.use")}
+          {saving ? t("common.message.saving") : t("employees.photo.use")}
         </Button>
       </DialogFooter>
     </>

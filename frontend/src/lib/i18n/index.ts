@@ -34,6 +34,11 @@ function subscribe(onChange: () => void) {
   };
 }
 
+/** The chosen language outside React (api.ts sends it as Accept-Language, so server messages match). */
+export function currentLang(): Lang {
+  return read();
+}
+
 export function setLang(lang: Lang) {
   try {
     localStorage.setItem(KEY, lang);

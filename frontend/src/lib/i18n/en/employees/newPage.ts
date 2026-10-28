@@ -29,7 +29,6 @@ export const newPage = {
   idInfoAfter: " and this password. No email needed. Share this link so the company is filled in for them:",
 
   // ── Save ─────────────────────────────────────────────────────────
-  adding: "Adding…",
   added: "Employee added",
   addedEmail: "{email} can now sign in.",
   addedId: "They sign in with employee ID {code}. Share your company sign-in link with them.",

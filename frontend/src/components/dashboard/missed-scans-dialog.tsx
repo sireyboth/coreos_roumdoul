@@ -255,7 +255,7 @@ export function MissedScansDialog({
                       </div>
                     </div>
                     <Button type="button" variant="outline" size="sm" disabled={saving !== null} onClick={() => save([day], day.id)}>
-                      {saving === day.id ? t("attendance.missedScans.saving") : t("common.action.save")}
+                      {saving === day.id ? t("common.message.saving") : t("common.action.save")}
                     </Button>
                   </li>
                 );
@@ -268,7 +268,7 @@ export function MissedScansDialog({
           <p className="text-xs text-muted-foreground sm:mr-auto">{t("attendance.missedScans.footerHint")}</p>
           <Button type="button" disabled={!days?.length || saving !== null} onClick={() => days && save(days, "all")}>
             {saving === "all"
-              ? t("attendance.missedScans.saving")
+              ? t("common.message.saving")
               : days?.length
                 ? t("attendance.missedScans.saveAllCount", { n: days.length })
                 : t("attendance.missedScans.saveAll")}

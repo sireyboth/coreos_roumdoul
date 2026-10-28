@@ -20,7 +20,7 @@ class SelfApproval
 
     /**
      * @param  string  $field  the form field the error is shown on
-     * @param  string  $what  finishes "You can't … yourself", e.g. "approve overtime for"
+     * @param  string  $what  finishes "You can't … yourself", e.g. "approve overtime for" (English; translated here)
      */
     public static function assertNotSelf(User $user, Employee|int|null $employee, string $field, string $what): void
     {
@@ -33,7 +33,7 @@ class SelfApproval
         }
 
         throw ValidationException::withMessages([
-            $field => ["You can't {$what} yourself — ask someone else who has the permission."],
+            $field => [__('You can\'t :what yourself — ask someone else who has the permission.', ['what' => __($what)])],
         ]);
     }
 }

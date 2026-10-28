@@ -284,7 +284,7 @@ export function MembersDialog({
               </Button>
               <Button onClick={handleAdd} disabled={busy || picked.size === 0}>
                 {busy
-                  ? t("org.members.adding")
+                  ? t("common.message.adding")
                   : picked.size === 0
                     ? t("org.members.addPeople")
                     : picked.size === 1

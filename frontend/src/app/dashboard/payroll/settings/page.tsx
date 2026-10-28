@@ -115,7 +115,7 @@ function PolicyCard({ policy, onSaved }: { policy: PayrollPolicy; onSaved: (p: P
           </div>
           <div className="flex justify-end sm:col-span-2">
             <Button type="submit" disabled={saving}>
-              {saving ? t("payroll.settings.policy.saving") : t("payroll.settings.policy.save")}
+              {saving ? t("common.message.saving") : t("payroll.settings.policy.save")}
             </Button>
           </div>
         </form>

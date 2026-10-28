@@ -244,7 +244,7 @@ function WorkLocationFormDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("org.shared.saving") : location ? t("org.shared.saveChanges") : t("org.workLocationsPage.add")}
+              {saving ? t("common.message.saving") : location ? t("common.action.saveChanges") : t("org.workLocationsPage.add")}
             </Button>
           </DialogFooter>
         </form>

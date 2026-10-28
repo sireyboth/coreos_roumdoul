@@ -78,7 +78,7 @@ class AttendanceReviewController extends Controller
             abort(404);
         }
         if ($day->overtime_minutes <= 0) {
-            throw ValidationException::withMessages(['overtime' => ['This day has no overtime to review.']]);
+            throw ValidationException::withMessages(['overtime' => [__('This day has no overtime to review.')]]);
         }
         SelfApproval::assertNotSelf($request->user(), $day->employee_id, 'overtime', 'review overtime for');
         $this->recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'overtime', $day->employee_id);
@@ -204,17 +204,19 @@ class AttendanceReviewController extends Controller
         $end = $start->endOfMonth();
 
         if ($end->toDateString() >= now($timezone)->toDateString()) {
-            throw ValidationException::withMessages(['month' => ['A month can only be locked once it has ended.']]);
+            throw ValidationException::withMessages(['month' => [__('A month can only be locked once it has ended.')]]);
         }
         if ($this->recorder->isLocked($company->id, $start->toDateString())) {
-            throw ValidationException::withMessages(['month' => [$start->format('F Y').' is already locked.']]);
+            throw ValidationException::withMessages(['month' => [__(':month is already locked.', ['month' => $start->format('F Y')])]]);
         }
 
         $pending = AttendanceDay::query()->where('overtime_status', 'pending')
             ->whereDate('date', '>=', $start->toDateString())->whereDate('date', '<=', $end->toDateString())->count();
         if ($pending > 0 && ! $request->boolean('ignore_pending_overtime')) {
             return response()->json([
-                'message' => "{$pending} ".($pending === 1 ? 'day still has' : 'days still have').' overtime waiting for approval. Review it first, or lock anyway (it won\'t be paid).',
+                'message' => $pending === 1
+                    ? __(':n day still has overtime waiting for approval. Review it first, or lock anyway (it won\'t be paid).', ['n' => $pending])
+                    : __(':n days still have overtime waiting for approval. Review it first, or lock anyway (it won\'t be paid).', ['n' => $pending]),
                 'code' => 'pending_overtime',
                 'pending' => $pending,
             ], 422);

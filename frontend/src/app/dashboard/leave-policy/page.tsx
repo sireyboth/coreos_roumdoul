@@ -137,7 +137,7 @@ function TypeDialog({ type, open, onOpenChange, onSaved }: { type: LeaveType | n
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("leave.policyPage.saveFailed"));
+      setError(err instanceof ApiError ? err.message : t("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -259,7 +259,7 @@ function TypeDialog({ type, open, onOpenChange, onSaved }: { type: LeaveType | n
           <DialogFooter className="sm:col-span-2">
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("leave.policyPage.saving") : t("common.action.save")}
+              {saving ? t("common.message.saving") : t("common.action.save")}
             </Button>
           </DialogFooter>
         </form>
@@ -460,7 +460,7 @@ function BalanceAdjuster({ types }: { types: LeaveType[] }) {
                 />
               </div>
               <Button type="submit" disabled={saving || !days || !reason.trim()}>
-                {saving ? t("leave.policyPage.saving") : t("leave.policyPage.adjust")}
+                {saving ? t("common.message.saving") : t("leave.policyPage.adjust")}
               </Button>
             </form>
 

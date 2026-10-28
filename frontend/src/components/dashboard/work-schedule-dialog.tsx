@@ -460,7 +460,7 @@ export function WorkScheduleDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("schedules.form.saving") : schedule ? t("schedules.form.saveChanges") : t("schedules.form.create")}
+              {saving ? t("common.message.saving") : schedule ? t("common.action.saveChanges") : t("schedules.form.create")}
             </Button>
           </DialogFooter>
         </form>

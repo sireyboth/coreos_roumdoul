@@ -75,8 +75,6 @@ export const roleDialog = {
   // ── Footer ───────────────────────────────────────────────────────
   allPermissions: "All permissions",
   permissionCount: "{n} of {total} permissions",
-  saving: "Saving…",
-  saveChanges: "Save changes",
   create: "Create role",
   updated: "Role updated",
   created: "Role created",

@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $who = mb_strtolower(trim((string) ($request->input('email') ?: $request->input('company').'|'.$request->input('employee_id'))));
             $tooMany = fn (Request $request, array $headers) => response()->json(
-                ['message' => 'Too many sign-in attempts. Please wait a minute and try again.'],
+                ['message' => __('Too many sign-in attempts. Please wait a minute and try again.')],
                 429,
                 $headers,
             );

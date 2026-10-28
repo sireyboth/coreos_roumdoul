@@ -139,7 +139,7 @@ export function PayGroupDialog({
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.payGroups.save.failed"));
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -338,7 +338,7 @@ export function PayGroupDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !form.name.trim()}>
-              {saving ? t("payrollSetup.payGroups.save.saving") : group ? t("common.action.save") : t("payrollSetup.payGroups.save.addGroup")}
+              {saving ? t("common.message.saving") : group ? t("common.action.save") : t("payrollSetup.payGroups.save.addGroup")}
             </Button>
           </DialogFooter>
         </form>

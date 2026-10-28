@@ -51,7 +51,7 @@ class ScheduleAssignmentService
                     $when = CarbonImmutable::parse($existingFrom)->format('M j, Y');
 
                     throw ValidationException::withMessages([
-                        'effective_from' => ["{$employee->name} is already set to follow \"{$name}\" from {$when}. Change or remove that first."],
+                        'effective_from' => [__(':employee is already set to follow ":schedule" from :date. Change or remove that first.', ['employee' => $employee->name, 'schedule' => $name, 'date' => $when])],
                     ]);
                 }
 
@@ -98,7 +98,7 @@ class ScheduleAssignmentService
         $to = array_key_exists('effective_to', $changes) ? $changes['effective_to'] : $oldTo;
 
         if ($to !== null && $to < $from) {
-            throw ValidationException::withMessages(['effective_to' => ['The end date can\'t be before the start date.']]);
+            throw ValidationException::withMessages(['effective_to' => [__('The end date can\'t be before the start date.')]]);
         }
 
         // Both the old and the new span must be unlocked: days leave one plan and join another.
@@ -115,7 +115,7 @@ class ScheduleAssignmentService
             $range = $clash->effective_from->format('M j, Y').($clash->effective_to ? ' – '.$clash->effective_to->format('M j, Y') : ' onward');
 
             throw ValidationException::withMessages([
-                'effective_from' => ["That overlaps \"{$clash->workSchedule?->name}\" ({$range}). Adjust that one first."],
+                'effective_from' => [__('That overlaps ":schedule" (:range). Adjust that one first.', ['schedule' => $clash->workSchedule?->name, 'range' => $range])],
             ]);
         }
 

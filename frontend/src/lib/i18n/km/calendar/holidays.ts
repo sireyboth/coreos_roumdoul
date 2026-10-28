@@ -26,8 +26,6 @@ export const holidays: Dictionary["calendar"]["holidays"] = {
   addTitle: "បន្ថែមថ្ងៃឈប់សម្រាក",
   formText: "បុគ្គលិកនឹងមិនត្រូវបានកំណត់កាលវិភាគការងារនៅថ្ងៃនេះទេ។",
   repeats: "កើតឡើងរៀងរាល់ឆ្នាំ",
-  saving: "កំពុងរក្សាទុក…",
-  saveChanges: "រក្សាទុកការកែប្រែ",
   updated: "បានកែប្រែថ្ងៃឈប់សម្រាក",
   added: "បានបន្ថែមថ្ងៃឈប់សម្រាក",
 };

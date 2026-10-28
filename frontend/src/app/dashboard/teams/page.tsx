@@ -143,7 +143,7 @@ function TeamFormDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("org.shared.saving") : team ? t("org.shared.saveChanges") : t("org.teamsPage.add")}
+              {saving ? t("common.message.saving") : team ? t("common.action.saveChanges") : t("org.teamsPage.add")}
             </Button>
           </DialogFooter>
         </form>

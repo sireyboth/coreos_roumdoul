@@ -20,7 +20,6 @@ export const missedScans: Dictionary["attendance"]["missedScans"] = {
   noScans: "គ្មានការស្កេន",
   missingScan: "ខកខានស្កេន",
   slotTime: "ម៉ោង {slot}",
-  saving: "កំពុងរក្សាទុក…",
 
   // ── Footer ────────────────────────────────────────────────────────
   footerHint: "ម៉ោងពណ៌ប្រផេះគឺជាការស្កេនពិត ហើយនឹងរក្សាទុកដដែល។ ម៉ោងដែលលោកអ្នកមិនបានកែប្រែ នឹងប្រើតាមកាលវិភាគ។",

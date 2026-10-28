@@ -17,7 +17,7 @@ class WorkLocationController extends Controller
     {
         if ($require && ($latitude === null || $longitude === null)) {
             throw ValidationException::withMessages([
-                'require_location' => ['Set this location\'s latitude and longitude first — there is nothing to check the scan against without them.'],
+                'require_location' => [__('Set this location\'s latitude and longitude first — there is nothing to check the scan against without them.')],
             ]);
         }
     }
@@ -115,7 +115,7 @@ class WorkLocationController extends Controller
 
         if ($workLocation->branch()->exists()) {
             return response()->json([
-                'message' => "This is {$workLocation->branch->name}'s check-in location — it's managed by the branch. Deactivate or delete the branch instead.",
+                'message' => __('This is :branch\'s check-in location — it\'s managed by the branch. Deactivate or delete the branch instead.', ['branch' => $workLocation->branch->name]),
                 'code' => 'in_use',
             ], 422);
         }
@@ -124,7 +124,9 @@ class WorkLocationController extends Controller
 
         if ($upcoming > 0) {
             return response()->json([
-                'message' => "This location is used by {$upcoming} upcoming ".($upcoming === 1 ? 'schedule' : 'schedules').'. Remove those first.',
+                'message' => $upcoming === 1
+                    ? __('This location is used by :n upcoming schedule. Remove those first.', ['n' => $upcoming])
+                    : __('This location is used by :n upcoming schedules. Remove those first.', ['n' => $upcoming]),
                 'code' => 'in_use',
             ], 422);
         }

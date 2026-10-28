@@ -85,7 +85,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("payroll.adjustments.dialog.saveFailed"));
+      setError(err instanceof ApiError ? err.message : t("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -180,7 +180,7 @@ function AddDialog({ month, onOpenChange, onSaved }: { month: string; onOpenChan
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || recipients.length === 0 || !date || !name.trim() || !(Number(amount) > 0)}>
-              {saving ? t("payroll.adjustments.dialog.saving") : target === "one" ? t("common.action.add") : t("payroll.adjustments.dialog.addFor", { n: recipients.length })}
+              {saving ? t("common.message.saving") : target === "one" ? t("common.action.add") : t("payroll.adjustments.dialog.addFor", { n: recipients.length })}
             </Button>
           </DialogFooter>
         </form>

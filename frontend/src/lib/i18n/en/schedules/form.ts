@@ -74,8 +74,6 @@ export const form = {
   orderExample: "the most used schedule",
 
   // ── Footer & messages ─────────────────────────────────────────────
-  saving: "Saving…",
-  saveChanges: "Save changes",
   create: "Create schedule",
   needHours: "Add hours to at least one day, or turn overtime on to make an overtime-only schedule.",
   updated: "Schedule updated",

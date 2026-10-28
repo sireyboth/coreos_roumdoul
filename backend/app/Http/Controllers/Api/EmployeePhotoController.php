@@ -95,18 +95,18 @@ class EmployeePhotoController extends Controller
         $info = @getimagesizefromstring($raw);
 
         if (! $info || $info[0] < 1 || $info[1] < 1) {
-            throw ValidationException::withMessages(['photo' => ['That file is not a readable image.']]);
+            throw ValidationException::withMessages(['photo' => [__('That file is not a readable image.')]]);
         }
 
         // Guards memory: a tiny file can decode into a gigantic bitmap.
         if ($info[0] > self::MAX_SIDE || $info[1] > self::MAX_SIDE || $info[0] * $info[1] > self::MAX_PIXELS) {
-            throw ValidationException::withMessages(['photo' => ['That image is too large. Use a photo under about 40 megapixels.']]);
+            throw ValidationException::withMessages(['photo' => [__('That image is too large. Use a photo under about 40 megapixels.')]]);
         }
 
         $source = @imagecreatefromstring($raw);
 
         if (! $source instanceof GdImage) {
-            throw ValidationException::withMessages(['photo' => ['That file is not a readable image.']]);
+            throw ValidationException::withMessages(['photo' => [__('That file is not a readable image.')]]);
         }
 
         $source = $this->applyExifRotation($source, $raw, $info[2] ?? 0);

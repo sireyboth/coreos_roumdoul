@@ -89,7 +89,7 @@ class PayGroupService
 
             if ($later = $rows->first(fn (EmployeePayGroup $row) => $row->effective_from->toDateString() > $from)) {
                 throw ValidationException::withMessages([
-                    'effective_from' => ["A pay group change is already set from {$later->effective_from->toDateString()}. Remove it first, or pick a later date."],
+                    'effective_from' => [__('A pay group change is already set from :date. Remove it first, or pick a later date.', ['date' => $later->effective_from->toDateString()])],
                 ]);
             }
 
@@ -101,7 +101,7 @@ class PayGroupService
 
             $current = $rows->whereNull('effective_to')->last();
             if ($current?->pay_group_id === $group->id) {
-                throw ValidationException::withMessages(['pay_group_id' => ["{$employee->name} is already in {$group->name}."]]);
+                throw ValidationException::withMessages(['pay_group_id' => [__(':name is already in :group.', ['name' => $employee->name, 'group' => $group->name])]]);
             }
 
             $rows->whereNull('effective_to')->each(fn (EmployeePayGroup $open) => $open->update([
@@ -128,7 +128,7 @@ class PayGroupService
             $rows = $this->history($employee);
 
             if ($rows->last()?->id !== $row->id) {
-                throw ValidationException::withMessages(['pay_group' => ['Only the latest pay group change can be removed.']]);
+                throw ValidationException::withMessages(['pay_group' => [__('Only the latest pay group change can be removed.')]]);
             }
 
             $row->delete();
@@ -208,7 +208,7 @@ class PayGroupService
 
         if ($paid !== null && $date <= $paid) {
             throw ValidationException::withMessages([
-                'effective_from' => ["{$employee->name} is already paid through ".CarbonImmutable::parse($paid)->format('j M Y').'. Pick a later date.'],
+                'effective_from' => [__(':name is already paid through :date. Pick a later date.', ['name' => $employee->name, 'date' => CarbonImmutable::parse($paid)->format('j M Y')])],
             ]);
         }
     }

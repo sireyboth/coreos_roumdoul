@@ -53,7 +53,6 @@ export const shared = {
     overtime: " · {time} overtime",
     markOffLabel: "Mark {name} as off this day",
     reasonPlaceholder: "Reason (optional) — e.g. Sick, Family",
-    saving: "Saving…",
     markOff: "Mark as day off",
     removing: "Removing…",
     removeOff: "Remove this day off",

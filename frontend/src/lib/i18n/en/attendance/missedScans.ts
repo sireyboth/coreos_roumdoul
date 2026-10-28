@@ -18,7 +18,6 @@ export const missedScans = {
   noScans: "No scans",
   missingScan: "Missing a scan",
   slotTime: "{slot} time",
-  saving: "Saving…",
 
   // ── Footer ────────────────────────────────────────────────────────
   footerHint: "Grey times were scanned and stay as they are. Times you leave unchanged follow the schedule.",

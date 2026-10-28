@@ -34,6 +34,8 @@ export const common = {
     retry: "Try again",
     signIn: "Sign in",
     signOut: "Sign out",
+    saveChanges: "Save changes",
+    done: "Done",
   },
 
   // ── Statuses ──────────────────────────────────────────────────────
@@ -71,6 +73,7 @@ export const common = {
     email: "Email",
     optional: "(optional)",
     required: "Required",
+    select: "Select…",
   },
 
   // ── Messages ──────────────────────────────────────────────────────
@@ -85,6 +88,9 @@ export const common = {
     planLimit: "Plan limit reached",
     offline: "Can't reach the server",
     offlineHint: "Check your internet connection and try again.",
+    saving: "Saving…",
+    adding: "Adding…",
+    saveFailed: "Couldn't save.",
   },
 
   // ── Tables (components/ui/data-table.tsx) ─────────────────────────

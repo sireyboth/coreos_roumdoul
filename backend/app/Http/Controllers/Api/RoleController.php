@@ -78,7 +78,7 @@ class RoleController extends Controller
         // its name is only a label and can change like any other role's.
         if ($role->code === self::PROTECTED_ROLE && isset($data['permissions'])) {
             throw ValidationException::withMessages([
-                'role' => ['The company-admin role\'s permissions cannot be changed.'],
+                'role' => [__('The company-admin role\'s permissions cannot be changed.')],
             ]);
         }
 
@@ -105,13 +105,13 @@ class RoleController extends Controller
 
         if ($role->code === self::PROTECTED_ROLE) {
             throw ValidationException::withMessages([
-                'role' => ['The company-admin role cannot be deleted.'],
+                'role' => [__('The company-admin role cannot be deleted.')],
             ]);
         }
 
         if ($role->memberships()->exists()) {
             throw ValidationException::withMessages([
-                'role' => ['This role is still assigned to a user. Reassign them first.'],
+                'role' => [__('This role is still assigned to a user. Reassign them first.')],
             ]);
         }
 

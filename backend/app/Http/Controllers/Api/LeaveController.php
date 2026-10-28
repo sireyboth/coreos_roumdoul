@@ -113,7 +113,7 @@ class LeaveController extends Controller
         SelfApproval::assertNotSelf($request->user(), $employee, 'employee_id', 'change the leave balance of');
         // Half days are the smallest unit anywhere else, so keep balances in halves too.
         if (fmod(abs((float) $data['days']) * 2, 1) !== 0.0) {
-            throw ValidationException::withMessages(['days' => ['Use whole or half days (e.g. 1, 0.5, -2).']]);
+            throw ValidationException::withMessages(['days' => [__('Use whole or half days (e.g. 1, 0.5, -2).')]]);
         }
 
         $adjustment = LeaveAdjustment::query()->create([
@@ -160,7 +160,7 @@ class LeaveController extends Controller
 
         if (! $employeeId || $employeeId === $own?->id) {
             if (! $own) {
-                throw ValidationException::withMessages(['employee_id' => ['Your account isn\'t linked to an employee record yet.']]);
+                throw ValidationException::withMessages(['employee_id' => [__('Your account isn\'t linked to an employee record yet.')]]);
             }
 
             return $own->load('company');
@@ -207,7 +207,7 @@ class LeaveController extends Controller
         $data['yearly_days'] = $limited ? $data['yearly_days'] : null;
         $data['accrual'] = ! $limited ? 'none' : (($data['accrual'] ?? 'none') === 'none' ? 'yearly' : $data['accrual']);
         if (($data['counts'] ?? null) === 'calendar_days' && ($data['allow_half_day'] ?? false)) {
-            throw ValidationException::withMessages(['allow_half_day' => ['Half days only work with leave counted in work days.']]);
+            throw ValidationException::withMessages(['allow_half_day' => [__('Half days only work with leave counted in work days.')]]);
         }
 
         return $data;

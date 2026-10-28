@@ -43,7 +43,7 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -103,7 +103,7 @@ function SalaryDialog({ employeeId, current, onOpenChange, onSaved }: { employee
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !(Number(amount) > 0) || !from}>
-              {saving ? t("payrollSetup.employeePay.shared.saving") : t("payrollSetup.employeePay.salaryDialog.saveSalary")}
+              {saving ? t("common.message.saving") : t("payrollSetup.employeePay.salaryDialog.saveSalary")}
             </Button>
           </DialogFooter>
         </form>
@@ -133,7 +133,7 @@ function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employe
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -182,7 +182,7 @@ function ItemDialog({ employeeId, components, onOpenChange, onSaved }: { employe
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !componentId || !(Number(amount) > 0)}>
-              {saving ? t("payrollSetup.employeePay.shared.saving") : t("common.action.add")}
+              {saving ? t("common.message.saving") : t("common.action.add")}
             </Button>
           </DialogFooter>
         </form>
@@ -257,7 +257,7 @@ function ProfileCard({ employeeId, profile, canEdit }: { employeeId: number; pro
           {canEdit && (
             <div className="flex justify-end sm:col-span-2">
               <Button type="submit" disabled={saving}>
-                {saving ? t("payrollSetup.employeePay.shared.saving") : t("common.action.save")}
+                {saving ? t("common.message.saving") : t("common.action.save")}
               </Button>
             </div>
           )}
@@ -304,7 +304,7 @@ function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : translateNow("payrollSetup.employeePay.shared.saveFailed"));
+      setError(err instanceof ApiError ? err.message : translateNow("common.message.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -342,7 +342,7 @@ function PayGroupDialog({ employeeId, pay, onOpenChange, onSaved }: { employeeId
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !groupId || !from}>
-              {saving ? t("payrollSetup.employeePay.shared.saving") : t("payrollSetup.employeePay.groupDialog.changeGroup")}
+              {saving ? t("common.message.saving") : t("payrollSetup.employeePay.groupDialog.changeGroup")}
             </Button>
           </DialogFooter>
         </form>

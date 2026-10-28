@@ -14,8 +14,6 @@ export const profilePage = {
   signsInWithId: "You sign in with employee ID {id}. An email here is optional and doesn't change that.",
   currentPassword: "Current password",
   emailPasswordHint: "Needed to change the email you sign in with.",
-  saving: "Saving…",
-  saveChanges: "Save changes",
   updated: "Profile updated",
 
   // ── Change password ──────────────────────────────────────────────

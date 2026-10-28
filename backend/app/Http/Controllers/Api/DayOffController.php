@@ -33,12 +33,12 @@ class DayOffController extends Controller
         $this->recorder->assertUnlocked($employee->company_id, $data['date'], employeeId: $employee->id);
 
         if (DayOff::query()->where('employee_id', $employee->id)->whereDate('date', $data['date'])->exists()) {
-            throw ValidationException::withMessages(['date' => ['This day is already marked as a day off.']]);
+            throw ValidationException::withMessages(['date' => [__('This day is already marked as a day off.')]]);
         }
 
         if (Schedule::query()->where('employee_id', $employee->id)->whereDate('date', $data['date'])->exists()) {
             throw ValidationException::withMessages([
-                'date' => ['This employee has a roster entry on that day. Remove it from the roster first.'],
+                'date' => [__('This employee has a roster entry on that day. Remove it from the roster first.')],
             ]);
         }
 

@@ -186,7 +186,7 @@ class EmployeeRequestController extends Controller
         $requests = EmployeeRequest::query()->with($this->relations())->whereKey($data['ids'])->get()
             ->filter(fn (EmployeeRequest $r) => $this->chain->covers($request->user(), $r->employee));
         if ($requests->count() !== count($data['ids'])) {
-            throw ValidationException::withMessages(['ids' => ['Some of those requests no longer exist or are outside your branches. Reload and try again.']]);
+            throw ValidationException::withMessages(['ids' => [__('Some of those requests no longer exist or are outside your branches. Reload and try again.')]]);
         }
 
         $locked = $requests->where('status', 'approved')
@@ -268,7 +268,7 @@ class EmployeeRequestController extends Controller
         $employeeId = $data['employee_id'] ?? $own?->id;
 
         if (! $employeeId) {
-            throw ValidationException::withMessages(['employee_id' => ['Your account isn\'t linked to an employee record yet.']]);
+            throw ValidationException::withMessages(['employee_id' => [__('Your account isn\'t linked to an employee record yet.')]]);
         }
 
         // Unscoped lookup: a line manager may be in another branch, yet only
@@ -276,7 +276,7 @@ class EmployeeRequestController extends Controller
         $employee = Employee::query()->withoutGlobalScope('branch_access')->with('currentAssignment', 'company')->findOrFail($employeeId);
 
         if ($employee->id !== $own?->id && ! $this->chain->covers($user, $employee)) {
-            abort(403, 'You can only send requests for yourself.');
+            abort(403, __('You can only send requests for yourself.'));
         }
 
         return [$employee, $lateEarly ? null : LeaveType::query()->findOrFail($data['leave_type_id']), $data];

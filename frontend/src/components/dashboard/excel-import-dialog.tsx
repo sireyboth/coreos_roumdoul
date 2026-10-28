@@ -23,7 +23,7 @@ import {
   type ImportSpec,
   type ParsedRow,
 } from "@/lib/excel-import";
-import { useT } from "@/lib/i18n";
+import { translate, useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +100,7 @@ export function ExcelImportDialog<Ctx>({
         `${spec.templateFile}-import-template.xlsx`,
         capitalise(many),
         templateColumns(spec.fields, spec.choices?.(ctx)),
-        [spec.matching, ...(typeof spec.notes === "function" ? spec.notes(ctx) : (spec.notes ?? []))],
+        [translate("en", spec.matching, spec.matchingVars), ...(typeof spec.notes === "function" ? spec.notes(ctx) : (spec.notes ?? []))],
       );
     } catch (err) {
       notifyError(err);
@@ -134,7 +134,8 @@ export function ExcelImportDialog<Ctx>({
 
       setStage({ step: "review", fileName: file.name, rows: parseRows(spec.fields, columns, rows), ignored });
     } catch (err) {
-      setError(err instanceof WorkbookError ? err.message : t("app.excelImport.file.unreadable"));
+      if (err instanceof WorkbookError) setError(err.code ? t(`app.excelImport.file.${err.code}`) : err.message);
+      else setError(t("app.excelImport.file.unreadable"));
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -292,7 +293,7 @@ export function ExcelImportDialog<Ctx>({
             </label>
 
             {error && <Alert variant="destructive">{error}</Alert>}
-            <Alert variant="info">{spec.matching} {t("app.excelImport.upload.blankCells")}</Alert>
+            <Alert variant="info">{t(spec.matching, spec.matchingVars)} {t("app.excelImport.upload.blankCells")}</Alert>
           </div>
         )}
 
@@ -363,7 +364,7 @@ export function ExcelImportDialog<Ctx>({
                 <RefreshCw className="size-4" />
                 {t("app.excelImport.done.importAnother")}
               </Button>
-              <Button onClick={() => handleOpenChange(false)}>{t("app.excelImport.done.done")}</Button>
+              <Button onClick={() => handleOpenChange(false)}>{t("common.action.done")}</Button>
             </DialogFooter>
           </div>
         )}
@@ -475,8 +476,8 @@ function ReviewStep<Ctx>({
             className="mt-0.5 size-4 rounded border-input"
           />
           <span>
-            <span className="block font-medium">{setting.label}</span>
-            {setting.description && <span className="block text-xs text-muted-foreground">{setting.description}</span>}
+            <span className="block font-medium">{t(setting.label)}</span>
+            {setting.description && <span className="block text-xs text-muted-foreground">{t(setting.description)}</span>}
           </span>
         </label>
       ))}

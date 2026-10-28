@@ -71,8 +71,6 @@ export const payGroups: Dictionary["payrollSetup"]["payGroups"] = {
   save: {
     saved: "បានរក្សាទុកក្រុមបើកប្រាក់បៀវត្សរ៍",
     added: "បានបន្ថែមក្រុមបើកប្រាក់បៀវត្សរ៍",
-    failed: "មិនអាចរក្សាទុកបានទេ។",
-    saving: "កំពុងរក្សាទុក…",
     addGroup: "បន្ថែមក្រុម",
   },
 

@@ -94,7 +94,5 @@ export const componentDialog: Dictionary["payrollSetup"]["componentDialog"] = {
     active: "សកម្ម — ប្រើក្នុងការបើកប្រាក់បៀវត្សរ៍",
     added: "បានបន្ថែមធាតុប្រាក់បៀវត្សរ៍",
     saved: "បានរក្សាទុកធាតុប្រាក់បៀវត្សរ៍",
-    saveFailed: "មិនអាចរក្សាទុកបានទេ។",
-    saving: "កំពុងរក្សាទុក…",
   },
 };

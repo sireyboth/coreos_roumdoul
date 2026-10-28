@@ -49,8 +49,6 @@ export const policyPage = {
   order: "Display order",
   allowHalf: "Allow half days (morning / afternoon)",
   activeHint: "Active — staff can choose it",
-  saving: "Saving…",
-  saveFailed: "Couldn't save.",
   typeSaved: "Leave type saved",
   typeAdded: "Leave type added",
 

@@ -6,9 +6,6 @@ export const shared = {
   editTitle: 'Edit "{name}"',
   code: "Code (optional)",
   address: "Address (optional)",
-  saveChanges: "Save changes",
-  saving: "Saving…",
-  adding: "Adding…",
 
   // ── Location fields (branches & work locations) ─────────────────
   location: "Location",

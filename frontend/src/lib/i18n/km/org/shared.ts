@@ -7,9 +7,6 @@ export const shared: Dictionary["org"]["shared"] = {
   editTitle: 'កែប្រែ "{name}"',
   code: "កូដ (ស្រេចចិត្ត)",
   address: "អាសយដ្ឋាន (ស្រេចចិត្ត)",
-  saveChanges: "រក្សាទុកការកែប្រែ",
-  saving: "កំពុងរក្សាទុក…",
-  adding: "កំពុងបន្ថែម…",
 
   // ── Location fields (branches & work locations) ─────────────────
   location: "ទីតាំង",

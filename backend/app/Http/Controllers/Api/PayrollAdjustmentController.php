@@ -73,7 +73,7 @@ class PayrollAdjustmentController extends Controller
         // Only people the caller can see; anyone else in the list is an error, not silently skipped.
         $employees = Employee::query()->whereIn('id', $data['employee_ids'])->get();
         if ($employees->count() !== count($data['employee_ids'])) {
-            throw ValidationException::withMessages(['employee_ids' => ['Some of these employees no longer exist or are outside your branches.']]);
+            throw ValidationException::withMessages(['employee_ids' => [__('Some of these employees no longer exist or are outside your branches.')]]);
         }
         foreach ($employees as $employee) {
             SelfApproval::assertNotSelf($request->user(), $employee, 'employee_ids', 'add pay adjustments for');
@@ -138,17 +138,17 @@ class PayrollAdjustmentController extends Controller
             $employee = $employees[$row['employee_code']] ?? null;
             $date = $row['date'] ?? $data['date'];
             if (! $employee) {
-                $errors[] = ['row' => $i + 1, 'message' => "No employee with ID {$row['employee_code']}."];
+                $errors[] = ['row' => $i + 1, 'message' => __('No employee with ID :code.', ['code' => $row['employee_code']])];
 
                 continue;
             }
             if ($employee->user_id === $request->user()->id && ! SelfApproval::allowed($request->user())) {
-                $errors[] = ['row' => $i + 1, 'message' => 'You can\'t add pay adjustments for yourself — ask someone else who has the permission.'];
+                $errors[] = ['row' => $i + 1, 'message' => __('You can\'t add pay adjustments for yourself — ask someone else who has the permission.')];
 
                 continue;
             }
             if ($this->groups->paidOn([$employee->id], $date)->isNotEmpty()) {
-                $errors[] = ['row' => $i + 1, 'message' => "{$employee->name} is already paid for {$date}. Use a later date."];
+                $errors[] = ['row' => $i + 1, 'message' => __(':name is already paid for :date. Use a later date.', ['name' => $employee->name, 'date' => $date])];
 
                 continue;
             }
@@ -201,7 +201,9 @@ class PayrollAdjustmentController extends Controller
 
         $names = $employees->filter()->whereIn('id', $paid)->take(5)->map(fn (Employee $e) => $e->name)->join(', ');
         throw ValidationException::withMessages(['date' => [
-            "Pay for {$date} is already approved for {$names}".($paid->count() > 5 ? ' and others' : '').'. Pick a date in a later pay period.',
+            $paid->count() > 5
+                    ? __('Pay for :date is already approved for :names and others. Pick a date in a later pay period.', ['date' => $date, 'names' => $names])
+                    : __('Pay for :date is already approved for :names. Pick a date in a later pay period.', ['date' => $date, 'names' => $names]),
         ]]);
     }
 

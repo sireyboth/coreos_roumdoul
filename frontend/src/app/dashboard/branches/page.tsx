@@ -372,7 +372,7 @@ export default function BranchesPage() {
                       <DialogFooter>
                         <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                         <Button type="submit" disabled={creating}>
-                          {creating ? t("org.shared.adding") : t("org.branchesPage.add")}
+                          {creating ? t("common.message.adding") : t("org.branchesPage.add")}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -438,7 +438,7 @@ export default function BranchesPage() {
               <DialogFooter>
                 <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
                 <Button type="submit" disabled={savingEdit}>
-                  {savingEdit ? t("org.shared.saving") : t("org.shared.saveChanges")}
+                  {savingEdit ? t("common.message.saving") : t("common.action.saveChanges")}
                 </Button>
               </DialogFooter>
             </form>

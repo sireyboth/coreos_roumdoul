@@ -14,6 +14,5 @@ export const photo: Dictionary["employees"]["photo"] = {
   // ── Crop dialog ──────────────────────────────────────────────────
   cropTitle: "កែសម្រួលរូបថត",
   zoom: "ពង្រីក",
-  saving: "កំពុងរក្សាទុក…",
   use: "ប្រើរូបថតនេះ",
 };

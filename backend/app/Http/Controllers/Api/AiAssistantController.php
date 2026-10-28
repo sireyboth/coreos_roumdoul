@@ -38,14 +38,14 @@ class AiAssistantController extends Controller
         // A user without a company (e.g. a platform admin) has no shared
         // budget to count against, so they can't use the assistant here.
         if (! $membership) {
-            return response()->json(['message' => 'The help assistant is only available inside a company.'], 403);
+            return response()->json(['message' => __('The help assistant is only available inside a company.')], 403);
         }
 
         // Every question costs real API credit, so only paying companies get
         // it: a trial is refused even when its plan includes the module.
         if ($membership->company?->status !== 'active') {
             return response()->json([
-                'message' => 'The help assistant is available once your company is on a paid plan.',
+                'message' => __('The help assistant is available once your company is on a paid plan.'),
                 'code' => 'module_not_enabled',
             ], 403);
         }
@@ -59,7 +59,7 @@ class AiAssistantController extends Controller
         if (RateLimiter::tooManyAttempts($companyKey, self::PER_COMPANY_PER_DAY)
             || RateLimiter::tooManyAttempts($userKey, self::PER_USER_PER_DAY)) {
             return response()->json([
-                'message' => 'Daily question limit reached. Try again tomorrow.',
+                'message' => __('Daily question limit reached. Try again tomorrow.'),
             ], 429);
         }
 
@@ -82,7 +82,7 @@ class AiAssistantController extends Controller
             RateLimiter::decrement($userKey, 86400);
 
             return response()->json([
-                'message' => 'The assistant is not available right now. Try again in a few minutes.',
+                'message' => __('The assistant is not available right now. Try again in a few minutes.'),
             ], 503);
         }
 

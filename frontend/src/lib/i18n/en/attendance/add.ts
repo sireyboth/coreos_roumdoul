@@ -24,7 +24,6 @@ export const add = {
 
   // ── Reason & save ─────────────────────────────────────────────────
   reasonPlaceholder: "e.g. Worked Sunday stock count; confirmed by branch manager",
-  saving: "Saving…",
   added: "Attendance added",
   recalculated: "The day was recalculated.",
 };

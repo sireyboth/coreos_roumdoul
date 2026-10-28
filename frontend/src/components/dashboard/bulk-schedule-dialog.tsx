@@ -283,7 +283,7 @@ export function BulkScheduleDialog({
                 <Label htmlFor="bulk-shift">{t("schedules.bulk.schedule")}</Label>
                 <select id="bulk-shift" required value={scheduleId} onChange={(e) => setScheduleId(e.target.value)} className={SELECT_CLASS}>
                   <option value="" disabled>
-                    {t("schedules.bulk.select")}
+                    {t("common.field.select")}
                   </option>
                   {activeSchedules.map((schedule) => (
                     <option key={schedule.id} value={schedule.id}>
@@ -404,7 +404,7 @@ export function BulkScheduleDialog({
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving || !previewReady || !result || result.created === 0}>
               {saving
-                ? t("schedules.bulk.adding")
+                ? t("common.message.adding")
                 : result
                   ? t(result.created === 1 ? "schedules.bulk.addOne" : "schedules.bulk.addMany", { n: result.created })
                   : t("schedules.bulk.title")}

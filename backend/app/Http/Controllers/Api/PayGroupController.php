@@ -65,13 +65,13 @@ class PayGroupController extends Controller
         $data = $this->validated($request, $group);
 
         if ($group->is_default && array_key_exists('is_default', $data) && ! $data['is_default']) {
-            throw ValidationException::withMessages(['is_default' => ['Make another group the default instead.']]);
+            throw ValidationException::withMessages(['is_default' => [__('Make another group the default instead.')]]);
         }
 
         $timing = array_intersect_key($data, array_flip(['schedule', 'cutoff_days', 'anchor_date']));
         $changesTiming = collect($timing)->contains(fn ($value, $key) => $value != $group->{$key} && ! ($key === 'anchor_date' && $value === $group->anchor_date?->toDateString()));
         if ($changesTiming && $group->payRuns()->whereIn('status', ['draft', 'calculated'])->exists()) {
-            throw ValidationException::withMessages(['schedule' => ['Approve or delete this group\'s open pay runs before changing its schedule.']]);
+            throw ValidationException::withMessages(['schedule' => [__('Approve or delete this group\'s open pay runs before changing its schedule.')]]);
         }
 
         DB::transaction(function () use ($group, $data) {
@@ -87,13 +87,15 @@ class PayGroupController extends Controller
     public function destroy(PayGroup $group)
     {
         if ($group->is_default) {
-            throw ValidationException::withMessages(['group' => ['The default group can\'t be deleted. Make another group the default first.']]);
+            throw ValidationException::withMessages(['group' => [__('The default group can\'t be deleted. Make another group the default first.')]]);
         }
         if ($group->payRuns()->exists()) {
-            throw ValidationException::withMessages(['group' => ['This group has pay runs, so it is kept for the record.']]);
+            throw ValidationException::withMessages(['group' => [__('This group has pay runs, so it is kept for the record.')]]);
         }
         if (($count = $group->members()->count()) > 0) {
-            throw ValidationException::withMessages(['group' => ["{$count} pay group ".($count === 1 ? 'change points' : 'changes point').' to this group. Move those people to another group first.']]);
+            throw ValidationException::withMessages(['group' => [$count === 1
+                ? __(':n pay group change points to this group. Move those people to another group first.', ['n' => $count])
+                : __(':n pay group changes point to this group. Move those people to another group first.', ['n' => $count])]]);
         }
 
         $group->delete();
@@ -164,16 +166,16 @@ class PayGroupController extends Controller
             $needed = $schedule === 'monthly' ? 1 : 2;
             $cutoffs = collect($cutoffs ?? [])->map(fn ($d) => (int) $d)->sort()->values()->all();
             if (count($cutoffs) !== $needed) {
-                throw ValidationException::withMessages(['cutoff_days' => [$needed === 1 ? 'Pick the day each period ends on.' : 'Pick the two days the periods end on.']]);
+                throw ValidationException::withMessages(['cutoff_days' => [$needed === 1 ? __('Pick the day each period ends on.') : __('Pick the two days the periods end on.')]]);
             }
             if ($needed === 2 && min(abs($cutoffs[1] - $cutoffs[0]), 31 - abs($cutoffs[1] - $cutoffs[0])) < 7) {
-                throw ValidationException::withMessages(['cutoff_days' => ['The two cut-off days should be at least a week apart.']]);
+                throw ValidationException::withMessages(['cutoff_days' => [__('The two cut-off days should be at least a week apart.')]]);
             }
             $data['cutoff_days'] = $cutoffs;
             $data['anchor_date'] = null;
         } elseif (in_array($schedule, ['weekly', 'biweekly'], true)) {
             if (! $anchor) {
-                throw ValidationException::withMessages(['anchor_date' => ['Pick the first day of any one period; the rest follow from it.']]);
+                throw ValidationException::withMessages(['anchor_date' => [__('Pick the first day of any one period; the rest follow from it.')]]);
             }
             $data['anchor_date'] = $anchor;
             $data['cutoff_days'] = null;
@@ -202,7 +204,7 @@ class PayGroupController extends Controller
         $clean = [];
 
         foreach ($rules as $id => $rule) {
-            $component = $components->get((int) $id) ?? throw ValidationException::withMessages(['component_rules' => ['One of these rules is for a component that no longer exists.']]);
+            $component = $components->get((int) $id) ?? throw ValidationException::withMessages(['component_rules' => [__('One of these rules is for a component that no longer exists.')]]);
             if ($component->method === 'base') {
                 continue;
             }

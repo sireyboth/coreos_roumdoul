@@ -5,8 +5,6 @@ import type { Dictionary } from "../../en";
 export const employeePay: Dictionary["payrollSetup"]["employeePay"] = {
   // ── Shared words ──────────────────────────────────────────────────
   shared: {
-    saving: "កំពុងរក្សាទុក…",
-    saveFailed: "មិនអាចរក្សាទុកបានទេ។",
     note: "កំណត់សម្គាល់",
     optional: "ស្រេចចិត្ត",
     now: "បច្ចុប្បន្ន",

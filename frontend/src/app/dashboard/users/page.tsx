@@ -91,7 +91,7 @@ function BranchAccessDialog({
         <DialogFooter>
           <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
           <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? t("access.usersPage.saving") : t("common.action.save")}
+            {saving ? t("common.message.saving") : t("common.action.save")}
           </Button>
         </DialogFooter>
       </DialogContent>

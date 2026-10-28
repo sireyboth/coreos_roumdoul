@@ -36,7 +36,7 @@ class EmployeeSalaryService
 
             if ($later = $rows->first(fn (EmployeeSalary $row) => $row->effective_from->toDateString() > $effectiveFrom)) {
                 throw ValidationException::withMessages([
-                    'effective_from' => ["A salary change is already set from {$later->effective_from->toDateString()}. Remove it first, or pick a later date."],
+                    'effective_from' => [__('A salary change is already set from :date. Remove it first, or pick a later date.', ['date' => $later->effective_from->toDateString()])],
                 ]);
             }
 
@@ -78,7 +78,7 @@ class EmployeeSalaryService
             $rows = $this->history($employee);
 
             if ($rows->last()?->id !== $salary->id) {
-                throw ValidationException::withMessages(['salary' => ['Only the latest salary can be removed.']]);
+                throw ValidationException::withMessages(['salary' => [__('Only the latest salary can be removed.')]]);
             }
 
             $salary->delete();
@@ -148,7 +148,7 @@ class EmployeeSalaryService
     {
         if ($this->monthPaid($employee, $date)) {
             throw ValidationException::withMessages([
-                'effective_from' => ["{$employee->name} is already paid through ".CarbonImmutable::parse($this->groups->paidThrough($employee))->format('j M Y').'. Choose a later date, or add an adjustment to the next pay run.'],
+                'effective_from' => [__(':name is already paid through :date. Choose a later date, or add an adjustment to the next pay run.', ['name' => $employee->name, 'date' => CarbonImmutable::parse($this->groups->paidThrough($employee))->format('j M Y')])],
             ]);
         }
     }

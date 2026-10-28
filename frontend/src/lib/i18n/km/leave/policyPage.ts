@@ -51,8 +51,6 @@ export const policyPage: Dictionary["leave"]["policyPage"] = {
   order: "លំដាប់បង្ហាញ",
   allowHalf: "អនុញ្ញាតកន្លះថ្ងៃ (ពេលព្រឹក / ពេលរសៀល)",
   activeHint: "សកម្ម — បុគ្គលិកអាចជ្រើសរើសបាន",
-  saving: "កំពុងរក្សាទុក…",
-  saveFailed: "មិនអាចរក្សាទុកបានទេ។",
   typeSaved: "បានរក្សាទុកប្រភេទច្បាប់ឈប់សម្រាក",
   typeAdded: "បានបន្ថែមប្រភេទច្បាប់ឈប់សម្រាក",
 

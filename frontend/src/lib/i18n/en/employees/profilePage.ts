@@ -39,8 +39,6 @@ export const profilePage = {
   idIsSignIn: "This is their sign-in ID, so it can't be changed here.",
   branchMoveHint: "Moving someone to another branch also moves where they're allowed to check in.",
   reset: "Reset",
-  saving: "Saving…",
-  saveChanges: "Save changes",
 
   // ── Read-only details ────────────────────────────────────────────
   details: "Details",

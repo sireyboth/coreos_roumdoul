@@ -19,6 +19,7 @@ import {
 import { dateOnly } from "@/lib/date";
 import { downloadSheet, today } from "@/lib/excel";
 import { errorText, isFatal, Lookup, optionLabel, Row, RowError, yesNo, type ImportSpec, type SaveResult } from "@/lib/excel-import";
+import { translateNow } from "@/lib/i18n";
 import { daysOffProblem, parseDaysOff } from "@/lib/excel-specs/time";
 import { daysOffText } from "@/lib/schedule";
 
@@ -208,7 +209,7 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
   return {
     noun: { one: "employee", many: "employees" },
     templateFile: "employees",
-    matching: "A row whose Employee ID (or, without one, Email) matches an existing employee updates that employee.",
+    matching: "app.excelSpecs.matching.employees",
     notes: [
       "Imported employees don't get a login. Give them one afterwards from their profile.",
       "If you name a Team but no Department, the team's own department is used.",
@@ -284,7 +285,7 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
               type: "number" as const,
               hint: `${c.kind === "earning" ? "Allowance" : "Deduction"} amount for this person. 0 stops it.`,
               aliases: [c.code],
-              validate: (text: string) => (Number(text.replace(/,/g, "")) < 0 ? `${c.name} can't be negative.` : null),
+              validate: (text: string) => (Number(text.replace(/,/g, "")) < 0 ? translateNow("app.excelSpecs.row.cantBeNegative", { field: c.name }) : null),
             })),
           ]
         : []),
@@ -359,17 +360,17 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
       const workSchedule = schedule && row.text("work_schedule") ? ctx.schedules.require(row.text("work_schedule")!) : undefined;
       const daysOff = schedule && row.has("days_off") ? parseDaysOff(row.text("days_off")!, "Days off") : undefined;
       if (daysOff && !workSchedule && !(existing && ctx.scheduleToday.has(existing.id))) {
-        throw new RowError("Days off needs a Work schedule.");
+        throw new RowError(translateNow("app.excelSpecs.row.daysOffNeedsSchedule"));
       }
 
       if (row.number("base_salary") != null && !row.has("salary_currency")) {
         // An update can reuse the currency they're already paid in.
         const currency = existing ? (pay ? ctx.pay.get(existing.id)?.salary?.currency : existing.salary_currency) : undefined;
-        if (!currency) throw new RowError("A Base salary needs a Currency (USD or KHR).");
+        if (!currency) throw new RowError(translateNow("app.excelSpecs.row.salaryNeedsCurrency"));
         if (!pay) payload.salary_currency = currency;
       }
       if (pay && !row.has("base_salary") && !(existing && ctx.pay.get(existing.id)?.salary) && (row.has("salary_currency") || row.has("pay_type"))) {
-        throw new RowError("Fill in the Base salary too.");
+        throw new RowError(translateNow("app.excelSpecs.row.fillSalary"));
       }
 
       let employee: Employee;
@@ -381,8 +382,8 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
         result = "updated";
       } else {
         const name = row.text("name") ?? [row.text("first_name"), row.text("last_name")].filter(Boolean).join(" ");
-        if (!name) throw new RowError("Fill in Name, or First name and Last name.");
-        if (!payload.branch_id) throw new RowError("A new employee needs a Branch.");
+        if (!name) throw new RowError(translateNow("app.excelSpecs.row.fillName"));
+        if (!payload.branch_id) throw new RowError(translateNow("app.excelSpecs.row.employeeNeedsBranch"));
         // A new person starts in their pay group from their first day.
         if (group) payload.pay_group_id = group.id;
         employee = await api.employees.create({ ...payload, name, branch_id: payload.branch_id });
@@ -396,7 +397,7 @@ export function employeeImport({ salary, pay, schedule, items = [] }: EmployeeSh
         if (schedule) await saveSchedule(row, employee, ctx, workSchedule, daysOff);
       } catch (err) {
         if (isFatal(err) || err instanceof RowError) throw err;
-        throw new RowError(`${employee.name} was saved, but not all of their pay and schedule: ${errorText(err)}`);
+        throw new RowError(translateNow("app.excelSpecs.row.partlySaved", { name: employee.name, error: errorText(err) }));
       }
       return result;
     },
@@ -504,7 +505,7 @@ export async function exportUsers(): Promise<string> {
 export const userImport: ImportSpec<{ users: Lookup<CompanyUser>; roles: Lookup<Role> }> = {
   noun: { one: "user", many: "users" },
   templateFile: "users",
-  matching: "A row whose Email matches an existing user changes that user's Role.",
+  matching: "app.excelSpecs.matching.users",
   notes: [
     "The password is only used for new accounts. Ask each person to change it after signing in, and delete this file once imported.",
     "Employees who sign in with their employee ID are managed from the Employees page instead.",
@@ -534,8 +535,8 @@ export const userImport: ImportSpec<{ users: Lookup<CompanyUser>; roles: Lookup<
     }
 
     const password = row.text("password");
-    if (!password) throw new RowError("A new user needs a Password.");
-    if (password.length < 8) throw new RowError("The password must be at least 8 characters.");
+    if (!password) throw new RowError(translateNow("app.excelSpecs.row.userNeedsPassword"));
+    if (password.length < 8) throw new RowError(translateNow("app.excelSpecs.row.passwordTooShort"));
 
     ctx.users.add(await api.users.invite({ name: row.text("name")!, email: row.text("email")!, password, role }));
     return "created";
@@ -563,7 +564,7 @@ export async function exportRoles(): Promise<string> {
 export const roleImport: ImportSpec<{ roles: Lookup<Role>; permissions: Set<string> }> = {
   noun: { one: "role", many: "roles" },
   templateFile: "roles",
-  matching: "A row whose Role matches an existing role replaces that role's permissions.",
+  matching: "app.excelSpecs.matching.roles",
   notes: (ctx) => [
     "List permissions separated by commas. Available permissions: " + [...ctx.permissions].sort().join(", ") + ".",
   ],
@@ -589,12 +590,12 @@ export const roleImport: ImportSpec<{ roles: Lookup<Role>; permissions: Set<stri
       : undefined;
 
     const unknown = permissions?.filter((p) => !ctx.permissions.has(p)) ?? [];
-    if (unknown.length > 0) throw new RowError(`Unknown permission${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}.`);
+    if (unknown.length > 0) throw new RowError(translateNow(unknown.length === 1 ? "app.excelSpecs.row.unknownPermissionOne" : "app.excelSpecs.row.unknownPermissionOther", { list: unknown.join(", ") }));
 
     const existing = ctx.roles.find(row.text("name"));
     if (existing) {
       if (permissions === undefined) return "skipped";
-      if (existing.protected) throw new RowError(`"${existing.name}" is a built-in role, so its permissions can't be changed.`);
+      if (existing.protected) throw new RowError(translateNow("app.excelSpecs.row.builtInRole", { name: existing.name }));
       const same = permissions.length === existing.permissions.length && permissions.every((p) => existing.permissions.includes(p));
       if (same) return "skipped";
       ctx.roles.put(await api.roles.update(existing.id, { permissions }));

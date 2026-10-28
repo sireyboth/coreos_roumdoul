@@ -278,7 +278,7 @@ export default function NewEmployeePage() {
                 {t("common.action.cancel")}
               </Button>
               <Button type="submit" disabled={saving || atEmployeeLimit || !form.branch_id || !form.name.trim()}>
-                {saving ? t("employees.newPage.adding") : t("employees.shared.addEmployee")}
+                {saving ? t("common.message.adding") : t("employees.shared.addEmployee")}
               </Button>
             </div>
           </div>

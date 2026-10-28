@@ -355,7 +355,7 @@ export function RoleDialog({
             <div className="flex gap-2">
               <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
               <Button type="submit" disabled={saving || !name.trim()}>
-                {saving ? t("access.roleDialog.saving") : role ? t("access.roleDialog.saveChanges") : t("access.roleDialog.create")}
+                {saving ? t("common.message.saving") : role ? t("common.action.saveChanges") : t("access.roleDialog.create")}
               </Button>
             </div>
           </DialogFooter>

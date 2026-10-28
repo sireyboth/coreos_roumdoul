@@ -63,7 +63,7 @@ class AuthController extends Controller
 
         if ($byId && ! empty($data['email'])) {
             throw ValidationException::withMessages([
-                'email' => ['Sign in with either an email or an employee ID, not both.'],
+                'email' => [__('Sign in with either an email or an employee ID, not both.')],
             ]);
         }
 
@@ -78,13 +78,13 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($data['password'], $user->password)) {
             throw ValidationException::withMessages([
-                $field => ['These credentials do not match our records.'],
+                $field => [__('These credentials do not match our records.')],
             ]);
         }
 
         if (! $user->is_active) {
             throw ValidationException::withMessages([
-                $field => ['This account has been deactivated.'],
+                $field => [__('This account has been deactivated.')],
             ]);
         }
 
@@ -93,13 +93,13 @@ class AuthController extends Controller
 
         if (in_array($companyStatus, ['suspended', 'cancelled'], true)) {
             throw ValidationException::withMessages([
-                $field => ["This company's account has been {$companyStatus}. Contact support."],
+                $field => [__('This company\'s account has been :status. Contact support.', ['status' => __($companyStatus)])],
             ]);
         }
 
         if ($company?->isTrialExpired()) {
             throw ValidationException::withMessages([
-                $field => ['Your trial has ended. Please upgrade your plan to continue.'],
+                $field => [__('Your trial has ended. Please upgrade your plan to continue.')],
             ]);
         }
 
@@ -150,6 +150,6 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out.']);
+        return response()->json(['message' => __('Logged out.')]);
     }
 }

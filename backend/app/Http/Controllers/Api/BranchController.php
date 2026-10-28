@@ -50,7 +50,7 @@ class BranchController extends Controller
     {
         if ($request->user()->company->hasReachedBranchLimit()) {
             return response()->json([
-                'message' => 'Your plan\'s branch limit has been reached. Upgrade your plan to add more.',
+                'message' => __('Your plan\'s branch limit has been reached. Upgrade your plan to add more.'),
                 'code' => 'plan_limit_reached',
             ], 422);
         }
@@ -119,7 +119,9 @@ class BranchController extends Controller
 
         if ($employees > 0) {
             return response()->json([
-                'message' => "{$branch->name} still has {$employees} ".($employees === 1 ? 'employee' : 'employees').'. Move them to another branch first.',
+                'message' => $employees === 1
+                    ? __(':name still has :n employee. Move them to another branch first.', ['name' => $branch->name, 'n' => $employees])
+                    : __(':name still has :n employees. Move them to another branch first.', ['name' => $branch->name, 'n' => $employees]),
                 'code' => 'in_use',
             ], 422);
         }

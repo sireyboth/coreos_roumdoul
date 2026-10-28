@@ -1,5 +1,6 @@
 import { trackPageRead, withBusy } from "@/lib/busy";
 import { createHttpCache } from "@/lib/http-cache";
+import { currentLang } from "@/lib/i18n";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -127,6 +128,8 @@ async function sendOnce<T>(path: string, options: RequestInit): Promise<T> {
         // A FormData body sets its own multipart boundary — forcing JSON would break uploads.
         ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         Accept: "application/json",
+        // Server messages (errors, "Password updated.") come back in the language on screen.
+        "Accept-Language": currentLang(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
@@ -1369,7 +1372,7 @@ export const api = {
     card: async (id: number): Promise<Blob> => {
       const token = getToken();
       const res = await fetch(`${API_URL}/api/employees/${id}/card`, {
-        headers: { Accept: "application/pdf", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { Accept: "application/pdf", "Accept-Language": currentLang(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
 
       if (!res.ok) {
@@ -1625,7 +1628,7 @@ export const api = {
 
       const token = getToken();
       const res = await fetch(`${API_URL}/api/attendance/export?${query}`, {
-        headers: { Accept: "text/csv, application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { Accept: "text/csv, application/json", "Accept-Language": currentLang(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
 
       if (!res.ok) {
@@ -1814,7 +1817,7 @@ export const api = {
     exportRun: async (id: number, filename: string): Promise<{ blob: Blob; filename: string }> => {
       const token = getToken();
       const res = await fetch(`${API_URL}/api/payroll/runs/${id}/export`, {
-        headers: { Accept: "text/csv, application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        headers: { Accept: "text/csv, application/json", "Accept-Language": currentLang(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));

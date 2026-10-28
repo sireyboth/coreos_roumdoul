@@ -25,21 +25,21 @@ class EnsureCompanyIsActive
         // reachable, and nothing there needs a company.
         if ($request->user()?->company_id !== null && ! $company) {
             return response()->json([
-                'message' => "This company's account no longer exists. Contact support.",
+                'message' => __("This company's account no longer exists. Contact support."),
                 'code' => 'company_deleted',
             ], 403);
         }
 
         if (in_array($company?->status, self::BLOCKED_STATUSES, true)) {
             return response()->json([
-                'message' => "This company's account has been {$company->status}. Contact support.",
+                'message' => __('This company\'s account has been :status. Contact support.', ['status' => __($company->status)]),
                 'code' => "company_{$company->status}",
             ], 403);
         }
 
         if ($company?->isTrialExpired()) {
             return response()->json([
-                'message' => 'Your trial has ended. Please upgrade your plan to continue.',
+                'message' => __('Your trial has ended. Please upgrade your plan to continue.'),
                 'code' => 'trial_expired',
             ], 403);
         }

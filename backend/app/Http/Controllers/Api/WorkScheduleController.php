@@ -144,7 +144,7 @@ class WorkScheduleController extends Controller
         $overtimeMode = $data['overtime_mode'] ?? $schedule?->overtime_mode ?? 'off';
         if (! $hasDays && $overtimeMode === 'off') {
             throw ValidationException::withMessages(['days' => [
-                'Add hours to at least one day. A schedule with no hours is only for overtime — turn overtime on to save it without hours.',
+                __('Add hours to at least one day. A schedule with no hours is only for overtime — turn overtime on to save it without hours.'),
             ]]);
         }
 
@@ -169,14 +169,14 @@ class WorkScheduleController extends Controller
         foreach (array_values($slots) as $i => $slot) {
             $expectedType = $i % 2 === 0 ? 'in' : 'out';
             if ($slot['type'] !== $expectedType) {
-                throw ValidationException::withMessages([$field => ['Slots must alternate IN, OUT, IN, OUT … starting with IN.']]);
+                throw ValidationException::withMessages([$field => [__('Slots must alternate IN, OUT, IN, OUT … starting with IN.')]]);
             }
 
             [$hour, $minute] = array_map('intval', explode(':', $slot['time']));
             $minutes = $hour * 60 + $minute + (($slot['next_day'] ?? false) ? 1440 : 0);
 
             if ($previous !== null && $minutes <= $previous) {
-                throw ValidationException::withMessages([$field => ["Each slot must be later than the one before it ({$slot['time']} isn't). Mark a slot after midnight as \"next day\"."]]);
+                throw ValidationException::withMessages([$field => [__('Each slot must be later than the one before it (:time isn\'t). Mark a slot after midnight as "next day".', ['time' => $slot['time']])]]);
             }
 
             $first ??= $minutes;
@@ -184,10 +184,10 @@ class WorkScheduleController extends Controller
         }
 
         if (count($slots) % 2 !== 0) {
-            throw ValidationException::withMessages([$field => ['Every IN needs an OUT after it.']]);
+            throw ValidationException::withMessages([$field => [__('Every IN needs an OUT after it.')]]);
         }
         if ($previous - $first >= 1440) {
-            throw ValidationException::withMessages([$field => ['A day\'s slots must all fall within 24 hours.']]);
+            throw ValidationException::withMessages([$field => [__('A day\'s slots must all fall within 24 hours.')]]);
         }
     }
 

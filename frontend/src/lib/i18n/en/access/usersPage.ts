@@ -45,7 +45,6 @@ export const usersPage = {
   // ── Branch access dialog ─────────────────────────────────────────
   branchTitle: "Branch access for {name}",
   branchDescription: "Leave everything unchecked to give them access to every branch. Check specific branches to restrict them to only those.",
-  saving: "Saving…",
   branchSaved: "Branch access updated",
   branchSavedSome: "{name} can now see only the selected branches.",
   branchSavedAll: "{name} can now see every branch.",

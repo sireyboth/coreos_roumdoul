@@ -40,7 +40,7 @@ class CalendarController extends Controller
             : $user->employee;
 
         if (! $employee) {
-            return response()->json(['message' => 'No employee record is linked to your account.', 'code' => 'no_employee'], 422);
+            return response()->json(['message' => __('No employee record is linked to your account.'), 'code' => 'no_employee'], 422);
         }
 
         [$start, $end, $today, $timezone] = $this->month($request);
@@ -135,7 +135,7 @@ class CalendarController extends Controller
         $to = CarbonImmutable::createFromFormat('Y-m-d', $request->string('to'), $timezone)->startOfDay();
 
         if ($from->diffInDays($to) > 366) {
-            return response()->json(['message' => 'Pick a range of a year or less.', 'errors' => ['to' => ['Pick a range of a year or less.']]], 422);
+            return response()->json(['message' => __('Pick a range of a year or less.'), 'errors' => ['to' => ['Pick a range of a year or less.']]], 422);
         }
 
         // Same rule as the month view: managers see anyone they can see
@@ -147,7 +147,7 @@ class CalendarController extends Controller
         } elseif ($user->employee) {
             $employees = collect([$user->employee]);
         } else {
-            return response()->json(['message' => 'No employee record is linked to your account.', 'code' => 'no_employee'], 422);
+            return response()->json(['message' => __('No employee record is linked to your account.'), 'code' => 'no_employee'], 422);
         }
 
         $types = $request->input('types') ?: ['holiday', 'day_off', 'leave', 'absent'];

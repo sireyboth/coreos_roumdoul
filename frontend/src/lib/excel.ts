@@ -348,16 +348,24 @@ export function headerKey(header: string): string {
   return header.replace(/\*/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export class WorkbookError extends Error {}
+/** Why a workbook couldn't be read. Screens translate it (app.excelImport.file.<code>); the message stays English for logs. */
+export type WorkbookErrorCode = "oldXls" | "notXlsx" | "damaged" | "noSheets" | "emptySheet";
+
+export class WorkbookError extends Error {
+  constructor(
+    message: string,
+    readonly code?: WorkbookErrorCode,
+  ) {
+    super(message);
+  }
+}
 
 /** Reads the first sheet of an .xlsx file: the first non-empty row is the header. */
 export async function readFirstSheet(file: File): Promise<{ headers: string[]; rows: SheetRow[] }> {
   if (!/\.xlsx$/i.test(file.name)) {
-    throw new WorkbookError(
-      /\.xls$/i.test(file.name)
-        ? "That's an old-style .xls file. Open it in Excel and save it as an Excel Workbook (.xlsx) first."
-        : "Choose an Excel workbook (.xlsx).",
-    );
+    throw /\.xls$/i.test(file.name)
+      ? new WorkbookError("That's an old-style .xls file. Open it in Excel and save it as an Excel Workbook (.xlsx) first.", "oldXls")
+      : new WorkbookError("Choose an Excel workbook (.xlsx).", "notXlsx");
   }
 
   const ExcelJS = await excel();
@@ -365,11 +373,11 @@ export async function readFirstSheet(file: File): Promise<{ headers: string[]; r
   try {
     await workbook.xlsx.load(await file.arrayBuffer());
   } catch {
-    throw new WorkbookError("That file couldn't be opened as an Excel workbook. It may be damaged or password-protected.");
+    throw new WorkbookError("That file couldn't be opened as an Excel workbook. It may be damaged or password-protected.", "damaged");
   }
 
   const sheet = workbook.worksheets.find((s) => s.state !== "hidden" && s.state !== "veryHidden");
-  if (!sheet) throw new WorkbookError("The workbook has no sheets.");
+  if (!sheet) throw new WorkbookError("The workbook has no sheets.", "noSheets");
 
   let headers: string[] = [];
   const rows: SheetRow[] = [];
@@ -390,7 +398,7 @@ export async function readFirstSheet(file: File): Promise<{ headers: string[]; r
     if (Object.values(cells).some((v) => v !== "")) rows.push({ rowNumber, cells });
   });
 
-  if (headers.length === 0) throw new WorkbookError("The first sheet is empty.");
+  if (headers.length === 0) throw new WorkbookError("The first sheet is empty.", "emptySheet");
 
   return { headers, rows };
 }

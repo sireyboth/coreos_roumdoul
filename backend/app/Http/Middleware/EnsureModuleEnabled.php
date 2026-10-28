@@ -21,7 +21,7 @@ class EnsureModuleEnabled
 
         if (! $company?->hasModule($moduleKey)) {
             return response()->json([
-                'message' => "Your plan doesn't include the \"{$moduleKey}\" module.",
+                'message' => __('Your plan doesn\'t include the ":module" module.', ['module' => $moduleKey]),
                 'code' => 'module_not_enabled',
             ], 403);
         }

@@ -58,13 +58,13 @@ class AttendanceService
         // (they're flagged as work on a day off).
         if ($expected->kind === 'unscheduled' && config('attendance.require_schedule')) {
             throw ValidationException::withMessages([
-                'schedule' => ["You don't have a work schedule for today. Ask your manager to assign you one."],
+                'schedule' => [__("You don't have a work schedule for today. Ask your manager to assign you one.")],
             ]);
         }
 
         if ($expected->isWork() && ($expected->rules['auto_attendance'] ?? false)) {
             throw ValidationException::withMessages([
-                'schedule' => ["Your attendance is recorded automatically on {$expected->scheduleName}, so there's no need to scan."],
+                'schedule' => [__('Your attendance is recorded automatically on :schedule, so there\'s no need to scan.', ['schedule' => $expected->scheduleName])],
             ]);
         }
 
@@ -145,7 +145,7 @@ class AttendanceService
         DB::transaction(function () use ($correction, $reviewerId, $notes) {
             // Claim it first: two managers approving at the same moment must not add the scans twice.
             if (! $correction->decide('approved', $reviewerId, $notes)) {
-                throw ValidationException::withMessages(['status' => ['This request has already been reviewed.']]);
+                throw ValidationException::withMessages(['status' => [__('This request has already been reviewed.')]]);
             }
 
             foreach ($correction->requestedTimes() as $time) {
@@ -192,7 +192,7 @@ class AttendanceService
             ->get();
 
         if ($toVoid->count() !== count(array_unique($voidIds))) {
-            throw ValidationException::withMessages(['void' => ["Some of those scans don't belong to {$employee->name}."]]);
+            throw ValidationException::withMessages(['void' => [__('Some of those scans don\'t belong to :name.', ['name' => $employee->name])]]);
         }
 
         // Every work date involved: the day itself, the next (a night shift's
@@ -315,7 +315,7 @@ class AttendanceService
             $status = str_replace('_', ' ', $employee->employment_status);
 
             throw ValidationException::withMessages([
-                'employee' => ["Your employment status is \"{$status}\", so you can't check in. Ask your manager."],
+                'employee' => [__('Your employment status is ":status", so you can\'t check in. Ask your manager.', ['status' => __($status)])],
             ]);
         }
     }
@@ -334,7 +334,7 @@ class AttendanceService
             $time = $last->event_time->setTimezone($this->timezoneFor($employee))->format('H:i');
 
             throw ValidationException::withMessages([
-                'scan' => ["You already scanned at {$time}. Wait a moment before scanning again."],
+                'scan' => [__('You already scanned at :time. Wait a moment before scanning again.', ['time' => $time])],
             ]);
         }
     }
@@ -358,7 +358,7 @@ class AttendanceService
     {
         $hasGps = isset($data['latitude'], $data['longitude']);
         // One action now covers both; the schedule decides which it was.
-        $verb = 'check in or out';
+        $verb = __('check in or out');
         $allowed = $this->allowedLocations($employee, $expected->workLocationId);
 
         if (! empty($data['qr_token'])) {
@@ -369,7 +369,7 @@ class AttendanceService
 
             if (! $workLocation) {
                 throw ValidationException::withMessages([
-                    'qr_token' => ['This QR code isn\'t recognized. Ask your manager for a fresh one.'],
+                    'qr_token' => [__('This QR code isn\'t recognized. Ask your manager for a fresh one.')],
                 ]);
             }
 
@@ -380,7 +380,7 @@ class AttendanceService
                 ->find($data['work_location_id']);
 
             if (! $workLocation) {
-                throw ValidationException::withMessages(['work_location_id' => ['That location doesn\'t exist.']]);
+                throw ValidationException::withMessages(['work_location_id' => [__('That location doesn\'t exist.')]]);
             }
 
             $this->assertLocationAllowed($employee, $allowed, $workLocation, $verb);
@@ -388,13 +388,13 @@ class AttendanceService
             $workLocation = $this->nearestLocation($employee, $allowed, (float) $data['latitude'], (float) $data['longitude'], true);
         } else {
             throw ValidationException::withMessages([
-                'verification' => ["Scan your branch's QR code or share your location to {$verb}."],
+                'verification' => [__('Scan your branch\'s QR code or share your location to :verb.', ['verb' => $verb])],
             ]);
         }
 
         if (! $workLocation->is_active) {
             throw ValidationException::withMessages([
-                'qr_token' => ["{$workLocation->name} is no longer active, so you can't check in there."],
+                'qr_token' => [__(':name is no longer active, so you can\'t check in there.', ['name' => $workLocation->name])],
             ]);
         }
 
@@ -416,7 +416,7 @@ class AttendanceService
 
             if ($distance > $workLocation->radius_meters) {
                 throw ValidationException::withMessages([
-                    'latitude' => ["You're too far from {$workLocation->name} to {$verb} (".round($distance).'m away).'],
+                    'latitude' => [__('You\'re too far from :name to :verb (:distance m away).', ['name' => $workLocation->name, 'verb' => $verb, 'distance' => round($distance)])],
                 ]);
             }
         }
@@ -457,7 +457,7 @@ class AttendanceService
         $branch = $this->assignedBranchName($employee);
 
         throw ValidationException::withMessages([
-            'qr_token' => ["This is the {$workLocation->name} code. You're assigned to {$branch}, so you can only {$verb} there."],
+            'qr_token' => [__('This is the :name code. You\'re assigned to :branch, so you can only :verb there.', ['name' => $workLocation->name, 'branch' => $branch, 'verb' => $verb])],
         ]);
     }
 
@@ -483,7 +483,7 @@ class AttendanceService
 
         if ($candidates->isEmpty()) {
             throw ValidationException::withMessages([
-                'latitude' => ['No check-in location is set up for your branch yet. Ask your admin.'],
+                'latitude' => [__('No check-in location is set up for your branch yet. Ask your admin.')],
             ]);
         }
 
@@ -492,7 +492,7 @@ class AttendanceService
 
         if ($distance > $nearest->radius_meters) {
             throw ValidationException::withMessages([
-                'latitude' => ["You're not near {$nearest->name} — you're ".round($distance).'m away.'],
+                'latitude' => [__('You\'re not near :name — you\'re :distance m away.', ['name' => $nearest->name, 'distance' => round($distance)])],
             ]);
         }
 

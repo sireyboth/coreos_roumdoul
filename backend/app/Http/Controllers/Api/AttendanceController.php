@@ -113,7 +113,7 @@ class AttendanceController extends Controller
         ]);
 
         if (empty($data['add']) && empty($data['void'])) {
-            throw ValidationException::withMessages(['add' => ['Add or remove at least one scan.']]);
+            throw ValidationException::withMessages(['add' => [__('Add or remove at least one scan.')]]);
         }
 
         // Scoped like every employee lookup, so a branch-limited manager only reaches their branch.
@@ -144,7 +144,7 @@ class AttendanceController extends Controller
         // Through the employee, so a branch-limited manager only reaches their branch.
         $days = AttendanceDay::query()->whereHas('employee')->with('employee.company')->whereKey($data['ids'])->get();
         if ($days->count() !== count($data['ids'])) {
-            throw ValidationException::withMessages(['ids' => ['Some of those days no longer exist or are outside your branches. Reload and try again.']]);
+            throw ValidationException::withMessages(['ids' => [__('Some of those days no longer exist or are outside your branches. Reload and try again.')]]);
         }
 
         $recorder = app(AttendanceRecorder::class);
@@ -174,7 +174,7 @@ class AttendanceController extends Controller
         // Through the employee, so a branch-limited manager only reaches their branch.
         $days = AttendanceDay::query()->whereHas('employee')->with('employee.company')->whereKey($data['ids'])->get();
         if ($days->count() !== count($data['ids'])) {
-            throw ValidationException::withMessages(['ids' => ['Some of those days no longer exist or are outside your branches. Reload and try again.']]);
+            throw ValidationException::withMessages(['ids' => [__('Some of those days no longer exist or are outside your branches. Reload and try again.')]]);
         }
 
         $recorder = app(AttendanceRecorder::class);
@@ -227,7 +227,7 @@ class AttendanceController extends Controller
 
         // A year is plenty for a report; an unbounded range would hold the connection open for minutes.
         if ($request->date('from')->diffInDays($request->date('to')) > 366) {
-            throw ValidationException::withMessages(['to' => ['Pick a range of one year or less.']]);
+            throw ValidationException::withMessages(['to' => [__('Pick a range of one year or less.')]]);
         }
 
         $withIds = $request->boolean('with_ids');
@@ -595,7 +595,7 @@ class AttendanceController extends Controller
 
         if (! $employee) {
             throw ValidationException::withMessages([
-                'employee' => ['Your account isn\'t linked to an employee record yet.'],
+                'employee' => [__('Your account isn\'t linked to an employee record yet.')],
             ]);
         }
 

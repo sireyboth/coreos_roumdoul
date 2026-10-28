@@ -74,7 +74,7 @@ class UserController extends Controller
 
         if ($user->is($request->user())) {
             throw ValidationException::withMessages([
-                'user' => ['You cannot deactivate your own account.'],
+                'user' => [__('You cannot deactivate your own account.')],
             ]);
         }
 
@@ -98,7 +98,7 @@ class UserController extends Controller
 
         if ($user->is($request->user())) {
             throw ValidationException::withMessages([
-                'user' => ['You cannot remove your own account.'],
+                'user' => [__('You cannot remove your own account.')],
             ]);
         }
 

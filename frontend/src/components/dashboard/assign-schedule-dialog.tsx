@@ -191,7 +191,7 @@ function AssignForm({
             ) : (
               <select id="assign-schedule" required value={scheduleId} onChange={(e) => chooseSchedule(e.target.value)} className={SELECT_CLASS}>
                 <option value="" disabled>
-                  {schedules.length === 0 ? t("schedules.assign.noActive") : t("schedules.assign.select")}
+                  {schedules.length === 0 ? t("schedules.assign.noActive") : t("common.field.select")}
                 </option>
                 {schedules.map((s) => (
                   <option key={s.id} value={s.id}>

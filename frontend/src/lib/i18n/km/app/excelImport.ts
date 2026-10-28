@@ -31,6 +31,11 @@ export const excelImport: Dictionary["app"]["excelImport"] = {
     noRows: "ឯកសារនេះមានជួរចំណងជើង ប៉ុន្តែគ្មានទិន្នន័យនៅខាងក្រោមទេ។",
     tooManyRows: "ឯកសារនេះមាន {n} ជួរ។ សូមនាំចូលម្តងមិនលើសពី {max} ជួរ — សូមបំបែកវាជាឯកសារតូចៗ។",
     unreadable: "មិនអាចអានឯកសារនេះបានទេ។",
+    oldXls: "នេះជាឯកសារ .xls ទម្រង់ចាស់។ សូមបើកវាក្នុង Excel ហើយរក្សាទុកជា Excel Workbook (.xlsx) ជាមុនសិន។",
+    notXlsx: "សូមជ្រើសរើសឯកសារ Excel (.xlsx)។",
+    damaged: "មិនអាចបើកឯកសារនេះជា Excel បានទេ។ ឯកសារអាចខូច ឬមានពាក្យសម្ងាត់ការពារ។",
+    noSheets: "ឯកសារ Excel នេះគ្មានសន្លឹកទេ។",
+    emptySheet: "សន្លឹកទីមួយគ្មានទិន្នន័យទេ។",
   },
 
   // ── Step 2: review ────────────────────────────────────────────────
@@ -70,7 +75,6 @@ export const excelImport: Dictionary["app"]["excelImport"] = {
     downloadFailures: "ទាញយកជួរដែលត្រូវកែ",
     allImported: "ជួរទាំងអស់ត្រូវបាននាំចូលរួចរាល់។",
     importAnother: "នាំចូលឯកសារផ្សេងទៀត",
-    done: "រួចរាល់",
     importedOne: "បាននាំចូល {n} ជួរ",
     importedOther: "បាននាំចូល {n} ជួរ",
     needAttentionOne: "មាន {n} ជួរត្រូវពិនិត្យ។",

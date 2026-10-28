@@ -174,7 +174,7 @@ function DepartmentFormDialog({
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
-              {saving ? t("org.shared.saving") : department ? t("org.shared.saveChanges") : t("org.departmentsPage.add")}
+              {saving ? t("common.message.saving") : department ? t("common.action.saveChanges") : t("org.departmentsPage.add")}
             </Button>
           </DialogFooter>
         </form>

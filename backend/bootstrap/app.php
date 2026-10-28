@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Before everything else, so even auth and company-status errors are translated.
+        $middleware->prepend(\App\Http\Middleware\SetLocaleFromRequest::class);
+
         $middleware->alias([
             'company_permission' => \App\Http\Middleware\EnsureMembershipPermission::class,
             'module' => \App\Http\Middleware\EnsureModuleEnabled::class,
