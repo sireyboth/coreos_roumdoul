@@ -50,6 +50,7 @@ class Employee extends Model
         'sort_order',
         'employment_type',
         'hire_date',
+        'probation_end_date',
         'termination_date',
         'notes',
         'rest_days',
@@ -76,6 +77,17 @@ class Employee extends Model
     public function hasLeft(): bool
     {
         return in_array($this->employment_status, self::LEFT_STATUSES, true);
+    }
+
+    /**
+     * Still on probation on $date: their status says so and $date isn't past
+     * the end date (no end date = until HR says they passed). Someone HR
+     * passed early is Active, so the end date no longer holds them back.
+     */
+    public function onProbationOn(string $date): bool
+    {
+        return $this->employment_status === 'probation'
+            && ($this->probation_end_date === null || $date <= $this->probation_end_date->toDateString());
     }
 
     /** Stands in for "no display order" so those people sort after everyone numbered. */
@@ -126,10 +138,10 @@ class Employee extends Model
     public const SALARY_FIELDS = ['base_salary', 'salary_currency', 'bank_name', 'bank_account_number'];
 
     /**
-     * Identity details only the employee pages show. Not secret, but kept out
+     * Identity details (and the probation end date) only the employee pages show. Not secret, but kept out
      * of nested rows (roster, attendance) for the size reason below.
      */
-    public const PROFILE_FIELDS = ['first_name', 'last_name', 'name_km'];
+    public const PROFILE_FIELDS = ['first_name', 'last_name', 'name_km', 'probation_end_date'];
 
     // Kept out of every API response: internal columns nothing on screen reads.
     // An employee is nested inside roster and attendance rows, so each unused
@@ -140,6 +152,7 @@ class Employee extends Model
         ...self::PERSONAL_FIELDS,
         ...self::SALARY_FIELDS,
         'name_km',
+        'probation_end_date',
         'photo_path',
         'company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days',
         'created_at', 'updated_at',
@@ -157,6 +170,7 @@ class Employee extends Model
     {
         return [
             'hire_date' => 'date',
+            'probation_end_date' => 'date',
             'sort_order' => 'integer',
             'termination_date' => 'date',
             'date_of_birth' => 'date',

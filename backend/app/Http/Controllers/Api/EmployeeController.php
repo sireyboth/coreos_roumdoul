@@ -129,6 +129,8 @@ class EmployeeController extends Controller
             'address' => ['nullable', 'string', 'max:1000'],
             'employment_type' => ['nullable', 'in:full_time,part_time,contract,temporary'],
             'hire_date' => ['nullable', 'date'],
+            // The last day of probation; empty = the company's default length from the hire date.
+            'probation_end_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
             // Lowest first in every list; empty = after everyone numbered.
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:99999'],
@@ -148,6 +150,33 @@ class EmployeeController extends Controller
             // A salary without a currency means nothing, so one comes with the other.
             'salary_currency' => ['nullable', 'required_with:base_salary', 'in:USD,KHR'],
         ];
+    }
+
+    /**
+     * Someone on probation always has an end date when it can be worked out:
+     * the one HR typed, the one they already had, or the company's default
+     * length counted from the hire date. Other statuses keep theirs as a record.
+     */
+    private function withProbation(Request $request, array $data, ?Employee $employee = null): array
+    {
+        $status = $data['employment_status'] ?? $employee?->employment_status ?? 'active';
+        $hireDate = array_key_exists('hire_date', $data) ? $data['hire_date'] : $employee?->hire_date?->toDateString();
+
+        if ($status !== 'probation') {
+            return $data;
+        }
+
+        $end = $data['probation_end_date'] ?? null;
+        if ($end === null && ! array_key_exists('probation_end_date', $data) && $employee?->probation_end_date) {
+            $end = $employee->probation_end_date->toDateString();
+        }
+        $end ??= $request->user()->company->probationEndFor($hireDate)?->toDateString();
+
+        if ($end !== null && $hireDate !== null && $end < $hireDate) {
+            throw ValidationException::withMessages(['probation_end_date' => [__('Probation can\'t end before the hire date.')]]);
+        }
+
+        return [...$data, 'probation_end_date' => $end];
     }
 
     /**
@@ -272,7 +301,7 @@ class EmployeeController extends Controller
         if (! empty($data['pay_group_id']) && ! $request->user()->hasCompanyPermission('salary.manage')) {
             throw ValidationException::withMessages(['pay_group_id' => [__('You don\'t have permission to set pay.')]]);
         }
-        $data = $this->withName($data);
+        $data = $this->withProbation($request, $this->withName($data));
 
         $employee = DB::transaction(function () use ($request, $data, $withLogin, $method) {
             $employee = Employee::query()->create(
@@ -470,7 +499,7 @@ class EmployeeController extends Controller
         if ($payChanges !== []) {
             SelfApproval::assertNotSelf($request->user(), $employee, 'base_salary', 'change the pay or bank details of');
         }
-        $data = $this->withName($data, $employee);
+        $data = $this->withProbation($request, $this->withName($data, $employee), $employee);
 
         $employee->update(
             collect($data)->except(['job_title', 'branch_id', 'department_id', 'team_id', 'manager_employee_id'])->all()

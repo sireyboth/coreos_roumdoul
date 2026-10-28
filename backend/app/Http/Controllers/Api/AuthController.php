@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
-use App\Services\CompanyUserService;
 use App\Services\CompanyProvisioner;
+use App\Services\CompanyUserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -136,7 +136,7 @@ class AuthController extends Controller
             'roles' => $membership?->roles()->pluck('name') ?? [],
             'permissions' => $membership?->permissionCodes() ?? [],
             'employee' => $user->employee?->only('id', 'name'),
-            'company' => $company?->only('id', 'name', 'slug', 'status', 'trial_ends_at', 'allow_self_approval'),
+            'company' => $company?->only('id', 'name', 'slug', 'status', 'trial_ends_at', 'allow_self_approval', 'probation_length', 'probation_unit', 'probation_reminder_days'),
             'plan' => $company?->subscription?->plan?->only('name', 'max_employees', 'max_branches'),
             'usage' => $company ? [
                 'employees' => $company->employeeCount(),

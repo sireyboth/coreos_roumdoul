@@ -20,7 +20,7 @@ class LeaveType extends Model
 
     protected $fillable = [
         'company_id', 'code', 'name', 'name_km', 'pay_percent', 'counts', 'accrual', 'yearly_days',
-        'seniority_every_years', 'seniority_extra_days', 'eligible_after_months', 'requires_balance',
+        'seniority_every_years', 'seniority_extra_days', 'eligible_after_months', 'allowed_during_probation', 'requires_balance',
         'allow_half_day', 'attachment_from_days', 'min_notice_days', 'max_days_per_request', 'gender',
         'is_active', 'sort_order',
     ];
@@ -35,6 +35,7 @@ class LeaveType extends Model
             'seniority_every_years' => 'integer',
             'seniority_extra_days' => 'float',
             'eligible_after_months' => 'integer',
+            'allowed_during_probation' => 'boolean',
             'requires_balance' => 'boolean',
             'allow_half_day' => 'boolean',
             'attachment_from_days' => 'float',

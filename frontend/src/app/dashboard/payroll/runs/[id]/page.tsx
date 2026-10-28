@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, ChartColumnBig, ChevronDown, Download, FileText, Landmark, RefreshCw, Sheet, Trash2, Undo2, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Banknote, Building2, ChartColumnBig, ChevronDown, Download, FileText, Landmark, RefreshCw, Sheet, Trash2, Undo2, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { PayslipDialog } from "@/components/dashboard/payroll/payslip-view";
+import { BankExportDialog } from "@/components/dashboard/payroll/bank-export-dialog";
 import { RUN_STATUS, WarningList, money } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { api, type PayRunDetail, type PayslipRow } from "@/lib/api";
@@ -43,6 +44,7 @@ export default function PayRunPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [openSlip, setOpenSlip] = useState<number | null>(null);
   const [reopening, setReopening] = useState(false);
+  const [bankExport, setBankExport] = useState(false);
 
   useEffect(() => {
     api.payroll.run(id).then(setRun).catch(notifyError);
@@ -269,6 +271,13 @@ export default function PayRunPage() {
                     <span className="text-xs text-muted-foreground">{t("payroll.run.pdfPaymentsHint")}</span>
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setBankExport(true)}>
+                  <Building2 className="size-4" />
+                  <div className="flex flex-col">
+                    <span>{t("payroll.bankExport.menu")}</span>
+                    <span className="text-xs text-muted-foreground">{t("payroll.bankExport.menuHint")}</span>
+                  </div>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={exportCsv}>
                   <Sheet className="size-4" />
                   <div className="flex flex-col">
@@ -386,6 +395,7 @@ export default function PayRunPage() {
         </div>
       )}
 
+      <BankExportDialog run={run} open={bankExport} onOpenChange={setBankExport} canManage={canManage} />
       <PayslipDialog payslipId={openSlip} onOpenChange={(o) => !o && setOpenSlip(null)} />
       <ReopenDialog
         open={reopening}

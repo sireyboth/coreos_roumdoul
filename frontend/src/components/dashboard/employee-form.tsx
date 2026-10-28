@@ -3,8 +3,10 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useMe } from "@/contexts/me-context";
 import type { Branch, Department, Employee, EmployeeInput, SalaryCurrency, Team } from "@/lib/api";
 import { translate, useLang, useT, type Lang, type TKey } from "@/lib/i18n";
+import { defaultProbationEnd } from "@/lib/probation";
 
 // Kept in step with Employee::STATUSES on the server. `aliases` are other
 // words an Excel import accepts for the same status.
@@ -105,6 +107,7 @@ export type EmployeeForm = {
   employment_type: string;
   employment_status: string;
   hire_date: string;
+  probation_end_date: string;
   termination_date: string;
   sort_order: string;
   gender: string;
@@ -151,6 +154,7 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
     employment_type: "",
     employment_status: "active",
     hire_date: "",
+    probation_end_date: "",
     termination_date: "",
     sort_order: "",
     gender: "",
@@ -187,6 +191,7 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
     employment_type: employee.employment_type ?? "",
     employment_status: employee.employment_status,
     hire_date: employee.hire_date?.slice(0, 10) ?? "",
+    probation_end_date: employee.probation_end_date?.slice(0, 10) ?? "",
     termination_date: employee.termination_date?.slice(0, 10) ?? "",
     sort_order: employee.sort_order != null ? String(employee.sort_order) : "",
     gender: employee.gender ?? "",
@@ -241,6 +246,8 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
     employment_type: orNull(form.employment_type),
     employment_status: form.employment_status,
     hire_date: orNull(form.hire_date),
+    // Only while on probation; empty = the company default. Otherwise left as it was, as a record.
+    ...(form.employment_status === "probation" ? { probation_end_date: orNull(form.probation_end_date) } : {}),
     sort_order: form.sort_order.trim() === "" ? null : Number(form.sort_order),
     // Only meaningful for someone who has left.
     termination_date: hasLeft(form.employment_status) ? orNull(form.termination_date) : null,
@@ -326,6 +333,24 @@ export function EmployeeFormFields({
   const id = (name: string) => `${idPrefix}-${name}`;
   const t = useT();
   const lang = useLang();
+  const probation = useMe().me?.company ?? null;
+  const probationDefault = probation?.probation_length
+    ? t(probation.probation_unit === "days" ? "employees.probation.days" : "employees.probation.months", { n: probation.probation_length })
+    : null;
+
+  /**
+   * The end date follows the company default — filled in when they go on
+   * probation, and moved with the hire date — until someone types their own.
+   */
+  function changeProbationBasis(patch: { employment_status?: string; hire_date?: string }) {
+    const status = patch.employment_status ?? form.employment_status;
+    const hire = patch.hire_date ?? form.hire_date;
+    const following = form.probation_end_date === "" || form.probation_end_date === defaultProbationEnd(form.hire_date, probation);
+    onChange({
+      ...patch,
+      ...(status === "probation" && following ? { probation_end_date: defaultProbationEnd(hire, probation) ?? "" } : {}),
+    });
+  }
 
   /**
    * Typing a first or last name keeps the full name in step — until someone
@@ -539,24 +564,39 @@ export function EmployeeFormFields({
             id={id("hire")}
             type="date"
             value={form.hire_date}
-            onChange={(e) => onChange({ hire_date: e.target.value })}
+            onChange={(e) => changeProbationBasis({ hire_date: e.target.value })}
           />
         </Field>
         <Field
           label={t("common.field.status")}
           htmlFor={id("status")}
           hint={t("employees.form.statusHint")}
-          wide={!hasLeft(form.employment_status)}
+          wide={!hasLeft(form.employment_status) && form.employment_status !== "probation"}
         >
           <SearchableSelect
             id={id("status")}
             options={optionsIn(lang, "status", EMPLOYMENT_STATUSES)}
             value={form.employment_status}
-            onChange={(value) => onChange({ employment_status: value })}
+            onChange={(value) => changeProbationBasis({ employment_status: value })}
             clearable={false}
             className="h-9 w-full rounded-md"
           />
         </Field>
+        {form.employment_status === "probation" && (
+          <Field
+            label={t("employees.probation.endDate")}
+            htmlFor={id("probation")}
+            hint={probationDefault ? t("employees.probation.endHint", { length: probationDefault }) : t("employees.probation.endHintNoDefault")}
+          >
+            <Input
+              id={id("probation")}
+              type="date"
+              min={form.hire_date || undefined}
+              value={form.probation_end_date}
+              onChange={(e) => onChange({ probation_end_date: e.target.value })}
+            />
+          </Field>
+        )}
         {hasLeft(form.employment_status) && (
           <Field label={t("employees.form.lastDay")} htmlFor={id("term")}>
             <Input

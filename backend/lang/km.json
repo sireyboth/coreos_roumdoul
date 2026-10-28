@@ -167,6 +167,8 @@
     "Your plan's branch limit has been reached. Upgrade your plan to add more.": "គម្រោងរបស់លោកអ្នកបានដល់ចំនួនសាខាអតិបរមាហើយ។ សូមដំឡើងគម្រោង ដើម្បីបន្ថែមទៀត។",
     "Your plan's employee limit has been reached. Upgrade your plan to add more.": "គម្រោងរបស់លោកអ្នកបានដល់ចំនួនបុគ្គលិកអតិបរមាហើយ។ សូមដំឡើងគម្រោង ដើម្បីបន្ថែមទៀត។",
     "Your trial has ended. Please upgrade your plan to continue.": "រយៈពេលសាកល្បងរបស់លោកអ្នកបានបញ្ចប់ហើយ។ សូមដំឡើងគម្រោង ដើម្បីបន្តប្រើប្រាស់។",
+    "Probation can't end before the hire date.": "ថ្ងៃបញ្ចប់រយៈពេលសាកល្បង មិនអាចនៅមុនថ្ងៃចូលបម្រើការងារបានទេ។",
+    ":name is not on probation.": ":name មិនស្ថិតក្នុងរយៈពេលសាកល្បងការងារទេ។",
 
     "check in or out": "ស្កេនចូល ឬស្កេនចេញ",
 
@@ -180,6 +182,7 @@
     "delete attendance days of": "លុបថ្ងៃវត្តមានរបស់",
     "fill in the attendance of": "បំពេញវត្តមានរបស់",
     "review overtime for": "ពិនិត្យម៉ោងបន្ថែមសម្រាប់",
+    "decide the probation of": "សម្រេចលើរយៈពេលសាកល្បងរបស់",
 
     "pending": "កំពុងរង់ចាំ",
     "approved": "បានអនុម័ត",

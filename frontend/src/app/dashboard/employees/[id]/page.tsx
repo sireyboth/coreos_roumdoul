@@ -26,6 +26,7 @@ import {
   type EmployeeForm,
 } from "@/components/dashboard/employee-form";
 import { PhotoPicker } from "@/components/dashboard/photo-picker";
+import { ProbationCard } from "@/components/dashboard/probation-card";
 import { EmployeeScheduleAssignments } from "@/components/dashboard/employee-schedule-assignments";
 import { EmployeePayPanel } from "@/components/dashboard/payroll/employee-pay-panel";
 import { RosterView } from "@/components/dashboard/roster-view";
@@ -303,9 +304,23 @@ export default function EmployeePage() {
                   <Fact label={t("common.field.phone")}>{employee.phone ?? "—"}</Fact>
                   <Fact label={t("common.field.email")}>{employee.email ?? "—"}</Fact>
                   <Fact label={t("employees.shared.hired")}>{dateLabel(employee.hire_date, lang)}</Fact>
+                  {employee.employment_status !== "probation" && employee.probation_end_date && (
+                    <Fact label={t("employees.probation.ended")}>{dateLabel(employee.probation_end_date, lang)}</Fact>
+                  )}
                 </dl>
               </CardContent>
             </Card>
+
+            {employee.employment_status === "probation" && (
+              <ProbationCard
+                employee={employee}
+                canManage={canManage}
+                onChanged={(updated) => {
+                  setEmployee(updated);
+                  setForm(formFromEmployee(updated));
+                }}
+              />
+            )}
 
             <Card>
               <CardHeader>

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\AuditLogger;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -49,7 +50,13 @@ class Company extends Model
         'trial_ends_at',
         'default_rest_days',
         'allow_self_approval',
+        'probation_length',
+        'probation_unit',
+        'probation_reminder_days',
     ];
+
+    /** How a probation length is counted. */
+    public const PROBATION_UNITS = ['days', 'months'];
 
     protected function casts(): array
     {
@@ -57,7 +64,28 @@ class Company extends Model
             'trial_ends_at' => 'datetime',
             'default_rest_days' => 'array',
             'allow_self_approval' => 'boolean',
+            'probation_length' => 'integer',
+            'probation_reminder_days' => 'integer',
         ];
+    }
+
+    /**
+     * The last day of probation for someone starting on $hireDate, using the
+     * company's default length: 3 months from 1 Oct ends on 31 Dec, 60 days
+     * from 1 Oct ends on 29 Nov. Null without a hire date or with a length of 0.
+     */
+    public function probationEndFor(\DateTimeInterface|string|null $hireDate): ?CarbonImmutable
+    {
+        if (! $hireDate || ! $this->probation_length) {
+            return null;
+        }
+
+        $start = CarbonImmutable::parse($hireDate)->startOfDay();
+        $end = $this->probation_unit === 'days'
+            ? $start->addDays($this->probation_length)
+            : $start->addMonthsNoOverflow($this->probation_length);
+
+        return $end->subDay();
     }
 
     public function memberships(): HasMany

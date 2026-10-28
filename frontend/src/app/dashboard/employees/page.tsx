@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarRange, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { CalendarRange, Hourglass, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
 import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelIn, optionsIn, statusVariant } from "@/components/dashboard/employee-form";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { probationDateLabel, useProbationCountdown } from "@/components/dashboard/probation-card";
+import { ProbationSettingsDialog } from "@/components/dashboard/probation-settings-dialog";
 import { RosterView } from "@/components/dashboard/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, Branch, Department, Employee, PayItemComponent, Team } from "@/lib/api";
@@ -65,6 +67,8 @@ function EmployeesPageContent() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loginFor, setLoginFor] = useState<Employee | null>(null);
+  const [probationRulesOpen, setProbationRulesOpen] = useState(false);
+  const countdown = useProbationCountdown();
 
   function load() {
     api.employees
@@ -241,11 +245,20 @@ function EmployeesPageContent() {
     {
       id: "status",
       header: t("common.field.status"),
-      cell: (employee) => (
-        <Badge variant={statusVariant(employee.employment_status)}>
-          {labelIn(lang, "status", employee.employment_status)}
-        </Badge>
-      ),
+      cell: (employee) => {
+        const end = employee.employment_status === "probation" ? employee.probation_end_date : null;
+        const left = end ? countdown(end) : null;
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <Badge variant={statusVariant(employee.employment_status)}>{labelIn(lang, "status", employee.employment_status)}</Badge>
+            {end && left && (
+              <span className={left.tone === "info" ? "text-xs text-muted-foreground" : left.tone === "warning" ? "text-xs text-warning" : "text-xs text-destructive"}>
+                {t("employees.probation.listEnds", { date: probationDateLabel(end, lang) })}
+              </span>
+            )}
+          </div>
+        );
+      },
       sortValue: (employee) => employee.employment_status,
     },
     {
@@ -363,6 +376,12 @@ function EmployeesPageContent() {
                     refresh();
                   }}
                 />
+                {canManage && (
+                  <Button variant="outline" onClick={() => setProbationRulesOpen(true)}>
+                    <Hourglass className="size-4" />
+                    {t("employees.probation.settings")}
+                  </Button>
+                )}
                 {canManage &&
                   branches.length > 0 &&
                   (atEmployeeLimit ? (
@@ -467,6 +486,8 @@ function EmployeesPageContent() {
 
         {activeTab === "roster" && <RosterView />}
       </div>
+
+      {probationRulesOpen && <ProbationSettingsDialog open onOpenChange={setProbationRulesOpen} />}
 
       <CreateLoginDialog
         key={loginFor?.id ?? "none"}

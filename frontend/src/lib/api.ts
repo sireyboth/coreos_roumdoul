@@ -187,7 +187,15 @@ export type MeResponse = {
   permissions: string[];
   employee: { id: number; name: string } | null;
   // allow_self_approval: people may approve or change their own attendance, leave balance and pay.
-  company: { id: number; name: string; slug: string; status: string; trial_ends_at: string | null; allow_self_approval: boolean } | null;
+  // probation_*: the default probation for new people (e.g. 3 months) and how many days before it ends HR is reminded (null = on the day).
+  company: {
+    id: number;
+    name: string;
+    slug: string;
+    status: string;
+    trial_ends_at: string | null;
+    allow_self_approval: boolean;
+  } & ProbationSettings | null;
   // null limits mean unlimited.
   plan: { name: string; max_employees: number | null; max_branches: number | null } | null;
   usage: { employees: number; branches: number } | null;
@@ -253,6 +261,8 @@ export type EmployeeInput = {
   employment_status?: string;
   employment_type?: string | null;
   hire_date?: string | null;
+  // Probation only; null = the company's default length from the hire date.
+  probation_end_date?: string | null;
   termination_date?: string | null;
   // Lowest first in every list; null = after everyone numbered.
   sort_order?: number | null;
@@ -299,6 +309,9 @@ export type Employee = {
   // Serialized as an ISO datetime — take the first 10 chars for a date input.
   hire_date: string | null;
   termination_date: string | null;
+  // The last day of probation (it starts on hire_date). Sent with the
+  // identity details below; kept after they pass, as a record.
+  probation_end_date?: string | null;
   // Personal details: the API only sends these to people who can manage employees.
   gender?: string | null;
   date_of_birth?: string | null;
@@ -879,6 +892,8 @@ export type LeaveType = {
   seniority_every_years: number | null;
   seniority_extra_days: number | null;
   eligible_after_months: number | null;
+  // false = can't be taken by someone still on probation.
+  allowed_during_probation: boolean;
   requires_balance: boolean;
   allow_half_day: boolean;
   // A file is needed for requests of at least this many days (1 = always); null = never.
@@ -888,6 +903,12 @@ export type LeaveType = {
   gender: "male" | "female" | null;
   is_active: boolean;
   sort_order: number | null;
+};
+
+export type ProbationSettings = {
+  probation_length: number;
+  probation_unit: "days" | "months";
+  probation_reminder_days: number | null;
 };
 
 export type LeaveTypeInput = Partial<Omit<LeaveType, "id">>;
@@ -1066,6 +1087,8 @@ export type PayrollPolicy = {
   enforce_overtime_minimums: boolean;
   khr_rounding: number;
   fallback_exchange_rate: number | null;
+  // The company's own details a bank's payroll file asks for, remembered between exports.
+  bank_exports: { chipmong?: { company_code?: string | null; debit_account?: string | null } } | null;
 };
 
 export type PayrollSettings = {
@@ -1358,6 +1381,10 @@ export const api = {
       return request<{ photo_url: string | null }>(`/api/employees/${id}/photo`, { method: "POST", body });
     },
     removePhoto: (id: number) => request<void>(`/api/employees/${id}/photo`, { method: "DELETE" }),
+    // Probation decisions: passed (Active from today) or more time (a later end date).
+    passProbation: (id: number) => request<Employee>(`/api/employees/${id}/probation/pass`, { method: "POST" }),
+    extendProbation: (id: number, probationEndDate: string) =>
+      request<Employee>(`/api/employees/${id}/probation/extend`, { method: "POST", body: JSON.stringify({ probation_end_date: probationEndDate }) }),
     create: (data: EmployeeInput & { name: string; branch_id: number; password?: string; login_method?: "email" | "employee_id" }) =>
       request<Employee>("/api/employees", { method: "POST", body: JSON.stringify(data) }),
     update: (id: number, data: EmployeeInput) =>
@@ -1884,6 +1911,11 @@ export const api = {
   },
 
   // Company-wide rules (company.manage). Read back through me.company.
+  probation: {
+    updateSettings: (data: ProbationSettings) =>
+      request<{ id: number } & ProbationSettings>("/api/probation/settings", { method: "PUT", body: JSON.stringify(data) }),
+  },
+
   companySettings: {
     update: (data: { allow_self_approval?: boolean }) =>
       request<{ id: number; allow_self_approval: boolean }>("/api/company/settings", {

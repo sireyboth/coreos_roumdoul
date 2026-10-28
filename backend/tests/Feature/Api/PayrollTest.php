@@ -254,6 +254,20 @@ class PayrollTest extends TestCase
         $this->assertSame([], $run['payslips'][0]['warnings']);
     }
 
+    public function test_bank_file_details_are_remembered_on_the_policy(): void
+    {
+        $details = ['chipmong' => ['company_code' => '0100718', 'debit_account' => '98410041']];
+
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['bank_exports' => $details])
+            ->assertOk()->assertJsonPath('bank_exports.chipmong.company_code', '0100718');
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')
+            ->assertJsonPath('policy.bank_exports', $details);
+
+        // Only the known banks and fields are kept.
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['bank_exports' => ['other' => ['x' => '1']]])
+            ->assertJsonValidationErrors('bank_exports');
+    }
+
     public function test_daily_workers_are_paid_for_days_worked_and_never_charged_absence(): void
     {
         TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);

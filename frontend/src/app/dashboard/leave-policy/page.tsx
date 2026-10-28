@@ -37,6 +37,7 @@ function rules(lt: LeaveType, lang: Lang): string {
       ? tr("leave.policyPage.rules.seniority", { days: lt.seniority_extra_days, years: lt.seniority_every_years })
       : null,
     lt.eligible_after_months ? tr("leave.policyPage.rules.after", { n: lt.eligible_after_months }) : null,
+    lt.allowed_during_probation ? null : tr("leave.policyPage.rules.notDuringProbation"),
     lt.counts === "calendar_days" ? tr("leave.policyPage.rules.calendarDays") : null,
     lt.max_days_per_request ? tr("leave.policyPage.rules.maxPerRequest", { n: lt.max_days_per_request }) : null,
     lt.attachment_from_days
@@ -52,9 +53,10 @@ function rules(lt: LeaveType, lang: Lang): string {
     .join(" · ");
 }
 
-type Form = Record<keyof Omit<LeaveType, "id" | "requires_balance" | "allow_half_day" | "is_active">, string> & {
+type Form = Record<keyof Omit<LeaveType, "id" | "requires_balance" | "allow_half_day" | "allowed_during_probation" | "is_active">, string> & {
   requires_balance: boolean;
   allow_half_day: boolean;
+  allowed_during_probation: boolean;
   is_active: boolean;
 };
 
@@ -78,6 +80,7 @@ function toForm(t: LeaveType | null): Form {
     sort_order: s(t?.sort_order),
     requires_balance: t?.requires_balance ?? false,
     allow_half_day: t?.allow_half_day ?? true,
+    allowed_during_probation: t?.allowed_during_probation ?? true,
     is_active: t?.is_active ?? true,
   };
 }
@@ -103,6 +106,7 @@ function toPayload(f: Form): LeaveTypeInput {
     sort_order: n(f.sort_order),
     requires_balance: limited,
     allow_half_day: f.allow_half_day,
+    allowed_during_probation: f.allowed_during_probation,
     is_active: f.is_active,
   };
 }
@@ -245,6 +249,10 @@ function TypeDialog({ type, open, onOpenChange, onSaved }: { type: LeaveType | n
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.allow_half_day} disabled={form.counts === "calendar_days"} onChange={(e) => set({ allow_half_day: e.target.checked })} />
               {t("leave.policyPage.allowHalf")}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={form.allowed_during_probation} onChange={(e) => set({ allowed_during_probation: e.target.checked })} />
+              {t("leave.policyPage.allowProbation")}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.is_active} onChange={(e) => set({ is_active: e.target.checked })} />

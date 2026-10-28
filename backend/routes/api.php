@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\PayGroupController;
 use App\Http\Controllers\Api\PayrollAdjustmentController;
 use App\Http\Controllers\Api\PayrollSettingsController;
 use App\Http\Controllers\Api\PayRunController;
+use App\Http\Controllers\Api\ProbationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\RoleController;
@@ -151,6 +152,9 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
         Route::post('/employees/{employee}/photo', [EmployeePhotoController::class, 'store']);
         Route::delete('/employees/{employee}/photo', [EmployeePhotoController::class, 'destroy']);
         Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);
+        Route::put('/probation/settings', [ProbationController::class, 'updateSettings']);
+        Route::post('/employees/{employee}/probation/pass', [ProbationController::class, 'pass']);
+        Route::post('/employees/{employee}/probation/extend', [ProbationController::class, 'extend']);
     });
 
     Route::middleware('company_permission:branches.manage')->group(function () {

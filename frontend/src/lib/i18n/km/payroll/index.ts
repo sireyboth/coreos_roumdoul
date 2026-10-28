@@ -8,5 +8,6 @@ import { adjustments } from "./adjustments";
 import { settings } from "./settings";
 import { payslip } from "./payslip";
 import { guide } from "./guide";
+import { bankExport } from "./bankExport";
 
-export const payroll = { shared, runs, run, dashboard, adjustments, settings, payslip, guide };
+export const payroll = { shared, runs, run, dashboard, adjustments, settings, payslip, guide, bankExport };

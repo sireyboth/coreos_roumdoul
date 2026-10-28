@@ -53,6 +53,10 @@ class PayrollSettingsController extends Controller
             'enforce_overtime_minimums' => ['sometimes', 'boolean'],
             'khr_rounding' => ['sometimes', 'integer', Rule::in([1, 100, 500, 1000])],
             'fallback_exchange_rate' => ['sometimes', 'nullable', 'numeric', 'min:1000', 'max:10000'],
+            // What the bank files ask about the company itself — see frontend lib/bank-export.ts.
+            'bank_exports' => ['sometimes', 'nullable', 'array:chipmong'],
+            'bank_exports.chipmong' => ['sometimes', 'array:company_code,debit_account'],
+            'bank_exports.chipmong.*' => ['nullable', 'string', 'max:50'],
         ]);
 
         $policy = $this->setup->ensure($request->user()->company);

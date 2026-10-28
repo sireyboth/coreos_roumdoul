@@ -11,5 +11,6 @@ import { birthdays } from "./birthdays";
 import { photo } from "./photo";
 import { qrCode } from "./qrCode";
 import { celebration } from "./celebration";
+import { probation } from "./probation";
 
-export const employees = { options, shared, listPage, profilePage, newPage, form, idCards, birthdays, photo, qrCode, celebration };
+export const employees = { options, shared, listPage, profilePage, newPage, form, idCards, birthdays, photo, qrCode, celebration, probation };

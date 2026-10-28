@@ -1,0 +1,30 @@
+// Bank transfer file dialog (components/dashboard/payroll/bank-export-dialog.tsx)
+
+export const bankExport = {
+  menu: "Bank transfer file (Excel)",
+  menuHint: "Bulk salary upload for Chip Mong or ABA",
+  title: "Bank transfer file",
+  description: "Choose your bank. The file is laid out the way its bulk payroll upload expects.",
+  bank: "Bank",
+  currency: "Currency",
+  currencyHint: "One file per currency — banks don't mix them.",
+  companyCode: "Company code",
+  debitAccount: "Debit account",
+  valueDate: "Value date",
+  remembered: "Company code and debit account are saved for next time.",
+  remarks: "Remarks",
+  sameBankOnly: "Only staff with a {bank} account",
+  sameBankOnlyHint: "Matched on the bank name in each employee's profile.",
+  noneAtBank: "No employee has {bank} as their bank, so everyone paid by bank is included.",
+  transfersOne: "{n} transfer",
+  transfersOther: "{n} transfers",
+  skipped: {
+    noAccount: "{n} left out: no account number",
+    cash: "{n} left out: paid in cash",
+    otherBank: "{n} left out: another bank",
+    nothingToPay: "{n} left out: nothing to pay",
+  },
+  missingTitle: "{n} without an account number",
+  download: "Download file",
+  downloaded: "Bank file ready — {n} transfers",
+};

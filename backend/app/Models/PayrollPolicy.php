@@ -17,7 +17,7 @@ class PayrollPolicy extends Model
 
     protected $fillable = [
         'company_id', 'rate_basis', 'rate_basis_days', 'hours_per_day', 'missing_scan_policy',
-        'daily_paid_holidays', 'enforce_overtime_minimums', 'khr_rounding', 'fallback_exchange_rate',
+        'daily_paid_holidays', 'enforce_overtime_minimums', 'khr_rounding', 'fallback_exchange_rate', 'bank_exports',
     ];
 
     protected $hidden = ['company_id', 'created_at', 'updated_at'];
@@ -31,6 +31,7 @@ class PayrollPolicy extends Model
             'enforce_overtime_minimums' => 'boolean',
             'khr_rounding' => 'integer',
             'fallback_exchange_rate' => 'float',
+            'bank_exports' => 'array',
         ];
     }
 }

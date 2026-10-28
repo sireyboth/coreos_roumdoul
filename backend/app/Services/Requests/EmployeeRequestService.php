@@ -123,7 +123,7 @@ final class EmployeeRequestService
      * only if everything else is saved, its approval chain started.
      *
      * @param  \Closure(): array{0: array<string, mixed>, 1: array<int, array<string, mixed>>, 2: array<string, string>}  $build
-     *                                                                                                                         the request's fields, its days and any problems — run inside the lock
+     *                                                                                                                            the request's fields, its days and any problems — run inside the lock
      */
     private function send(User $by, Employee $employee, ?UploadedFile $file, bool $approveNow, \Closure $build): EmployeeRequest
     {
@@ -191,7 +191,7 @@ final class EmployeeRequestService
 
     /**
      * @param  array<int, string>|null  $paidDates  leave only: the dates to pay, the rest unpaid — whatever the
-     *                                             leave type says (needs requests.set_pay). Null leaves pay to the type.
+     *                                              leave type says (needs requests.set_pay). Null leaves pay to the type.
      */
     public function approve(User $by, EmployeeRequest $request, ?string $notes = null, ?array $paidDates = null): EmployeeRequest
     {
@@ -587,6 +587,12 @@ final class EmployeeRequestService
                 $problems['start_date'] = "{$type->name} can be taken from ".CarbonImmutable::parse($from)->format('j M Y')
                     ." ({$type->eligible_after_months} months after starting work).";
             }
+        }
+
+        if (! $type->allowed_during_probation && $employee->onProbationOn($start)) {
+            $problems['start_date'] ??= $employee->probation_end_date
+                ? "{$type->name} can be taken once probation ends on ".$employee->probation_end_date->format('j M Y').'.'
+                : "{$type->name} can be taken once {$employee->name} passes probation.";
         }
 
         // Notice applies to staff asking for themselves; HR recording leave after the fact is fine.

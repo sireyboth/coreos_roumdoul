@@ -31,6 +31,7 @@ final class LeaveDefaults
             'seniority_every_years' => null,
             'seniority_extra_days' => null,
             'eligible_after_months' => null,
+            'allowed_during_probation' => true,
             'requires_balance' => false,
             'allow_half_day' => true,
             'attachment_from_days' => null,

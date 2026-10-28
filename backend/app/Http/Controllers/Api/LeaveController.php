@@ -186,6 +186,7 @@ class LeaveController extends Controller
             'seniority_every_years' => ['nullable', 'integer', 'between:1,50'],
             'seniority_extra_days' => ['nullable', 'numeric', 'between:0,30'],
             'eligible_after_months' => ['nullable', 'integer', 'between:0,120'],
+            'allowed_during_probation' => ['sometimes', 'boolean'],
             'requires_balance' => ['sometimes', 'boolean'],
             'allow_half_day' => [$required, 'boolean'],
             'attachment_from_days' => ['nullable', 'numeric', 'between:0.5,366'],
