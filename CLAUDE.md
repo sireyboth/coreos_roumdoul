@@ -5,7 +5,7 @@ Modular monolith for Cambodian businesses. One Laravel API serves every client.
 ```
 backend/    Laravel 12 API (/api/*) + Filament platform admin (/admin)
 frontend/   Next.js web app — see frontend/CLAUDE.md
-mobile/     (planned) Expo app — same API, same token
+mobile/     Expo (SDK 58) app — same API on /api/v1, same token — see mobile/README.md
 ```
 
 ## Rules for new code
@@ -39,8 +39,9 @@ mobile/     (planned) Expo app — same API, same token
 - **API versions.** Every route is served at `/api/...` (web app, older clients) and
   `/api/v1/...` (route names `v1.*`). The mobile app uses `/api/v1`. A breaking change
   goes into a new version, never into v1.
-- **Local database is local.** `backend/.env` uses SQLite (`database/database.sqlite`).
-  Never point a local `.env` at the Laravel Cloud production database.
+- **Local database is local.** `backend/.env` uses PostgreSQL on this Mac
+  (`127.0.0.1`, database `business_os`) — the same type as production. Never point a
+  local `.env` at the Laravel Cloud production database. Tests use SQLite in memory.
 
 ## Errors and debugging
 
@@ -63,7 +64,17 @@ php artisan test           # all tests must pass
 npm run lint
 npx next typegen && npx tsc --noEmit   # typegen: Next's generated LayoutProps/PageProps
 npm run build
+
+# mobile/  (read mobile/AGENTS.md first; add packages with `npx expo install`)
+npm run lint
+npx tsc --noEmit
 ```
+
+- **Mobile app.** `mobile/src/lib/api/` mirrors `frontend/src/lib/api/` (one file per module,
+  merged into `api`), always on `/api/v1`. Token in SecureStore, never AsyncStorage.
+  Screens in `mobile/src/app/(app)/`; `_layout.tsx` guards sign-in with `Stack.Protected`.
+  UI = NativeWind (Tailwind classes) + React Native Reusables (`src/components/ui/`, shadcn-style)
+  + lucide icons via `<Icon as={…}>`. No hand-written `StyleSheet` for new screens.
 
 Add a feature test for every new endpoint and every bug fix.
 
