@@ -19,7 +19,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -43,6 +43,12 @@ jobs:
       - name: Code style (Pint)
         run: ./vendor/bin/pint --test
 
+      - name: Static analysis (Larastan)
+        run: ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      - name: Known vulnerabilities in PHP packages
+        run: composer audit --abandoned=report
+
       - name: Tests
         run: php artisan test
 
@@ -55,9 +61,9 @@ jobs:
     env:
       NEXT_PUBLIC_API_URL: http://localhost:8000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -65,11 +71,18 @@ jobs:
 
       - run: npm ci
 
+      - name: Known vulnerabilities in npm packages (high or worse)
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Lint
         run: npm run lint
 
+      # Next.js writes some global types (LayoutProps, PageProps) into .next/;
+      # a fresh checkout has none, so generate them before type-checking.
       - name: Type check
-        run: npx tsc --noEmit
+        run: |
+          npx next typegen
+          npx tsc --noEmit
 
       - name: Build
         run: npm run build

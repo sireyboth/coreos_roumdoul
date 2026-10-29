@@ -1,0 +1,21 @@
+# Weekly pull requests that update dependencies (security fixes come as soon as
+# GitHub knows of them). Each PR runs CI, so a green check means it is safe to merge.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /backend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      laravel: { patterns: ["laravel/*", "filament/*", "symfony/*"] }
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch: { update-types: ["minor", "patch"] }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }

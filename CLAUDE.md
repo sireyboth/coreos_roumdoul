@@ -36,6 +36,11 @@ mobile/     (planned) Expo app — same API, same token
 - **Stock is a ledger** of movements (in, out, transfer, adjust), never one overwritten number.
 - **Files always go to S3** (disk `s3`), in every environment.
 - **Don't break old endpoints** — older app versions stay on phones. Add, don't rename.
+- **API versions.** Every route is served at `/api/...` (web app, older clients) and
+  `/api/v1/...` (route names `v1.*`). The mobile app uses `/api/v1`. A breaking change
+  goes into a new version, never into v1.
+- **Local database is local.** `backend/.env` uses SQLite (`database/database.sqlite`).
+  Never point a local `.env` at the Laravel Cloud production database.
 
 ## Errors and debugging
 
@@ -50,11 +55,13 @@ mobile/     (planned) Expo app — same API, same token
 ```bash
 # backend/
 ./vendor/bin/pint          # fix code style (CI runs: pint --test)
+./vendor/bin/phpstan analyse --memory-limit=1G   # Larastan; old findings in phpstan-baseline.neon, new code must be clean
+composer audit             # known vulnerable packages
 php artisan test           # all tests must pass
 
 # frontend/
 npm run lint
-npx tsc --noEmit
+npx next typegen && npx tsc --noEmit   # typegen: Next's generated LayoutProps/PageProps
 npm run build
 ```
 
