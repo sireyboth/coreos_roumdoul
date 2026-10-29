@@ -1,0 +1,2821 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Filament/Resources/AuditLogResource.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Filament/Resources/AuditLogResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$currency\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/SubscriptionResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/SubscriptionResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$interval\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/SubscriptionResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$price_cents\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/SubscriptionResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Pagination\\AbstractPaginator\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:through\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array, Closure\(App\\Models\\AuditLog\)\: array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Parameter \#1 \$data of method App\\Http\\Controllers\\Api\\Access\\AuditLogController\:\:withoutSecrets\(\) expects array\|null, string\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Access/AuditLogController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CompanyRole\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/RoleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$login_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$roles\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:branchAccess\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:roles\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:users\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>sort_order" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Api/Access/UserController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AiAssistantController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AiAssistantController.php
+
+		-
+			message: '#^Parameter \#1 \$membership of method App\\Http\\Controllers\\Api\\Account\\AiAssistantController\:\:roleName\(\) expects App\\Models\\CompanyMembership, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Account/AiAssistantController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$login_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$subscription\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:branchCount\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:createToken\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:employeeCount\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isTrialExpired\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:moduleAccess\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:permissionCodes\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:roles\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/AuthController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Account/NotificationController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:markAsRead\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Account/NotificationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Account/NotificationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, type\: string, data\: non\-empty\-array\<mixed\>, link\: string\|null, actor\: mixed, read_at\: string\|null, resolved_at\: string\|null, resolution\: string\|null, resolved_by\: mixed, created_at\: string\|null\}, Closure\(App\\Models\\Notification\)\: array\{id\: int\<0, max\>, type\: string, data\: non\-empty\-array\<mixed\>, link\: string\|null, actor\: mixed, read_at\: string\|null, resolved_at\: string\|null, resolution\: string\|null, resolved_by\: mixed, created_at\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Account/NotificationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$login_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Account/ProfileController.php
+
+		-
+			message: '#^Instanceof between Laravel\\Sanctum\\PersonalAccessToken and Laravel\\Sanctum\\PersonalAccessToken will always evaluate to true\.$#'
+			identifier: instanceof.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Api/Account/ProfileController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$job_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 7
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$photo_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Cannot call method setTimezone\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 11
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''at'' does not exist on string\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''expected_at'' does not exist on string\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''holiday'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''leave'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''method'' on string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''permission'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''role'' does not exist on string\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''schedule_name'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Offset ''type'' does not exist on string\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array, Closure\(App\\Models\\AttendanceDay\)\: array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,string\>\:\:map\(\) expects callable\(string, 0\)\: non\-empty\-array, Closure\(array\)\: non\-empty\-array given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Parameter \#1 \$company of class App\\Services\\Attendance\\ScheduleResolver constructor expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Parameter \#1 \$list of closure expects array\|null, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Parameter \#2 \$employee of static method App\\Support\\SelfApproval\:\:assertNotSelf\(\) expects App\\Models\\Employee\|int\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceCorrectionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceCorrectionController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Offset ''schedule_name'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AttendanceDay\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AttendancePeriod\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Employee\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Parameter \#1 \$company of static method App\\Services\\Attendance\\MonthlyAttendance\:\:for\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Attendance/AttendanceReviewController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BirthdayController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/Organization/BirthdayController.php
+
+		-
+			message: '#^Parameter \#1 \$dateOfBirth of method App\\Http\\Controllers\\Api\\Organization\\BirthdayController\:\:nextBirthday\(\) expects DateTimeInterface, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BirthdayController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$require_location\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BranchController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BranchController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasReachedBranchLimit\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BranchController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:regenerateQrToken\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/BranchController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\AttendanceDay\:\:\$day\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$photo_url\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasModule\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Cannot call method setTimezone\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AttendanceDay\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DashboardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/DepartmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeCardController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$membership\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slug\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$team_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasReachedEmployeeLimit\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:probationEndFor\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Services\\Company\\CompanyUserService\:\:followEmployeeBranch\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>employment_status" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeeController.php
+
+		-
+			message: '#^Offset 2 on array\{0\: int\<1, 12000\>, 1\: int\<1, 12000\>, 2\: int, 3\: string, mime\: string, channels\?\: int, bits\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Organization/EmployeePhotoController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Organization/HolidayController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/Organization/HolidayController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Attendance\\AttendanceRecorder\:\:recalculateDatesForCompany\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Organization/HolidayController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/ProbationController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Http/Controllers/Api/Organization/ProbationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$team_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/TeamController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/WorkLocationController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Organization/WorkLocationController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payGroup\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/EmployeePayController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/EmployeePayController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:defaultGroup\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/EmployeePayController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:ensure\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/EmployeePayController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>payGroup" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/EmployeePayController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$period_end\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$period_start\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:first\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\PayRun\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:defaultGroup\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:ensure\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Api/Payroll/PayGroupController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$job_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$month\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payGroup\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$period_end\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$period_start\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasBranchRestriction\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 5
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{code\: string, name\: string, kind\: string, amount\: float, is_base\: bool\}, Closure\(App\\Models\\PayslipLine\)\: array\{code\: string, name\: string, kind\: string, amount\: float, is_base\: bool\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, currency\: string, pay_type\: string, base_salary\: float, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float, warnings\: string\|null, employee\: non\-empty\-array\|null, lines\: Illuminate\\Support\\Collection\<int, array\{code\: string, name\: string, kind\: string, amount\: float, is_base\: bool\}\>\}, Closure\(App\\Models\\Payslip\)\: array\{id\: int\<0, max\>, currency\: string, pay_type\: string, base_salary\: float, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float, warnings\: string\|null, employee\: non\-empty\-array\|null, lines\: Illuminate\\Support\\Collection\<int, array\{code\: string, name\: string, kind\: string, amount\: float, is_base\: bool\}\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, currency\: string, pay_type\: string, base_salary\: float, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float, warnings\: string\|null, is_stale\: bool, employee\: array\|null\}, Closure\(App\\Models\\Payslip\)\: array\{id\: int\<0, max\>, currency\: string, pay_type\: string, base_salary\: float, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float, warnings\: string\|null, is_stale\: bool, employee\: array\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\Payslip\)\: array\{mixed, mixed\} given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayRunService\:\:create\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:defaultGroup\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:ensure\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>sort_order" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Api/Payroll/PayRunController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasBranchRestriction\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Parameter \#1 \$employees of method App\\Http\\Controllers\\Api\\Payroll\\PayrollAdjustmentController\:\:assertOpen\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Employee\|null\>, Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Employee\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Parameter \#1 \$employees of method App\\Http\\Controllers\\Api\\Payroll\\PayrollAdjustmentController\:\:assertOpen\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Employee\|null\>, Illuminate\\Support\\Collection\<int, App\\Models\\Employee\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Employee\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollAdjustmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollCalculator\:\:context\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:applyPreset\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:defaultGroup\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollSetup\:\:ensure\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 5
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Parameter \#2 \$employees of method App\\Services\\Payroll\\PayrollCalculator\:\:attendance\(\) expects Illuminate\\Support\\Collection\<int, App\\Models\\Employee\>, Illuminate\\Support\\Collection\<int, App\\Models\\Employee\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\Employee\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Payroll/PayrollSettingsController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name_km\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pay_percent\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$steps\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 8
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Offset ''changed_from'' on string\|null in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Offset ''pay_changed'' on string\|null in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{date\: mixed, portion\: float, part\: string, paid\: bool\}, Closure\(App\\Models\\EmployeeRequestDay\)\: array\{date\: mixed, portion\: float, part\: string, paid\: bool\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{id\: int\<0, max\>, name\: string, mime\: string, size\: int\<0, max\>, url\: string\}, Closure\(App\\Models\\Attachment\)\: array\{id\: int\<0, max\>, name\: string, mime\: string, size\: int\<0, max\>, url\: string\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:lockedMonth\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#1 \$u of closure expects App\\Models\\User\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\Requests\\ApprovalChain\:\:covers\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pay_percent" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Requests/EmployeeRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/LeaveController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Requests/LeaveController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Requests/LeaveController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\Requests\\LeaveController\:\:employeeFor\(\) should return App\\Models\\Employee but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Api/Requests/LeaveController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 5
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Offset ''employee'' on \(int\|string\) on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Offset ''type'' does not exist on \(int\|string\)\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AttendanceDay\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\DayOff\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Employee\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$company of class App\\Services\\Attendance\\ScheduleResolver constructor expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$dates of method App\\Http\\Controllers\\Api\\Schedules\\CalendarController\:\:runs\(\) expects Illuminate\\Support\\Collection\<int, array\{employee_id\: int, date\: string, label\: string\}\>, Illuminate\\Support\\Collection\<int, array\{employee_id\: int, date\: mixed, label\: string\}\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Http\\Controllers\\Api\\Schedules\\CalendarController\:\:buildMonth\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>exceptions" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>overtime_minutes" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>worked_minutes" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/CalendarController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/DayOffController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/DayOffController.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Http\\Controllers\\Api\\Schedules\\DayOffController\:\:recalculate\(\) expects App\\Models\\Employee\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/DayOffController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasLeft\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/ScheduleAssignmentController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 5
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Http\\Controllers\\Api\\Schedules\\ScheduleController\:\:recalculate\(\) expects App\\Models\\Employee\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/Schedules/ScheduleController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\WorkSchedule\:\:\$sort_order\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$weekday\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:slots\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>overtime_mode" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/Schedules/WorkScheduleController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Middleware/CatchUpAttendance.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Attendance\\AttendanceCatchUp\:\:runIfDue\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Middleware/CatchUpAttendance.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Middleware/EnsureCompanyIsActive.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:isTrialExpired\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Middleware/EnsureCompanyIsActive.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasModule\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Middleware/EnsureModuleEnabled.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<Carbon\\Carbon\|non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Models/AttendanceCorrection.php
+
+		-
+			message: '#^Parameter \#2 \$array of function array_map expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/AttendanceCorrection.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$latitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/AttendanceEvent.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$longitude\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/AttendanceEvent.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:distanceInMetersTo\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/AttendanceEvent.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$qr_token\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Branch.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_enabled\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Company.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$plan\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Models/Company.php
+
+		-
+			message: '#^Cannot call method isPast\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/Company.php
+
+		-
+			message: '#^Parameter \#1 \$entitlement of method App\\Models\\Company\:\:entitlementIsActive\(\) expects App\\Models\\CompanyModuleEntitlement, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Models/Company.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/CompanyModuleEntitlement.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/CompanyModuleEntitlement.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:users\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/CompanyModuleEntitlement.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$job_title\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$manager_employee_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:employeeCount\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Parameter \#1 \$company of static method App\\Services\\Company\\UsageRecorder\:\:record\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pay_percent\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Offset ''kind'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed, Closure\(App\\Models\\EmployeeRequestDay\)\: mixed given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EmployeeRequestDay\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and ''early'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pay_percent" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/EmployeeRequest.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pay_percent" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/EmployeeRequestDay.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$bank_account_number\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Payslip.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$bank_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/Payslip.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$payProfile\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Payslip.php
+
+		-
+			message: '#^Method App\\Models\\Payslip\:\:paymentDetails\(\) should return array\{payment_method\: string, bank_name\: string\|null, bank_account_number\: string\|null, bank_account_name\: string\|null\} but returns string\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Payslip.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>payment_method" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/Payslip.php
+
+		-
+			message: '#^Method App\\Models\\Plan\:\:monthlyPrice\(\) should return App\\Models\\PlanPrice\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Plan.php
+
+		-
+			message: '#^Method App\\Models\\Plan\:\:yearlyPrice\(\) should return App\\Models\\PlanPrice\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Plan.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: app/Models/RequestTypeSetting.php
+
+		-
+			message: '#^Cannot call method isFuture\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/SupportAccessSession.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasCompanyPermission\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$slots\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/WorkSchedule.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>is_active" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Providers/AppServiceProvider.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceNotifier\:\:timezone\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Parameter \$employee of method App\\Services\\Attendance\\AttendanceNotifier\:\:requestCreated\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Parameter \$employee of method App\\Services\\Attendance\\AttendanceNotifier\:\:requestDecided\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Offset ''leave'' on non\-falsy\-string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Offset ''permission'' on non\-falsy\-string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\AttendanceLock\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#1 \$company of class App\\Services\\Attendance\\ScheduleResolver constructor expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#1 \$company of static method App\\Services\\Attendance\\ScheduleResolver\:\:around\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#1 \$date of static method Carbon\\CarbonImmutable\:\:instance\(\) expects DateTimeInterface, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#2 \$at of method App\\Services\\Attendance\\AttendanceRecorder\:\:workDateFor\(\) expects Carbon\\CarbonInterface, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Parameter \#3 \$snapshot of static method App\\Services\\Attendance\\ExpectedDay\:\:fromSnapshot\(\) expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceRecorder.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$company_id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$radius_meters\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:distanceInMetersTo\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Cannot call method setTimezone\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 3
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Cannot call method utc\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Method App\\Services\\Attendance\\AttendanceService\:\:nearestLocation\(\) should return App\\Models\\WorkLocation but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Method App\\Services\\Attendance\\AttendanceService\:\:scan\(\) should return array\{event\: App\\Models\\AttendanceEvent, day\: App\\Models\\AttendanceDay\|null, slot\: array\|null\} but returns array\{event\: App\\Models\\AttendanceEvent, day\: App\\Models\\AttendanceDay\|null, slot\: string\|null\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:sortBy\(\) expects array\<array\{string, string\}\|\(callable\(Illuminate\\Database\\Eloquent\\Model, Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string\>\|\(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: mixed\)\|string, Closure\(App\\Models\\WorkLocation\)\: float given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,string\>\:\:filter\(\) expects \(callable\(string, 0\)\: bool\)\|null, Closure\(array\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,string\>\:\:map\(\) expects callable\(string, 0\)\: Carbon\\CarbonImmutable, Closure\(array\)\: Carbon\\CarbonImmutable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$company of static method App\\Services\\Attendance\\ScheduleResolver\:\:around\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceRecorder\:\:recalculate\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceRecorder\:\:recalculateRange\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceRecorder\:\:workDateFor\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceService\:\:adjustDay\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#2 \$at of method App\\Services\\Attendance\\AttendanceRecorder\:\:workDateFor\(\) expects Carbon\\CarbonInterface, string given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between ''pending'' and ''missing'' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and null will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>slots" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Attendance/AttendanceService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{sequence\: int, type\: string, time\: string, next_day\: bool, at\: Carbon\\CarbonImmutable\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/Attendance/ExpectedDay.php
+
+		-
+			message: '#^Method App\\Services\\Attendance\\MonthlyAttendance\:\:for\(\) should return Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> but returns Illuminate\\Support\\Collection\<int, array\{planned\: non\-empty\-array\<string, int\>, leave\: array\{paid\: float, unpaid\: float, paid_share\: float, unpaid_share\: float, by_type\: array\<string, float\>\}, excused\: array\{all\: \(float\|int\), unpaid\: \(float\|int\)\}, present_days\: int, absent_days\: int, incomplete_days\: int, late_days\: int, late_minutes\: int, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Attendance/MonthlyAttendance.php
+
+		-
+			message: '#^Offset ''holiday'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Attendance/MonthlyAttendance.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: app/Services/Attendance/MonthlyAttendance.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$details\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 6
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Parameter \#2 \$schedule of method App\\Services\\Attendance\\ScheduleResolver\:\:workDay\(\) expects App\\Models\\WorkSchedule, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Parameter \#4 \$schedule of method App\\Services\\Attendance\\ScheduleResolver\:\:offDay\(\) expects App\\Models\\WorkSchedule\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 6
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Property App\\Services\\Attendance\\ScheduleResolver\:\:\$assignments \(Illuminate\\Support\\Collection\<int, Illuminate\\Support\\Collection\<int, App\\Models\\EmployeeScheduleAssignment\>\>\) does not accept Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\), Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\EmployeeScheduleAssignment\>\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Attendance/ScheduleResolver.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Http\\Request\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 4
+			path: app/Services/AuditLogger.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:roles\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Company/CompanyProvisioner.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<string,array\<int, string\>\>\:\:map\(\) expects callable\(array\<int, string\>, string\)\: int\<0, max\>, Closure\(string\)\: int\<0, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Company/CompanyProvisioner.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$login_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Company/CompanyUserService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Company/CompanyUserService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:branchAccess\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/Company/CompanyUserService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:roles\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Company/CompanyUserService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$membership\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Method App\\Services\\Employees\\BirthdayNotifier\:\:activeUser\(\) should return App\\Models\\User\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: \(App\\Models\\User\|null\), Closure\(App\\Models\\Employee\)\: \(App\\Models\\User\|null\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\Employee\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Parameter \#1 \$dateOfBirth of method App\\Services\\Employees\\BirthdayNotifier\:\:isBirthday\(\) expects DateTimeInterface, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Employees\\BirthdayNotifier\:\:activeUser\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\Employees\\BirthdayNotifier\:\:colleagues\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/BirthdayNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$department_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$job_title\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$manager_employee_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$team\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$team_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Method App\\Services\\Employees\\EmployeeAssignmentService\:\:open\(\) should return App\\Models\\EmployeeAssignment but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Method App\\Services\\Employees\\EmployeeAssignmentService\:\:reassign\(\) should return App\\Models\\EmployeeAssignment\|null but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Employees/EmployeeAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$membership\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Employees/EmployeeRemover.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Services\\Employees\\EmployeeRemover\:\:removeLogin\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Employees/EmployeeRemover.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Employees/ProbationNotifier.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Employees/ProbationNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/NotificationService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 9
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Payroll\\EmployeeSalaryService\:\:assertMonthOpen\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Payroll\\EmployeeSalaryService\:\:history\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Payroll\\EmployeeSalaryService\:\:syncProfile\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pay_type" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Payroll/EmployeeSalaryService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$effective_from\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayGroupService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 6
+			path: app/Services/Payroll/PayGroupService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Payroll\\PayGroupService\:\:assertNotPaid\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayGroupService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Payroll\\PayGroupService\:\:history\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayGroupService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employee_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:hasModule\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:paymentDetails\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Call to function is_array\(\) with null will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 11
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Method App\\Services\\Payroll\\PayRunService\:\:adjustments\(\) should return Illuminate\\Support\\Collection\<int, Illuminate\\Support\\Collection\<int, App\\Models\\PayrollAdjustment\>\> but returns Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\), Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\PayrollAdjustment\>\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Offset ''employees'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Offset ''fingerprint'' on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Offset ''fingerprint'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Offset ''global'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Offset ''skipped_employee_ids'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{currency\: string, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float\}, Closure\(App\\Models\\Payslip\)\: array\{currency\: string, gross\: float, nssf_employee\: float, tax\: float, net\: float, employer_cost\: float\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\Payslip\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayRunService\:\:create\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayRunService\:\:today\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayRunService\:\:today\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$company of method App\\Services\\Payroll\\PayrollCalculator\:\:context\(\) expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#1 \$value of function collect expects Illuminate\\Contracts\\Support\\Arrayable\<\(int\|string\), mixed\>\|iterable\<\(int\|string\), mixed\>\|null, string\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Parameter \#2 \$group of method App\\Services\\Payroll\\PayrollCalculator\:\:context\(\) expects App\\Models\\PayGroup, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Services/Payroll/PayRunService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$amount\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$note\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Call to function array_key_exists\(\) with ''is_active'' and non\-empty\-string will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 12
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Offset ''params'' on \*NEVER\* in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Offset decimal\-int\-string on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{pay_component_id\: mixed, code\: mixed, name\: mixed, kind\: mixed, amount\: mixed, explanation\: mixed, details\: mixed, sort_order\: int\<1, max\>\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{salary\: App\\Models\\EmployeeSalary, from\: Carbon\\CarbonImmutable, to\: Carbon\\CarbonImmutable, days\: int\}, Closure\(App\\Models\\EmployeeSalary\)\: array\{salary\: App\\Models\\EmployeeSalary, from\: Carbon\\CarbonImmutable, to\: Carbon\\CarbonImmutable, days\: int\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EmployeePayItem\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EmployeeSalary\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Parameter \#2 \$array of function array_key_exists expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Payroll/PayrollCalculator.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$branch_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_active\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$manager_employee_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$membership\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$steps\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:accessibleBranchIds\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Method App\\Services\\Requests\\ApprovalChain\:\:lineManagerUser\(\) should return App\\Models\\User\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Method App\\Services\\Requests\\ApprovalChain\:\:start\(\) should return App\\Models\\ApprovalStep but returns Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceNotifier\:\:managersFor\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\ApprovalChain\:\:lineManagerUser\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\Requests\\ApprovalChain\:\:covers\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/ApprovalChain.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$date\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pay_percent\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$type\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:countsCalendarDays\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:label\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 19
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{date\: mixed, portion\: float, part\: string\}, Closure\(App\\Models\\EmployeeRequestDay\)\: array\{date\: mixed, portion\: float, part\: string\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{string, string\}, Closure\(App\\Models\\Attachment\)\: array\{string, string\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:filter\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: bool\)\|null, Closure\(App\\Models\\EmployeeRequestDay\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$company of class App\\Services\\Attendance\\ScheduleResolver constructor expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Attendance\\AttendanceRecorder\:\:recalculateRange\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:assertMonthsOpen\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:lockedMonth\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:shortfall\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:today\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Requests\\LeaveDayCounter\:\:count\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\Requests\\ApprovalChain\:\:covers\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#2 \$employee of method App\\Services\\Requests\\EmployeeRequestService\:\:check\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#2 \$type of method App\\Services\\Requests\\EmployeeRequestService\:\:shortfall\(\) expects App\\Models\\LeaveType\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Parameter \#2 \$type of method App\\Services\\Requests\\LeaveDayCounter\:\:count\(\) expects App\\Models\\LeaveType, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>pay_percent" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Requests/EmployeeRequestService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/LeaveBalance.php
+
+		-
+			message: '#^Parameter \#1 \$company of class App\\Services\\Attendance\\ScheduleResolver constructor expects App\\Models\\Company, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/LeaveDayCounter.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$user_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''at'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''changed_from'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''kind'' on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''minutes'' on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''notes'' on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''pay_changed'' on string\|null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Offset ''time'' on array\{\}\|string on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Parameter \$actor of static method App\\Services\\NotificationService\:\:send\(\) expects App\\Models\\User\|null, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''late'' and ''late'' will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Ternary operator condition is always false\.$#'
+			identifier: ternary.alwaysFalse
+			count: 2
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/Requests/RequestNotifier.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$timezone\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 6
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Schedules\\ScheduleAssignmentService\:\:assertNoLockedMonth\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Parameter \#1 \$employee of method App\\Services\\Schedules\\ScheduleAssignmentService\:\:recalculate\(\) expects App\\Models\\Employee, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/Schedules/ScheduleAssignmentService.php
+
+		-
+			message: '#^Method App\\Support\\CompanyPermissions\:\:forRole\(\) should return array\<string, array\<int, string\>\> but returns array\<int, string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/CompanyPermissions.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$allow_self_approval\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/SelfApproval.php

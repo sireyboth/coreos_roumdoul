@@ -36,7 +36,7 @@ class RouteProtectionTest extends TestCase
 
             $middleware = $route->gatherMiddleware();
             foreach (array_diff($route->methods(), ['HEAD']) as $method) {
-                $key = "{$method} {$route->uri()}";
+                $key = "{$method} ".self::unversioned($route->uri());
 
                 if (in_array($key, self::PUBLIC, true)) {
                     continue;
@@ -68,7 +68,7 @@ class RouteProtectionTest extends TestCase
             }
 
             foreach (array_diff($route->methods(), ['HEAD']) as $method) {
-                $key = "{$method} {$route->uri()}";
+                $key = "{$method} ".self::unversioned($route->uri());
                 if (! in_array($key, $allowed, true) && ! in_array(EnsureCompanyIsActive::class, $middleware, true)) {
                     $missing[] = $key;
                 }
@@ -76,5 +76,25 @@ class RouteProtectionTest extends TestCase
         }
 
         $this->assertSame([], $missing, 'These routes skip the active-company check.');
+    }
+
+    public function test_every_api_route_is_also_served_under_v1(): void
+    {
+        $uris = fn (string $prefix) => collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($r) => str_starts_with($r->uri(), $prefix))
+            ->map(fn ($r) => implode('|', $r->methods()).' '.self::unversioned($r->uri()))
+            ->sort()->values()->all();
+
+        $plain = $uris('api/');  // both: api/x and api/v1/x
+        $v1 = $uris('api/v1/');
+
+        $this->assertNotEmpty($v1);
+        $this->assertSame(count($plain), 2 * count($v1), 'Every /api route needs a /api/v1 twin.');
+    }
+
+    /** api/v1/x and api/x are the same route for these checks. */
+    private static function unversioned(string $uri): string
+    {
+        return preg_replace('#^api/v1/#', 'api/', $uri);
     }
 }

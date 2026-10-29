@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -30,6 +31,15 @@ class AssignRequestId
 
         $response = $next($request);
         $response->headers->set(self::HEADER, $id);
+
+        // Errors a middleware answers itself (module off, company paused, …) never
+        // reach the exception handler, so they get the ID in the body here.
+        if ($request->is('api/*') && $response instanceof JsonResponse && $response->getStatusCode() >= 400) {
+            $data = $response->getData(true);
+            if (is_array($data) && ! isset($data['request_id'])) {
+                $response->setData($data + ['request_id' => $id]);
+            }
+        }
 
         return $response;
     }
