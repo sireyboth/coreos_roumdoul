@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Employees;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;

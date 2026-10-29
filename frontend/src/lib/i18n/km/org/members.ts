@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Members dialog for a department or team (components/dashboard/members-dialog.tsx) — same keys as en/org/members.ts.
+// Members dialog for a department or team (components/dashboard/organization/members-dialog.tsx) — same keys as en/org/members.ts.
 
 export const members: Dictionary["org"]["members"] = {
   // ── Header ───────────────────────────────────────────────────────

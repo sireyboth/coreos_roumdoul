@@ -11,7 +11,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PlanResource extends Resource
 {
@@ -84,12 +83,12 @@ class PlanResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('monthly_price')
                     ->label('Monthly')
-                    ->state(fn (\App\Models\Plan $record) => $record->monthlyPrice()
+                    ->state(fn (Plan $record) => $record->monthlyPrice()
                         ? number_format($record->monthlyPrice()->price_cents / 100, 2).' '.$record->monthlyPrice()->currency
                         : '—'),
                 Tables\Columns\TextColumn::make('yearly_price')
                     ->label('Yearly')
-                    ->state(fn (\App\Models\Plan $record) => $record->yearlyPrice()
+                    ->state(fn (Plan $record) => $record->yearlyPrice()
                         ? number_format($record->yearlyPrice()->price_cents / 100, 2).' '.$record->yearlyPrice()->currency
                         : '—'),
                 Tables\Columns\TextColumn::make('max_employees')

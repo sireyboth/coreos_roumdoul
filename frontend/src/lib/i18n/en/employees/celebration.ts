@@ -1,4 +1,4 @@
-// Birthday celebration dialog (components/dashboard/birthday-celebration.tsx)
+// Birthday celebration dialog (components/dashboard/employees/birthday-celebration.tsx)
 
 export const celebration = {
   // ── Heading ──────────────────────────────────────────────────────

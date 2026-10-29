@@ -10,7 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WorkLocation;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;

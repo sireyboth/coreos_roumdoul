@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { hasLeft } from "@/components/dashboard/employee-form";
+import { hasLeft } from "@/components/dashboard/employees/employee-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError, type Employee, type WorkSchedule } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";

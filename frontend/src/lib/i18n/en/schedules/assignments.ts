@@ -1,4 +1,4 @@
-// One employee's schedules over time (components/dashboard/employee-schedule-assignments.tsx).
+// One employee's schedules over time (components/dashboard/schedules/employee-schedule-assignments.tsx).
 
 export const assignments = {
   // ── Header ────────────────────────────────────────────────────────

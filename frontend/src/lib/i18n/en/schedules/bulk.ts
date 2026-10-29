@@ -1,4 +1,4 @@
-// Add many days to the roster (components/dashboard/bulk-schedule-dialog.tsx).
+// Add many days to the roster (components/dashboard/schedules/bulk-schedule-dialog.tsx).
 
 export const bulk = {
   // ── Header ────────────────────────────────────────────────────────

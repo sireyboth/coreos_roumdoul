@@ -75,6 +75,7 @@ export function MeProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the one sign-in check on start, by design
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

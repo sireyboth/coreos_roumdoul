@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Missed scans dialog (components/dashboard/missed-scans-dialog.tsx) — same keys as en/attendance/missedScans.ts.
+// Missed scans dialog (components/dashboard/attendance/missed-scans-dialog.tsx) — same keys as en/attendance/missedScans.ts.
 // IN/OUT slot names come from attendance.fillMissed (slotIn / slotOut).
 
 export const missedScans: Dictionary["attendance"]["missedScans"] = {

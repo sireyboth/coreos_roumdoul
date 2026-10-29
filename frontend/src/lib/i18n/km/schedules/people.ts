@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Who follows a schedule (components/dashboard/schedule-people-dialog.tsx) — same keys as en/schedules/people.ts.
+// Who follows a schedule (components/dashboard/schedules/schedule-people-dialog.tsx) — same keys as en/schedules/people.ts.
 
 export const people: Dictionary["schedules"]["people"] = {
   // ── Header ────────────────────────────────────────────────────────

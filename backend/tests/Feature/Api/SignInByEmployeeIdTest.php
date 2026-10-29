@@ -7,7 +7,7 @@ use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\Employee;
 use App\Models\User;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;

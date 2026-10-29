@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Adjust scans (components/dashboard/attendance-adjust-scans.tsx) — same keys as en/attendance/adjust.ts.
+// Adjust scans (components/dashboard/attendance/attendance-adjust-scans.tsx) — same keys as en/attendance/adjust.ts.
 
 export const adjust: Dictionary["attendance"]["adjust"] = {
   // ── Heading ──────────────────────────────────────────────────────

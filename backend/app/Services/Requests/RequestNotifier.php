@@ -142,8 +142,10 @@ final class RequestNotifier
         $start = Carbon::parse($request->start_date);
         $end = Carbon::parse($request->end_date);
         $dates = $start->isSameDay($end)
-            ? $start->format('D j M').match ($request->day_part) { 'am' => ' (morning)', 'pm' => ' (afternoon)', default => '' }
-            : $start->format('D j M').' – '.$end->format('D j M');
+            ? $start->format('D j M').match ($request->day_part) {
+                'am' => ' (morning)', 'pm' => ' (afternoon)', default => ''
+            }
+        : $start->format('D j M').' – '.$end->format('D j M');
         $days = $request->days == 1 ? '1 day' : rtrim(rtrim(number_format($request->days, 1), '0'), '.').' days';
 
         return ($request->leaveType?->name ?? 'Leave')." · {$dates} · {$days}";

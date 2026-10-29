@@ -1,4 +1,4 @@
-// Assign a schedule to people (components/dashboard/assign-schedule-dialog.tsx).
+// Assign a schedule to people (components/dashboard/schedules/assign-schedule-dialog.tsx).
 
 export const assign = {
   // ── Header ────────────────────────────────────────────────────────

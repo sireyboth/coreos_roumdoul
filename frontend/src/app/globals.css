@@ -309,7 +309,7 @@
   }
 }
 
-/* Birthday celebration confetti (components/dashboard/birthday-celebration.tsx). */
+/* Birthday celebration confetti (components/dashboard/employees/birthday-celebration.tsx). */
 @keyframes confetti-fall {
   0% {
     transform: translateY(0) rotate(0deg);

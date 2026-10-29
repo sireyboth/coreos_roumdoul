@@ -1,4 +1,4 @@
-// Close the month (components/dashboard/attendance-month-close.tsx)
+// Close the month (components/dashboard/attendance/attendance-month-close.tsx)
 
 export const monthClose = {
   // ── Checklist before closing ──────────────────────────────────────

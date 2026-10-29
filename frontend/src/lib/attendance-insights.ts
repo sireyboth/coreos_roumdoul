@@ -1,4 +1,4 @@
-import type { AttendanceReport } from "@/lib/excel-specs/time";
+import type { AttendanceReport } from "@/lib/excel/specs/time";
 import type { TKey } from "@/lib/i18n";
 
 /**

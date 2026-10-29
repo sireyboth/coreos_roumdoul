@@ -1,4 +1,4 @@
-// Fill missed scans dialog (components/dashboard/attendance-fill-missed-dialog.tsx)
+// Fill missed scans dialog (components/dashboard/attendance/attendance-fill-missed-dialog.tsx)
 
 export const fillMissed = {
   // ── Header ────────────────────────────────────────────────────────

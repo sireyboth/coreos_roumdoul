@@ -5,7 +5,7 @@ import { CheckCircle2, Lock, LockOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendancePeriod } from "@/lib/api";
 import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";

@@ -16,10 +16,10 @@ import {
 } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
 import { daysWith, ISSUES, type IssueKind, type PersonInsight } from "@/lib/attendance-insights";
-import { barChartImage, type Bar } from "@/lib/chart-image";
+import { barChartImage, type Bar } from "@/lib/excel/chart-image";
 import type { Worksheet } from "exceljs";
 import { downloadSheet, downloadWorkbook, styleHeader, today, type SheetColumn } from "@/lib/excel";
-import { Lookup, Row, RowError, yesNo, type ImportField, type ImportSpec } from "@/lib/excel-import";
+import { Lookup, Row, RowError, yesNo, type ImportField, type ImportSpec } from "@/lib/excel/import";
 import { translateNow } from "@/lib/i18n";
 import { daysOffText, formatMinutes, slotsOn, slotsSummary, WEEK_ORDER, WEEKDAY_SHORT } from "@/lib/schedule";
 

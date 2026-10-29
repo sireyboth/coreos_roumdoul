@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Assign a schedule to people (components/dashboard/assign-schedule-dialog.tsx) — same keys as en/schedules/assign.ts.
+// Assign a schedule to people (components/dashboard/schedules/assign-schedule-dialog.tsx) — same keys as en/schedules/assign.ts.
 
 export const assign: Dictionary["schedules"]["assign"] = {
   // ── Header ────────────────────────────────────────────────────────

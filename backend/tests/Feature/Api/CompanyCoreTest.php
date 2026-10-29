@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\CompanyModuleEntitlement;
 use App\Models\Module;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
@@ -44,7 +45,7 @@ class CompanyCoreTest extends TestCase
 
         $this->assertTrue($admin->membership->roles->contains('code', 'company-admin'));
         $this->assertCount(1, $admin->notifications);
-        $this->assertSame('company.created', \App\Models\AuditLog::query()->first()->event);
+        $this->assertSame('company.created', AuditLog::query()->first()->event);
     }
 
     public function test_company_admin_can_manage_branches_but_employee_cannot(): void

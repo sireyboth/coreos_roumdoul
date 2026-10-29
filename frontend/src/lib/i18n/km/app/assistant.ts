@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Help assistant chat (components/dashboard/ai-assistant.tsx) — same keys as en/app/assistant.ts.
+// Help assistant chat (components/dashboard/layout/ai-assistant.tsx) — same keys as en/app/assistant.ts.
 
 export const assistant: Dictionary["app"]["assistant"] = {
   // ── Button & header ───────────────────────────────────────────────

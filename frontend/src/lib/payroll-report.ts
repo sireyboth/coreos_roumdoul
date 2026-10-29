@@ -2,7 +2,7 @@ import type { PayLineKind, PayRunReportRow } from "@/lib/api";
 
 /**
  * The figures of a pay run report, worked out once and shared by the printed
- * report (payroll-pdf.ts) and the report dashboard — so both always agree.
+ * report (lib/pdf/payroll.ts) and the report dashboard — so both always agree.
  */
 
 const n = (v: unknown) => Number(v ?? 0);

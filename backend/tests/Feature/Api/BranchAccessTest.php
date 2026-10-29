@@ -5,7 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\MembershipBranchAccess;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;

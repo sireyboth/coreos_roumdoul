@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
@@ -8,9 +8,9 @@ use App\Models\Employee;
 use App\Models\EmployeeAssignment;
 use App\Models\PayGroup;
 use App\Models\Team;
-use App\Services\CompanyUserService;
-use App\Services\EmployeeAssignmentService;
-use App\Services\EmployeeRemover;
+use App\Services\Company\CompanyUserService;
+use App\Services\Employees\EmployeeAssignmentService;
+use App\Services\Employees\EmployeeRemover;
 use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\Payroll\PayGroupService;
 use App\Support\SelfApproval;

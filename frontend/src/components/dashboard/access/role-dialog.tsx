@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
+import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
 import { api, ApiError, type PermissionGroup, type Role } from "@/lib/api";
 import { notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";

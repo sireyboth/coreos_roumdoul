@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Attendance;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceAdjustment;
@@ -9,8 +9,8 @@ use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
 use App\Models\Employee;
 use App\Services\Attendance\AttendanceRecorder;
+use App\Services\Attendance\AttendanceService;
 use App\Services\Attendance\ScheduleResolver;
-use App\Services\AttendanceService;
 use App\Services\AuditLogger;
 use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;

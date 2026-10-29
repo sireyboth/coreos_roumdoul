@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { KbachCorner, surfaceCard } from "@/components/dashboard/kbach";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
@@ -15,7 +15,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-// Same look as the home page (components/dashboard/kbach): a hero card with the
+// Same look as the home page (components/dashboard/shared/kbach): a hero card with the
 // person's photo, name and role over the kbach flower, then the two forms on
 // solid surface cards.
 

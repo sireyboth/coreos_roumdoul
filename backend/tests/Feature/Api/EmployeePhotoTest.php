@@ -6,7 +6,7 @@ use App\Models\Attachment;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\Schedule;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;

@@ -6,10 +6,10 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AttendanceDayDialog } from "@/components/dashboard/attendance-day-dialog";
-import { AttendanceLateDetail } from "@/components/dashboard/attendance-late-detail";
-import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance-month-close";
-import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/calendar-shared";
+import { AttendanceDayDialog } from "@/components/dashboard/attendance/attendance-day-dialog";
+import { AttendanceLateDetail } from "@/components/dashboard/attendance/attendance-late-detail";
+import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance/attendance-month-close";
+import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type AttendanceDay } from "@/lib/api";
 import { buildInsights, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
@@ -22,7 +22,7 @@ import {
   readAttendanceReport,
   type AttendanceCalendar,
   type AttendanceReport as Report,
-} from "@/lib/excel-specs/time";
+} from "@/lib/excel/specs/time";
 import { notifyError } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 

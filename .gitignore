@@ -1,2 +1,10 @@
 
 .vscode/settings.json
+
+# OS / editor junk
+.DS_Store
+
+# Local database dumps and personal notes — never in git
+*.session.sql
+*.sql
+Note/

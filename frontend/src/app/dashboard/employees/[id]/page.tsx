@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { LoginLink } from "@/components/dashboard/login-link";
-import { AttendanceExportDialog } from "@/components/dashboard/attendance-export-dialog";
-import { CardPreviewDialog } from "@/components/dashboard/card-preview-dialog";
-import { CreateLoginDialog } from "@/components/dashboard/create-login-dialog";
-import { EmptyState } from "@/components/dashboard/empty-state";
+import { LoginLink } from "@/components/dashboard/employees/login-link";
+import { AttendanceExportDialog } from "@/components/dashboard/attendance/attendance-export-dialog";
+import { CardPreviewDialog } from "@/components/dashboard/employees/card-preview-dialog";
+import { CreateLoginDialog } from "@/components/dashboard/employees/create-login-dialog";
+import { EmptyState } from "@/components/dashboard/shared/empty-state";
 import {
   EmployeeFormFields,
   formFromEmployee,
@@ -24,16 +24,16 @@ import {
   statusVariant,
   toPayload,
   type EmployeeForm,
-} from "@/components/dashboard/employee-form";
-import { PhotoPicker } from "@/components/dashboard/photo-picker";
-import { ProbationCard } from "@/components/dashboard/probation-card";
-import { EmployeeScheduleAssignments } from "@/components/dashboard/employee-schedule-assignments";
+} from "@/components/dashboard/employees/employee-form";
+import { PhotoPicker } from "@/components/dashboard/employees/photo-picker";
+import { ProbationCard } from "@/components/dashboard/employees/probation-card";
+import { EmployeeScheduleAssignments } from "@/components/dashboard/schedules/employee-schedule-assignments";
 import { EmployeePayPanel } from "@/components/dashboard/payroll/employee-pay-panel";
-import { RosterView } from "@/components/dashboard/roster-view";
+import { RosterView } from "@/components/dashboard/schedules/roster-view";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Employee, photoSrc, Team } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
-import { saveBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/export/download";
 import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";

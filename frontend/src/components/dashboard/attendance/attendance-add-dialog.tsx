@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, type AttendanceDay, type Employee } from "@/lib/api";
-import { scansOn } from "@/lib/excel-specs/time";
+import { scansOn } from "@/lib/excel/specs/time";
 import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 

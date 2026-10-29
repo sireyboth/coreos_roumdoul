@@ -6,7 +6,7 @@ use App\Models\Employee;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\WorkLocation;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;

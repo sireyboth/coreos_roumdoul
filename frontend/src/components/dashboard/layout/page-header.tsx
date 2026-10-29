@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { findNavItem } from "@/components/dashboard/nav";
+import { findNavItem } from "@/components/dashboard/layout/nav";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({

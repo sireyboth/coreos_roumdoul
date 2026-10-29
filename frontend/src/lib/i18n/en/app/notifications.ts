@@ -1,4 +1,4 @@
-// Notification bell (components/dashboard/notification-bell.tsx). Alert titles and
+// Notification bell (components/dashboard/layout/notification-bell.tsx). Alert titles and
 // bodies come from the server and are not translated here.
 
 export const notifications = {

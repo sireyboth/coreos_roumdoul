@@ -1,4 +1,4 @@
-// Create-login dialog (components/dashboard/create-login-dialog.tsx)
+// Create-login dialog (components/dashboard/employees/create-login-dialog.tsx)
 
 export const createLogin = {
   title: "Create a login for {name}",

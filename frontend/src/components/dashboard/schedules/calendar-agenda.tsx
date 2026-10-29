@@ -5,7 +5,7 @@ import { Coffee, Flag, Palmtree, UserX, type LucideIcon } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, CalendarEvent, CalendarEventType, CalendarEvents, Employee } from "@/lib/api";
 import { dateLocale, translate, useLang, useT, type Lang } from "@/lib/i18n";

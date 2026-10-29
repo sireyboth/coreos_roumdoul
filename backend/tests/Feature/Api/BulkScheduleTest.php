@@ -9,7 +9,7 @@ use App\Models\Holiday;
 use App\Models\Schedule;
 use App\Models\WorkLocation;
 use App\Models\WorkSchedule;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;

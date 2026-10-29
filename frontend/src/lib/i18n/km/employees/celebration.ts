@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// អបអរខួបកំណើត (components/dashboard/birthday-celebration.tsx) — same keys as en/employees/celebration.ts.
+// អបអរខួបកំណើត (components/dashboard/employees/birthday-celebration.tsx) — same keys as en/employees/celebration.ts.
 
 export const celebration: Dictionary["employees"]["celebration"] = {
   // ── Heading ──────────────────────────────────────────────────────

@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Attendance;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttendanceCorrection;
 use App\Models\Employee;
 use App\Services\Attendance\AttendanceNotifier;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\AttendanceService;
+use App\Services\Attendance\AttendanceService;
 use App\Support\SelfApproval;
 use Carbon\Carbon;
 use Illuminate\Http\Request;

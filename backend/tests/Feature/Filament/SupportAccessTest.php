@@ -2,9 +2,10 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\CompanyResource\Pages\ManageCompanies;
 use App\Models\AuditLog;
 use App\Models\PlatformAdmin;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -19,7 +20,7 @@ class SupportAccessTest extends TestCase
         $platformAdmin = PlatformAdmin::factory()->create();
 
         Livewire::actingAs($platformAdmin, 'platform')
-            ->test(\App\Filament\Resources\CompanyResource\Pages\ManageCompanies::class)
+            ->test(ManageCompanies::class)
             ->callTableAction('start_support_access', $company, data: [
                 'reason' => 'Investigating a billing question',
                 'duration_minutes' => 30,
@@ -34,7 +35,7 @@ class SupportAccessTest extends TestCase
         $this->assertSame(PlatformAdmin::class, $startLog->actor_type);
 
         Livewire::actingAs($platformAdmin, 'platform')
-            ->test(\App\Filament\Resources\CompanyResource\Pages\ManageCompanies::class)
+            ->test(ManageCompanies::class)
             ->callTableAction('end_support_access', $company);
 
         $this->assertNotNull($session->fresh()->ended_at);

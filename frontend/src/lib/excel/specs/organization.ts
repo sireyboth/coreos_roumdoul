@@ -1,6 +1,6 @@
 import { api, type Branch, type Department, type Team, type WorkLocation } from "@/lib/api";
 import { downloadSheet, today } from "@/lib/excel";
-import { Lookup, optionLabel, RowError, STATUS_OPTIONS, yesNo, type ImportSpec } from "@/lib/excel-import";
+import { Lookup, optionLabel, RowError, STATUS_OPTIONS, yesNo, type ImportSpec } from "@/lib/excel/import";
 import { translateNow } from "@/lib/i18n";
 
 /*

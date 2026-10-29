@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// "Today" scan card (components/dashboard/attendance-today-card.tsx) — same keys as en/attendance/today.ts.
+// "Today" scan card (components/dashboard/attendance/attendance-today-card.tsx) — same keys as en/attendance/today.ts.
 
 export const today: Dictionary["attendance"]["today"] = {
   // ── What kind of day it is ────────────────────────────────────────

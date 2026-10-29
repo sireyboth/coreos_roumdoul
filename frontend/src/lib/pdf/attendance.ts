@@ -1,6 +1,6 @@
 import { daysWith, duration, ISSUES, totalsOf, type IssueKind, type PersonInsight, type ReportDay } from "@/lib/attendance-insights";
-import { CALENDAR_CODES, type AttendanceCalendar } from "@/lib/excel-specs/time";
-import { escapeHtml, printHtmlDocument, REPORT_FONTS } from "@/lib/print-pdf";
+import { CALENDAR_CODES, type AttendanceCalendar } from "@/lib/excel/specs/time";
+import { escapeHtml, printHtmlDocument, REPORT_FONTS } from "@/lib/pdf/print";
 
 /**
  * The attendance report as a printed document, saved as PDF by the browser.

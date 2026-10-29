@@ -130,7 +130,7 @@ export const common = {
     loading: "Loading",
   },
 
-  // ── Excel buttons (components/dashboard/excel-actions.tsx) ────────
+  // ── Excel buttons (components/dashboard/excel/excel-actions.tsx) ────────
   excel: {
     import: "Import",
     importSubject: "Import {subject}",
@@ -148,7 +148,7 @@ export const common = {
     qrHint: "Point your camera at the code posted at your branch.",
   },
 
-  // ── Display order (components/dashboard/display-order.tsx) ────────
+  // ── Display order (components/dashboard/shared/display-order.tsx) ────────
   order: {
     label: "Display order (optional)",
     placeholder: "e.g. 1",

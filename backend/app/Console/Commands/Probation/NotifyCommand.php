@@ -3,7 +3,7 @@
 namespace App\Console\Commands\Probation;
 
 use App\Models\Company;
-use App\Services\ProbationNotifier;
+use App\Services\Employees\ProbationNotifier;
 use Illuminate\Console\Command;
 
 /**

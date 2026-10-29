@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Company;
 
 use App\Models\CompanyRole;
 use App\Models\User;
+use App\Services\AuditLogger;
 
 /**
  * Creates a login inside an existing company: the User, its company

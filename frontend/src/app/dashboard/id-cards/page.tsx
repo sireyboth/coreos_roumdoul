@@ -5,13 +5,13 @@ import { Eye, IdCard } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { CardPreviewDialog } from "@/components/dashboard/card-preview-dialog";
-import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { CardPreviewDialog } from "@/components/dashboard/employees/card-preview-dialog";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, Employee } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
-import { saveBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/export/download";
 import { useT } from "@/lib/i18n";
 import { notifyError } from "@/lib/notify";
 

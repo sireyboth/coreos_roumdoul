@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Import Cambodian holidays dialog (components/dashboard/khmer-holiday-import-dialog.tsx) — same keys as en/calendar/khmerImport.ts.
+// Import Cambodian holidays dialog (components/dashboard/schedules/khmer-holiday-import-dialog.tsx) — same keys as en/calendar/khmerImport.ts.
 
 export const khmerImport: Dictionary["calendar"]["khmerImport"] = {
   // ── Header ────────────────────────────────────────────────────────

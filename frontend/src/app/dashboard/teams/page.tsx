@@ -18,13 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MembersDialog } from "@/components/dashboard/members-dialog";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { MembersDialog } from "@/components/dashboard/organization/members-dialog";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Department, Team } from "@/lib/api";
-import { exportTeams, teamImport } from "@/lib/excel-specs/organization";
+import { exportTeams, teamImport } from "@/lib/excel/specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 

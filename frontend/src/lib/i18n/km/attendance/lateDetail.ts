@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Late / early / missed detail (components/dashboard/attendance-late-detail.tsx) — same keys as en/attendance/lateDetail.ts.
+// Late / early / missed detail (components/dashboard/attendance/attendance-late-detail.tsx) — same keys as en/attendance/lateDetail.ts.
 
 export const lateDetail: Dictionary["attendance"]["lateDetail"] = {
   // ── Toolbar ───────────────────────────────────────────────────────

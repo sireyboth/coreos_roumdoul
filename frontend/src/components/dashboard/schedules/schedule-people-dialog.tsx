@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type ScheduleAssignment, type WorkSchedule } from "@/lib/api";
 import { daysOffText } from "@/lib/schedule";

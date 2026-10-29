@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Account;
 
 use App\Http\Controllers\Controller;
 use App\Models\CompanyMembership;
 use App\Services\Ai\AssistantService;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,6 +18,7 @@ class AiAssistantController extends Controller
 
     /** Daily limits. All companies share one API budget, so keep these modest. */
     private const PER_COMPANY_PER_DAY = 200;
+
     private const PER_USER_PER_DAY = 30;
 
     /** Questions in one chat before a new chat is needed. Matches the chat's QUESTIONS_PER_CHAT. */

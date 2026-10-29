@@ -12,6 +12,7 @@ export function ThemeToggle() {
   const t = useT();
 
   // Avoids a hydration mismatch: the server can't know the viewer's theme.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- runs once after mount, by design
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {

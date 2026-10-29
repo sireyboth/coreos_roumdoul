@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Notification bell (components/dashboard/notification-bell.tsx) — same keys as en/app/notifications.ts.
+// Notification bell (components/dashboard/layout/notification-bell.tsx) — same keys as en/app/notifications.ts.
 
 export const notifications: Dictionary["app"]["notifications"] = {
   // ── Bell & list ───────────────────────────────────────────────────

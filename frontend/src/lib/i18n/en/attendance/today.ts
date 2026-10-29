@@ -1,4 +1,4 @@
-// "Today" scan card (components/dashboard/attendance-today-card.tsx)
+// "Today" scan card (components/dashboard/attendance/attendance-today-card.tsx)
 
 export const today = {
   // ── What kind of day it is ────────────────────────────────────────

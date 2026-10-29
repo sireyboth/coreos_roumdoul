@@ -1,5 +1,5 @@
 import { api, type Employee, type PayKind } from "@/lib/api";
-import { Lookup, RowError, type ImportSpec, type Row } from "@/lib/excel-import";
+import { Lookup, RowError, type ImportSpec, type Row } from "@/lib/excel/import";
 import { translateNow } from "@/lib/i18n";
 
 /*

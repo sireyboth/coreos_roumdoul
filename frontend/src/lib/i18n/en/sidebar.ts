@@ -1,4 +1,4 @@
-// Sidebar (components/dashboard/sidebar.tsx, nav.ts) and the language switch.
+// Sidebar (components/dashboard/layout/sidebar.tsx, nav.ts) and the language switch.
 // Page names here are the full ones; nav.ts has the short ones for phone tiles.
 
 export const sidebar = {

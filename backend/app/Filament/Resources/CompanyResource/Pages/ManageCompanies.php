@@ -4,7 +4,7 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Resources\CompanyResource;
 use App\Models\Company;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Filament\Actions;
 use Filament\Resources\Pages\ManageRecords;
 use Illuminate\Database\Eloquent\Model;

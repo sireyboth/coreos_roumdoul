@@ -4,15 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\RequiresPlatformPermission;
 use App\Filament\Resources\CompanyModuleEntitlementResource\Pages;
-use App\Filament\Resources\CompanyModuleEntitlementResource\RelationManagers;
 use App\Models\CompanyModuleEntitlement;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CompanyModuleEntitlementResource extends Resource
 {

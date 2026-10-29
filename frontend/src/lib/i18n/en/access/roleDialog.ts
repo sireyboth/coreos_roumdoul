@@ -1,4 +1,4 @@
-// Role editor dialog (components/dashboard/role-dialog.tsx)
+// Role editor dialog (components/dashboard/access/role-dialog.tsx)
 
 export const roleDialog = {
   // ── Header ───────────────────────────────────────────────────────

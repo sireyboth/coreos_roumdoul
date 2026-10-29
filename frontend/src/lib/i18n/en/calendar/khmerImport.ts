@@ -1,4 +1,4 @@
-// Import Cambodian holidays dialog (components/dashboard/khmer-holiday-import-dialog.tsx)
+// Import Cambodian holidays dialog (components/dashboard/schedules/khmer-holiday-import-dialog.tsx)
 
 export const khmerImport = {
   // ── Header ────────────────────────────────────────────────────────

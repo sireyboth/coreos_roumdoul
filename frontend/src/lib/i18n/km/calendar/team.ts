@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Team calendar (components/dashboard/team-calendar.tsx) — same keys as en/calendar/team.ts.
+// Team calendar (components/dashboard/schedules/team-calendar.tsx) — same keys as en/calendar/team.ts.
 
 export const team: Dictionary["calendar"]["team"] = {
   // ── Toolbar ───────────────────────────────────────────────────────

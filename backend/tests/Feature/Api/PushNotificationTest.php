@@ -5,7 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\NotificationDelivery;
 use App\Models\PushSubscription;
 use App\Models\User;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use App\Services\NotificationService;
 use App\Services\Push\PushResult;
 use App\Services\Push\PushSender;

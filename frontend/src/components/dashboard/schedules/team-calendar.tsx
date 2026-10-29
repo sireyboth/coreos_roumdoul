@@ -17,11 +17,11 @@ import {
   halfDayLabel,
   halfDayLeave,
   WEEKDAY_KEYS,
-} from "@/components/dashboard/calendar-shared";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
+} from "@/components/dashboard/schedules/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
 import { useApi } from "@/hooks/use-api";
 import { api, Branch, CalendarAttendance, CalendarDay, CalendarDayType, TeamCalendar as TeamData } from "@/lib/api";
-import { dayOffImport, exportTeamCalendar } from "@/lib/excel-specs/time";
+import { dayOffImport, exportTeamCalendar } from "@/lib/excel/specs/time";
 import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { slotsSummary } from "@/lib/schedule";

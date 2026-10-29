@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Employees;
 
 use App\Models\Company;
 use App\Models\Employee;
 use App\Services\Attendance\AttendanceNotifier;
+use App\Services\NotificationService;
 use Carbon\CarbonImmutable;
 
 /**

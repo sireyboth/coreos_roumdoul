@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Report tab (components/dashboard/attendance-report.tsx, lib/attendance-insights.ts) — same keys as en/attendance/report.ts.
+// Report tab (components/dashboard/attendance/attendance-report.tsx, lib/attendance-insights.ts) — same keys as en/attendance/report.ts.
 
 export const report: Dictionary["attendance"]["report"] = {
   // ── Period & view switches ────────────────────────────────────────

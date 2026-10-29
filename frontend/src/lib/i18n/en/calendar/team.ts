@@ -1,4 +1,4 @@
-// Team calendar (components/dashboard/team-calendar.tsx)
+// Team calendar (components/dashboard/schedules/team-calendar.tsx)
 
 export const team = {
   // ── Toolbar ───────────────────────────────────────────────────────

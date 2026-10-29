@@ -4,6 +4,7 @@ namespace App\Models\Concerns;
 
 use App\Models\Company;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Enforces tenant isolation: every query against a company-owned model is
@@ -30,7 +31,7 @@ trait BelongsToCompany
         });
     }
 
-    public function company(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
     }

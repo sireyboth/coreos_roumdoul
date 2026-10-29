@@ -3,7 +3,7 @@
 namespace App\Console\Commands\Birthdays;
 
 use App\Models\Company;
-use App\Services\BirthdayNotifier;
+use App\Services\Employees\BirthdayNotifier;
 use Illuminate\Console\Command;
 
 /**

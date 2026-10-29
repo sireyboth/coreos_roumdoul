@@ -1,5 +1,5 @@
-// Import from Excel (components/dashboard/excel-import-dialog.tsx) and its row checks
-// (lib/excel-import.ts). {noun}/{many} are the module's own words; {field} is the Excel
+// Import from Excel (components/dashboard/excel/excel-import-dialog.tsx) and its row checks
+// (lib/excel/import.ts). {noun}/{many} are the module's own words; {field} is the Excel
 // column header, which never changes (lib/excel-specs/*). The Excel file's own contents
 // (template, error report) stay as they are.
 
@@ -80,7 +80,7 @@ export const excelImport = {
     needAttentionOther: "{n} rows need attention.",
   },
 
-  // ── Row checks (lib/excel-import.ts) ──────────────────────────────
+  // ── Row checks (lib/excel/import.ts) ──────────────────────────────
   check: {
     invalidOption: "{field} \"{text}\" isn't valid. Use one of: {options}.",
     wholeNumber: "{field} must be a whole number.",

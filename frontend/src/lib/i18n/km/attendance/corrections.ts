@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Corrections tab (components/dashboard/attendance-corrections.tsx) — same keys as en/attendance/corrections.ts.
+// Corrections tab (components/dashboard/attendance/attendance-corrections.tsx) — same keys as en/attendance/corrections.ts.
 
 export const corrections: Dictionary["attendance"]["corrections"] = {
   // ── Toolbar ──────────────────────────────────────────────────────

@@ -5,13 +5,14 @@ namespace Tests\Feature\Api;
 use App\Models\AttendanceDay;
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\CompanyPermission;
 use App\Models\Employee;
 use App\Models\MembershipBranchAccess;
 use App\Models\Plan;
 use App\Models\Schedule;
 use App\Models\Subscription;
 use App\Models\User;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;
@@ -123,7 +124,7 @@ class SecurityHardeningTest extends TestCase
     public function test_the_audit_log_hides_pay_and_id_numbers_from_people_who_cant_see_them(): void
     {
         $role = $this->company->roles()->create(['name' => 'auditor', 'code' => 'auditor']);
-        $role->permissions()->attach(\App\Models\CompanyPermission::query()->where('code', 'audit.view')->pluck('id'));
+        $role->permissions()->attach(CompanyPermission::query()->where('code', 'audit.view')->pluck('id'));
         $auditor = $this->createUserWithRole($this->company, 'auditor');
 
         $branch = Branch::query()->create(['company_id' => $this->company->id, 'name' => 'HQ', 'latitude' => 11.5, 'longitude' => 104.9]);

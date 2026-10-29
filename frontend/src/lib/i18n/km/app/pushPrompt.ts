@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Ask to turn on notifications (components/dashboard/push-prompt.tsx) — same keys as en/app/pushPrompt.ts.
+// Ask to turn on notifications (components/dashboard/layout/push-prompt.tsx) — same keys as en/app/pushPrompt.ts.
 
 export const pushPrompt: Dictionary["app"]["pushPrompt"] = {
   // ── iPhone in Safari: add to Home Screen first ────────────────────

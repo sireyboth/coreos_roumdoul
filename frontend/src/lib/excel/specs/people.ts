@@ -1,4 +1,4 @@
-import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, GENDERS, SALARY_CURRENCIES } from "@/components/dashboard/employee-form";
+import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, GENDERS, SALARY_CURRENCIES } from "@/components/dashboard/employees/employee-form";
 import {
   api,
   type Branch,
@@ -18,9 +18,9 @@ import {
 } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
 import { downloadSheet, today } from "@/lib/excel";
-import { errorText, isFatal, Lookup, optionLabel, Row, RowError, yesNo, type ImportSpec, type SaveResult } from "@/lib/excel-import";
+import { errorText, isFatal, Lookup, optionLabel, Row, RowError, yesNo, type ImportSpec, type SaveResult } from "@/lib/excel/import";
 import { translateNow } from "@/lib/i18n";
-import { daysOffProblem, parseDaysOff } from "@/lib/excel-specs/time";
+import { daysOffProblem, parseDaysOff } from "@/lib/excel/specs/time";
 import { daysOffText } from "@/lib/schedule";
 
 /*

@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Role editor dialog (components/dashboard/role-dialog.tsx) — same keys as en/access/roleDialog.ts.
+// Role editor dialog (components/dashboard/access/role-dialog.tsx) — same keys as en/access/roleDialog.ts.
 
 export const roleDialog: Dictionary["access"]["roleDialog"] = {
   // ── Header ───────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Add attendance dialog (components/dashboard/attendance-add-dialog.tsx) — same keys as en/attendance/add.ts.
+// Add attendance dialog (components/dashboard/attendance/attendance-add-dialog.tsx) — same keys as en/attendance/add.ts.
 
 export const add: Dictionary["attendance"]["add"] = {
   // ── Header ────────────────────────────────────────────────────────

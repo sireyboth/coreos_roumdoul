@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Day details dialog (components/dashboard/attendance-day-dialog.tsx) — same keys as en/attendance/day.ts.
+// Day details dialog (components/dashboard/attendance/attendance-day-dialog.tsx) — same keys as en/attendance/day.ts.
 
 export const day: Dictionary["attendance"]["day"] = {
   // ── Header ───────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// Members dialog for a department or team (components/dashboard/members-dialog.tsx)
+// Members dialog for a department or team (components/dashboard/organization/members-dialog.tsx)
 
 export const members = {
   // ── Header ───────────────────────────────────────────────────────

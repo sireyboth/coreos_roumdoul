@@ -131,7 +131,7 @@ export const common: Dictionary["common"] = {
     loading: "កំពុងផ្ទុក",
   },
 
-  // ── Excel buttons (components/dashboard/excel-actions.tsx) ────────
+  // ── Excel buttons (components/dashboard/excel/excel-actions.tsx) ────────
   excel: {
     import: "នាំចូល",
     importSubject: "នាំចូល{subject}",
@@ -149,7 +149,7 @@ export const common: Dictionary["common"] = {
     qrHint: "សូមតម្រង់កាមេរ៉ាទៅកូដ QR ដែលបិទនៅសាខារបស់លោកអ្នក។",
   },
 
-  // ── Display order (components/dashboard/display-order.tsx) ────────
+  // ── Display order (components/dashboard/shared/display-order.tsx) ────────
   order: {
     label: "លំដាប់បង្ហាញ (ស្រេចចិត្ត)",
     placeholder: "ឧ. 1",

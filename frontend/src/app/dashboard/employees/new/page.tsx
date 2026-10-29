@@ -15,12 +15,12 @@ import {
   emptyEmployeeForm,
   toPayload,
   type EmployeeForm,
-} from "@/components/dashboard/employee-form";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { PhotoPicker } from "@/components/dashboard/photo-picker";
-import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
-import { LoginLink } from "@/components/dashboard/login-link";
-import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
+} from "@/components/dashboard/employees/employee-form";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
+import { PhotoPicker } from "@/components/dashboard/employees/photo-picker";
+import { PlanLimitAlert } from "@/components/dashboard/layout/plan-limit-alert";
+import { LoginLink } from "@/components/dashboard/employees/login-link";
+import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/employees/sign-in-method";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, Department, Team, type PayGroupOption } from "@/lib/api";
 import { useT } from "@/lib/i18n";

@@ -1,4 +1,4 @@
-// Check-in QR code dialog for a branch or work location (components/dashboard/qr-code-dialog.tsx)
+// Check-in QR code dialog for a branch or work location (components/dashboard/organization/qr-code-dialog.tsx)
 
 export const qrCode = {
   // ── Dialog ───────────────────────────────────────────────────────

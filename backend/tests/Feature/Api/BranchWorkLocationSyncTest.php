@@ -2,8 +2,9 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Branch;
 use App\Models\WorkLocation;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -36,7 +37,7 @@ class BranchWorkLocationSyncTest extends TestCase
 
         $response->assertCreated()->assertJsonPath('code', 'HQ-01');
 
-        $branch = \App\Models\Branch::query()->where('name', 'Head Office')->firstOrFail();
+        $branch = Branch::query()->where('name', 'Head Office')->firstOrFail();
         $this->assertSame('HQ-01', $branch->getAttributes()['branch_code']);
     }
 

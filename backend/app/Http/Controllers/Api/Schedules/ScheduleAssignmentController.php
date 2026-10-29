@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Schedules;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\EmployeeScheduleAssignment;
 use App\Models\WorkSchedule;
-use App\Services\ScheduleAssignmentService;
+use App\Services\Schedules\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;

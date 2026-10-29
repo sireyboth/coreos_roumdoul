@@ -18,12 +18,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch, CompanyUser, Role } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
-import { exportUsers, userImport } from "@/lib/excel-specs/people";
+import { exportUsers, userImport } from "@/lib/excel/specs/people";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useT } from "@/lib/i18n";

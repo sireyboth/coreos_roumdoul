@@ -16,7 +16,7 @@ use App\Models\Subscription;
 use App\Models\TaxExchangeRate;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use App\Services\Payroll\PayRunService;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;

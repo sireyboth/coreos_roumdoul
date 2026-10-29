@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Calendar agenda view (components/dashboard/calendar-agenda.tsx) — same keys as en/calendar/agenda.ts.
+// Calendar agenda view (components/dashboard/schedules/calendar-agenda.tsx) — same keys as en/calendar/agenda.ts.
 
 export const agenda: Dictionary["calendar"]["agenda"] = {
   // ── Event types (totals double as filter chips) ───────────────────

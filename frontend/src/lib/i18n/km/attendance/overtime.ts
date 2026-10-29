@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Overtime tab (components/dashboard/overtime-review.tsx) — same keys as en/attendance/overtime.ts.
+// Overtime tab (components/dashboard/attendance/overtime-review.tsx) — same keys as en/attendance/overtime.ts.
 
 export const overtime: Dictionary["attendance"]["overtime"] = {
   // ── Status tabs ──────────────────────────────────────────────────

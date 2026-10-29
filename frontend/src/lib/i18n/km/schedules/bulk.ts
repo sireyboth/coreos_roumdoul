@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Add many days to the roster (components/dashboard/bulk-schedule-dialog.tsx) — same keys as en/schedules/bulk.ts.
+// Add many days to the roster (components/dashboard/schedules/bulk-schedule-dialog.tsx) — same keys as en/schedules/bulk.ts.
 
 export const bulk: Dictionary["schedules"]["bulk"] = {
   // ── Header ────────────────────────────────────────────────────────

@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { EmployeeAvatar } from "@/components/dashboard/employee-avatar";
-import { hasLeft, labelIn, statusVariant } from "@/components/dashboard/employee-form";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { hasLeft, labelIn, statusVariant } from "@/components/dashboard/employees/employee-form";
 import { useApi } from "@/hooks/use-api";
 import { api, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";

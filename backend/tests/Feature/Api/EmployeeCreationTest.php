@@ -3,7 +3,11 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Branch;
-use App\Services\CompanyProvisioner;
+use App\Models\Company;
+use App\Models\CompanyRole;
+use App\Models\Employee;
+use App\Models\User;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -58,7 +62,7 @@ class EmployeeCreationTest extends TestCase
             ->assertOk()
             ->assertJsonPath('branch.id', $branchTwo->id);
 
-        $employee = \App\Models\Employee::query()->findOrFail($employeeId);
+        $employee = Employee::query()->findOrFail($employeeId);
         $this->assertCount(2, $employee->assignments);
         $this->assertSame($hq->id, $employee->assignments()->whereNotNull('effective_to')->first()->branch_id);
         $this->assertSame($branchTwo->id, $employee->currentAssignment->branch_id);
@@ -134,7 +138,7 @@ class EmployeeCreationTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('email');
 
-        $this->assertSame(0, \App\Models\Employee::query()->count());
+        $this->assertSame(0, Employee::query()->count());
     }
 
     public function test_an_employee_added_without_a_login_can_be_given_one_later_but_only_once(): void
@@ -156,7 +160,7 @@ class EmployeeCreationTest extends TestCase
 
         $this->assertSame(
             $employeeId,
-            \App\Models\User::query()->where('email', 'dara@laterco.test')->firstOrFail()->employee->id,
+            User::query()->where('email', 'dara@laterco.test')->firstOrFail()->employee->id,
         );
 
         $this->actingAs($admin)
@@ -173,10 +177,10 @@ class EmployeeCreationTest extends TestCase
             ->postJson('/api/employees', ['name' => 'Target', 'branch_id' => $branch->id])
             ->json('id');
 
-        $staff = \App\Models\User::factory()->create();
+        $staff = User::factory()->create();
         $membership = $staff->membership()->create(['company_id' => $company->id, 'status' => 'active', 'joined_at' => now()]);
         $membership->roles()->attach(
-            \App\Models\CompanyRole::query()->where('company_id', $company->id)->where('name', 'employee')->value('id'),
+            CompanyRole::query()->where('company_id', $company->id)->where('name', 'employee')->value('id'),
             ['created_at' => now()],
         );
 
@@ -235,7 +239,7 @@ class EmployeeCreationTest extends TestCase
             'notes' => 'private',
         ])->assertCreated();
 
-        $sokha = \App\Models\User::query()->where('email', 'sokha@privacyco.test')->firstOrFail();
+        $sokha = User::query()->where('email', 'sokha@privacyco.test')->firstOrFail();
         $this->app['auth']->forgetGuards();
 
         $row = $this->actingAs($sokha)->getJson('/api/employees')->assertOk()->json('data.0');
@@ -284,7 +288,7 @@ class EmployeeCreationTest extends TestCase
     private function branchIdsOf(int $companyId, string $email): ?array
     {
         $this->app['auth']->forgetGuards();
-        $admin = \App\Models\Company::query()->findOrFail($companyId)->users()->first();
+        $admin = Company::query()->findOrFail($companyId)->users()->first();
 
         $row = collect($this->actingAs($admin)->getJson('/api/users')->assertOk()->json())->firstWhere('email', $email);
 
@@ -307,7 +311,7 @@ class EmployeeCreationTest extends TestCase
         $this->assertSame([$hq->id], $this->branchIdsOf($company->id, 'sokha@scopeco.test'));
 
         // And it really is enforced: Sokha can't see the other branch's employee.
-        $sokha = \App\Models\User::query()->where('email', 'sokha@scopeco.test')->firstOrFail();
+        $sokha = User::query()->where('email', 'sokha@scopeco.test')->firstOrFail();
         $this->app['auth']->forgetGuards();
         $names = collect($this->actingAs($sokha)->getJson('/api/employees')->assertOk()->json('data'))->pluck('name')->all();
         $this->assertSame(['Sokha'], $names);
@@ -341,7 +345,7 @@ class EmployeeCreationTest extends TestCase
         $this->assertSame([$two->id], $this->branchIdsOf($company->id, 'mover@moveco.test'));
 
         // Without the follow-along they would be locked out of their own record.
-        $mover = \App\Models\User::query()->where('email', 'mover@moveco.test')->firstOrFail();
+        $mover = User::query()->where('email', 'mover@moveco.test')->firstOrFail();
         $this->app['auth']->forgetGuards();
         $this->actingAs($mover)->getJson('/api/me')->assertOk()->assertJsonPath('employee.name', 'Mover');
     }
@@ -361,8 +365,8 @@ class EmployeeCreationTest extends TestCase
             'name' => 'Free', 'email' => 'free@keepco.test', 'password' => 'password123', 'branch_id' => $a->id,
         ])->json('id');
 
-        $wideUser = \App\Models\User::query()->where('email', 'wide@keepco.test')->firstOrFail();
-        $freeUser = \App\Models\User::query()->where('email', 'free@keepco.test')->firstOrFail();
+        $wideUser = User::query()->where('email', 'wide@keepco.test')->firstOrFail();
+        $freeUser = User::query()->where('email', 'free@keepco.test')->firstOrFail();
         $this->actingAs($admin)->putJson("/api/users/{$wideUser->id}/branch-access", ['branch_ids' => [$a->id, $b->id]])->assertOk();
         $this->actingAs($admin)->putJson("/api/users/{$freeUser->id}/branch-access", ['branch_ids' => []])->assertOk();
 

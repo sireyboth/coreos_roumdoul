@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
@@ -34,7 +35,7 @@ class ProfileTest extends TestCase
             ])
             ->assertOk();
 
-        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-456', $user->fresh()->password));
+        $this->assertTrue(Hash::check('new-password-456', $user->fresh()->password));
     }
 
     public function test_password_change_rejected_with_wrong_current_password(): void

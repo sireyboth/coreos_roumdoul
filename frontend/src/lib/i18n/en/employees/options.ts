@@ -1,4 +1,4 @@
-// Employee option names on screen (labelIn / optionsIn in components/dashboard/employee-form.tsx).
+// Employee option names on screen (labelIn / optionsIn in components/dashboard/employees/employee-form.tsx).
 // The English labels in employee-form.tsx stay as they are: Excel files match them.
 
 export const options = {

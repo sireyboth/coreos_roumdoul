@@ -18,13 +18,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
 import { useMe } from "@/contexts/me-context";
-import { displayOrderColumn } from "@/components/dashboard/display-order";
-import { monthBounds, MonthBar } from "@/components/dashboard/calendar-shared";
+import { displayOrderColumn } from "@/components/dashboard/shared/display-order";
+import { monthBounds, MonthBar } from "@/components/dashboard/schedules/calendar-shared";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
-import { attendanceImport, exportCorrections } from "@/lib/excel-specs/time";
+import { attendanceImport, exportCorrections } from "@/lib/excel/specs/time";
 import { dateOnly } from "@/lib/date";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";

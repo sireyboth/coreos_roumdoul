@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Create-login dialog (components/dashboard/create-login-dialog.tsx) — same keys as en/access/createLogin.ts.
+// Create-login dialog (components/dashboard/employees/create-login-dialog.tsx) — same keys as en/access/createLogin.ts.
 
 export const createLogin: Dictionary["access"]["createLogin"] = {
   title: "បង្កើតគណនីចូលប្រព័ន្ធសម្រាប់ {name}",

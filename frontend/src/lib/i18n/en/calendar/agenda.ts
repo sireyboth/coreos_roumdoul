@@ -1,4 +1,4 @@
-// Calendar agenda view (components/dashboard/calendar-agenda.tsx)
+// Calendar agenda view (components/dashboard/schedules/calendar-agenda.tsx)
 
 export const agenda = {
   // ── Event types (totals double as filter chips) ───────────────────

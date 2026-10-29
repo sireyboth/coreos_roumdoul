@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// ទម្រង់ព័ត៌មានបុគ្គលិក (components/dashboard/employee-form.tsx) — same keys as en/employees/form.ts.
+// ទម្រង់ព័ត៌មានបុគ្គលិក (components/dashboard/employees/employee-form.tsx) — same keys as en/employees/form.ts.
 
 export const form: Dictionary["employees"]["form"] = {
   // ── Basic info ───────────────────────────────────────────────────

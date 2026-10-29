@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Shared calendar labels and the day dialog (components/dashboard/calendar-shared.tsx) — same keys as en/calendar/shared.ts.
+// Shared calendar labels and the day dialog (components/dashboard/schedules/calendar-shared.tsx) — same keys as en/calendar/shared.ts.
 
 export const shared: Dictionary["calendar"]["shared"] = {
   // ── Weekdays ──────────────────────────────────────────────────────

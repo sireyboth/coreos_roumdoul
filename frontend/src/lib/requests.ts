@@ -1,4 +1,4 @@
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import type { DayPart, EmployeeRequest, RequestStatus } from "@/lib/api";
 import { dateLocale, translate, type Lang, type TKey } from "@/lib/i18n";
 

@@ -15,14 +15,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/schedules/calendar-shared";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, ApiError, Employee } from "@/lib/api";
 import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights";
 import { withBusy } from "@/lib/busy";
-import { PDF_CALENDAR_MAX_DAYS, printAttendancePdf } from "@/lib/attendance-pdf";
-import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel, buildAttendanceCalendar, readAttendanceReport } from "@/lib/excel-specs/time";
+import { PDF_CALENDAR_MAX_DAYS, printAttendancePdf } from "@/lib/pdf/attendance";
+import { ATTENDANCE_REPORT_COLUMNS, attendanceReportToExcel, buildAttendanceCalendar, readAttendanceReport } from "@/lib/excel/specs/time";
 import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";

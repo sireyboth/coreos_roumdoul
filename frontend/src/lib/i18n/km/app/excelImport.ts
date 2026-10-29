@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Import from Excel (excel-import-dialog.tsx, lib/excel-import.ts) — same keys as
+// Import from Excel (excel-import-dialog.tsx, lib/excel/import.ts) — same keys as
 // en/app/excelImport.ts. The module's English nouns ({noun}/{many}) are left out here,
 // so Khmer reads "ទិន្នន័យ" / "ជួរ" instead. {field} is the Excel column header.
 
@@ -81,7 +81,7 @@ export const excelImport: Dictionary["app"]["excelImport"] = {
     needAttentionOther: "មាន {n} ជួរត្រូវពិនិត្យ។",
   },
 
-  // ── Row checks (lib/excel-import.ts) ──────────────────────────────
+  // ── Row checks (lib/excel/import.ts) ──────────────────────────────
   check: {
     invalidOption: "{field} \"{text}\" មិនត្រឹមត្រូវទេ។ សូមប្រើមួយក្នុងចំណោម៖ {options}។",
     wholeNumber: "{field} ត្រូវតែជាចំនួនគត់។",

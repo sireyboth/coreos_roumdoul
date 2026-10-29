@@ -1,5 +1,5 @@
 import type { Cell, CellValue, Workbook, Worksheet } from "exceljs";
-import { saveBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/export/download";
 
 /**
  * Reading and writing real Excel workbooks (.xlsx) in the browser.

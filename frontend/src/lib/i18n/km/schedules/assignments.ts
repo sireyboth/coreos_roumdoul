@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// One employee's schedules over time (components/dashboard/employee-schedule-assignments.tsx) — same keys as en/schedules/assignments.ts.
+// One employee's schedules over time (components/dashboard/schedules/employee-schedule-assignments.tsx) — same keys as en/schedules/assignments.ts.
 
 export const assignments: Dictionary["schedules"]["assignments"] = {
   // ── Header ────────────────────────────────────────────────────────

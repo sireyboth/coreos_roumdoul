@@ -25,7 +25,7 @@ class CatchUpAttendance
     {
         $company = $request->user()?->company;
 
-        if (! config('attendance.catch_up_on_requests') || ! $company ||in_array($company->status, ['suspended', 'cancelled'], true)) {
+        if (! config('attendance.catch_up_on_requests') || ! $company || in_array($company->status, ['suspended', 'cancelled'], true)) {
             return;
         }
 

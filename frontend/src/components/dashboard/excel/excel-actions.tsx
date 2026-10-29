@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { FileDown, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ExcelImportDialog } from "@/components/dashboard/excel-import-dialog";
-import type { ImportSpec } from "@/lib/excel-import";
+import { ExcelImportDialog } from "@/components/dashboard/excel/excel-import-dialog";
+import type { ImportSpec } from "@/lib/excel/import";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 

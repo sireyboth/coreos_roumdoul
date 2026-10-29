@@ -1,4 +1,4 @@
-// ID cards page (app/dashboard/id-cards/page.tsx) and its preview (components/dashboard/card-preview-dialog.tsx)
+// ID cards page (app/dashboard/id-cards/page.tsx) and its preview (components/dashboard/employees/card-preview-dialog.tsx)
 
 export const idCards = {
   // ── Page ─────────────────────────────────────────────────────────

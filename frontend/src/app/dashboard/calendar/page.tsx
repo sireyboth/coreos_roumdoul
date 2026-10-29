@@ -18,15 +18,15 @@ import {
   HalfDayShade,
   halfDayLabel,
   halfDayLeave,
-} from "@/components/dashboard/calendar-shared";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { PageHeader } from "@/components/dashboard/page-header";
-import { CalendarAgenda } from "@/components/dashboard/calendar-agenda";
-import { TeamCalendar } from "@/components/dashboard/team-calendar";
+} from "@/components/dashboard/schedules/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
+import { CalendarAgenda } from "@/components/dashboard/schedules/calendar-agenda";
+import { TeamCalendar } from "@/components/dashboard/schedules/team-calendar";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
 import { api, CalendarAttendance, CalendarDay, CalendarDayType, CalendarMonth, Employee } from "@/lib/api";
-import { dayOffImport, exportMonthCalendar } from "@/lib/excel-specs/time";
+import { dayOffImport, exportMonthCalendar } from "@/lib/excel/specs/time";
 import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { formatMinutes, slotsSummary } from "@/lib/schedule";

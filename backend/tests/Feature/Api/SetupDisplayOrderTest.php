@@ -9,7 +9,7 @@ use App\Models\Employee;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\WorkLocation;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\PlanSeeder;

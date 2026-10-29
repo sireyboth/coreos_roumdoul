@@ -1,4 +1,4 @@
-// Who follows a schedule (components/dashboard/schedule-people-dialog.tsx).
+// Who follows a schedule (components/dashboard/schedules/schedule-people-dialog.tsx).
 
 export const people = {
   // ── Header ────────────────────────────────────────────────────────

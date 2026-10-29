@@ -1,4 +1,4 @@
-// Missed scans dialog (components/dashboard/missed-scans-dialog.tsx)
+// Missed scans dialog (components/dashboard/attendance/missed-scans-dialog.tsx)
 // IN/OUT slot names come from attendance.fillMissed (slotIn / slotOut).
 
 export const missedScans = {

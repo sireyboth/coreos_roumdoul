@@ -1,5 +1,5 @@
 // Probation: the form field, the profile card and the company's rules
-// (components/dashboard/probation-card.tsx, probation-settings-dialog.tsx, employee-form.tsx)
+// (components/dashboard/employees/probation-card.tsx, probation-settings-dialog.tsx, employee-form.tsx)
 
 export const probation = {
   // ── Employee form ────────────────────────────────────────────────

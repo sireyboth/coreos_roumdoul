@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Account;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\CompanyMembership;
 use App\Models\User;
-use App\Services\CompanyProvisioner;
-use App\Services\CompanyUserService;
+use App\Services\Company\CompanyProvisioner;
+use App\Services\Company\CompanyUserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;

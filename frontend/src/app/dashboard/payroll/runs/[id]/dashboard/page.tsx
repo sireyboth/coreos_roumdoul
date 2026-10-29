@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, CreditCard, FileWarning, Wallet
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { ChartCard, ChartEmpty } from "@/components/dashboard/charts/chart-card";
 import { BarListChart, ColumnChart, SERIES, ShareBar, TrendChart } from "@/components/dashboard/charts/charts";
 import { StatTile, type StatDelta } from "@/components/dashboard/charts/stat-tile";

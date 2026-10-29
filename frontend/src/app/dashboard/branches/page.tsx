@@ -17,18 +17,18 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
+import { DisplayOrderField, displayOrderColumn, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Branch } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
-import { exportBranches, branchImport } from "@/lib/excel-specs/organization";
+import { exportBranches, branchImport } from "@/lib/excel/specs/organization";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
-import { PlanLimitAlert } from "@/components/dashboard/plan-limit-alert";
+import { PlanLimitAlert } from "@/components/dashboard/layout/plan-limit-alert";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { QrCodeDialog } from "@/components/dashboard/qr-code-dialog";
+import { QrCodeDialog } from "@/components/dashboard/organization/qr-code-dialog";
 
 type BranchFormState = {
   name: string;

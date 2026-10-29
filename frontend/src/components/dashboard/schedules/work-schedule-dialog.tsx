@@ -20,7 +20,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { formatMinutes, slotsOn, WEEK_ORDER, weekdayLong, weekdayShort } from "@/lib/schedule";
 import { translateNow, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/display-order";
+import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
 
 /** One stretch of work: scan IN at `in`, scan OUT at `out`. */
 type Stretch = { in: string; out: string };

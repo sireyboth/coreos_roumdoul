@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Access;
 
 use App\Http\Controllers\Controller;
 use App\Models\CompanyRole;
 use App\Models\User;
 use App\Services\AuditLogger;
-use App\Services\CompanyUserService;
+use App\Services\Company\CompanyUserService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;

@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { saveBlob } from "@/lib/download";
+import { saveBlob } from "@/lib/export/download";
 import { useT } from "@/lib/i18n";
 
 /**

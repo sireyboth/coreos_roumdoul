@@ -1,4 +1,4 @@
-// Sign-in method picker (components/dashboard/sign-in-method.tsx)
+// Sign-in method picker (components/dashboard/employees/sign-in-method.tsx)
 
 export const signInMethod = {
   legend: "How they sign in",

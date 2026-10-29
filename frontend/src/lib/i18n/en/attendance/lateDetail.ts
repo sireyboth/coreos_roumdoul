@@ -1,4 +1,4 @@
-// Late / early / missed detail (components/dashboard/attendance-late-detail.tsx)
+// Late / early / missed detail (components/dashboard/attendance/attendance-late-detail.tsx)
 
 export const lateDetail = {
   // ── Toolbar ───────────────────────────────────────────────────────

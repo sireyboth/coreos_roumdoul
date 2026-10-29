@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { hasLeft } from "@/components/dashboard/employee-form";
-import { WEEKDAY_KEYS } from "@/components/dashboard/calendar-shared";
+import { hasLeft } from "@/components/dashboard/employees/employee-form";
+import { WEEKDAY_KEYS } from "@/components/dashboard/schedules/calendar-shared";
 import { api, ApiError, Employee, ScheduleBulkInput, ScheduleBulkResult, WorkLocation, WorkSchedule } from "@/lib/api";
 import { weekSummary } from "@/lib/schedule";
 import { notifyError, notifySuccess } from "@/lib/notify";

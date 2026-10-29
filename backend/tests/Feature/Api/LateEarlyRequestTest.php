@@ -7,13 +7,14 @@ use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
+use App\Models\EmployeeRequest;
 use App\Models\LeaveType;
 use App\Models\Notification;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
 use Database\Seeders\PermissionSeeder;
@@ -110,7 +111,7 @@ class LateEarlyRequestTest extends TestCase
             ->assertJsonPath('label', 'Late arrival')
             ->assertJsonPath('details', ['kind' => 'late', 'time' => '09:00', 'minutes' => 60])
             ->assertJsonPath('days', 0);
-        $id = \App\Models\EmployeeRequest::query()->withoutGlobalScopes()->latest('id')->value('id');
+        $id = EmployeeRequest::query()->withoutGlobalScopes()->latest('id')->value('id');
 
         $alert = Notification::query()->withoutGlobalScopes()->where('recipient_user_id', $this->admin->id)->where('notification_type', 'request.late_early_requested')->sole();
         $this->assertSame('⏰ Late arrival request from Dara', $alert->title);

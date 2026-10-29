@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { money, today } from "@/components/dashboard/payroll/shared";
 import { api, type PayRun, type PayRunReport, type PayrollPolicy } from "@/lib/api";
-import { BANK_FORMATS, bankTransfers, defaultRemarks, downloadBankFile, isBank, type BankFormat, type SkippedSlip } from "@/lib/bank-export";
+import { BANK_FORMATS, bankTransfers, defaultRemarks, downloadBankFile, isBank, type BankFormat, type SkippedSlip } from "@/lib/export/bank";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 import { cn } from "cn";

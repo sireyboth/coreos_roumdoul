@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { PayslipDialog } from "@/components/dashboard/payroll/payslip-view";
 import { BankExportDialog } from "@/components/dashboard/payroll/bank-export-dialog";
@@ -23,8 +23,8 @@ import { RUN_STATUS, WarningList, money } from "@/components/dashboard/payroll/s
 import { useMe } from "@/contexts/me-context";
 import { api, type PayRunDetail, type PayslipRow } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
-import { saveBlob } from "@/lib/download";
-import { printPayrollPdf } from "@/lib/payroll-pdf";
+import { saveBlob } from "@/lib/export/download";
+import { printPayrollPdf } from "@/lib/pdf/payroll";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 

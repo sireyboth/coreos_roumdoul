@@ -1,8 +1,8 @@
 "use client";
 
 import { Alert } from "@/components/ui/alert";
-import { formatSalary } from "@/components/dashboard/employee-form";
-import { WEEKDAY_KEYS } from "@/components/dashboard/calendar-shared";
+import { formatSalary } from "@/components/dashboard/employees/employee-form";
+import { WEEKDAY_KEYS } from "@/components/dashboard/schedules/calendar-shared";
 import type { LatenessParams, PayComponent, PayGroup, PayKind, PayLineKind, PayRunStatus, PaySchedule, PayWarning, SalaryReason } from "@/lib/api";
 import { dateLocale, translate, useT, type Lang, type TKey } from "@/lib/i18n";
 

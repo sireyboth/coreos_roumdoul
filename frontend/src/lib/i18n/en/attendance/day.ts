@@ -1,4 +1,4 @@
-// Day details dialog (components/dashboard/attendance-day-dialog.tsx)
+// Day details dialog (components/dashboard/attendance/attendance-day-dialog.tsx)
 
 export const day = {
   // ── Header ───────────────────────────────────────────────────────

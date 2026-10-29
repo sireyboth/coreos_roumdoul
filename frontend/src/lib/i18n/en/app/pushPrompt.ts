@@ -1,4 +1,4 @@
-// Ask to turn on notifications (components/dashboard/push-prompt.tsx).
+// Ask to turn on notifications (components/dashboard/layout/push-prompt.tsx).
 
 export const pushPrompt = {
   // ── iPhone in Safari: add to Home Screen first ────────────────────

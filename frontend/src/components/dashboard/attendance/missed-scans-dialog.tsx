@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
-import { parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
+import { parseDate, shiftMonth } from "@/components/dashboard/schedules/calendar-shared";
 import { useApi } from "@/hooks/use-api";
 import { api, type AttendanceDay } from "@/lib/api";
 import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";

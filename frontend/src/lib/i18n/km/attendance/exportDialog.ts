@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Export dialog (components/dashboard/attendance-export-dialog.tsx) — same keys as en/attendance/exportDialog.ts.
+// Export dialog (components/dashboard/attendance/attendance-export-dialog.tsx) — same keys as en/attendance/exportDialog.ts.
 // Only the dialog is translated; the Excel / PDF files it makes stay in English.
 
 export const exportDialog: Dictionary["attendance"]["exportDialog"] = {

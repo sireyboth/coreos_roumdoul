@@ -1,4 +1,4 @@
-// Export dialog (components/dashboard/attendance-export-dialog.tsx)
+// Export dialog (components/dashboard/attendance/attendance-export-dialog.tsx)
 // Only the dialog is translated; the Excel / PDF files it makes stay in English.
 
 export const exportDialog = {

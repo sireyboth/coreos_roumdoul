@@ -1,4 +1,4 @@
-// Help assistant chat (components/dashboard/ai-assistant.tsx). Answers come from the server.
+// Help assistant chat (components/dashboard/layout/ai-assistant.tsx). Answers come from the server.
 
 export const assistant = {
   // ── Button & header ───────────────────────────────────────────────

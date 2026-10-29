@@ -1,4 +1,4 @@
-// Shared calendar labels and the day dialog (components/dashboard/calendar-shared.tsx).
+// Shared calendar labels and the day dialog (components/dashboard/schedules/calendar-shared.tsx).
 // Weekdays: t(`calendar.shared.weekday.short.${WEEKDAY_KEYS[d.getDay()]}`).
 
 export const shared = {

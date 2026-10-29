@@ -1,4 +1,4 @@
-// Add attendance dialog (components/dashboard/attendance-add-dialog.tsx)
+// Add attendance dialog (components/dashboard/attendance/attendance-add-dialog.tsx)
 
 export const add = {
   // ── Header ────────────────────────────────────────────────────────

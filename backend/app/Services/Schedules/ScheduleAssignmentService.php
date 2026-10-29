@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Schedules;
 
 use App\Models\Employee;
 use App\Models\EmployeeScheduleAssignment;

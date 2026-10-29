@@ -1,4 +1,4 @@
-// Month roster (components/dashboard/roster-view.tsx).
+// Month roster (components/dashboard/schedules/roster-view.tsx).
 
 export const roster = {
   // ── Edit entry dialog ─────────────────────────────────────────────

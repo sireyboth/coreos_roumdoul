@@ -1,4 +1,4 @@
-// Company sign-in link box (components/dashboard/login-link.tsx)
+// Company sign-in link box (components/dashboard/employees/login-link.tsx)
 
 export const loginLink = {
   label: "Sign-in link",

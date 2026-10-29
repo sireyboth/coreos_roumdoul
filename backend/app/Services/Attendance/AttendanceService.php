@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Attendance;
 
 use App\Models\AttendanceAdjustment;
 use App\Models\AttendanceCorrection;
@@ -9,9 +9,6 @@ use App\Models\AttendanceEvent;
 use App\Models\Branch;
 use App\Models\Employee;
 use App\Models\WorkLocation;
-use App\Services\Attendance\AttendanceRecorder;
-use App\Services\Attendance\ExpectedDay;
-use App\Services\Attendance\ScheduleResolver;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;

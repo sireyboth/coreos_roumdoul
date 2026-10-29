@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoginLink } from "@/components/dashboard/login-link";
-import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/sign-in-method";
+import { LoginLink } from "@/components/dashboard/employees/login-link";
+import { SignInMethodPicker, type SignInMethod } from "@/components/dashboard/employees/sign-in-method";
 import { api, ApiError, Employee } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";

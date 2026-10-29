@@ -1,4 +1,4 @@
-// Report tab (components/dashboard/attendance-report.tsx, lib/attendance-insights.ts)
+// Report tab (components/dashboard/attendance/attendance-report.tsx, lib/attendance-insights.ts)
 
 export const report = {
   // ── Period & view switches ────────────────────────────────────────

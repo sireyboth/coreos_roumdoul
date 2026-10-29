@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Api\Organization;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Services\AuditLogger;
+use App\Services\Employees\ProbationNotifier;
 use App\Services\NotificationService;
-use App\Services\ProbationNotifier;
 use App\Support\SelfApproval;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;

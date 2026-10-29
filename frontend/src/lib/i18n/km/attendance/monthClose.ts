@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Close the month (components/dashboard/attendance-month-close.tsx) — same keys as en/attendance/monthClose.ts.
+// Close the month (components/dashboard/attendance/attendance-month-close.tsx) — same keys as en/attendance/monthClose.ts.
 
 export const monthClose: Dictionary["attendance"]["monthClose"] = {
   // ── Checklist before closing ──────────────────────────────────────

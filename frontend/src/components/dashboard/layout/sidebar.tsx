@@ -16,7 +16,7 @@ import {
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
-import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/nav";
+import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/layout/nav";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useMe } from "@/contexts/me-context";
 import { pageLabel, useLang, useT } from "@/lib/i18n";

@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { House, QrCode, type LucideIcon } from "lucide-react";
-import { canSee, findNavItem } from "@/components/dashboard/nav";
+import { canSee, findNavItem } from "@/components/dashboard/layout/nav";
 import { useMe } from "@/contexts/me-context";
 import { navLabel, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

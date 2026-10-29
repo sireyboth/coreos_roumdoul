@@ -1,4 +1,4 @@
-// Create or edit a work schedule (components/dashboard/work-schedule-dialog.tsx).
+// Create or edit a work schedule (components/dashboard/schedules/work-schedule-dialog.tsx).
 
 export const form = {
   // ── Header ────────────────────────────────────────────────────────

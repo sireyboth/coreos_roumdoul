@@ -1,4 +1,4 @@
-// Employee form fields (components/dashboard/employee-form.tsx)
+// Employee form fields (components/dashboard/employees/employee-form.tsx)
 
 export const form = {
   // ── Basic info ───────────────────────────────────────────────────

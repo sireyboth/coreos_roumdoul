@@ -10,7 +10,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { GettingStartedCard, PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
 import { RUN_STATUS, money, scheduleSummary, today } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";

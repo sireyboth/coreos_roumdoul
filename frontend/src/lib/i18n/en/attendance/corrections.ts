@@ -1,4 +1,4 @@
-// Corrections tab (components/dashboard/attendance-corrections.tsx)
+// Corrections tab (components/dashboard/attendance/attendance-corrections.tsx)
 
 export const corrections = {
   // ── Toolbar ──────────────────────────────────────────────────────

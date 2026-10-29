@@ -16,8 +16,8 @@ import {
 import { api, type AttendanceDay, type DaySlot, type ScanDetail } from "@/lib/api";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { notifyError, notifySuccess } from "@/lib/notify";
-import { AttendanceAdjustScans } from "@/components/dashboard/attendance-adjust-scans";
-import { parseDate } from "@/components/dashboard/calendar-shared";
+import { AttendanceAdjustScans } from "@/components/dashboard/attendance/attendance-adjust-scans";
+import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
 import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

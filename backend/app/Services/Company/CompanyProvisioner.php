@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Company;
 
 use App\Models\Company;
 use App\Models\CompanyPermission;
 use App\Models\CompanyRole;
 use App\Models\LeaveType;
 use App\Models\User;
+use App\Services\NotificationService;
 use App\Support\CompanyPermissions;
 use App\Support\LeaveDefaults;
 use Illuminate\Support\Str;

@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Month roster (components/dashboard/roster-view.tsx) — same keys as en/schedules/roster.ts.
+// Month roster (components/dashboard/schedules/roster-view.tsx) — same keys as en/schedules/roster.ts.
 
 export const roster: Dictionary["schedules"]["roster"] = {
   // ── Edit entry dialog ─────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// កូដ QR សម្រាប់ស្កេនវត្តមាន (components/dashboard/qr-code-dialog.tsx) — same keys as en/employees/qrCode.ts.
+// កូដ QR សម្រាប់ស្កេនវត្តមាន (components/dashboard/organization/qr-code-dialog.tsx) — same keys as en/employees/qrCode.ts.
 
 export const qrCode: Dictionary["employees"]["qrCode"] = {
   // ── Dialog ───────────────────────────────────────────────────────

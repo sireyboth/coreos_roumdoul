@@ -18,15 +18,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BulkScheduleDialog } from "@/components/dashboard/bulk-schedule-dialog";
-import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/calendar-shared";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
+import { BulkScheduleDialog } from "@/components/dashboard/schedules/bulk-schedule-dialog";
+import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/schedules/calendar-shared";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
 import { useApi } from "@/hooks/use-api";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Employee, Schedule, WorkLocation, WorkSchedule } from "@/lib/api";
 import { slotsOn, slotsSummary, weekSummary } from "@/lib/schedule";
 import { dateOnly } from "@/lib/date";
-import { exportRoster, rosterImport } from "@/lib/excel-specs/time";
+import { exportRoster, rosterImport } from "@/lib/excel/specs/time";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { dateLocale, translateNow, useLang, useT } from "@/lib/i18n";
 

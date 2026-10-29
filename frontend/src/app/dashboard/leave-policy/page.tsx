@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { api, ApiError, type LateEarlySettings, type LeaveAdjustment, type LeaveBalances, type LeaveType, type LeaveTypeInput } from "@/lib/api";
 import { dateLocale, translate, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";

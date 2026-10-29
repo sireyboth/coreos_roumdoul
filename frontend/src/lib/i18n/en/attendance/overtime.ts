@@ -1,4 +1,4 @@
-// Overtime tab (components/dashboard/overtime-review.tsx)
+// Overtime tab (components/dashboard/attendance/overtime-review.tsx)
 
 export const overtime = {
   // ── Status tabs ──────────────────────────────────────────────────

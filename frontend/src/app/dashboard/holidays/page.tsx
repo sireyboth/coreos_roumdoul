@@ -18,13 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExcelActions } from "@/components/dashboard/excel-actions";
-import { KhmerHolidayImportDialog } from "@/components/dashboard/khmer-holiday-import-dialog";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
+import { KhmerHolidayImportDialog } from "@/components/dashboard/schedules/khmer-holiday-import-dialog";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, Holiday } from "@/lib/api";
 import { dateOnly } from "@/lib/date";
-import { exportHolidays, holidayImport } from "@/lib/excel-specs/time";
+import { exportHolidays, holidayImport } from "@/lib/excel/specs/time";
 import { useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 

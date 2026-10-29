@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, QrCode, X } from "lucide-react";
-import { HomeButton } from "@/components/dashboard/home-button";
+import { HomeButton } from "@/components/dashboard/layout/home-button";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/contexts/me-context";

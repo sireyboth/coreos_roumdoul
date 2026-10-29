@@ -22,7 +22,7 @@ import {
   templateColumns,
   type ImportSpec,
   type ParsedRow,
-} from "@/lib/excel-import";
+} from "@/lib/excel/import";
 import { translate, useT } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";

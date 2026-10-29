@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Create or edit a work schedule (components/dashboard/work-schedule-dialog.tsx) — same keys as en/schedules/form.ts.
+// Create or edit a work schedule (components/dashboard/schedules/work-schedule-dialog.tsx) — same keys as en/schedules/form.ts.
 
 export const form: Dictionary["schedules"]["form"] = {
   // ── Header ────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PhotoCropDialog } from "@/components/dashboard/photo-crop-dialog";
+import { PhotoCropDialog } from "@/components/dashboard/employees/photo-crop-dialog";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 

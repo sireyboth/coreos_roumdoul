@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeAssignment;
 use App\Models\EmployeeRequest;
+use App\Models\EmployeeScheduleAssignment;
 use App\Models\Holiday;
 use App\Models\LeaveType;
 use App\Models\MembershipBranchAccess;
@@ -17,7 +18,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\AttendanceRecorder;
-use App\Services\CompanyProvisioner;
+use App\Services\Company\CompanyProvisioner;
 use App\Services\Requests\EmployeeRequestService;
 use Carbon\Carbon;
 use Database\Seeders\ModuleSeeder;
@@ -557,7 +558,7 @@ class LeaveRequestTest extends TestCase
     {
         [$user, $employee] = $this->person('Rith', 'employee', ['hire_date' => '2020-01-01']);
         $single = $this->makeWorkSchedule($this->company, [['in', '08:00'], ['out', '17:00']], ['break_minutes' => 60], weekdays: [1, 2, 3, 4, 5]);
-        \App\Models\EmployeeScheduleAssignment::query()->withoutGlobalScopes()->where('employee_id', $employee->id)->delete();
+        EmployeeScheduleAssignment::query()->withoutGlobalScopes()->where('employee_id', $employee->id)->delete();
         $this->assignSchedule($employee, $single);
 
         $id = $this->ask($user, 'annual', '2026-10-01', null, ['day_part' => 'pm'])->assertCreated()->json('id');

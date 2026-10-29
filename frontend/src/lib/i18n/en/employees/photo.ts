@@ -1,4 +1,4 @@
-// Profile photo (components/dashboard/photo-picker.tsx, photo-crop-dialog.tsx)
+// Profile photo (components/dashboard/employees/photo-picker.tsx, photo-crop-dialog.tsx)
 
 export const photo = {
   // ── Picker ───────────────────────────────────────────────────────

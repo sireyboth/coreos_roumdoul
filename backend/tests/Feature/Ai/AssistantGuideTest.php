@@ -15,7 +15,7 @@ class AssistantGuideTest extends TestCase
      */
     public function test_every_sidebar_page_is_in_the_guide(): void
     {
-        $navPath = base_path('../frontend/src/components/dashboard/nav.ts');
+        $navPath = base_path('../frontend/src/components/dashboard/layout/nav.ts');
 
         if (! file_exists($navPath)) {
             $this->markTestSkipped('frontend nav.ts not found');
@@ -47,7 +47,7 @@ class AssistantGuideTest extends TestCase
 
         Http::fake([
             'api.anthropic.com/*' => Http::response([
-                'content' => [['type' => 'text', 'text' => "[OFF_TOPIC] Sorry, I can only help with questions about CoreOS Roumdoul."]],
+                'content' => [['type' => 'text', 'text' => '[OFF_TOPIC] Sorry, I can only help with questions about CoreOS Roumdoul.']],
                 'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
             ]),
         ]);

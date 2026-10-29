@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Employees;
 
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\NotificationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;

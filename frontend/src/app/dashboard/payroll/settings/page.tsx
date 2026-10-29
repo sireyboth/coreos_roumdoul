@@ -10,7 +10,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { PageHeader } from "@/components/dashboard/page-header";
+import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { ComponentDialog } from "@/components/dashboard/payroll/component-dialog";
 import { PayGroupsCard } from "@/components/dashboard/payroll/pay-groups";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";

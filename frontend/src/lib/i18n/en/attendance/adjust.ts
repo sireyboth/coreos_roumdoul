@@ -1,4 +1,4 @@
-// Adjust scans (components/dashboard/attendance-adjust-scans.tsx)
+// Adjust scans (components/dashboard/attendance/attendance-adjust-scans.tsx)
 
 export const adjust = {
   // ── Heading ──────────────────────────────────────────────────────

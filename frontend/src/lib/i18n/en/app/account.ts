@@ -1,5 +1,5 @@
-// Account warnings: components/dashboard/account-banner.tsx (locked account, free trial)
-// and components/dashboard/plan-limit-alert.tsx (plan limits).
+// Account warnings: components/dashboard/layout/account-banner.tsx (locked account, free trial)
+// and components/dashboard/layout/plan-limit-alert.tsx (plan limits).
 
 export const account = {
   // ── Locked account ────────────────────────────────────────────────

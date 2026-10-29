@@ -1,6 +1,6 @@
 import type { Dictionary } from "../../en";
 
-// Sign-in method picker (components/dashboard/sign-in-method.tsx) — same keys as en/access/signInMethod.ts.
+// Sign-in method picker (components/dashboard/employees/sign-in-method.tsx) — same keys as en/access/signInMethod.ts.
 
 export const signInMethod: Dictionary["access"]["signInMethod"] = {
   legend: "របៀបចូលប្រព័ន្ធ",

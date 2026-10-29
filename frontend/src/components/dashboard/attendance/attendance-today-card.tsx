@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { QrScanDialog } from "@/components/dashboard/qr-scan-dialog";
+import { QrScanDialog } from "@/components/dashboard/attendance/qr-scan-dialog";
 import { api, ApiError, type AttendanceToday } from "@/lib/api";
 import { translateNow, useLang, useT } from "@/lib/i18n";
 import { withLocationRetry } from "@/lib/location";

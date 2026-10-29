@@ -1,10 +1,10 @@
 import type { PayLineKind, PayRunReport, PayRunStatus } from "@/lib/api";
 import { byCurrency, componentTotals, groupTotals, REGISTER_NUMBERS, totalsOf, type RegisterRow, type RegisterTotals } from "@/lib/payroll-report";
-import { escapeHtml as esc, printHtmlDocument, REPORT_FONTS } from "@/lib/print-pdf";
+import { escapeHtml as esc, printHtmlDocument, REPORT_FONTS } from "@/lib/pdf/print";
 
 /**
  * A pay run as a printed payroll report, saved as PDF by the browser (see
- * print-pdf.ts for why it isn't made with a PDF library).
+ * lib/pdf/print.ts for why it isn't made with a PDF library).
  *
  * Reads like an accountant's pack: summary, payroll register, what each pay
  * component cost, cost by branch and department, an optional payment list,

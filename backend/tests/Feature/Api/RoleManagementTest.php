@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Branch;
 use App\Models\CompanyRole;
-use App\Services\CompanyProvisioner;
+use App\Models\User;
+use App\Services\Company\CompanyProvisioner;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesCompanyUsers;
@@ -88,11 +90,11 @@ class RoleManagementTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors('name');
 
         // Giving an employee a login still finds the (renamed) employee role.
-        $branch = \App\Models\Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
+        $branch = Branch::query()->create(['company_id' => $company->id, 'name' => 'HQ']);
         $this->actingAs($admin)->postJson('/api/employees', [
             'name' => 'Dara', 'branch_id' => $branch->id, 'email' => 'dara@delta.test', 'password' => 'password123', 'login_method' => 'email',
         ])->assertCreated();
-        $this->assertSame('Staff', \App\Models\User::query()->where('email', 'dara@delta.test')->firstOrFail()->membership->roles->sole()->name);
+        $this->assertSame('Staff', User::query()->where('email', 'dara@delta.test')->firstOrFail()->membership->roles->sole()->name);
 
         // The admin still has every permission, under the new name.
         $this->actingAs($admin)->getJson('/api/me')->assertJsonPath('roles', ['Owner'])->assertJsonFragment(['requests.manage']);
