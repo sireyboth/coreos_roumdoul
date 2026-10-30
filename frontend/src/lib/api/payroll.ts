@@ -154,7 +154,20 @@ export type PayRunReportRow = Omit<PayslipRow, "is_stale" | "employee"> & {
 
 export type PayRunReport = PayRun & { payslips: PayRunReportRow[] };
 
-export type PayslipLine = { id?: number; code: string; name: string; kind: PayLineKind; amount: Amount; explanation: string | null };
+// An amount HR set by hand in place of the rule's, kept across recalculations.
+export type PayslipLineOverride = { id: number; calculated: number; calculated_explanation: string | null; reason: string; by: string | null; at: string | null };
+
+export type PayslipLine = {
+  id?: number;
+  // The rule that made the line; null for adjustments, NSSF and tax (those can't be set by hand).
+  pay_component_id?: number | null;
+  code: string;
+  name: string;
+  kind: PayLineKind;
+  amount: Amount;
+  explanation: string | null;
+  details?: ({ override?: PayslipLineOverride } & Record<string, unknown>) | null;
+};
 
 export type PayslipInputs = {
   attendance: Record<string, unknown> & { present_days?: number; absent_days?: number; incomplete_days?: number; late_days?: number; late_minutes?: number };
@@ -320,6 +333,12 @@ export const payrollApi = {
     // One person only, leaving everyone else's payslip as it is.
     calculateEmployee: (id: number, employeeId: number) =>
       request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/calculate`, { method: "POST", body: "{}" }),
+    // HR's own amount for one payslip line (by its rule), kept across recalculations; recalculates that person.
+    setLine: (id: number, employeeId: number, componentId: number, data: { amount: number; reason: string }) =>
+      request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/lines/${componentId}`, { method: "PUT", body: JSON.stringify(data) }),
+    // Back to what the rule works out.
+    clearLine: (id: number, employeeId: number, componentId: number) =>
+      request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/lines/${componentId}`, { method: "DELETE" }),
     approve: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/approve`, { method: "POST", body: "{}" }),
     markPaid: (id: number) => request<PayRunDetail>(`/api/payroll/runs/${id}/paid`, { method: "POST", body: "{}" }),
     // Back to calculated, unlocking its attendance; the reason goes to the audit log.

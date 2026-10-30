@@ -259,6 +259,7 @@ Payroll → "Pay Runs". Status: "Draft" → "In review" → "Approved" → "Paid
 
 1. "New pay run" → "Pay group" and "Period" → "Calculate pay". A period that isn't over yet is only a preview.
 2. Review: totals (USD and KHR shown separately), and each payslip's "Check" ("OK", "Note", "Needs fixing", "Changed"). Click a row to see how each line was worked out. If something changes, click "Recalculate now". "Fix before approving" warnings must be solved first, e.g. missing scans or a missing exchange rate.
+   **Set a line by hand** (Payroll Manage, before approval): in a payslip, click the pencil next to a line made by a rule (salary, overtime, absence, an allowance…), enter the "Amount" and a "Reason", then "Save". That person is recalculated at once; the line shows "Set by hand", the reason and what the rule worked out. It stays through every recalculation and approval until you click "Use the rule's amount". Every set, change and removal is in the audit log. NSSF, tax and adjustments can't be set this way: change the adjustment itself.
 3. "Approve" (Payroll Approve): pay is recalculated one last time, frozen, and the attendance it used is locked.
 4. Pay staff, then "Mark as paid" (Payroll Manage).
 

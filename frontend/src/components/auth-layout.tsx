@@ -1,112 +1,172 @@
 "use client";
 
-import { Boxes, CalendarCheck, ShieldCheck, Wallet } from "lucide-react";
-import { glass, HeroPattern, LangSwitch } from "@/components/brand-hero";
+/* eslint-disable @next/next/no-img-element -- tiny static logo, no optimisation needed */
+import { CalendarCheck, Palmtree, Wallet, type LucideIcon } from "lucide-react";
+import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
- * Shell for sign in and sign up.
- * - Desktop (lg+): split screen — dark brand panel left, form right.
- * - Phone: looks like a native app sign-in — dark hero with the home screen's
- *   pattern (components/brand-hero), app icon centred, and the form in a
- *   rounded sheet pulled up over it.
+ * Shell for sign in and sign up, in the Roumdoul look of the phone home screen
+ * (app/dashboard/home): the warm coffee mesh behind everything, the form on a
+ * solid surface card with the kbach flower in its corner, caramel as the accent.
+ * - Desktop (lg+): two columns on the mesh — logo, headline and a few sample
+ *   app cards left; the form card right.
+ * - Phone: logo and language on top, a short headline, then the form card.
  */
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   const t = useT();
-  const features = [
-    { icon: CalendarCheck, title: t("app.auth.panel.attendanceTitle"), text: t("app.auth.panel.attendanceText") },
-    { icon: Wallet, title: t("app.auth.panel.payrollTitle"), text: t("app.auth.panel.payrollText") },
-    { icon: ShieldCheck, title: t("app.auth.panel.securityTitle"), text: t("app.auth.panel.securityText") },
-  ];
-  const copyright = `© ${new Date().getFullYear()} Business OS. ${t("app.auth.panel.rights")}`;
+  // Tight line-height suits big Latin headings but clips Khmer's stacked marks.
+  const tight = useLang() === "km" ? "leading-snug" : "leading-[1.1]";
+  const copyright = `© ${new Date().getFullYear()} Roumdoul · Business OS. ${t("app.auth.panel.rights")}`;
 
   return (
-    // grid-cols-1 (= minmax(0,1fr)) matters: a bare `grid` sizes its column to the
-    // content, which can grow wider than a phone screen.
-    <div className="grid min-h-dvh grid-cols-1 bg-background lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      {/* Desktop brand panel — fixed dark colours so it reads the same in light and dark mode. */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-zinc-950 p-12 text-zinc-100 lg:flex">
-        <BrandBackdrop />
-        <Brand className="relative" />
-
-        <div className="relative max-w-md">
-          <h2 className="text-3xl leading-tight font-semibold tracking-tight text-white">{t("app.auth.panel.headline")}</h2>
-          <p className="mt-4 text-sm leading-relaxed text-zinc-400">{t("app.auth.panel.subheadline")}</p>
-          <ul className="mt-10 flex flex-col gap-6">
-            {features.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5">
-                  <Icon className="size-4 text-zinc-200" aria-hidden />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-white">{title}</p>
-                  <p className="mt-0.5 text-sm text-zinc-400">{text}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative text-xs text-zinc-500">{copyright}</p>
-      </aside>
-
-      <div className="flex min-w-0 flex-col">
-        {/* Phone hero. Language switch sits here, before signing in, so someone new can pick a language first.
-            Top padding includes the notch (safe area) for when it runs as an installed app. */}
-        {/* Neutral dark on purpose — the sign-in screen stays formal, not colourful. */}
-        <header className="relative overflow-hidden bg-zinc-950 px-5 pt-[calc(1rem+env(safe-area-inset-top))] pb-16 text-white lg:hidden">
-          <HeroPattern />
-          <div className="relative flex justify-end">
-            <LangSwitch activeText="text-zinc-900" />
+    <div className="mesh-coffee min-h-dvh text-ink" style={BRAND_THEME}>
+      <div className="mx-auto grid min-h-dvh w-full max-w-6xl grid-cols-1 gap-6 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-16 lg:py-10">
+        {/* Left on desktop, the top band on phones. */}
+        <aside className="flex flex-col lg:justify-between lg:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <Logo />
+            <LanguageToggle className="lg:hidden" />
           </div>
-          <div className="relative mt-3 flex flex-col items-center text-center">
-            <div className={cn("flex size-16 items-center justify-center rounded-2xl shadow-lg shadow-black/30", glass)}>
-              <Boxes className="size-8" />
-            </div>
-            <p className="mt-3 text-xl font-semibold tracking-tight">Business OS</p>
-            <p className="mt-1 max-w-xs text-sm leading-relaxed text-white/80">{t("app.auth.panel.headline")}</p>
-          </div>
-        </header>
 
-        {/* Form: a rounded sheet pulled up over the hero on phones, a plain centred column on desktop. */}
-        <main className="relative -mt-8 flex flex-1 flex-col rounded-t-[2rem] bg-background px-5 pt-8 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-[0_-12px_32px_-12px_rgb(0_0_0/0.3)] sm:px-8 dark:border-t lg:mt-0 lg:rounded-none lg:py-6 lg:shadow-none dark:lg:border-t-0">
-          <div className="hidden justify-end lg:flex">
+          <div className="mt-8 lg:mt-0">
+            <h2 className={cn("max-w-lg text-[28px] font-semibold tracking-tight text-balance sm:text-4xl lg:text-5xl", tight)}>
+              {t("app.auth.panel.headline")}
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-ink-muted sm:text-base lg:mt-5">{t("app.auth.panel.subheadline")}</p>
+            <SampleCards />
+          </div>
+
+          <p className="hidden text-xs text-ink-muted lg:block">{copyright}</p>
+        </aside>
+
+        <main className="flex flex-col lg:justify-center">
+          <div className="mb-3 hidden justify-end lg:flex">
             <LanguageToggle />
           </div>
-          <div className="flex flex-1 justify-center lg:items-center lg:py-10">
-            <div className="w-full max-w-sm">{children}</div>
+          <div className={cn(surfaceCard, "p-6 sm:p-8")}>
+            <KbachCorner />
+            {children}
           </div>
-          <p className="mt-8 text-center text-xs text-muted-foreground lg:hidden">{copyright}</p>
+          <p className="mt-6 text-center text-xs text-ink-muted lg:hidden">{copyright}</p>
         </main>
       </div>
     </div>
   );
 }
 
-// Soft primary glow + faint grid, behind the dark desktop brand panel.
-function BrandBackdrop() {
+/**
+ * Re-points the shadcn colour tokens at the Roumdoul ones for everything inside
+ * this shell, so the shared Button, Input, Label and Alert pick up caramel and
+ * espresso without each form styling them by hand. Scoped here only — the rest
+ * of the app keeps its own theme.
+ */
+const BRAND_THEME = {
+  "--primary": "var(--brand)",
+  "--primary-foreground": "var(--brand-foreground)",
+  "--ring": "var(--brand)",
+  "--foreground": "var(--ink)",
+  "--muted-foreground": "var(--ink-muted)",
+  "--background": "var(--surface)",
+  "--border": "var(--surface-border)",
+  // Ink-tinted, so field borders and the tab strip read on the cream card in light and dark alike.
+  "--input": "color-mix(in srgb, var(--ink) 16%, transparent)",
+  "--muted": "color-mix(in srgb, var(--ink) 6%, transparent)",
+} as React.CSSProperties;
+
+/** The Roumdoul logo on a white disc, with the product name beside it. */
+function Logo() {
   return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0"
-      style={{
-        backgroundImage:
-          "radial-gradient(circle at 0% 0%, rgb(255 255 255 / 0.08), transparent 60%), linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px)",
-        backgroundSize: "100% 100%, 40px 40px, 40px 40px",
-      }}
-    />
+    <div className="flex items-center gap-3">
+      <span className="flex size-11 items-center justify-center rounded-full bg-white shadow-[0_4px_12px_-2px_rgb(194_124_121/0.45)]">
+        <img src="/logoroumdoul.png" alt="" className="size-[82%] object-contain" />
+      </span>
+      <div className="leading-tight">
+        <p className="text-lg font-semibold tracking-tight">Roumdoul</p>
+        <p className="text-xs text-ink-muted">Business OS</p>
+      </div>
+    </div>
   );
 }
 
-function Brand({ className }: { className?: string }) {
+/**
+ * Three small cards like the ones inside the app — a check-in, a payslip and a
+ * leave approval — scattered with a slight tilt and a slow bob. They say what
+ * the product does better than a feature list. Purely decorative (aria-hidden),
+ * and desktop only: on a phone the form matters more than the picture.
+ */
+function SampleCards() {
+  const t = useT();
   return (
-    <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
-      <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-        <Boxes className="size-5" />
+    <div aria-hidden className="relative mt-12 hidden h-56 max-w-md select-none lg:block">
+      <SampleCard
+        className="top-0 left-0 w-64 -rotate-3"
+        delay="0s"
+        icon={CalendarCheck}
+        tint="bg-emerald-100 text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-100"
+        title={t("app.auth.panel.cards.checkedIn")}
+        text="Sokha Chan · 07:58"
+        badge={t("app.auth.panel.cards.onTime")}
+      />
+      <SampleCard
+        className="top-20 right-0 w-56 rotate-2"
+        delay="-2s"
+        icon={Wallet}
+        tint="bg-amber-100 text-amber-900 dark:bg-amber-400/25 dark:text-amber-100"
+        title={t("app.auth.panel.cards.payslipReady")}
+        text={t("app.auth.panel.cards.payslipPeriod")}
+      />
+      <SampleCard
+        className="top-40 left-10 w-60 -rotate-1"
+        delay="-4s"
+        icon={Palmtree}
+        tint="bg-[#e8eaf6] text-[#2f3a6e] dark:bg-[#8f9ce0]/22 dark:text-[#d3d9f7]"
+        title={t("app.auth.panel.cards.leaveApproved")}
+        text={t("app.auth.panel.cards.leaveDays")}
+      />
+    </div>
+  );
+}
+
+function SampleCard({
+  className,
+  delay,
+  icon: Icon,
+  tint,
+  title,
+  text,
+  badge,
+}: {
+  className: string;
+  delay: string;
+  icon: LucideIcon;
+  tint: string;
+  title: string;
+  text: string;
+  badge?: string;
+}) {
+  return (
+    // Tilt on the outer box, bob on the inner one, so the two never overwrite each other.
+    <div className={cn("absolute", className)}>
+      <div
+        className="flex animate-[auth-float_6s_ease-in-out_infinite] items-center gap-3 rounded-[20px] border border-surface-border bg-surface p-3 shadow-[0_1px_2px_rgb(43_27_18/0.05),0_16px_32px_-12px_rgb(43_27_18/0.3)] motion-reduce:animate-none"
+        style={{ animationDelay: delay }}
+      >
+        <div className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", tint)}>
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{title}</p>
+          <p className="truncate text-xs text-ink-muted">{text}</p>
+        </div>
+        {badge && (
+          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:bg-emerald-400/20 dark:text-emerald-100">
+            {badge}
+          </span>
+        )}
       </div>
-      <span className="text-lg font-semibold tracking-tight">Business OS</span>
     </div>
   );
 }

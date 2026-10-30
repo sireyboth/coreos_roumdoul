@@ -342,3 +342,15 @@
     transform: translateX(400%);
   }
 }
+
+/* Sign-in brand panel (components/auth-layout.tsx): the sample app cards bob
+   gently. Uses `translate`, not `transform`, so each card keeps its tilt. */
+@keyframes auth-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
+  }
+}

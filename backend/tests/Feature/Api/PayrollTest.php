@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\AttendanceDay;
+use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\CompanyPermission;
 use App\Models\CompanyRole;
@@ -11,6 +12,7 @@ use App\Models\EmployeeSalary;
 use App\Models\PayComponent;
 use App\Models\PayrollAdjustment;
 use App\Models\PayRun;
+use App\Models\PayslipOverride;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TaxExchangeRate;
@@ -647,6 +649,78 @@ class PayrollTest extends TestCase
         // Dara's payslip was left alone.
         $this->assertSame($daraSlip, collect($run['payslips'])->firstWhere('employee.id', $dara->id)['id']);
         $this->assertEquals(500 + 400, $run['totals']['USD']['gross']);
+    }
+
+    public function test_hr_can_set_a_line_by_hand_and_it_survives_recalculation_with_an_audit_trail(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $dara = $this->employee('Dara');
+        $this->salary($sokha, 520);
+        $this->salary($dara, 400);
+        $this->day($sokha, '2026-09-01', ['status' => 'absent', 'scan_count' => 0]);
+
+        $run = $this->createRun()->json();
+        $slipId = fn (array $run) => collect($run['payslips'])->firstWhere('employee.id', $sokha->id)['id'];
+        $absence = $this->line($this->payslip($slipId($run)), 'ABSENCE');
+        $this->assertEquals(20, $absence['amount']);
+        $url = "/api/payroll/runs/{$run['id']}/employees/{$sokha->id}/lines/{$absence['pay_component_id']}";
+
+        // A reason is required: it goes on the payslip and in the audit log.
+        $this->actingAs($this->admin)->putJson($url, ['amount' => 0])->assertJsonValidationErrors(['reason']);
+
+        // Set to 0: the line stays on the payslip, showing it was set by hand and what the rule said.
+        $run = $this->actingAs($this->admin)->putJson($url, ['amount' => 0, 'reason' => 'Doctor\'s note came late'])->assertOk()->json();
+        $slip = $this->payslip($slipId($run));
+        $line = $this->line($slip, 'ABSENCE');
+        $this->assertEquals(0, $line['amount']);
+        $this->assertSame('Set by hand: Doctor\'s note came late', $line['explanation']);
+        $this->assertEquals(20, $line['details']['override']['calculated']);
+        $this->assertEquals(520, $slip['gross']);
+        $this->assertEquals(520 + 400, $run['totals']['USD']['gross']);
+
+        // Recalculating everyone keeps it.
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk()->json();
+        $this->assertEquals(0, $this->line($this->payslip($slipId($run)), 'ABSENCE')['amount']);
+
+        // Changing it again is one row, logged with before and after.
+        $this->actingAs($this->admin)->putJson($url, ['amount' => 10, 'reason' => 'Half the day was excused'])->assertOk();
+        $this->assertSame(1, PayslipOverride::query()->count());
+        $this->assertSame(
+            ['payslip_override.created', 'payslip_override.updated'],
+            AuditLog::query()->where('event', 'like', 'payslip_override.%')->orderBy('id')->pluck('event')->all(),
+        );
+
+        // Removing it goes back to what the rule works out.
+        $run = $this->actingAs($this->admin)->deleteJson($url)->assertOk()->json();
+        $slip = $this->payslip($slipId($run));
+        $this->assertEquals(20, $this->line($slip, 'ABSENCE')['amount']);
+        $this->assertArrayNotHasKey('override', $this->line($slip, 'ABSENCE')['details'] ?? []);
+        $this->assertTrue(AuditLog::query()->where('event', 'payslip_override.deleted')->exists());
+
+        // Someone outside the run has no payslip to set an amount on.
+        $outsider = $this->employee('Outsider');
+        $this->actingAs($this->admin)->putJson("/api/payroll/runs/{$run['id']}/employees/{$outsider->id}/lines/{$absence['pay_component_id']}", ['amount' => 1, 'reason' => 'x'])
+            ->assertJsonValidationErrors(['employee_id']);
+    }
+
+    public function test_a_hand_set_amount_cant_change_once_the_run_is_approved(): void
+    {
+        $this->company->update(['allow_self_approval' => true]);
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520);
+        $run = $this->createRun()->json();
+        $base = $this->line($this->payslip($run['payslips'][0]['id']), 'BASE');
+        $url = "/api/payroll/runs/{$run['id']}/employees/{$sokha->id}/lines/{$base['pay_component_id']}";
+
+        $this->actingAs($this->admin)->putJson($url, ['amount' => 500, 'reason' => 'Agreed with the employee'])->assertOk();
+        // Approval recalculates one last time: the amount set by hand is what gets approved.
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk()->json();
+        $this->assertEquals(500, $run['totals']['USD']['gross']);
+
+        $this->actingAs($this->admin)->putJson($url, ['amount' => 450, 'reason' => 'Changed my mind'])->assertStatus(422);
+        $this->actingAs($this->admin)->deleteJson($url)->assertStatus(422);
     }
 
     public function test_an_automatic_group_prepares_the_period_that_just_ended(): void

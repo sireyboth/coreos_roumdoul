@@ -56,6 +56,9 @@ Route::middleware('module:payroll')->group(function () {
         Route::post('/payroll/runs', [PayRunController::class, 'store']);
         Route::post('/payroll/runs/{run}/calculate', [PayRunController::class, 'calculate']);
         Route::post('/payroll/runs/{run}/employees/{employee}/calculate', [PayRunController::class, 'calculateEmployee'])->whereNumber('employee');
+        // HR's own amount for one payslip line, kept across recalculations.
+        Route::put('/payroll/runs/{run}/employees/{employee}/lines/{component}', [PayRunController::class, 'overrideLine'])->whereNumber('employee');
+        Route::delete('/payroll/runs/{run}/employees/{employee}/lines/{component}', [PayRunController::class, 'clearLineOverride'])->whereNumber('employee');
         Route::post('/payroll/runs/{run}/paid', [PayRunController::class, 'markPaid']);
         Route::delete('/payroll/runs/{run}', [PayRunController::class, 'destroy']);
 

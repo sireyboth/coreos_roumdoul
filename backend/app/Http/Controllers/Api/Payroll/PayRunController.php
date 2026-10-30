@@ -68,6 +68,23 @@ class PayRunController extends Controller
         return $this->detail($request, $this->runs->calculateEmployee($run, $employee, $request->user()));
     }
 
+    /** HR's own amount for one line of one person's payslip; the reason goes on the payslip and in the audit log. */
+    public function overrideLine(Request $request, PayRun $run, int $employee, PayComponent $component)
+    {
+        $data = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0', 'max:999999999999'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        return $this->detail($request, $this->runs->setOverride($run, $employee, $component, (float) $data['amount'], $data['reason'], $request->user()));
+    }
+
+    /** Back to what the rule works out. */
+    public function clearLineOverride(Request $request, PayRun $run, int $employee, PayComponent $component)
+    {
+        return $this->detail($request, $this->runs->clearOverride($run, $employee, $component, $request->user()));
+    }
+
     public function approve(Request $request, PayRun $run)
     {
         return $this->detail($request, $this->runs->approve($run, $request->user()));
@@ -107,7 +124,8 @@ class PayRunController extends Controller
             'pay_group' => $run->payGroup?->only(['id', 'name']),
             'status' => $run->status,
             'employee' => $this->employee($payslip),
-            'lines' => $payslip->lines->map->only(['id', 'code', 'name', 'kind', 'amount', 'explanation', 'details']),
+            // pay_component_id: which rule made the line (null for adjustments, NSSF and tax) — the one an amount can be set for.
+            'lines' => $payslip->lines->map->only(['id', 'pay_component_id', 'code', 'name', 'kind', 'amount', 'explanation', 'details']),
         ];
     }
 

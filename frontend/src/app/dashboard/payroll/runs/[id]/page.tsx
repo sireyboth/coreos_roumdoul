@@ -396,7 +396,19 @@ export default function PayRunPage() {
       )}
 
       <BankExportDialog run={run} open={bankExport} onOpenChange={setBankExport} canManage={canManage} />
-      <PayslipDialog payslipId={openSlip} onOpenChange={(o) => !o && setOpenSlip(null)} />
+      <PayslipDialog
+        payslipId={openSlip}
+        onOpenChange={(o) => !o && setOpenSlip(null)}
+        // Setting a line by hand rebuilds that person's payslip: follow them to the new one.
+        onRunChange={
+          canManage && editable
+            ? (next, employeeId) => {
+                setRun(next);
+                setOpenSlip(next.payslips.find((p) => p.employee?.id === employeeId)?.id ?? null);
+              }
+            : undefined
+        }
+      />
       <ReopenDialog
         open={reopening}
         onOpenChange={setReopening}

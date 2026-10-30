@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Building2, Check, Eye, EyeOff, IdCard, Loader2, Lock, Mail, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowRight, Building2, Check, IdCard, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { AuthLayout } from "@/components/auth-layout";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field, IconInput, PasswordInput } from "@/components/auth-fields";
 import { api, ApiError, setToken } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { translateNow, useT } from "@/lib/i18n";
@@ -31,7 +30,6 @@ export function LoginForm({ linkedCompany = null }: { linkedCompany?: string | n
   const company = linkedCompany ?? typedCompany;
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -61,7 +59,7 @@ export function LoginForm({ linkedCompany = null }: { linkedCompany?: string | n
   return (
     <AuthLayout>
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("app.auth.signIn.title")}</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("app.auth.signIn.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("app.auth.signIn.description")}</p>
       </div>
 
@@ -164,26 +162,13 @@ export function LoginForm({ linkedCompany = null }: { linkedCompany?: string | n
         </div>
 
         <Field id="password" label={t("app.auth.signIn.password")}>
-          <div className="relative">
-            <IconInput
-              icon={Lock}
-              id="password"
-              type={showPassword ? "text" : "password"}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              className="pr-11 lg:pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? t("app.auth.signIn.hidePassword") : t("app.auth.signIn.showPassword")}
-              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-muted-foreground transition-colors hover:text-foreground lg:w-10 lg:rounded-r-lg"
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
+          <PasswordInput
+            id="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+          />
         </Field>
 
         {error && (
@@ -192,16 +177,25 @@ export function LoginForm({ linkedCompany = null }: { linkedCompany?: string | n
           </div>
         )}
 
-        <Button type="submit" disabled={loading || signedIn} className="h-12 w-full rounded-xl text-base lg:h-10 lg:rounded-lg lg:text-sm">
+        <Button
+          type="submit"
+          disabled={loading || signedIn}
+          className="group mt-1 h-12 w-full rounded-xl text-base shadow-lg shadow-primary/25 lg:h-11 lg:rounded-lg lg:text-sm"
+        >
           {signedIn ? (
             <>
               <Check className="size-4" />
               {t("app.auth.signIn.success")}
             </>
+          ) : loading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              {t("app.auth.signIn.submitting")}
+            </>
           ) : (
             <>
-              {loading && <Loader2 className="size-4 animate-spin" />}
-              {loading ? t("app.auth.signIn.submitting") : t("common.action.signIn")}
+              {t("common.action.signIn")}
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </>
           )}
         </Button>
@@ -251,27 +245,6 @@ function SignedInScreen() {
           style={{ animationDuration: `${SUCCESS_DELAY_MS}ms` }}
         />
       </div>
-    </div>
-  );
-}
-
-function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-// Taller input with a leading icon, for the sign-in form only. Phone sizes
-// (48px, rounded-xl) match native app fields; lg: drops back to desktop size.
-function IconInput({ icon: Icon, className, ...props }: React.ComponentProps<typeof Input> & { icon: LucideIcon }) {
-  return (
-    <div className="relative">
-      <Icon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground lg:left-3" aria-hidden />
-      <Input className={`h-12 rounded-xl pl-10 lg:h-10 lg:rounded-lg lg:pl-9 ${className ?? ""}`} {...props} />
     </div>
   );
 }

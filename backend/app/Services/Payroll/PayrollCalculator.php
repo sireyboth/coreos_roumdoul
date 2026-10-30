@@ -11,6 +11,7 @@ use App\Models\PayComponent;
 use App\Models\PayGroup;
 use App\Models\PayrollAdjustment;
 use App\Models\PayrollPolicy;
+use App\Models\PayslipOverride;
 use App\Models\StatutoryRate;
 use App\Models\TaxExchangeRate;
 use App\Services\Attendance\MonthlyAttendance;
@@ -185,10 +186,12 @@ class PayrollCalculator
      * @param  array<string, mixed>  $ctx  from context()
      * @param  array<string, mixed>  $attendance  this employee's attendance totals for the period
      * @param  Collection<int, PayrollAdjustment>  $adjustments  this employee's adjustments dated in the period
+     * @param  Collection<array-key, PayslipOverride>|null  $overrides  HR's amounts for this person in this run, keyed by pay_component_id
      * @return array<string, mixed> a payslip, or ['skipped' => reason]
      */
-    public function calculate(array $ctx, Employee $employee, array $attendance, Collection $adjustments): array
+    public function calculate(array $ctx, Employee $employee, array $attendance, Collection $adjustments, ?Collection $overrides = null): array
     {
+        $overrides ??= collect();
         $policy = $ctx['policy'];
         $member = $this->memberSpan($ctx, $employee) ?? [$ctx['start'], $ctx['end']];
         [$from, $to] = $this->employedSpan($employee, $member);
@@ -251,13 +254,26 @@ class PayrollCalculator
                 default => null,
             };
 
-            if ($line !== null && $line['amount'] > 0) {
+            // HR's amount wins, even 0 or where the rule gave nothing, so the payslip shows it was set by hand.
+            $override = $overrides->get($component->id);
+            if ($override !== null) {
+                $line = $this->overriddenLine($line, $override, $currency);
+            }
+
+            if ($line !== null && ($line['amount'] > 0 || $override !== null)) {
                 $lines[] = [
                     'pay_component_id' => $component->id, 'code' => $component->code, 'name' => $component->name, 'kind' => $component->kind,
                     'taxable' => $component->taxable, 'nssf_insurable' => $component->nssf_insurable, 'order' => $component->sort_order,
                     ...$line,
                 ];
             }
+        }
+
+        // A rule switched off or removed from this group since: its amount has no line to go on.
+        $unused = $overrides->reject(fn (PayslipOverride $o) => $ctx['components']->contains('id', $o->pay_component_id));
+        if ($unused->isNotEmpty()) {
+            $warnings[] = $this->warning('override_unused', 'An amount set by hand is not used because its rule is no longer on: '
+                .$unused->map(fn (PayslipOverride $o) => $o->component->name)->join(', ').'. Remove it or switch the rule back on.', false);
         }
 
         foreach ($adjustments as $adjustment) {
@@ -430,6 +446,33 @@ class PayrollCalculator
             'amount' => $result['amount'],
             'explanation' => $result['explanation'],
             'details' => ['template' => $component->template, 'params' => $component->params, 'formula' => $result['formula'], 'variables' => $result['variables']],
+        ];
+    }
+
+    /**
+     * HR's amount in place of the rule's. What the rule worked out stays in
+     * the details, so the payslip can show both and undoing is one click.
+     *
+     * @param  array<string, mixed>|null  $line  the rule's line, or null when it gave nothing
+     */
+    private function overriddenLine(?array $line, PayslipOverride $override, string $currency): array
+    {
+        $calculated = (float) ($line['amount'] ?? 0);
+
+        return [
+            'amount' => Money::round((float) $override->amount, $currency),
+            'explanation' => 'Set by hand: '.$override->reason,
+            'details' => [
+                ...($line['details'] ?? []),
+                'override' => [
+                    'id' => $override->id,
+                    'calculated' => $calculated,
+                    'calculated_explanation' => $line['explanation'] ?? null,
+                    'reason' => $override->reason,
+                    'by' => $override->updatedBy?->name,
+                    'at' => $override->updated_at?->toIso8601String(),
+                ],
+            ],
         ];
     }
 

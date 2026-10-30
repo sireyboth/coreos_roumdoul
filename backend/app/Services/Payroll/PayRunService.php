@@ -6,11 +6,13 @@ use App\Models\AttendanceLock;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeePayGroup;
+use App\Models\PayComponent;
 use App\Models\PayGroup;
 use App\Models\PayrollAdjustment;
 use App\Models\PayRun;
 use App\Models\Payslip;
 use App\Models\PayslipLine;
+use App\Models\PayslipOverride;
 use App\Models\User;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\AuditLogger;
@@ -24,7 +26,8 @@ use Illuminate\Validation\ValidationException;
  * One pay group's pay run for one period: draft → calculated → approved → paid.
  *
  * Calculating replaces every payslip, as often as needed; one person can be
- * recalculated alone after a fix. Approving needs the period to be over,
+ * recalculated alone after a fix. Amounts HR sets by hand on a line are kept
+ * apart and applied again on every calculation. Approving needs the period to be over,
  * recalculates one last time, refuses while any payslip has a blocking
  * warning, then locks the attendance it used — for those people and those
  * days only. After that nothing changes: fixes go into a later period as
@@ -75,10 +78,11 @@ class PayRunService
         $employees = $this->calculator->employees($ctx);
         $attendance = $this->calculator->attendance($ctx, $employees);
         $adjustments = $this->adjustments($run, $employees->pluck('id'));
+        $overrides = $this->overrides($run, $employees->pluck('id'));
 
         $results = $employees->map(fn (Employee $employee) => [
             'employee' => $employee,
-            'result' => $this->calculator->calculate($ctx, $employee, $attendance->get($employee->id), $adjustments->get($employee->id, collect())),
+            'result' => $this->calculator->calculate($ctx, $employee, $attendance->get($employee->id), $adjustments->get($employee->id, collect()), $overrides->get($employee->id)),
         ]);
 
         $skipped = $results->filter(fn ($r) => isset($r['result']['skipped']))->pluck('employee');
@@ -117,7 +121,8 @@ class PayRunService
 
         $attendance = $this->calculator->attendance($ctx, collect([$employee]))->get($employee->id);
         $adjustments = $this->adjustments($run, collect([$employee->id]))->get($employee->id, collect());
-        $result = $this->calculator->calculate($ctx, $employee, $attendance, $adjustments);
+        $overrides = $this->overrides($run, collect([$employee->id]))->get($employee->id);
+        $result = $this->calculator->calculate($ctx, $employee, $attendance, $adjustments, $overrides);
 
         DB::transaction(function () use ($run, $employee, $result, $ctx, $by) {
             $run->payslips()->where('employee_id', $employee->id)->delete();
@@ -154,6 +159,39 @@ class PayRunService
         });
 
         return $run->fresh();
+    }
+
+    /**
+     * HR's own amount for one line of one person's payslip, in place of what
+     * the rule works out. Kept through every recalculation (approval included)
+     * until removed; the person's payslip is recalculated straight away.
+     */
+    public function setOverride(PayRun $run, int $employeeId, PayComponent $component, float $amount, string $reason, User $by): PayRun
+    {
+        $this->assertEditable($run);
+        if (! $run->payslips()->where('employee_id', $employeeId)->exists()) {
+            throw ValidationException::withMessages(['employee_id' => [__('This person has no payslip in this pay run.')]]);
+        }
+
+        $override = PayslipOverride::query()->firstOrNew(['pay_run_id' => $run->id, 'employee_id' => $employeeId, 'pay_component_id' => $component->id]);
+        $override->fill([
+            'company_id' => $run->company_id, 'amount' => $amount, 'reason' => $reason,
+            'created_by' => $override->created_by ?? $by->id, 'updated_by' => $by->id,
+        ])->save();
+
+        return $this->calculateEmployee($run, $employeeId, $by);
+    }
+
+    /** Back to what the rule works out. */
+    public function clearOverride(PayRun $run, int $employeeId, PayComponent $component, User $by): PayRun
+    {
+        $this->assertEditable($run);
+
+        // One by one, so each removal reaches the audit log.
+        PayslipOverride::query()->where(['pay_run_id' => $run->id, 'employee_id' => $employeeId, 'pay_component_id' => $component->id])
+            ->get()->each->delete();
+
+        return $this->calculateEmployee($run, $employeeId, $by);
     }
 
     public function approve(PayRun $run, User $by): PayRun
@@ -377,6 +415,15 @@ class PayRunService
             ->where('company_id', $run->company_id)->whereIn('employee_id', $employeeIds)
             ->whereDate('date', '>=', $run->period_start->toDateString())->whereDate('date', '<=', $run->period_end->toDateString())
             ->orderBy('id')->get()->groupBy('employee_id');
+    }
+
+    /** @return Collection<array-key, \Illuminate\Database\Eloquent\Collection<array-key, PayslipOverride>> keyed by employee id, then by pay_component_id */
+    private function overrides(PayRun $run, Collection $employeeIds): Collection
+    {
+        return PayslipOverride::query()->withoutGlobalScopes()
+            ->where('pay_run_id', $run->id)->whereIn('employee_id', $employeeIds)
+            ->with(['component' => fn ($q) => $q->withoutGlobalScopes(), 'updatedBy:id,name'])
+            ->get()->groupBy('employee_id')->map(fn (Collection $rows) => $rows->keyBy('pay_component_id'));
     }
 
     private function savePayslip(PayRun $run, array $result): void

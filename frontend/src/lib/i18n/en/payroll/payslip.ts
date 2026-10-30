@@ -34,4 +34,18 @@ export const payslip = {
   // ── Dialog ────────────────────────────────────────────────────────
   title: "Payslip",
   for: "Payslip for {period}",
+
+  // ── Set a line by hand ────────────────────────────────────────────
+  override: {
+    edit: "Set {line} by hand",
+    badge: "Set by hand",
+    because: "Reason: {reason}",
+    wasRule: "The rule worked out {amount}",
+    ruleSays: "The rule works out {amount}. The amount you set stays when the payslip is recalculated, until you remove it.",
+    amount: "Amount",
+    reason: "Reason",
+    reasonHint: "Why this amount? It shows on the payslip and in the audit log.",
+    useRule: "Use the rule's amount",
+    saved: "Payslip updated.",
+  },
 };

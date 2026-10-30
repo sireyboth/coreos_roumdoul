@@ -3,8 +3,8 @@
 export const auth = {
   // ── Sign in ───────────────────────────────────────────────────────
   signIn: {
-    title: "Sign in to your account",
-    description: "Enter your credentials to access your organization's workspace.",
+    title: "Welcome back",
+    description: "Sign in to pick up where your team left off.",
     email: "Email",
     employeeId: "Employee ID",
     // "Signing in to <company>. Not your company?"
@@ -28,23 +28,30 @@ export const auth = {
 
   // ── Brand panel beside both forms (components/auth-layout.tsx) ────
   panel: {
-    headline: "One platform for your people and operations.",
-    subheadline: "Attendance, leave, payroll and records — managed securely in one place for every branch of your organization.",
-    attendanceTitle: "Attendance & scheduling",
-    attendanceText: "Accurate time records across every branch and shift.",
-    payrollTitle: "Payroll & leave",
-    payrollText: "Pay periods, adjustments and leave balances, calculated consistently.",
-    securityTitle: "Role-based access",
-    securityText: "Every action audited; each user sees only what their role permits.",
+    headline: "Your team's whole workday, in one calm place.",
+    subheadline: "Check-ins, leave and payroll for every branch — in Khmer and English.",
+    // Sample app cards on the panel — an illustration, not real data.
+    cards: {
+      checkedIn: "Checked in",
+      onTime: "On time",
+      payslipReady: "Payslip ready",
+      payslipPeriod: "October 2026",
+      leaveApproved: "Leave approved",
+      leaveDays: "2 days · 4–5 Nov",
+    },
     rights: "All rights reserved.",
   },
 
   // ── Sign up ───────────────────────────────────────────────────────
   signUp: {
     title: "Create your company",
-    description: "Start a free 14-day trial on Business OS.",
+    description: "Set up your workspace in a minute, then invite your team.",
+    trial: "14-day free trial",
     companyName: "Company name",
+    companyNamePlaceholder: "e.g. Angkor Coffee",
     yourName: "Your name",
+    yourNamePlaceholder: "e.g. Sokha Chan",
+    passwordHint: "At least 8 characters",
     submit: "Create account",
     submitting: "Creating…",
     haveAccount: "Already have an account?",
