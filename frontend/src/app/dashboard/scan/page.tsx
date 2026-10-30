@@ -107,8 +107,14 @@ export default function ScanPage() {
 
   return (
     <div className="relative flex h-full flex-col bg-black text-white">
-      <HomeButton className="absolute top-4 left-4 z-10 md:hidden" />
-      <Link href="/dashboard/attendance" className="absolute right-4 top-4 z-10 rounded-full bg-black/50 p-2 text-white" aria-label={t("attendance.scan.exit")}>
+      {/* Full-screen camera: keep the buttons below the iPhone status bar / notch
+          (safe-area-inset-top), where taps would otherwise not land. */}
+      <HomeButton className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] z-10 md:hidden" />
+      <Link
+        href="/dashboard/attendance"
+        className="absolute top-[calc(1rem+env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-10 rounded-full bg-black/50 p-3 text-white"
+        aria-label={t("attendance.scan.exit")}
+      >
         <X className="size-5" />
       </Link>
 
@@ -118,7 +124,7 @@ export default function ScanPage() {
             <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
           </div>
           <canvas ref={canvasRef} className="hidden" />
-          <div className="flex flex-col items-center gap-1 p-6 text-center">
+          <div className="flex flex-col items-center gap-1 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-center">
             <p className="text-lg font-medium">
               {status.kind === "submitting" ? t("attendance.today.recording") : t("attendance.scan.pointCamera")}
             </p>
