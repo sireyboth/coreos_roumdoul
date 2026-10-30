@@ -11,6 +11,8 @@ export const profilePage = {
   accountHintId: "Your name and, if you like, an email address",
   accountHint: "Your name and email address",
   emailOptional: "Email (optional)",
+  nickname: "Nickname (optional)",
+  nicknameHint: "What colleagues call you.",
   signsInWithId: "You sign in with employee ID {id}. An email here is optional and doesn't change that.",
   currentPassword: "Current password",
   emailPasswordHint: "Needed to change the email you sign in with.",

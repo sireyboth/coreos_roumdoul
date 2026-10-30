@@ -76,6 +76,8 @@ export type EmployeeInput = {
   first_name?: string | null;
   last_name?: string | null;
   name_km?: string | null;
+  // What colleagues call them ("Kim"); the employee can change it on their profile.
+  nickname?: string | null;
   nationality?: string | null;
   national_id_number?: string | null;
   passport_number?: string | null;
@@ -135,6 +137,8 @@ export type Employee = {
   first_name?: string | null;
   last_name?: string | null;
   name_km?: string | null;
+  // What colleagues call them ("Kim"); the employee can change it on their profile.
+  nickname?: string | null;
   // Where they work now. There is no branch_id field — read branch?.id.
   branch: Branch | null;
   department?: { id: number; name: string } | null;

@@ -164,7 +164,7 @@ function EmployeesPageContent() {
         </div>
       ),
       sortValue: (employee) => employee.name,
-      searchValue: (employee) => [employee.name, employee.name_km, employee.employee_code, employee.email].filter(Boolean).join(" "),
+      searchValue: (employee) => [employee.name, employee.name_km, employee.nickname, employee.employee_code, employee.email].filter(Boolean).join(" "),
     },
     {
       id: "order",

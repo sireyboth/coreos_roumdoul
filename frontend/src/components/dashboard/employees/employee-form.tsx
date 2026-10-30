@@ -117,6 +117,7 @@ export type EmployeeForm = {
   first_name: string;
   last_name: string;
   name_km: string;
+  nickname: string;
   nationality: string;
   national_id_number: string;
   passport_number: string;
@@ -133,6 +134,7 @@ export function emptyEmployeeForm(branchId = ""): EmployeeForm {
     first_name: "",
     last_name: "",
     name_km: "",
+    nickname: "",
     nationality: "",
     national_id_number: "",
     passport_number: "",
@@ -169,6 +171,7 @@ export function formFromEmployee(employee: Employee): EmployeeForm {
     first_name: employee.first_name ?? "",
     last_name: employee.last_name ?? "",
     name_km: employee.name_km ?? "",
+    nickname: employee.nickname ?? "",
     nationality: employee.nationality ?? "",
     national_id_number: employee.national_id_number ?? "",
     passport_number: employee.passport_number ?? "",
@@ -216,6 +219,7 @@ export function toPayload(form: EmployeeForm, options: { org: boolean; salary?: 
     first_name: orNull(form.first_name),
     last_name: orNull(form.last_name),
     name_km: orNull(form.name_km),
+    nickname: orNull(form.nickname),
     nationality: orNull(form.nationality),
     national_id_number: orNull(form.national_id_number),
     passport_number: orNull(form.passport_number),
@@ -423,6 +427,9 @@ export function EmployeeFormFields({
             value={form.name_km}
             onChange={(e) => onChange({ name_km: e.target.value })}
           />
+        </Field>
+        <Field label={t("employees.form.nickname")} htmlFor={id("nickname")} hint={t("employees.form.nicknameHint")}>
+          <Input id={id("nickname")} maxLength={100} value={form.nickname} onChange={(e) => onChange({ nickname: e.target.value })} />
         </Field>
         <Field
           label={codeRequired ? t("employees.form.employeeId") : t("employees.form.employeeCode")}

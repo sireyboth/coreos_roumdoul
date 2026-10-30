@@ -106,7 +106,9 @@ export function MobileTabBar() {
       lang={lang}
       className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 md:hidden"
     >
-      <div ref={barRef} className="glass-surface relative mx-auto flex max-w-md items-center gap-1 rounded-full p-1.5">
+      {/* Thick glass: the labels must stay readable over whatever scrolls
+          behind — thin glass vanished over dark content (photos, the ID card's back). */}
+      <div ref={barRef} className="glass-surface relative mx-auto flex max-w-md items-center gap-1 rounded-full p-1.5 [--glass-bg:var(--glass-thick)]">
         {capsule && (
           <span
             aria-hidden

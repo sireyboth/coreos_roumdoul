@@ -8,8 +8,8 @@ export type MeResponse = {
   user: { id: number; name: string; email: string | null; login_id?: string | null; company_id: number | null; is_platform_admin: boolean };
   roles: string[];
   permissions: string[];
-  // photo_url: a short-lived signed link — use photoSrc() to show it.
-  employee: { id: number; name: string; photo_url: string | null } | null;
+  // photo_url: a short-lived signed link — use photoSrc() to show it. nickname: they can change it on their profile.
+  employee: { id: number; name: string; nickname: string | null; photo_url: string | null } | null;
   // allow_self_approval: people may approve or change their own attendance, leave balance and pay.
   // probation_*: the default probation for new people (e.g. 3 months) and how many days before it ends HR is reminded (null = on the day).
   company: {
@@ -83,8 +83,8 @@ export const accountApi = {
       request<void>("/api/push/subscriptions", { method: "DELETE", body: JSON.stringify({ endpoint }), background: true }),
   },
   profile: {
-    // current_password is needed only when the email changes.
-    update: (data: { name: string; email: string | null; current_password?: string }) =>
+    // current_password is needed only when the email changes. nickname: only for people with an employee record.
+    update: (data: { name: string; email: string | null; current_password?: string; nickname?: string | null }) =>
       request<{ id: number; name: string; email: string | null }>("/api/profile", {
         method: "PUT",
         body: JSON.stringify(data),

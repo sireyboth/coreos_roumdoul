@@ -8,6 +8,8 @@ export const form = {
   fullName: "Full name",
   fullNameHint: "Filled in from the first and last name. Edit it if they go by something else.",
   nameKm: "Name in Khmer (optional)",
+  nickname: "Nickname (optional)",
+  nicknameHint: "What colleagues call them. They can change it themselves on their profile.",
   employeeId: "Employee ID",
   employeeCode: "Employee code (optional)",
   phone: "Phone (optional)",

@@ -138,6 +138,8 @@ class EmployeeController extends Controller
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'name_km' => ['nullable', 'string', 'max:255'],
+            // The employee can also change this themselves (PUT /profile).
+            'nickname' => ['nullable', 'string', 'max:100'],
             'nationality' => ['nullable', 'string', 'max:100'],
             'national_id_number' => ['nullable', 'string', 'max:50'],
             'passport_number' => ['nullable', 'string', 'max:50'],

@@ -8,8 +8,9 @@
      *
      * One view, two uses:
      * - PDF (dompdf): $forScreen = false. Images are local file paths.
-     * - On screen ($forScreen = true): shown in the app's preview, so images are
-     *   inlined as data URIs and the two sides sit next to each other.
+     * - On screen ($forScreen = true): shown in the app (IdCardView, inside a
+     *   shadow root), so images are inlined as data URIs and the two sides sit
+     *   next to each other.
      *
      * Dompdf-safe rules:
      * - Absolute positioning in mm inside a fixed-size side.
@@ -59,10 +60,6 @@
 <html>
 <head>
     <meta charset="utf-8">
-    @if ($forScreen)
-    {{-- Match the app's light/dark scheme so the frame around the card stays transparent. --}}
-    <meta name="color-scheme" content="light dark">
-    @endif
     <style>
         @page { size: 54mm 85.6mm; margin: 0; }
 
@@ -337,15 +334,18 @@
         }
 
         @if ($forScreen)
-        /* On screen: both sides next to each other (stacked when narrow), drawn 1.5x. */
-        html, body { width: auto; height: auto; background: transparent; }
-        body {
+        /* On screen: both sides next to each other (stacked when narrow), drawn
+           1.4x — one side still fits a phone. Styled on .sheet, not body: the
+           app drops this page into a shadow root, where html/body don't exist. */
+        .sheet {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             gap: 5mm;
             padding: 2mm;
-            zoom: 1.5;
+            zoom: 1.4;
+            font-family: "DejaVu Sans", sans-serif;
+            color: {{ $c['ink'] }};
         }
         .side {
             flex: none;
@@ -357,6 +357,7 @@
 </head>
 
 <body>
+<div class="sheet">
 
 {{-- ============================================================
      FRONT
@@ -457,5 +458,6 @@
 
 </div>
 
+</div>
 </body>
 </html>

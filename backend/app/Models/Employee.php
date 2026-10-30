@@ -38,6 +38,7 @@ class Employee extends Model
         'display_name',
         'name',
         'name_km',
+        'nickname',
         'email',
         'phone',
         'gender',
@@ -141,7 +142,7 @@ class Employee extends Model
      * Identity details (and the probation end date) only the employee pages show. Not secret, but kept out
      * of nested rows (roster, attendance) for the size reason below.
      */
-    public const PROFILE_FIELDS = ['first_name', 'last_name', 'name_km', 'probation_end_date'];
+    public const PROFILE_FIELDS = ['first_name', 'last_name', 'name_km', 'nickname', 'probation_end_date'];
 
     // Kept out of every API response: internal columns nothing on screen reads.
     // An employee is nested inside roster and attendance rows, so each unused
@@ -152,6 +153,7 @@ class Employee extends Model
         ...self::PERSONAL_FIELDS,
         ...self::SALARY_FIELDS,
         'name_km',
+        'nickname',
         'probation_end_date',
         'photo_path',
         'company_id', 'user_id', 'first_name', 'last_name', 'display_name', 'rest_days',

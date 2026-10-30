@@ -171,6 +171,8 @@ export default function ProfilePage() {
 
   const [name, setName] = useState(me?.user.name ?? "");
   const [email, setEmail] = useState(me?.user.email ?? "");
+  // Only people linked to an employee record have a nickname.
+  const [nickname, setNickname] = useState(me?.employee?.nickname ?? "");
   const signsInById = Boolean(me?.user.login_id);
   // Replacing the sign-in email asks for the password, like changing the password does.
   const [emailPassword, setEmailPassword] = useState("");
@@ -199,6 +201,7 @@ export default function ProfilePage() {
         name,
         email: email.trim() === "" ? null : email,
         ...(emailChanged ? { current_password: emailPassword } : {}),
+        ...(me?.employee ? { nickname: nickname.trim() === "" ? null : nickname } : {}),
       });
       notifySuccess(t("access.profilePage.updated"));
       setEmailPassword("");
@@ -252,6 +255,13 @@ export default function ProfilePage() {
                 <Label htmlFor="name">{t("common.field.name")}</Label>
                 <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
               </div>
+              {me.employee && (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="nickname">{t("access.profilePage.nickname")}</Label>
+                  <Input id="nickname" maxLength={100} value={nickname} onChange={(e) => setNickname(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">{t("access.profilePage.nicknameHint")}</p>
+                </div>
+              )}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email">{signsInById ? t("access.profilePage.emailOptional") : t("common.field.email")}</Label>
                 <Input

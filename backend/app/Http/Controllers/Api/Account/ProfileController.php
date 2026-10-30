@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Account;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -20,6 +21,8 @@ class ProfileController extends Controller
             // Someone who signs in with an employee ID has no email to lose, so it's optional for them.
             'email' => [$user->membership?->login_id !== null ? 'nullable' : 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'current_password' => ['nullable', 'string'],
+            // Optional, so older apps that don't send it change nothing.
+            'nickname' => ['sometimes', 'nullable', 'string', 'max:100'],
         ]);
 
         // The email is how you sign in, so replacing it needs your password —
@@ -33,7 +36,14 @@ class ProfileController extends Controller
 
         $user->update(collect($data)->only(['name', 'email'])->all());
 
-        return $user->only('id', 'name', 'email') + ['login_id' => $user->membership?->login_id];
+        // Your nickname lives on your own employee record (no HR permission needed).
+        // Only that record, never one picked by id; the change is audit-logged like any employee edit.
+        $employee = Employee::query()->where('user_id', $user->id)->first();
+        if ($employee && array_key_exists('nickname', $data)) {
+            $employee->update(['nickname' => filled($data['nickname']) ? trim($data['nickname']) : null]);
+        }
+
+        return $user->only('id', 'name', 'email') + ['login_id' => $user->membership?->login_id, 'nickname' => $employee?->nickname];
     }
 
     public function updatePassword(Request $request)

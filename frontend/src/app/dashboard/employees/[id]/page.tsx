@@ -280,7 +280,10 @@ export default function EmployeePage() {
                   onRemove={handleRemovePhoto}
                 />
                 <div className="flex flex-col items-center gap-1.5 text-center">
-                  <h1 className="text-xl font-semibold tracking-tight">{employee.name}</h1>
+                  <h1 className="text-xl font-semibold tracking-tight">
+                    {employee.name}
+                    {employee.nickname && <span className="font-normal text-muted-foreground"> ({employee.nickname})</span>}
+                  </h1>
                   {employee.name_km && (
                     <p lang="km" className="-mt-1 text-sm text-muted-foreground">
                       {employee.name_km}
