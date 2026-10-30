@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { IdCard, Mail } from "lucide-react";
+import { useRef, useState } from "react";
+import { Camera, IdCard, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { PhotoCropDialog } from "@/components/dashboard/employees/photo-crop-dialog";
 import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
@@ -18,6 +19,92 @@ import { cn } from "@/lib/utils";
 // Same look as the home page (components/dashboard/shared/kbach): a hero card with the
 // person's photo, name and role over the kbach flower, then the two forms on
 // solid surface cards.
+
+/**
+ * Your own photo, with a camera button to change it (crop first, then upload)
+ * and a remove button. Only people linked to an employee record have a photo;
+ * no HR permission is needed — the API only ever changes your own.
+ */
+function OwnPhoto({ name }: { name: string }) {
+  const { me, refresh } = useMe();
+  const t = useT();
+  const input = useRef<HTMLInputElement>(null);
+  // The picked file as an object URL while the crop dialog is open.
+  const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const photoUrl = me?.employee?.photo_url ?? null;
+  const avatar = <EmployeeAvatar name={name || "?"} photoUrl={photoUrl} className="size-16 text-lg ring-2 ring-surface" />;
+  if (!me?.employee) return avatar;
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset so choosing the same file again still fires.
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      notifyError(new Error(t("employees.photo.notImage")));
+      return;
+    }
+    setPickedUrl(URL.createObjectURL(file));
+  }
+
+  function closeCropDialog(open: boolean) {
+    if (!open && pickedUrl) {
+      URL.revokeObjectURL(pickedUrl);
+      setPickedUrl(null);
+    }
+  }
+
+  // Both refresh /me afterwards, which brings a fresh signed link (or none).
+  async function save(action: () => Promise<unknown>, done: string) {
+    setBusy(true);
+    try {
+      await action();
+      notifySuccess(done);
+      refresh();
+    } catch (err) {
+      notifyError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1">
+      <div className={cn("relative", busy && "opacity-60")}>
+        {avatar}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => input.current?.click()}
+          aria-label={photoUrl ? t("employees.photo.change") : t("employees.photo.upload")}
+          title={photoUrl ? t("employees.photo.change") : t("employees.photo.upload")}
+          className="absolute -right-1 -bottom-1 flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-surface transition-transform hover:scale-105"
+        >
+          <Camera className="size-3.5" />
+        </button>
+        <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} className="sr-only" />
+      </div>
+      {photoUrl && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => save(() => api.profile.removePhoto(), t("employees.profilePage.photoRemoved"))}
+          className="text-[11px] text-ink-muted underline-offset-2 hover:text-destructive hover:underline"
+        >
+          {t("common.action.remove")}
+        </button>
+      )}
+      <PhotoCropDialog
+        imageUrl={pickedUrl}
+        open={pickedUrl !== null}
+        onOpenChange={closeCropDialog}
+        onCropped={(photo) => save(() => api.profile.uploadPhoto(photo), t("employees.profilePage.photoUpdated"))}
+      />
+    </div>
+  );
+}
 
 /** Who's signed in: photo, name, role at the business, and how they sign in. */
 function ProfileHero() {
@@ -36,7 +123,7 @@ function ProfileHero() {
       <KbachCorner />
       <p className="text-[13px] font-semibold text-ink-muted">{t("access.profilePage.title")}</p>
       <div className="mt-3 flex items-center gap-4">
-        <EmployeeAvatar name={name || "?"} className="size-16 text-lg ring-2 ring-surface" />
+        <OwnPhoto name={name} />
         <div className="min-w-0">
           <h1 className={cn("truncate text-2xl font-semibold tracking-tight", tight)}>{name}</h1>
           <p className="truncate text-sm text-ink-muted">

@@ -7,6 +7,11 @@ export const idCards = {
   search: "Search by name or employee ID…",
   emptyHint: "Add employees first, then come back here to print their ID cards.",
 
+  // ── Your own card (staff) ────────────────────────────────────────
+  ownTitle: "My ID card",
+  ownDescription: "The front and back of your card. Ask HR if you need a printed one.",
+  noRecord: "Your account isn't linked to an employee record, so there's no ID card yet.",
+
   // ── Preview dialog ───────────────────────────────────────────────
   preview: "ID card preview",
 };

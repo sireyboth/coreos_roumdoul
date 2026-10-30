@@ -655,12 +655,6 @@ parameters:
 			path: app/Http/Controllers/Api/Organization/EmployeeController.php
 
 		-
-			message: '#^Offset 2 on array\{0\: int\<1, 12000\>, 1\: int\<1, 12000\>, 2\: int, 3\: string, mime\: string, channels\?\: int, bits\?\: int\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Http/Controllers/Api/Organization/EmployeePhotoController.php
-
-		-
 			message: '#^Cannot call method format\(\) on string\.$#'
 			identifier: method.nonObject
 			count: 1

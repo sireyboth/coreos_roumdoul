@@ -8,7 +8,8 @@ export type MeResponse = {
   user: { id: number; name: string; email: string | null; login_id?: string | null; company_id: number | null; is_platform_admin: boolean };
   roles: string[];
   permissions: string[];
-  employee: { id: number; name: string } | null;
+  // photo_url: a short-lived signed link — use photoSrc() to show it.
+  employee: { id: number; name: string; photo_url: string | null } | null;
   // allow_self_approval: people may approve or change their own attendance, leave balance and pay.
   // probation_*: the default probation for new people (e.g. 3 months) and how many days before it ends HR is reminded (null = on the day).
   company: {
@@ -97,6 +98,13 @@ export const accountApi = {
         method: "PUT",
         body: JSON.stringify(data),
       }),
+    // Your own photo (needs an employee record, no HR permission). Already cropped to a square.
+    uploadPhoto: (photo: Blob) => {
+      const body = new FormData();
+      body.append("photo", photo, "photo.jpg");
+      return request<{ photo_url: string | null }>("/api/profile/photo", { method: "POST", body });
+    },
+    removePhoto: () => request<void>("/api/profile/photo", { method: "DELETE" }),
   },
   companySettings: {
     update: (data: { allow_self_approval?: boolean }) =>

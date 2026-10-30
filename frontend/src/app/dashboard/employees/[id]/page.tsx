@@ -71,7 +71,9 @@ export default function EmployeePage() {
       ? "view"
       : "none";
   const canExportAttendance = (me?.permissions.includes("attendance.manage") ?? false) && Boolean(me?.modules.attendance);
-  const canPrintCard = (me?.permissions.includes("employees.view") ?? false) && Boolean(me?.modules.id_cards);
+  // Staff see only their own card and don't print; people who manage employees see and print anyone's.
+  const canSeeCard =
+    (me?.permissions.includes("employees.view") ?? false) && Boolean(me?.modules.id_cards) && (canManage || me?.employee?.id === id);
   // Salary history, tax profile and allowances live with payroll.
   const canPay = salaryAccess !== "none" && Boolean(me?.modules.payroll);
 
@@ -92,28 +94,20 @@ export default function EmployeePage() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  // "view" opens an in-page preview modal; "download" saves it straight
-  // away. Tracked separately so only the button actually clicked shows
-  // "Preparing…".
-  const [cardAction, setCardAction] = useState<"view" | "download" | null>(null);
-  const [cardBlob, setCardBlob] = useState<Blob | null>(null);
+  // "View" opens the card in a modal; "Download" saves the printable PDF.
   const [cardPreviewOpen, setCardPreviewOpen] = useState(false);
+  const [cardDownloading, setCardDownloading] = useState(false);
 
-  async function handleCard(action: "view" | "download") {
+  async function handleCardDownload() {
     if (!employee) return;
-    setCardAction(action);
+    setCardDownloading(true);
     try {
       const blob = await withBusy(() => api.employees.card(employee.id));
-      if (action === "view") {
-        setCardBlob(blob);
-        setCardPreviewOpen(true);
-      } else {
-        saveBlob(blob, `employee-card-${employee.employee_code ?? employee.id}.pdf`);
-      }
+      saveBlob(blob, `employee-card-${employee.employee_code ?? employee.id}.pdf`);
     } catch (err) {
       notifyError(err);
     } finally {
-      setCardAction(null);
+      setCardDownloading(false);
     }
   }
 
@@ -376,21 +370,23 @@ export default function EmployeePage() {
               </Card>
             )}
 
-            {canPrintCard && (
+            {canSeeCard && (
               <Card>
                 <CardHeader>
                   <CardTitle>{t("employees.profilePage.cardTitle")}</CardTitle>
                   <CardDescription>{t("employees.profilePage.cardHint", { name: employee.name })}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex gap-2">
-                  <Button variant="outline" onClick={() => handleCard("view")} disabled={cardAction !== null}>
+                  <Button variant="outline" onClick={() => setCardPreviewOpen(true)}>
                     <Eye className="size-4" />
-                    {cardAction === "view" ? t("employees.shared.preparing") : t("common.action.view")}
+                    {t("common.action.view")}
                   </Button>
-                  <Button variant="outline" onClick={() => handleCard("download")} disabled={cardAction !== null}>
-                    <IdCard className="size-4" />
-                    {cardAction === "download" ? t("employees.shared.preparing") : t("common.action.download")}
-                  </Button>
+                  {canManage && (
+                    <Button variant="outline" onClick={handleCardDownload} disabled={cardDownloading}>
+                      <IdCard className="size-4" />
+                      {cardDownloading ? t("employees.shared.preparing") : t("common.action.download")}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -512,8 +508,8 @@ export default function EmployeePage() {
         onSaved={reload}
       />
       <CardPreviewDialog
-        blob={cardBlob}
-        filename={`employee-card-${employee.employee_code ?? employee.id}.pdf`}
+        employee={employee}
+        canDownload={canManage}
         open={cardPreviewOpen}
         onOpenChange={setCardPreviewOpen}
       />

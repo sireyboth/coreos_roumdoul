@@ -10,6 +10,7 @@ import { PageLoadGate } from "@/components/ui/page-load-gate";
 import { AccountBanner } from "@/components/dashboard/layout/account-banner";
 import { AiAssistant, AssistantLauncher } from "@/components/dashboard/layout/ai-assistant";
 import { BirthdayCelebration } from "@/components/dashboard/employees/birthday-celebration";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { HomeButton } from "@/components/dashboard/layout/home-button";
 import { MobileTabBar } from "@/components/dashboard/layout/mobile-tab-bar";
 import { NotificationBell } from "@/components/dashboard/layout/notification-bell";
@@ -108,9 +109,13 @@ function TopBar() {
         <Link
           href="/dashboard/profile"
           aria-label={t("app.shell.profile")}
-          className="ml-1 flex size-9 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-transform hover:scale-105"
+          className="ml-1 flex size-9 items-center justify-center overflow-hidden rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-transform hover:scale-105"
         >
-          {initials}
+          {me?.employee?.photo_url ? (
+            <EmployeeAvatar name={me.user.name} photoUrl={me.employee.photo_url} className="size-full" />
+          ) : (
+            initials
+          )}
         </Link>
       </div>
     </header>

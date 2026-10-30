@@ -6,11 +6,15 @@
 use App\Http\Controllers\Api\Account\AiAssistantController;
 use App\Http\Controllers\Api\Account\NotificationController;
 use App\Http\Controllers\Api\Account\ProfileController;
+use App\Http\Controllers\Api\Account\ProfilePhotoController;
 use App\Http\Controllers\Api\Account\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::put('/profile', [ProfileController::class, 'update']);
 Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+// Your own photo: no HR permission needed, it only touches your own employee record.
+Route::post('/profile/photo', [ProfilePhotoController::class, 'store']);
+Route::delete('/profile/photo', [ProfilePhotoController::class, 'destroy']);
 
 Route::get('/notifications', [NotificationController::class, 'index']);
 Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);

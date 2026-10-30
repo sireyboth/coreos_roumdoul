@@ -2,14 +2,14 @@
 
 /* eslint-disable @next/next/no-img-element -- tiny static logo, no optimisation needed */
 import { CalendarCheck, Palmtree, Wallet, type LucideIcon } from "lucide-react";
-import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
+import { KbachCorner, KbachPattern, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
  * Shell for sign in and sign up, in the Roumdoul look of the phone home screen
- * (app/dashboard/home): the warm coffee mesh behind everything, the form on a
+ * (app/dashboard/home): the warm coffee mesh with the damask pattern over it, the form on a
  * solid surface card with the kbach flower in its corner, caramel as the accent.
  * - Desktop (lg+): two columns on the mesh — logo, headline and a few sample
  *   app cards left; the form card right.
@@ -22,7 +22,9 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
   const copyright = `© ${new Date().getFullYear()} Roumdoul · Business OS. ${t("app.auth.panel.rights")}`;
 
   return (
-    <div className="mesh-coffee min-h-dvh text-ink" style={BRAND_THEME}>
+    // relative isolate overflow-hidden: KbachPattern sits behind the content (-z-10) but on top of the mesh.
+    <div className="mesh-coffee relative isolate min-h-dvh overflow-hidden text-ink" style={BRAND_THEME}>
+      <KbachPattern />
       <div className="mx-auto grid min-h-dvh w-full max-w-6xl grid-cols-1 gap-6 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-16 lg:py-10">
         {/* Left on desktop, the top band on phones. */}
         <aside className="flex flex-col lg:justify-between lg:py-4">

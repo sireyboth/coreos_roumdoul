@@ -163,6 +163,8 @@
     "You're too far from :name to :verb (:distance m away).": "លោកអ្នកនៅឆ្ងាយពេកពី :name ដើម្បី:verb (ចម្ងាយ :distance ម៉ែត្រ)។",
     "Your account isn't linked to an employee record yet.": "គណនីរបស់លោកអ្នកមិនទាន់ភ្ជាប់ជាមួយព័ត៌មានបុគ្គលិកនៅឡើយទេ។",
     "Your attendance is recorded automatically on :schedule, so there's no need to scan.": "វត្តមានរបស់លោកអ្នកត្រូវបានកត់ត្រាដោយស្វ័យប្រវត្តិតាម :schedule ដូច្នេះមិនចាំបាច់ស្កេនទេ។",
+    "You can only open your own ID card.": "លោកអ្នកអាចបើកបានតែកាតសម្គាល់ខ្លួនរបស់លោកអ្នកប៉ុណ្ណោះ។",
+    "Your account is not linked to an employee record, so it has no profile photo.": "គណនីរបស់លោកអ្នកមិនបានភ្ជាប់ទៅនឹងកំណត់ត្រាបុគ្គលិកទេ ដូច្នេះមិនអាចដាក់រូបថតប្រវត្តិរូបបានទេ។",
     "Your employment status is \":status\", so you can't check in. Ask your manager.": "ស្ថានភាពការងាររបស់លោកអ្នកគឺ \":status\" ដូច្នេះលោកអ្នកមិនអាចស្កេនចូលបានទេ។ សូមសួរប្រធានរបស់លោកអ្នក។",
     "Your plan doesn't include the \":module\" module.": "គម្រោងរបស់លោកអ្នកមិនរួមបញ្ចូលម៉ូឌុល \":module\" ទេ។",
     "Your plan's branch limit has been reached. Upgrade your plan to add more.": "គម្រោងរបស់លោកអ្នកបានដល់ចំនួនសាខាអតិបរមាហើយ។ សូមដំឡើងគម្រោង ដើម្បីបន្ថែមទៀត។",

@@ -72,4 +72,5 @@ Route::middleware(['module:birthdays', 'company_permission:employees.view'])->gr
 
 Route::middleware(['module:id_cards', 'company_permission:employees.view'])->group(function () {
     Route::get('/employees/{employee}/card', [EmployeeCardController::class, 'show']);
+    Route::get('/employees/{employee}/card/preview', [EmployeeCardController::class, 'preview']);
 });

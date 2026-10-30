@@ -227,6 +227,21 @@ export type ProbationSettings = {
   probation_reminder_days: number | null;
 };
 
+/** An employee's ID card (PDF or HTML) — errors still come back as JSON. */
+async function fetchCard(path: string, accept: string): Promise<Response> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: { Accept: accept, "Accept-Language": currentLang(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body.message ?? `Couldn't generate the card (${res.status})`, body.errors, body.code);
+  }
+
+  return res;
+}
+
 export const organizationApi = {
   branches: {
     list: () => request<Paginated<Branch>>("/api/branches"),
@@ -269,21 +284,11 @@ export const organizationApi = {
       request<{ deleted: number }>("/api/employees/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
     createLogin: (id: number, data: LoginSetup) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
-    // A PDF, not JSON, so it can't go through request() — same reasoning as
-    // attendance.export below.
-    card: async (id: number): Promise<Blob> => {
-      const token = getToken();
-      const res = await fetch(`${API_URL}/api/employees/${id}/card`, {
-        headers: { Accept: "application/pdf", "Accept-Language": currentLang(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new ApiError(res.status, body.message ?? `Couldn't generate the card (${res.status})`, body.errors, body.code);
-      }
-
-      return res.blob();
-    },
+    // A PDF (to print), not JSON, so it can't go through request() — same
+    // reasoning as attendance.export below.
+    card: async (id: number): Promise<Blob> => (await fetchCard(`/api/employees/${id}/card`, "application/pdf")).blob(),
+    // The same card as an HTML page, to show on screen (see IdCardView).
+    cardPreview: async (id: number): Promise<string> => (await fetchCard(`/api/employees/${id}/card/preview`, "text/html")).text(),
   },
   workLocations: {
     list: () => request<Paginated<WorkLocation>>("/api/work_locations"),

@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/layout/nav";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useMe } from "@/contexts/me-context";
 import { pageLabel, useLang, useT } from "@/lib/i18n";
@@ -191,9 +192,13 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             pathname === "/dashboard/profile" && "bg-sidebar-accent",
           )}
         >
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white">
-            {initials || <CircleUserRound className="size-4" />}
-          </div>
+          {me?.employee?.photo_url ? (
+            <EmployeeAvatar name={me.user.name} photoUrl={me.employee.photo_url} className="size-8" />
+          ) : (
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white">
+              {initials || <CircleUserRound className="size-4" />}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{me?.user.name}</p>
             <p className="truncate text-[11px] capitalize text-sidebar-foreground/50">

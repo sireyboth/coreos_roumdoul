@@ -7,55 +7,86 @@ import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { CardPreviewDialog } from "@/components/dashboard/employees/card-preview-dialog";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { IdCardView } from "@/components/dashboard/employees/id-card-view";
 import { PageHeader } from "@/components/dashboard/layout/page-header";
+import { surfaceCard } from "@/components/dashboard/shared/kbach";
 import { useMe } from "@/contexts/me-context";
 import { api, Employee } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/export/download";
 import { useT } from "@/lib/i18n";
 import { notifyError } from "@/lib/notify";
+import { cn } from "@/lib/utils";
 
 /**
- * Browse employees and view/print a badge for any of them — the same PDF the
- * employee's own page generates (GET /api/employees/{id}/card), just listed
- * here for whoever wants several without opening each employee individually.
+ * ID cards. People who manage employees browse everyone and view or print
+ * any badge (the same PDF the employee's own page generates). Everyone else
+ * just sees their own card here — no list, no printing (the API refuses
+ * anyone else's card anyway).
  */
 export default function IdCardsPage() {
   const { me } = useMe();
   const t = useT();
   const canView = me?.permissions.includes("employees.view") ?? false;
+  const canManage = me?.permissions.includes("employees.manage") ?? false;
 
+  if (!canView) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <Alert variant="destructive">{t("employees.shared.noPermission")}</Alert>
+      </div>
+    );
+  }
+
+  return canManage ? <AllCards /> : <OwnCard employeeId={me?.employee?.id ?? null} />;
+}
+
+/** Staff: their own card, shown as the card itself. */
+function OwnCard({ employeeId }: { employeeId: number | null }) {
+  const t = useT();
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <PageHeader title={t("employees.idCards.ownTitle")} description={t("employees.idCards.ownDescription")} />
+        {employeeId ? (
+          <section className={cn(surfaceCard, "p-4 sm:p-6")}>
+            <IdCardView employeeId={employeeId} />
+          </section>
+        ) : (
+          <Alert>{t("employees.idCards.noRecord")}</Alert>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** HR / managers: every employee, with View (preview) and Print (PDF). */
+function AllCards() {
+  const t = useT();
   const [employees, setEmployees] = useState<Employee[] | null>(null);
-  // Tracks which row + action is currently generating, so only that one
-  // button shows "Preparing…" instead of freezing the whole table.
-  const [busy, setBusy] = useState<{ id: number; action: "view" | "download" } | null>(null);
-  // The employee whose card is open in the preview modal — kept alongside
-  // the blob so the modal's own Download button knows the right filename.
-  const [preview, setPreview] = useState<{ employee: Employee; blob: Blob } | null>(null);
+  // Which row is generating its PDF, so only that Print button shows "Preparing…".
+  const [printing, setPrinting] = useState<number | null>(null);
+  // The employee whose card is open in the preview modal.
+  const [preview, setPreview] = useState<Employee | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
-    if (!canView) return;
     api.employees
       .list()
       .then((res) => setEmployees(res.data))
       .catch(() => setEmployees([]));
-  }, [canView]);
+  }, []);
 
-  async function handleCard(employee: Employee, action: "view" | "download") {
-    setBusy({ id: employee.id, action });
+  async function handlePrint(employee: Employee) {
+    setPrinting(employee.id);
     try {
       const blob = await withBusy(() => api.employees.card(employee.id));
-      if (action === "view") {
-        setPreview({ employee, blob });
-        setPreviewOpen(true);
-      } else {
-        saveBlob(blob, `employee-card-${employee.employee_code ?? employee.id}.pdf`);
-      }
+      saveBlob(blob, `employee-card-${employee.employee_code ?? employee.id}.pdf`);
     } catch (err) {
       notifyError(err);
     } finally {
-      setBusy(null);
+      setPrinting(null);
     }
   }
 
@@ -90,14 +121,6 @@ export default function IdCardsPage() {
     },
   ];
 
-  if (!canView) {
-    return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <Alert variant="destructive">{t("employees.shared.noPermission")}</Alert>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="flex w-full flex-col gap-6">
@@ -121,32 +144,24 @@ export default function IdCardsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleCard(employee, "view")}
-                  disabled={busy?.id === employee.id}
+                  onClick={() => {
+                    setPreview(employee);
+                    setPreviewOpen(true);
+                  }}
                 >
                   <Eye className="size-3.5" />
-                  {busy?.id === employee.id && busy.action === "view" ? t("employees.shared.preparing") : t("common.action.view")}
+                  {t("common.action.view")}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleCard(employee, "download")}
-                  disabled={busy?.id === employee.id}
-                >
+                <Button variant="outline" size="sm" onClick={() => handlePrint(employee)} disabled={printing === employee.id}>
                   <IdCard className="size-3.5" />
-                  {busy?.id === employee.id && busy.action === "download" ? t("employees.shared.preparing") : t("common.action.print")}
+                  {printing === employee.id ? t("employees.shared.preparing") : t("common.action.print")}
                 </Button>
               </>
             )}
           />
         )}
       </div>
-      <CardPreviewDialog
-        blob={preview?.blob ?? null}
-        filename={`employee-card-${preview?.employee.employee_code ?? preview?.employee.id}.pdf`}
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-      />
+      <CardPreviewDialog employee={preview} canDownload open={previewOpen} onOpenChange={setPreviewOpen} />
     </div>
   );
 }

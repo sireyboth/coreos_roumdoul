@@ -16,8 +16,34 @@ use Illuminate\Support\Facades\Storage;
  */
 class EmployeeCardController extends Controller
 {
+    /** The printable PDF. */
     public function show(Request $request, Employee $employee)
     {
+        return Pdf::loadView('pdf.employee-card', $this->cardData($request, $employee))
+            ->stream("employee-card-{$employee->employee_code}.pdf");
+    }
+
+    /**
+     * The same card as an HTML page, for showing in the app (front and back
+     * side by side, images inlined) — no PDF viewer around it.
+     */
+    public function preview(Request $request, Employee $employee)
+    {
+        return response()->view('pdf.employee-card', $this->cardData($request, $employee) + ['forScreen' => true])
+            ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    /** @return array<string, mixed> */
+    private function cardData(Request $request, Employee $employee): array
+    {
+        // Staff can see colleagues (employees.view) but may only open their own
+        // badge; opening anyone's is for people who manage employees.
+        abort_unless(
+            $request->user()->hasCompanyPermission('employees.manage') || $employee->is($request->user()->employee),
+            403,
+            __('You can only open your own ID card.'),
+        );
+
         $employee->loadMissing(['department', 'branch']);
         $company = $request->user()->company;
 
@@ -35,7 +61,7 @@ class EmployeeCardController extends Controller
         // (WorkLocation::qr_token) which identifies a *place* and is scanned by
         // an already-authenticated employee at check-in. Different purpose,
         // deliberately not the same mechanism.
-        $pdf = Pdf::loadView('pdf.employee-card', [
+        return [
             'employee' => $employee,
             'company' => $company,
             'photoData' => $photoData,
@@ -44,9 +70,7 @@ class EmployeeCardController extends Controller
             // company has no dedicated website field, but this is real,
             // useful data: the same link admins already share for sign-in.
             'signInLink' => config('frontend.url')."/c/{$company->slug}/login",
-        ]);
-
-        return $pdf->stream("employee-card-{$employee->employee_code}.pdf");
+        ];
     }
 
     /**
