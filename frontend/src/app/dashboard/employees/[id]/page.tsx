@@ -27,6 +27,7 @@ import {
 } from "@/components/dashboard/employees/employee-form";
 import { PhotoPicker } from "@/components/dashboard/employees/photo-picker";
 import { ProbationCard } from "@/components/dashboard/employees/probation-card";
+import { ResetPasswordPanel } from "@/components/dashboard/employees/reset-password-panel";
 import { EmployeeScheduleAssignments } from "@/components/dashboard/schedules/employee-schedule-assignments";
 import { EmployeePayPanel } from "@/components/dashboard/payroll/employee-pay-panel";
 import { RosterView } from "@/components/dashboard/schedules/roster-view";
@@ -38,7 +39,7 @@ import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
-type Tab = "profile" | "schedule" | "pay";
+type Tab = "profile" | "schedule" | "pay" | "password";
 
 function dateLabel(value: string | null | undefined, lang: Lang): string {
   if (!value) return "—";
@@ -87,7 +88,7 @@ export default function EmployeePage() {
   // Who can be picked as line manager; null until loaded (the picker waits for it).
   const [managers, setManagers] = useState<{ id: number; name: string }[] | null>(null);
   const [tab, setTab] = useState<Tab>(() =>
-    typeof window !== "undefined" ? ((["schedule", "pay"] as const).find((t) => t === new URLSearchParams(window.location.search).get("tab")) ?? "profile") : "profile",
+    typeof window !== "undefined" ? ((["schedule", "pay", "password"] as const).find((t) => t === new URLSearchParams(window.location.search).get("tab")) ?? "profile") : "profile",
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -252,14 +253,17 @@ export default function EmployeePage() {
   const idIsSignIn = employee.login?.method === "employee_id";
   // has_login without details means an older response — assume the safe case (email).
   const emailIsSignIn = employee.has_login && !idIsSignIn;
-
+  // Only for someone with a login, and never your own — that's changed from Profile.
+  const canResetPassword = canManage && employee.has_login && me?.employee?.id !== employee.id;
 
   const tabs = [
     { id: "profile" as const, label: t("employees.profilePage.tabProfile"), icon: User, visible: true },
     { id: "schedule" as const, label: t("employees.profilePage.tabSchedule"), icon: CalendarRange, visible: canRoster },
     { id: "pay" as const, label: t("employees.profilePage.tabPay"), icon: Wallet, visible: canPay },
+    { id: "password" as const, label: t("employees.profilePage.tabPassword"), icon: KeyRound, visible: canResetPassword },
   ].filter((tab) => tab.visible);
-  const activeTab: Tab = tab === "schedule" && canRoster ? "schedule" : tab === "pay" && canPay ? "pay" : "profile";
+  const activeTab: Tab =
+    tab === "schedule" && canRoster ? "schedule" : tab === "pay" && canPay ? "pay" : tab === "password" && canResetPassword ? "password" : "profile";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -484,6 +488,8 @@ export default function EmployeePage() {
             )}
 
             {activeTab === "pay" && <EmployeePayPanel employeeId={employee.id} canEdit={salaryAccess === "edit"} />}
+
+            {activeTab === "password" && <ResetPasswordPanel employee={employee} />}
 
             {activeTab === "schedule" && (
               <div className="flex flex-col gap-6">

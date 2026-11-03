@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\EmployeeAssignment;
 use App\Models\PayGroup;
 use App\Models\Team;
+use App\Models\User;
 use App\Services\Company\CompanyUserService;
 use App\Services\Employees\EmployeeAssignmentService;
 use App\Services\Employees\EmployeeRemover;
@@ -371,6 +372,29 @@ class EmployeeController extends Controller
         });
 
         return $this->withLoginInfo($request, $this->reveal($request, $employee->fresh(['branch', 'department', 'team', 'manager'])));
+    }
+
+    /**
+     * Sets a new password for an employee who forgot theirs. Rules (not yourself,
+     * admins only by admins) live in CompanyUserService::resetPassword.
+     */
+    public function resetPassword(Request $request, Employee $employee)
+    {
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $employee->user_id !== null ? User::query()->find($employee->user_id) : null;
+
+        if ($user === null) {
+            throw ValidationException::withMessages([
+                'employee' => [__('This employee has no login yet.')],
+            ]);
+        }
+
+        app(CompanyUserService::class)->resetPassword($request->user(), $user, $data['password']);
+
+        return response()->json(['message' => __('Password updated.')]);
     }
 
     /**

@@ -20,7 +20,7 @@ Your profile is opened from your avatar or name card. "Sign out" is the icon nex
 
 **Signing up**: on "Create your company" enter Company name, Your name, Email and Password (at least 8 characters). This starts a free 14-day trial and makes you the company-admin. A banner warns when the trial is ending; contact support to switch to a paid plan.
 
-**Signing in**: the "Sign in" page has two tabs. "Email" uses email and password. "Employee ID" uses the "Company code" (your manager can tell you this), your "Employee ID" and password. Employee IDs and company codes ignore upper/lower case. A company sign-in link (with "Copy link" on the employee's page) fills in the company code for you. There is no "Forgot password" option: ask your admin if you are locked out. After too many failed attempts, wait a minute.
+**Signing in**: the "Sign in" page has two tabs. "Email" uses email and password. "Employee ID" uses the "Company code" (your manager can tell you this), your "Employee ID" and password. Employee IDs and company codes ignore upper/lower case. A company sign-in link (with "Copy link" on the employee's page) fills in the company code for you. There is no "Forgot password" option: ask your admin to reset it (Employees → the employee's page → "Password" tab). After too many failed attempts, wait a minute.
 
 **Phone app**: on a phone, use your browser's "Add to Home Screen" on your company link or on instant-scan mode. The icon opens straight to the scanner.
 
@@ -60,7 +60,7 @@ Organization → "Employees". Viewing needs employee view rights; adding and edi
 
 **Add an employee**: "Add employee" (you need at least one branch first). Only name and "Branch" are required. Other fields: Name in Khmer, "Employee code", phone, email, department, team, "Job title", "Line manager" (approves this person's requests first), "Employment type", "Hire date", "Status", personal details, identity documents, "Payroll & compliance" (NSSF number, Tax ID, Bank, Bank account number) and, with salary rights, "Base salary (per month)" and currency. Personal details are only visible to people who can manage employees.
 
-To give them a login at the same time, fill in the "Sign-in" card: choose "Email" or "Employee ID" and a "Temporary password". Leave the password empty to add them without a login. Later, use "Create login" on their page or in the list.
+To give them a login at the same time, fill in the "Sign-in" card: choose "Email" or "Employee ID" and a "Temporary password". Leave the password empty to add them without a login. Later, use "Create login" on their page or in the list. If an employee forgets their password, open their page → "Password" tab → enter and confirm a new one (at least 8 characters) → "Reset password". They are signed out on every device and sign in again with the new password. Needs permission to manage employees. It's not shown on your own page (use "Profile" instead), and only a company-admin can reset a company-admin's password.
 
 **Photo**: "Upload photo", then drag and "Zoom" to crop. JPG, PNG or WebP, up to 8 MB.
 

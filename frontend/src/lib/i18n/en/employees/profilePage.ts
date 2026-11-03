@@ -33,6 +33,7 @@ export const profilePage = {
   tabProfile: "Profile",
   tabSchedule: "Schedule",
   tabPay: "Pay",
+  tabPassword: "Password",
 
   // ── Edit form ────────────────────────────────────────────────────
   emailIsSignIn: "This is their sign-in email — change it from Users.",
@@ -47,4 +48,17 @@ export const profilePage = {
 
   // ── Schedule tab ─────────────────────────────────────────────────
   oneOffChanges: "One-off changes",
+
+  // ── Password tab ─────────────────────────────────────────────────
+  passwordTitle: "Reset password",
+  passwordHint: "Set a new password for {name} if they forgot theirs.",
+  passwordSignOut: "{name} will be signed out on every device and must sign in again with the new password.",
+  passwordMin: "At least 8 characters.",
+  passwordMismatch: "The two passwords don't match.",
+  passwordShow: "Show password",
+  passwordHide: "Hide password",
+  passwordSave: "Reset password",
+  passwordSaving: "Resetting…",
+  passwordDone: "Password reset",
+  passwordDoneHint: "Give {name} the new password in person or by phone — never in a group chat.",
 };
