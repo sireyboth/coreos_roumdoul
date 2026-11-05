@@ -12,4 +12,12 @@ export const celebration = {
   // ── Button ───────────────────────────────────────────────────────
   thanks: "Thank you",
   gotIt: "Got it",
+
+  // ── Envelope (shown first; opening it starts the song) ──────────
+  envelopeSelf: "A card just for you",
+  envelopeOther: "It's {name}'s birthday!",
+  envelopeHint: "Turn your sound on, then open the card.",
+  openCard: "Open the card",
+  soundOff: "Stop the song",
+  soundOn: "Play the song",
 };

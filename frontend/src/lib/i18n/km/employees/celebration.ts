@@ -14,4 +14,12 @@ export const celebration: Dictionary["employees"]["celebration"] = {
   // ── Button ───────────────────────────────────────────────────────
   thanks: "សូមអរគុណ",
   gotIt: "យល់ព្រម",
+
+  // ── Envelope (shown first; opening it starts the song) ──────────
+  envelopeSelf: "កាតមួយសម្រាប់អ្នក",
+  envelopeOther: "ថ្ងៃនេះជាខួបកំណើតរបស់ {name}!",
+  envelopeHint: "សូមបើកសំឡេង រួចបើកកាត។",
+  openCard: "បើកកាត",
+  soundOff: "បិទបទចម្រៀង",
+  soundOn: "ចាក់បទចម្រៀង",
 };

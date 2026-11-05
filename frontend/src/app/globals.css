@@ -321,6 +321,28 @@
   }
 }
 
+/* Birthday envelope: a gentle wiggle while it waits to be opened. Uses `rotate`,
+   not `transform`, so it never fights the flap/letter transforms inside. */
+@keyframes envelope-wiggle {
+  0%,
+  70%,
+  100% {
+    rotate: 0deg;
+  }
+  76% {
+    rotate: -3deg;
+  }
+  82% {
+    rotate: 3deg;
+  }
+  88% {
+    rotate: -2deg;
+  }
+  94% {
+    rotate: 1deg;
+  }
+}
+
 /* Re-order mode (components/ui/sortable-grid-dnd.tsx): while one item is held,
    the others jiggle like a phone home screen. Uses `rotate`, not `transform`,
    so it never fights the transform dnd-kit uses to slide items around. */
