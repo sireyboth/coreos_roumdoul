@@ -18,8 +18,11 @@ class LeaveType extends Model
 
     public const ACCRUALS = ['none', 'monthly', 'yearly'];
 
+    /** Colours a type can take in the attendance report; none of them is a day status's colour. */
+    public const COLORS = ['violet', 'fuchsia', 'pink', 'indigo', 'cyan', 'teal', 'lime', 'slate'];
+
     protected $fillable = [
-        'company_id', 'code', 'name', 'name_km', 'pay_percent', 'counts', 'accrual', 'yearly_days',
+        'company_id', 'code', 'report_code', 'color', 'text_color', 'bold', 'name', 'name_km', 'pay_percent', 'counts', 'accrual', 'yearly_days',
         'seniority_every_years', 'seniority_extra_days', 'eligible_after_months', 'allowed_during_probation', 'requires_balance',
         'allow_half_day', 'attachment_from_days', 'min_notice_days', 'max_days_per_request', 'gender',
         'is_active', 'sort_order',
@@ -30,6 +33,7 @@ class LeaveType extends Model
     protected function casts(): array
     {
         return [
+            'bold' => 'boolean',
             'pay_percent' => 'integer',
             'yearly_days' => 'float',
             'seniority_every_years' => 'integer',

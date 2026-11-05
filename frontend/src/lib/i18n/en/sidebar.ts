@@ -20,6 +20,7 @@ export const sidebar = {
     "/dashboard/work-schedules": "Work Schedules",
     "/dashboard/holidays": "Holidays",
     "/dashboard/leave-policy": "Leave Policy",
+    "/dashboard/attendance/status-codes": "Status Codes",
     "/dashboard/payroll": "Pay Runs",
     "/dashboard/payroll/adjustments": "Adjustments",
     "/dashboard/payroll/settings": "Payroll Settings",

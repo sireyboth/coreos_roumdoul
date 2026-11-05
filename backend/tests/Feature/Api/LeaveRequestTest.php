@@ -287,6 +287,28 @@ class LeaveRequestTest extends TestCase
         $this->assertEquals(18, $this->balance($this->staff, 'annual')['earned']);
     }
 
+    public function test_each_leave_type_has_its_own_report_code_and_colour(): void
+    {
+        // Every company starts with the usual codes.
+        $this->assertSame(['AL', 'violet'], [$this->type('annual')->report_code, $this->type('annual')->color]);
+        $sick = $this->type('sick');
+
+        // Typed in any case, kept upper case; Khmer letters work too.
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['report_code' => 'sk', 'color' => 'teal'])
+            ->assertOk()->assertJsonPath('report_code', 'SK')->assertJsonPath('color', 'teal');
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['report_code' => 'ឈឺ'])->assertOk()->assertJsonPath('report_code', 'ឈឺ');
+
+        // Never a day status's code, never another type's, never a made-up colour.
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['report_code' => 'm'])->assertJsonValidationErrors('report_code');
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['report_code' => 'AL'])->assertJsonValidationErrors('report_code');
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['report_code' => 'TOOLONG'])->assertJsonValidationErrors('report_code');
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['color' => 'red'])->assertJsonValidationErrors('color');
+
+        // Changing another setting keeps the code and colour.
+        $this->as($this->admin)->putJson("/api/leave-types/{$sick->id}", ['yearly_days' => 5])
+            ->assertOk()->assertJsonPath('report_code', 'ឈឺ')->assertJsonPath('color', 'teal');
+    }
+
     public function test_hr_adjusts_a_balance_with_a_reason_and_staff_cannot(): void
     {
         $payload = ['employee_id' => $this->dara->id, 'leave_type_id' => $this->type('annual')->id, 'year' => 2026, 'days' => 3, 'reason' => 'Carried over from 2025'];

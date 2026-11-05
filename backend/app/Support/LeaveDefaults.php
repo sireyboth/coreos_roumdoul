@@ -43,29 +43,29 @@ final class LeaveDefaults
 
         return array_map(fn (array $type) => [...$base, ...$type], [
             [
-                'code' => 'annual', 'name' => 'Annual leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកប្រចាំឆ្នាំ', 'sort_order' => 1,
+                'code' => 'annual', 'report_code' => 'AL', 'color' => 'violet', 'name' => 'Annual leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកប្រចាំឆ្នាំ', 'sort_order' => 1,
                 'accrual' => 'monthly', 'yearly_days' => 18, 'seniority_every_years' => 3, 'seniority_extra_days' => 1,
                 'eligible_after_months' => 12, 'requires_balance' => true,
             ],
             [
-                'code' => 'sick', 'name' => 'Sick leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកព្យាបាលជំងឺ', 'sort_order' => 2,
+                'code' => 'sick', 'report_code' => 'SL', 'color' => 'pink', 'name' => 'Sick leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកព្យាបាលជំងឺ', 'sort_order' => 2,
                 // A medical certificate from the first day.
                 'attachment_from_days' => 1,
             ],
             [
-                'code' => 'special', 'name' => 'Special leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកពិសេស', 'sort_order' => 3,
+                'code' => 'special', 'report_code' => 'SP', 'color' => 'indigo', 'name' => 'Special leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកពិសេស', 'sort_order' => 3,
                 'accrual' => 'yearly', 'yearly_days' => 7, 'requires_balance' => true,
             ],
             [
-                'code' => 'maternity', 'name' => 'Maternity leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកលំហែមាតុភាព', 'sort_order' => 4,
+                'code' => 'maternity', 'report_code' => 'ML', 'color' => 'fuchsia', 'name' => 'Maternity leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកលំហែមាតុភាព', 'sort_order' => 4,
                 'pay_percent' => 50, 'counts' => 'calendar_days', 'max_days_per_request' => 90, 'gender' => 'female', 'allow_half_day' => false,
             ],
             [
-                'code' => 'paternity', 'name' => 'Paternity leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកលំហែបិតុភាព', 'sort_order' => 5,
+                'code' => 'paternity', 'report_code' => 'PL', 'color' => 'cyan', 'name' => 'Paternity leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកលំហែបិតុភាព', 'sort_order' => 5,
                 'gender' => 'male',
             ],
             [
-                'code' => 'unpaid', 'name' => 'Unpaid leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកគ្មានប្រាក់ឈ្នួល', 'sort_order' => 6,
+                'code' => 'unpaid', 'report_code' => 'UL', 'color' => 'slate', 'name' => 'Unpaid leave', 'name_km' => 'ច្បាប់ឈប់សម្រាកគ្មានប្រាក់ឈ្នួល', 'sort_order' => 6,
                 'pay_percent' => 0,
             ],
         ]);

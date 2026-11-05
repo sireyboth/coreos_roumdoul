@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business OS v1.2.0</title>
+<meta name="description" content="What's new in Business OS version 1.2.0: status codes, My Pay, password reset by admins, and more.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f6fb;
+    --card: #ffffff;
+    --text: #18181f;
+    --muted: #5f6070;
+    --border: #e4e4ee;
+    --brand: #4f46e5;
+    --brand-soft: #eeedfd;
+    --ok: #0f8a5f;
+    --ok-soft: #e6f6ef;
+    --warn: #b45309;
+    --warn-soft: #fdf3e5;
+    --shadow: 0 1px 2px rgb(20 20 40 / 0.04), 0 8px 24px rgb(20 20 40 / 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101016; --card: #191922; --text: #ececf3; --muted: #a2a3b3; --border: #2b2b38;
+      --brand: #8b84ff; --brand-soft: #24224a; --ok: #4cc999; --ok-soft: #133327; --warn: #f0a54a; --warn-soft: #3a2a14;
+      --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101016; --card: #191922; --text: #ececf3; --muted: #a2a3b3; --border: #2b2b38;
+    --brand: #8b84ff; --brand-soft: #24224a; --ok: #4cc999; --ok-soft: #133327; --warn: #f0a54a; --warn-soft: #3a2a14;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.3);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+  header { padding: 56px 0 32px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 999px;
+    background: var(--brand-soft); color: var(--brand); font-size: 13px; font-weight: 600;
+  }
+  h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.15; margin: 16px 0 8px; letter-spacing: -0.02em; }
+  .lede { color: var(--muted); font-size: 18px; margin: 0; max-width: 680px; }
+  .meta { color: var(--muted); font-size: 14px; margin-top: 16px; }
+
+  nav.toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px;
+    box-shadow: var(--shadow); margin-bottom: 40px;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { break-inside: avoid; padding: 2px 0; }
+  nav.toc a { color: var(--text); text-decoration: none; font-weight: 500; }
+  nav.toc a:hover { color: var(--brand); }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
+
+  section.feature { margin-bottom: 56px; scroll-margin-top: 24px; }
+  .feature-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .num {
+    flex: none; width: 32px; height: 32px; border-radius: 9px; background: var(--brand); color: #fff;
+    display: inline-grid; place-items: center; font-weight: 700; font-size: 15px; transform: translateY(4px);
+  }
+  h2.title { font-size: 26px; margin: 0; letter-spacing: -0.01em; }
+  .who { font-size: 13px; font-weight: 600; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+  section.feature > p { color: var(--muted); max-width: 760px; }
+
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  ol.steps, ul.points { margin: 0; padding-left: 22px; }
+  ol.steps li, ul.points li { margin: 4px 0; }
+  .ui { font-weight: 600; color: var(--text); background: var(--brand-soft); padding: 1px 7px; border-radius: 6px; font-size: 0.94em; white-space: nowrap; }
+
+  figure {
+    margin: 20px 0 8px; background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 12px 16px; font-size: 14px; color: var(--muted); border-top: 1px solid var(--border); }
+
+  .note {
+    display: flex; gap: 12px; padding: 14px 16px; border-radius: 12px; margin: 16px 0; font-size: 15px;
+    background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
+  }
+  .note.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .note strong { color: var(--ok); }
+  .note.warn strong { color: var(--warn); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .table-scroll { overflow-x: auto; }
+
+  footer { border-top: 1px solid var(--border); padding: 24px 0 48px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="tag">Release notes · v1.2.0</span>
+    <h1>What's new in Business OS 1.2.0</h1>
+    <p class="lede">One place to set how every attendance status looks, a personal pay page for every staff member, and a way for admins to reset a forgotten password.</p>
+    <p class="meta">Released November 2026 · Screenshots from the demo company "Sovanna Trading Co., Ltd."</p>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>In this release</h2>
+    <ol>
+      <li><a href="#status-codes">Status codes in one place</a></li>
+      <li><a href="#leave-codes">Leave codes and colours</a></li>
+      <li><a href="#my-pay">My Pay for every staff member</a></li>
+      <li><a href="#reset-password">Admins can reset a password</a></li>
+      <li><a href="#excel">Leave columns in the Excel export</a></li>
+      <li><a href="#smaller">Smaller improvements</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1 -->
+  <section class="feature" id="status-codes">
+    <div class="feature-head">
+      <span class="num">1</span>
+      <h2 class="title">Status codes in one place</h2>
+      <span class="who">Admins · HR</span>
+    </div>
+    <p>Every day status — present, late, left early, missed a scan, absent, holiday, day off and each leave type — now has a short code and a colour that you choose once. The attendance report, the calendar, the attendance list, the Excel file and the PDF all follow it automatically.</p>
+
+    <h3>How to use it</h3>
+    <ol class="steps">
+      <li>Open <span class="ui">Attendance</span> → <span class="ui">Status Codes</span> in the sidebar.</li>
+      <li>For each status, type a code (up to 3 letters or numbers — Khmer works too) and pick a colour.</li>
+      <li>Optionally choose a text colour and whether the code is <strong>bold</strong>. The chip on the right shows the result.</li>
+      <li>Check the <span class="ui">Preview</span> row at the top, then press <span class="ui">Save</span>. <span class="ui">Reset to default</span> brings back the original look.</li>
+    </ol>
+
+    <figure>
+      <img src="screenshots/01-status-codes.png" alt="The Status codes page: a preview row of coloured codes, and a list of day statuses each with a code box, colour swatches, a text-colour menu and a bold checkbox." loading="lazy">
+      <figcaption>Attendance → Status Codes. Each row sets one status; the preview at the top shows all of them together.</figcaption>
+    </figure>
+
+    <div class="note"><span>ℹ️</span><div><strong>Only the look changes.</strong> A day is still late or absent because of its scans and work schedule. Totals and payroll are not affected.</div></div>
+
+    <h3>Where you see it</h3>
+    <p>The monthly attendance report uses the same codes and colours, with a legend above the grid and a <span class="ui">Customize codes</span> link that opens the page above.</p>
+    <figure>
+      <img src="screenshots/02-attendance-report.png" alt="The attendance report for October 2026: a legend of status codes and a grid of employees by day, each cell showing a coloured code such as P, L, OFF, H or AL." loading="lazy">
+      <figcaption>Attendance → Report. Each cell shows the day's code in the colour set on the Status Codes page.</figcaption>
+    </figure>
+    <figure>
+      <img src="screenshots/04-calendar.png" alt="The team calendar for October 2026, with each employee's days coloured by status and a small dot for attendance." loading="lazy">
+      <figcaption>Calendar → Team. Days use the same colours, so the calendar and the report always match.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 2 -->
+  <section class="feature" id="leave-codes">
+    <div class="feature-head">
+      <span class="num">2</span>
+      <h2 class="title">Leave codes and colours</h2>
+      <span class="who">Admins · HR</span>
+    </div>
+    <p>Each leave type now has its own code — for example <strong>AL</strong> for annual leave, <strong>SL</strong> for sick leave, <strong>UL</strong> for unpaid leave — so a leave day in the report says exactly which leave it was.</p>
+    <ul class="points">
+      <li>Codes and colours are set on the <span class="ui">Status Codes</span> page, under the leave types section.</li>
+      <li>The <span class="ui">Leave Policy</span> page shows each type's code chip next to its name.</li>
+      <li>A leave code can't reuse a day-status code: "M" can't mean both <em>missed a scan</em> and <em>maternity leave</em>.</li>
+    </ul>
+    <figure>
+      <img src="screenshots/03-leave-policy.png" alt="The Leave policy page listing Annual, Sick, Special, Maternity, Paternity and Unpaid leave, each with a coloured code chip, pay percentage and rules." loading="lazy">
+      <figcaption>Leave Policy. Every leave type shows its code chip.</figcaption>
+    </figure>
+  </section>
+
+  <!-- 3 -->
+  <section class="feature" id="my-pay">
+    <div class="feature-head">
+      <span class="num">3</span>
+      <h2 class="title">My Pay for every staff member</h2>
+      <span class="who">All staff</span>
+    </div>
+    <p>Staff can now see their own salary and payslips without asking HR. It appears on their <span class="ui">Profile</span> page when the Payroll module is turned on.</p>
+
+    <h3>How to use it</h3>
+    <ol class="steps">
+      <li>Open <span class="ui">Profile</span> (click your name at the bottom of the sidebar).</li>
+      <li>Under <span class="ui">My pay</span>, amounts start hidden. Press the eye button to show them.</li>
+      <li>Click a payslip to see every line: earnings, NSSF and tax, and what the company paid on top.</li>
+    </ol>
+
+    <figure>
+      <img src="screenshots/06-my-pay.png" alt="The Profile page of employee Ros Pisey with a My pay card: current salary hidden behind dots with an eye button, and a list of payslips with the October 2026 payslip marked Paid." loading="lazy">
+      <figcaption>Profile → My pay. Salary and amounts stay hidden until the eye button is pressed.</figcaption>
+    </figure>
+    <figure>
+      <img src="screenshots/07-my-payslip.png" alt="A payslip for 1–31 October 2026 showing gross pay $450.00, NSSF and tax $10.06, net pay $439.94, with earnings, deductions and employer contributions listed line by line." loading="lazy">
+      <figcaption>An opened payslip: gross, deductions and net pay, with the calculation shown under each line.</figcaption>
+    </figure>
+
+    <div class="note"><span>🔒</span><div><strong>Private by design.</strong> Everyone sees only their own pay, and only from pay runs that are approved or paid. No permission needs to be given.</div></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="feature" id="reset-password">
+    <div class="feature-head">
+      <span class="num">4</span>
+      <h2 class="title">Admins can reset an employee's password</h2>
+      <span class="who">Admins · HR</span>
+    </div>
+    <p>When an employee forgets their password, an admin can now set a new one from the employee's page. Before this, the only way out was to remove the login and create a new one.</p>
+
+    <h3>How to use it</h3>
+    <ol class="steps">
+      <li>Open <span class="ui">Employees</span> and click the employee.</li>
+      <li>Open the <span class="ui">Password</span> tab.</li>
+      <li>Type the new password (at least 8 characters) and type it again to confirm. The eye button shows what you typed.</li>
+      <li>Press <span class="ui">Reset password</span>, then give the employee the new password in person or by phone.</li>
+    </ol>
+
+    <figure>
+      <img src="screenshots/05-reset-password.png" alt="The Password tab on employee Ros Pisey's page: a warning that they will be signed out on every device, new and confirm password fields, a red 'The two passwords don't match' message, and a disabled Reset password button." loading="lazy">
+      <figcaption>Employees → employee → Password. The two fields must match before the button can be pressed.</figcaption>
+    </figure>
+
+    <div class="note warn"><span>⚠️</span><div><strong>The employee is signed out everywhere.</strong> Their phone and any other device must sign in again with the new password.</div></div>
+
+    <h3>Who can do it</h3>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Situation</th><th>Allowed?</th></tr></thead>
+        <tbody>
+          <tr><td>You have permission to manage employees</td><td>Yes</td></tr>
+          <tr><td>The employee has no login yet</td><td>No — use <span class="ui">Create login</span> first</td></tr>
+          <tr><td>Your own account</td><td>No — change it from <span class="ui">Profile</span> → <span class="ui">Change password</span></td></tr>
+          <tr><td>Resetting a company admin's password</td><td>Only another company admin</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Every reset is recorded in the <span class="ui">Audit log</span> (who did it and when — never the password).</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="feature" id="excel">
+    <div class="feature-head">
+      <span class="num">5</span>
+      <h2 class="title">Leave columns in the Excel export</h2>
+      <span class="who">Admins · HR · Payroll</span>
+    </div>
+    <p>The attendance Excel file now has three extra columns for leave days, so payroll can work straight from the file:</p>
+    <ul class="points">
+      <li><strong>Leave code</strong> — the leave type's code, e.g. AL or SL.</li>
+      <li><strong>Leave colour</strong> — the colour set for that leave.</li>
+      <li><strong>Leave pay %</strong> — how much of the day is paid. Unpaid leave shows <strong>0</strong>.</li>
+    </ul>
+    <p>Cells in the Excel and PDF files use the same colours as the screen.</p>
+  </section>
+
+  <!-- 6 -->
+  <section class="feature" id="smaller">
+    <div class="feature-head">
+      <span class="num">6</span>
+      <h2 class="title">Smaller improvements</h2>
+    </div>
+    <ul class="points">
+      <li><strong>Retry on slow loading.</strong> If a page takes too long to load (for example on a weak connection), a <span class="ui">Try again</span> button appears instead of an endless spinner.</li>
+      <li>The attendance day popup, attendance list and dashboard use the new status chips.</li>
+      <li>All new screens and messages are available in Khmer and English.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Business OS · Roumdoul · Version 1.2.0 · November 2026
+  </footer>
+
+</div>
+</body>
+</html>

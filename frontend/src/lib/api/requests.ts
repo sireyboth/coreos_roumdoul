@@ -2,10 +2,22 @@
 
 import { request } from "./client";
 import type { Paginated } from "./client";
+import type { TextColor } from "./attendance";
+
+// The colours a leave type can take in the attendance report; none is a day status's colour.
+export const LEAVE_COLORS = ["violet", "fuchsia", "pink", "indigo", "cyan", "teal", "lime", "slate"] as const;
+export type LeaveColor = (typeof LEAVE_COLORS)[number];
 
 export type LeaveType = {
   id: number;
+  // The stable key ("annual"); reports and integrations rely on it, so it never changes.
   code: string;
+  // How it shows everywhere ("AL", up to 3 letters): colour, text colour (null = auto) and bold.
+  // Set in Attendance → Status codes with every other status; null code = "LV", null colour = violet.
+  report_code: string | null;
+  color: LeaveColor | null;
+  text_color: Exclude<TextColor, "auto"> | null;
+  bold: boolean;
   name: string;
   name_km: string | null;
   // 0 unpaid, 50 half pay (maternity), 100 full pay.

@@ -80,6 +80,7 @@ export const common: Dictionary["common"] = {
   // ── Messages ──────────────────────────────────────────────────────
   message: {
     loading: "កំពុងផ្ទុក…",
+    takingLong: "ការផ្ទុកនេះយូរជាងធម្មតា។",
     noData: "មិនមានទិន្នន័យ",
     loadFailed: "មិនអាចផ្ទុកទិន្នន័យបានទេ",
     saved: "បានរក្សាទុក",

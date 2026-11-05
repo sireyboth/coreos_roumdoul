@@ -15,7 +15,8 @@ use Illuminate\Support\Collection;
  * birthday, from SEND_FROM_HOUR in the company's timezone:
  *
  *  - the birthday person gets a happy-birthday alert;
- *  - everyone else with a login in the same branch is told it's their day.
+ *  - everyone else with a login in the same branch and company is told it's
+ *    their day, including owner/admin logins whose branch access covers it.
  *
  * Nothing is stored beyond the alerts themselves: the date comes from
  * employees.date_of_birth, and each alert's dedupe key (person + recipient +
@@ -110,8 +111,13 @@ class BirthdayNotifier
     }
 
     /**
-     * Active logins of the other people in $employee's branch. Someone with no
-     * branch has no colleagues to tell.
+     * Everyone else with an active login in $employee's branch (same company only):
+     *
+     *  - staff logins (linked to an employee) whose employee works in that branch;
+     *  - logins with no employee record (owner, admin, HR) whose branch access
+     *    covers that branch. No branch restriction means every branch.
+     *
+     * Someone with no branch has no colleagues to tell.
      *
      * @return Collection<int, User>
      */
@@ -123,14 +129,35 @@ class BirthdayNotifier
             return collect();
         }
 
-        return $this->employees($company)
+        $staff = $this->employees($company)
             ->where('id', '!=', $employee->id)
             ->whereNotNull('user_id')
             ->whereHas('currentAssignment', fn (Builder $q) => $q->withoutGlobalScopes()->where('branch_id', $branchId))
             ->with('user.membership')
             ->get()
             ->map(fn (Employee $colleague) => $this->activeUser($colleague))
-            ->filter()
+            ->filter();
+
+        // Logins tied to any employee in this company are placed by that employee's
+        // branch above, so only logins without one are matched by branch access.
+        $linkedUserIds = Employee::query()->withoutGlobalScopes()
+            ->where('company_id', $company->id)
+            ->whereNotNull('user_id')
+            ->select('user_id');
+
+        $managers = User::query()
+            ->where('is_active', true)
+            ->whereNotIn('id', $linkedUserIds)
+            ->whereHas('membership', fn (Builder $q) => $q
+                ->where('company_id', $company->id)
+                ->where('status', 'active')
+                ->where(fn (Builder $q) => $q
+                    ->whereDoesntHave('branchAccess')
+                    ->orWhereHas('branchAccess', fn (Builder $q) => $q->where('branch_id', $branchId))))
+            ->get();
+
+        return $staff->concat($managers)
+            ->filter(fn (?User $user) => $user && $user->id !== $employee->user_id)
             ->unique('id')
             ->values();
     }

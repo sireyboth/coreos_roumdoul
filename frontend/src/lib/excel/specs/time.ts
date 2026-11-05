@@ -14,6 +14,8 @@ import {
   type WorkSchedule,
   type WorkScheduleInput,
 } from "@/lib/api";
+import type { DayStatus, ReportCodes, StatusLook } from "@/lib/api";
+import { COLOR_FILLS, DEFAULT_REPORT_CODES, leaveLook, lookInk } from "@/lib/attendance/status-codes";
 import { dateOnly } from "@/lib/date";
 import { daysWith, ISSUES, type IssueKind, type PersonInsight } from "@/lib/attendance-insights";
 import { barChartImage, type Bar } from "@/lib/excel/chart-image";
@@ -550,6 +552,8 @@ export type AttendanceReportOptions = {
   charts?: boolean;
   /** Add a "Calendar" sheet: employees down the side, dates across the top. */
   calendar?: boolean;
+  /** The company's status codes (Attendance → Status codes), so the Calendar sheet looks like the screen. */
+  codes?: ReportCodes;
   /** The dates asked for, so a day nobody has a record for still gets a column. */
   range?: { from: string; to: string };
 };
@@ -570,21 +574,27 @@ export async function readAttendanceReport(csv: Blob): Promise<AttendanceReport>
 
 /** The codes a Calendar cell can show — one list for the cells, the totals and the legend. */
 export const CALENDAR_CODES = [
-  { code: "P", total: "Present", legend: "Present, on time", fill: "FFDCFCE7" }, // green-100
-  { code: "L", total: "Late", legend: "Late", fill: "FFFEF3C7" }, // amber-100
-  { code: "E", total: "Left early", legend: "Left early", fill: "FFFEF9C3" }, // yellow-100
-  { code: "LE", total: "Late + early", legend: "Late and left early", fill: "FFFDE68A" }, // amber-200
-  { code: "M", total: "Missed scan", legend: "Missed a scan", fill: "FFFFEDD5" }, // orange-100
-  { code: "A", total: "Absent", legend: "Absent", fill: "FFFEE2E2" }, // red-100
-  { code: "½", total: "Half-day leave", legend: "Half-day leave, worked the other half", fill: "FFF5F3FF" }, // violet-50
-  { code: "LV", total: "Leave", legend: "On leave (full day)", fill: "FFEDE9FE" }, // violet-100
-  { code: "W", total: "Worked off", legend: "Worked on a day off / holiday / leave", fill: "FFDBEAFE" }, // blue-100
-  { code: "H", total: "Holiday", legend: "Holiday", fill: "FFE5E7EB" }, // gray-200
-  { code: "OFF", total: "Off", legend: "Day off / weekly off", fill: "FFF3F4F6" }, // gray-100
+  { code: "P", total: "Present", legend: "Present, on time" },
+  { code: "L", total: "Late", legend: "Late" },
+  { code: "E", total: "Left early", legend: "Left early" },
+  { code: "LE", total: "Late + early", legend: "Late and left early" },
+  { code: "M", total: "Missed scan", legend: "Missed a scan" },
+  { code: "A", total: "Absent", legend: "Absent" },
+  { code: "½", total: "Half-day leave", legend: "Half-day leave, worked the other half" },
+  { code: "LV", total: "Leave", legend: "On leave (full day)" },
+  { code: "W", total: "Worked off", legend: "Worked on a day off / holiday / leave" },
+  { code: "H", total: "Holiday", legend: "Holiday" },
+  { code: "OFF", total: "Off", legend: "Day off / weekly off" },
 ];
 
 // The day totals under the grid; the rest are only counted per employee.
 export const DAILY_TOTALS = ["P", "L", "E", "M", "A"];
+
+/** A leave code that shows in the period, for the legend and the Leave total. */
+export type CalendarLeave = { label: string; name: string; look: StatusLook };
+
+/** A legend entry: what the code means, how it looks, and the CALENDAR_CODES code it counts as. */
+export type CalendarLegendItem = { label: string; legend: string; code: string; look: StatusLook };
 
 /**
  * A report row's status as one Calendar code; null for days not yet due or
@@ -613,8 +623,14 @@ function datesBetween(from: string, to: string): string[] {
   return dates;
 }
 
-/** One date for one person: its code, and the detail behind it (one fact per line). */
-export type CalendarCell = { code: string; note: string };
+/**
+ * One date for one person. `code` is what it counts as (a CALENDAR_CODES code);
+ * `label` is what the cell shows and `look` how — both from Attendance → Status
+ * codes: the company's own code for the status, or for leave its type's
+ * ("AL", "½SL"). `half` = half-day leave; `unpaid` = leave that lowers pay.
+ * `note` = the detail, one fact per line.
+ */
+export type CalendarCell = { code: string; label: string; note: string; look: StatusLook; half: boolean; unpaid: boolean };
 
 export type CalendarPerson = {
   key: string;
@@ -634,14 +650,18 @@ export type AttendanceCalendar = {
   daily: Record<string, number[]>;
   /** Per code, across everyone and every date. */
   totals: Record<string, number>;
+  /** The full-day leave codes in the period, in the order first met; each counts as "Leave". */
+  leave: CalendarLeave[];
+  /** The status codes it was drawn with, for the legend and the workbook's formulas. */
+  codes: ReportCodes;
 };
 
 /**
- * The report as a grid: a person per row, a date per column. The Report tab
- * and the Calendar sheet are both drawn from this, so the screen and the
- * workbook always agree.
+ * The report as a grid: a person per row, a date per column. The Report tab,
+ * the Calendar sheet and the PDF are all drawn from this, with the company's
+ * status codes, so the screen and the files always agree.
  */
-export function buildAttendanceCalendar(report: AttendanceReport, range: { from: string; to: string }): AttendanceCalendar {
+export function buildAttendanceCalendar(report: AttendanceReport, range: { from: string; to: string }, codes: ReportCodes = DEFAULT_REPORT_CODES): AttendanceCalendar {
   const { header, rows } = report;
   const at = (row: string[], title: string) => row[header.indexOf(title)] ?? "";
   const dates = datesBetween(range.from, range.to);
@@ -652,6 +672,7 @@ export function buildAttendanceCalendar(report: AttendanceReport, range: { from:
   const totals = zero();
   // People in the order the server sent them (the company's employee order).
   const people = new Map<string, CalendarPerson>();
+  const leave = new Map<string, CalendarLeave>();
 
   for (const row of rows) {
     const key = at(row, "Employee ID") || at(row, "Employee");
@@ -667,8 +688,18 @@ export function buildAttendanceCalendar(report: AttendanceReport, range: { from:
     const code = calendarCode(at(row, "Status"), at(row, "Day type"), at(row, "Leave / holiday"), late, early);
     if (d === undefined || !code) continue;
 
+    // Leave wears its type's look; a type with no code of its own stays "LV".
+    const isLeave = code === "LV" || code === "½";
+    const look: StatusLook = isLeave ? leaveLook(codes, at(row, "Leave code")) : codes.statuses[code as DayStatus];
+    const label = code === "LV" ? look.code : code === "½" ? `½${look.code === "LV" ? "" : look.code}` : look.code;
+    if (code === "LV" && !leave.has(label)) leave.set(label, { label, name: at(row, "Leave / holiday") || "Leave", look });
+
     person.cells[d] = {
       code,
+      label,
+      look,
+      half: code === "½",
+      unpaid: isLeave && at(row, "Leave pay %") === "0",
       note: [
         at(row, "Status"),
         at(row, "Leave / holiday").replace(/\(am\)$/, "(morning)").replace(/\(pm\)$/, "(afternoon)"),
@@ -685,7 +716,27 @@ export function buildAttendanceCalendar(report: AttendanceReport, range: { from:
     totals[code]++;
   }
 
-  return { dates, people: [...people.values()], daily, totals };
+  return { dates, people: [...people.values()], daily, totals, leave: [...leave.values()], codes };
+}
+
+/** The legend: every status with the company's code and look, full-day leave split into the codes in the period. */
+export function calendarLegend(calendar: AttendanceCalendar): CalendarLegendItem[] {
+  const { codes } = calendar;
+  return CALENDAR_CODES.flatMap((c): CalendarLegendItem[] => {
+    if (c.code === "LV") {
+      return calendar.leave.length > 0
+        ? calendar.leave.map((l) => ({ label: l.label, legend: l.name, code: "LV", look: l.look }))
+        : [{ label: "LV", legend: c.legend, code: "LV", look: leaveLook(codes, null) }];
+    }
+    if (c.code === "½") return [{ label: "½", legend: c.legend, code: "½", look: leaveLook(codes, null) }];
+    const look = codes.statuses[c.code as DayStatus];
+    return [{ label: look.code, legend: c.legend, code: c.code, look }];
+  });
+}
+
+/** What a code's cells say in the workbook (the company's own code), for its COUNTIF. */
+export function calendarLabel(calendar: AttendanceCalendar, code: string): string {
+  return code === "LV" || code === "½" ? code : calendar.codes.statuses[code as DayStatus].code;
 }
 
 const GRID_BORDER = { style: "thin" as const, color: { argb: "FFE2E8F0" } };
@@ -705,6 +756,20 @@ function attendanceCalendar(sheet: Worksheet, calendar: AttendanceCalendar) {
   const lastRow = everyone.length + 1;
   const letter = (col: number) => sheet.getColumn(col).letter;
   const center = { horizontal: "center" as const };
+
+  // Leave cells show each type's own code ("AL"), half days "½" + it: count those as the code they stand for.
+  const leaveLabels = calendar.leave.length > 0 ? calendar.leave.map((l) => l.label) : ["LV"];
+  const countFormula = (range: string, code: string) =>
+    code === "LV"
+      ? `SUMPRODUCT(COUNTIF(${range},{${leaveLabels.map((l) => `"${l}"`).join(",")}}))`
+      : code === "½"
+        ? `COUNTIF(${range},"½*")`
+        : `COUNTIF(${range},"${calendarLabel(calendar, code)}")`;
+  // A look as a cell's fill and font, the same as on screen.
+  const paint = (cell: ReturnType<typeof sheet.getCell>, look: StatusLook, unpaid = false) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR_FILLS[look.color].fill } };
+    cell.font = { bold: look.bold, color: { argb: `FF${lookInk(look, unpaid).slice(1)}` } };
+  };
 
   const head = sheet.getRow(1);
   ["Employee ID", "Employee", ...dates.map((date) => `${oneMonth ? Number(date.slice(8)) : date.slice(5)}\n${WEEKDAY(date)}`), ...CALENDAR_CODES.map((c) => c.total)].forEach(
@@ -728,15 +793,15 @@ function attendanceCalendar(sheet: Worksheet, calendar: AttendanceCalendar) {
       cell.alignment = center;
       if (!day) return;
 
-      cell.value = day.code;
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: CALENDAR_CODES.find((c) => c.code === day.code)!.fill } };
+      cell.value = day.label;
+      paint(cell, day.look, day.unpaid);
       // Hovering a cell shows why it got its code.
       cell.note = day.note;
     });
 
     CALENDAR_CODES.forEach((c, t) => {
       const cell = line.getCell(last + 1 + t);
-      cell.value = { formula: `COUNTIF(${letter(first)}${r}:${letter(last)}${r},"${c.code}")`, result: person.totals[c.code] };
+      cell.value = { formula: countFormula(`${letter(first)}${r}:${letter(last)}${r}`, c.code), result: person.totals[c.code] };
       cell.alignment = center;
       cell.border = GRID_BORDERS;
     });
@@ -750,7 +815,7 @@ function attendanceCalendar(sheet: Worksheet, calendar: AttendanceCalendar) {
     dates.forEach((_, d) => {
       const col = first + d;
       const cell = line.getCell(col);
-      cell.value = { formula: `COUNTIF(${letter(col)}2:${letter(col)}${lastRow},"${code}")`, result: calendar.daily[code][d] };
+      cell.value = { formula: countFormula(`${letter(col)}2:${letter(col)}${lastRow}`, code), result: calendar.daily[code][d] };
       cell.alignment = center;
     });
   });
@@ -759,12 +824,12 @@ function attendanceCalendar(sheet: Worksheet, calendar: AttendanceCalendar) {
   const legendTop = lastRow + DAILY_TOTALS.length + 3;
   sheet.getRow(legendTop).getCell(1).value = "Legend";
   sheet.getRow(legendTop).getCell(1).font = { bold: true };
-  CALENDAR_CODES.forEach((c, i) => {
+  calendarLegend(calendar).forEach((c, i) => {
     const line = sheet.getRow(legendTop + 1 + i);
     const code = line.getCell(1);
-    code.value = c.code;
+    code.value = c.label;
     code.alignment = center;
-    code.fill = { type: "pattern", pattern: "solid", fgColor: { argb: c.fill } };
+    paint(code, c.look);
     code.border = GRID_BORDERS;
     line.getCell(2).value = c.legend;
   });
@@ -885,7 +950,7 @@ export async function attendanceReportToExcel(csv: Blob, filename: string, optio
   await downloadWorkbook(xlsxName, (book) => {
     book.sheet({ name: "Attendance", rows, columns });
 
-    if (options.calendar) book.worksheet("Calendar", (sheet) => attendanceCalendar(sheet, buildAttendanceCalendar(report, range)));
+    if (options.calendar) book.worksheet("Calendar", (sheet) => attendanceCalendar(sheet, buildAttendanceCalendar(report, range, options.codes)));
     if (!options.charts) return;
 
     const charts = book.chartSheet("Charts");

@@ -92,7 +92,8 @@ class BirthdayNotificationTest extends TestCase
         [, $sameBranch] = $this->employee('Sok', $this->branchA);
         [, $otherBranch] = $this->employee('Vanna', $this->branchB);
 
-        $this->assertSame(2, $this->notifyAt('2026-10-10 08:05'));
+        // Dara, Sok, and the owner (no employee record, every branch).
+        $this->assertSame(3, $this->notifyAt('2026-10-10 08:05'));
 
         $own = $this->birthdayAlerts($daraUser)->sole();
         $this->assertSame('Happy birthday, Dara!', $own->title);
@@ -111,7 +112,7 @@ class BirthdayNotificationTest extends TestCase
         [, $daraUser] = $this->employee('Dara', $this->branchA, '1995-10-10');
 
         $this->assertSame(0, $this->notifyAt('2026-10-10 07:59'));
-        $this->assertSame(1, $this->notifyAt('2026-10-10 08:00'));
+        $this->assertSame(2, $this->notifyAt('2026-10-10 08:00')); // Dara + owner
         $this->notifyAt('2026-10-10 09:00');
         $this->notifyAt('2026-10-10 15:00');
 
@@ -143,9 +144,9 @@ class BirthdayNotificationTest extends TestCase
     {
         [, $user] = $this->employee('Leap', $this->branchA, '2000-02-29');
 
-        $this->assertSame(1, $this->notifyAt('2027-02-28 09:00'));
+        $this->assertSame(2, $this->notifyAt('2027-02-28 09:00')); // Leap + owner
         $this->assertSame(0, $this->notifyAt('2028-02-28 09:00'));
-        $this->assertSame(1, $this->notifyAt('2028-02-29 09:00'));
+        $this->assertSame(2, $this->notifyAt('2028-02-29 09:00'));
         $this->assertCount(2, $this->birthdayAlerts($user));
     }
 
@@ -154,8 +155,28 @@ class BirthdayNotificationTest extends TestCase
         $this->employee('Dara', $this->branchA, '1995-10-10', login: false);
         [, $colleague] = $this->employee('Sok', $this->branchA);
 
-        $this->assertSame(1, $this->notifyAt('2026-10-10 09:00'));
+        $this->assertSame(2, $this->notifyAt('2026-10-10 09:00')); // Sok + owner
         $this->assertCount(1, $this->birthdayAlerts($colleague));
+    }
+
+    public function test_logins_without_an_employee_are_told_by_branch_access(): void
+    {
+        $owner = $this->company->users()->first(); // provisioned owner: no employee, no branch restriction
+        $managerA = $this->createUserWithRole($this->company, 'employee');
+        $managerA->membership->branchAccess()->create(['branch_id' => $this->branchA->id, 'created_at' => now()]);
+        $managerB = $this->createUserWithRole($this->company, 'employee');
+        $managerB->membership->branchAccess()->create(['branch_id' => $this->branchB->id, 'created_at' => now()]);
+
+        $otherCompany = app(CompanyProvisioner::class)->provision('Other Co', 'Other Boss', 'boss@other.test', 'password123');
+        $outsider = $otherCompany->users()->first();
+
+        $this->employee('Dara', $this->branchA, '1995-10-10', login: false);
+
+        $this->assertSame(2, $this->notifyAt('2026-10-10 09:00'));
+        $this->assertCount(1, $this->birthdayAlerts($owner));
+        $this->assertCount(1, $this->birthdayAlerts($managerA));
+        $this->assertCount(0, $this->birthdayAlerts($managerB));
+        $this->assertCount(0, $this->birthdayAlerts($outsider));
     }
 
     public function test_birthdays_page_lists_upcoming_without_the_year(): void

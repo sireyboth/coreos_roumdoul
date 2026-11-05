@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from "reac
 import { usePathname } from "next/navigation";
 import { useGlass } from "@/components/glass";
 import { LoaderCard } from "@/components/ui/loader-card";
+import { SlowLoadRetry } from "@/components/ui/slow-load-retry";
 import { beginPageLoad, isPageLoading, subscribeBusy } from "@/lib/busy";
 import { useT } from "@/lib/i18n";
 
@@ -70,7 +71,9 @@ export function PageLoadGate({ children }: { children: React.ReactNode }) {
               {/* Pinned to the middle of the screen, however far the page is scrolled.
                   Clicks pass through it — the veil above is what locks the page. */}
               <div className="pointer-events-none fixed inset-0 flex items-center justify-center p-6">
-                <LoaderCard label={t("common.message.loading")} glass={isGlass} />
+                <LoaderCard label={t("common.message.loading")} glass={isGlass}>
+                  <SlowLoadRetry />
+                </LoaderCard>
               </div>
             </>
           )}

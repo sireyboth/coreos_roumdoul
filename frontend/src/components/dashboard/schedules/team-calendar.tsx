@@ -1,5 +1,6 @@
 "use client";
 
+import { useStatusDot } from "@/components/dashboard/attendance/day-status-badge";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
@@ -43,6 +44,8 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: stri
 
 export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean; refreshKey?: number }) {
   const t = useT();
+  // Attendance marks in the company's colours (Attendance → Status codes).
+  const statusDot = useStatusDot();
   const lang = useLang();
   const [month, setMonth] = useState(currentMonth);
   const [branchId, setBranchId] = useState("");
@@ -149,10 +152,10 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
       {todayStats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <Stat label={t("calendar.team.stat.scheduled")} value={todayStats.working} tone="bg-info" />
-          <Stat label={t("calendar.team.stat.present")} value={todayStats.present} tone="bg-success" />
-          <Stat label={t("calendar.team.stat.late")} value={todayStats.late} tone="bg-warning" />
-          <Stat label={t("calendar.team.stat.absent")} value={todayStats.absent} tone="bg-destructive" />
-          <Stat label={t("calendar.team.stat.off")} value={todayStats.off} tone="bg-muted-foreground/50" />
+          <Stat label={t("calendar.team.stat.present")} value={todayStats.present} tone={statusDot("P")} />
+          <Stat label={t("calendar.team.stat.late")} value={todayStats.late} tone={statusDot("L")} />
+          <Stat label={t("calendar.team.stat.absent")} value={todayStats.absent} tone={statusDot("A")} />
+          <Stat label={t("calendar.team.stat.off")} value={todayStats.off} tone={statusDot("OFF")} />
         </div>
       )}
 
@@ -256,7 +259,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
                           {halfDay && <HalfDayShade part={halfDay.part} className="-z-10" />}
                           {attendance && (
                             <span
-                              className={cn("absolute right-0.5 top-0.5 size-1.5 rounded-full", ATTENDANCE[attendance].dot)}
+                              className={cn("absolute right-0.5 top-0.5 size-1.5 rounded-full", statusDot(attendance))}
                             />
                           )}
                         </button>
@@ -288,7 +291,7 @@ export function TeamCalendar({ canManage, refreshKey = 0 }: { canManage: boolean
         </span>
         {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
           <span key={status} className="flex items-center gap-1.5">
-            <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />
+            <span className={cn("size-2 rounded-full", statusDot(status))} />
             {t(`calendar.shared.attendance.${status}`)}
           </span>
         ))}

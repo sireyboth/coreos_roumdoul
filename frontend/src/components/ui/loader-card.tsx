@@ -53,9 +53,10 @@ export function LogoSpinner({ className }: { className?: string }) {
  * The card every loading state shows in the middle of the screen (a page's
  * data loading, a save in progress): the logo loader over one line of text.
  * `glass` gives the frosted look of the phone home screen.
- * Centring is the caller's job — this is only the card.
+ * Centring is the caller's job — this is only the card. `children` go under
+ * the label (e.g. <SlowLoadRetry />).
  */
-export function LoaderCard({ label, glass = false }: { label: string; glass?: boolean }) {
+export function LoaderCard({ label, glass = false, children }: { label: string; glass?: boolean; children?: React.ReactNode }) {
   return (
     <div
       className={cn(
@@ -68,6 +69,7 @@ export function LoaderCard({ label, glass = false }: { label: string; glass?: bo
     >
       <LogoSpinner />
       {label}
+      {children}
     </div>
   );
 }

@@ -26,6 +26,7 @@ export const policyPage = {
   codePlaceholder: "e.g. study",
   codeHint: "Lowercase letters, numbers and _. Can't be changed later.",
   nameKm: "Name in Khmer",
+  reportCode: "Code and colour in reports",
   pay: "Pay (%)",
   payHint: "0 = unpaid, 50 = half pay.",
   counts: "Days counted",

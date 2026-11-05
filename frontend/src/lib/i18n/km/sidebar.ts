@@ -21,6 +21,7 @@ export const sidebar: Dictionary["sidebar"] = {
     "/dashboard/work-schedules": "កាលវិភាគការងារ",
     "/dashboard/holidays": "ថ្ងៃឈប់សម្រាកសាធារណៈ",
     "/dashboard/leave-policy": "គោលការណ៍ច្បាប់ឈប់សម្រាក",
+    "/dashboard/attendance/status-codes": "កូដស្ថានភាព",
     "/dashboard/payroll": "ការបើកប្រាក់បៀវត្សរ៍",
     "/dashboard/payroll/adjustments": "ការកែសម្រួល",
     "/dashboard/payroll/settings": "ការកំណត់ប្រាក់បៀវត្សរ៍",

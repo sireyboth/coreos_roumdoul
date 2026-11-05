@@ -29,6 +29,7 @@ import { api, type AttendanceDay, type AttendanceDayStatus, type AttendanceExcep
 import { attendanceImport } from "@/lib/excel/specs/time";
 import { dateLocale, useLang, useT } from "@/lib/i18n";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
+import { DayStatusBadge } from "@/components/dashboard/attendance/day-status-badge";
 import { cn } from "@/lib/utils";
 
 type Tab = "records" | "overtime" | "corrections" | "report";
@@ -275,7 +276,7 @@ function AttendancePageContent() {
       header: t("common.field.status"),
       cell: (d) => (
         <div className="flex flex-wrap gap-1">
-          <Badge variant={DAY_STATUS[d.status].tone}>{t(`attendance.status.day.${d.status}`)}</Badge>
+          <DayStatusBadge status={d.status} />
           {d.exceptions
             .filter((code) => code !== "absent")
             .map((code) => (

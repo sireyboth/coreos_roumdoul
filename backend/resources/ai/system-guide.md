@@ -9,7 +9,7 @@ An HR system for companies in Cambodia: staff records, work schedules, attendanc
 Sidebar groups (you only see what your role allows):
 
 - **Overview**: "Dashboard".
-- **Time & Attendance**: "Attendance", "Leave & Requests", "Calendar", "Work Schedules", "Holidays", "Leave Policy".
+- **Time & Attendance**: "Attendance", "Leave & Requests", "Calendar", "Work Schedules", "Holidays", "Leave Policy", "Status Codes".
 - **Payroll**: "Pay Runs", "Adjustments", "Payroll Settings".
 - **Organization**: "Employees", "Departments", "Teams", "Branches", "Work Locations", "ID Cards".
 - **Access**: "Users", "Roles", "Audit Log".
@@ -120,6 +120,8 @@ Time & Attendance → "Leave Policy" (company-admin by default). It starts from 
 
 Default types: Annual leave (18 days a year earned monthly, +1 day per 3 years, usable after 12 months), Sick leave (no limit, document always needed), Special leave (7 a year), Maternity leave (90 calendar days, 50% pay, women only), Paternity leave (men only), Unpaid leave.
 
+Each leave type has a code (AL, SL, SP, ML, PL, UL by default) shown wherever attendance is, set in "Status Codes" (below).
+
 "Add leave type" or click a row to edit: "Pay (%)", "Days counted" (working days or every calendar day), "Days allowed per year" (empty = no limit), "How they are given" (all at the start of the year, or earned month by month), seniority extra days, "Usable after (months of service)", "Most days per request", "Document needed from (days)", "Notice (days ahead)", "Who can take it", "Allow half days" and "Active". The code can't be changed later.
 
 **Late arrival / Early leave** card: "Staff can ask for it", whether excused time is paid or unpaid, and "Most per person per month" (default 3).
@@ -186,7 +188,7 @@ Your balances show on "My requests". Requests go to your line manager, or to an 
 
 "Calendar" → "My month" shows work days and times, holidays, days off, leave and how each day went, with the Khmer lunar date and Sil days. "Agenda" lists just the days something happens. Your one-off shifts are on Employees → "Roster".
 
-"Profile": change your name and email under "Account details", and your password under "Change password" (needs your current password).
+"Profile": change your name and email under "Account details", and your password under "Change password" (needs your current password). With payroll on, staff linked to an employee record also see "My pay": their current salary and their payslips (newest first). Amounts start hidden; the eye button shows them. Click a payslip to see each line. Only approved or paid pay runs appear there, and no permission is needed: everyone sees only their own pay.
 
 The bell shows notifications (requests, approvals, birthdays). "Turn on notifications on this device" enables phone alerts. On iPhone, first "Add to Home Screen" and open the app from the icon.
 
@@ -225,7 +227,9 @@ To record leave for someone else (e.g. a sick call), use "New request", pick the
 
 ### Report and export
 
-"Attendance" → "Report": a month or date range, with tiles for late rate, absence rate, missed scans and leave days, and a calendar grid (P present, L late, I incomplete, A absent, W worked day off, LV leave, H holiday, OFF). "Late detail" ranks lateness and absences.
+"Attendance" → "Report": a month or date range, with tiles for late rate, absence rate, missed scans and leave days, and a calendar grid (P present on time, L late, E left early, LE late and left early, M missed a scan, A absent, ½ half-day leave, W worked a day off, H holiday, OFF day off). Leave shows each leave type's own code and colour (AL annual, SL sick, UL unpaid…; a type without a code shows LV), and unpaid leave is red. The screen, Excel and PDF show the same codes, and a "Customize codes" link opens "Status Codes". "Late detail" ranks lateness and absences.
+
+Time & Attendance → "Status Codes" (people who manage attendance): how every status looks, in one place — the report, the calendars, the attendance list, Excel and PDF all follow it. Each day status (Present, Late, Left early, Late and left early, Missed a scan, Absent, Worked on a day off, Holiday, Day off) and each leave type has a "Code" (up to 3 letters or numbers, Khmer too), a "Background" colour, a "Text" colour ("Auto" matches the background) and "Bold". The preview at the top shows them all. One code means one thing: two statuses or leave types can't share a code. Only the look changes — a day is still late or absent because of its scans and schedule, and totals and payroll stay the same. "Reset to default" brings back P, L, E… and AL, SL… in their usual colours.
 
 "Export" → "Excel workbook" (choose columns, optional Calendar and Charts sheets) or "PDF report". Every employee gets a row for every date in the range, including leave, holidays and missed days. Up to 366 days.
 
@@ -281,4 +285,4 @@ Payroll → "Adjustments": one-off amounts such as a bonus, penalty or advance. 
 - Gross = earnings − deductions. Net = gross − employee NSSF − tax − after-tax deductions. Cost to company = gross + employer NSSF.
 - Tax and NSSF are worked out in riel with the official monthly rate (or your fallback), and only for periods from the 1st to the last day of a month.
 
-**Locks**: an approved or paid run freezes those people's attendance for those days. Fix later problems with an adjustment, or ask a payroll approver to reopen. A closed attendance month does not stop pay runs. Employees can't see their own payslips in the app.
+**Locks**: an approved or paid run freezes those people's attendance for those days. Fix later problems with an adjustment, or ask a payroll approver to reopen. A closed attendance month does not stop pay runs. Once a run is approved, each employee sees their own payslip under "Profile" → "My pay" (without the company's cost or HR's check notes).

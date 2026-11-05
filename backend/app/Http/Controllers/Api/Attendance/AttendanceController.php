@@ -8,6 +8,7 @@ use App\Models\AttendanceCorrection;
 use App\Models\AttendanceDay;
 use App\Models\AttendanceEvent;
 use App\Models\Employee;
+use App\Models\LeaveType;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\Attendance\AttendanceService;
 use App\Services\Attendance\ScheduleResolver;
@@ -259,8 +260,21 @@ class AttendanceController extends Controller
                 'Expected', 'Scans', 'Late (min)', 'Early leave (min)', 'Worked (hours)', 'Overtime (hours)',
                 'Overtime type', 'Overtime status', 'Night (hours)', 'Status', 'Exceptions', 'Note',
                 'Adjusted by', 'Adjusted at', 'Adjustment reason', 'Adjustment changes',
+                'Leave code', 'Leave colour', 'Leave pay %',
                 ...($withIds ? ['Employee key'] : []),
             ]);
+
+            // How a leave day shows in the report: the type's short code and colour (Leave Policy),
+            // and the day's own pay — 0 marks unpaid leave. Kept by the type's stable code.
+            $types = LeaveType::query()->get(['code', 'report_code', 'color'])->keyBy('code');
+            $leaveCells = function (?array $leave) use ($types) {
+                if (! $leave) {
+                    return [null, null, null];
+                }
+                $type = $types->get($leave['code'] ?? '');
+
+                return [$type?->report_code, $type?->color, $leave['pay_percent'] ?? null];
+            };
 
             // Approved permission to come late / leave early, as the day expected it.
             $permits = fn (?array $permission) => collect($permission ?? [])
@@ -282,7 +296,7 @@ class AttendanceController extends Controller
                 ? $leave['type'].(($leave['part'] ?? 'full') === 'full' ? '' : ' ('.$leave['part'].')')
                 : $holiday;
 
-            $employees->chunk(100, function ($people) use ($out, $hours, $time, $how, $timezone, $company, $from, $to, $today, $leaveOrHoliday, $permits, $withIds) {
+            $employees->chunk(100, function ($people) use ($out, $hours, $time, $how, $timezone, $company, $from, $to, $today, $leaveOrHoliday, $leaveCells, $permits, $withIds) {
                 $ids = $people->modelKeys();
                 // Schedules, holidays, days off and approved leave for everyone in the chunk, loaded once.
                 $resolver = new ScheduleResolver($company, $ids, $from, $to);
@@ -344,6 +358,7 @@ class AttendanceController extends Controller
                                 null,
                                 $note($key, $expected->permission),
                                 null, null, null, null,
+                                ...$leaveCells($expected->leave),
                                 ...($withIds ? [$employee->id] : []),
                             ]));
 
@@ -353,12 +368,13 @@ class AttendanceController extends Controller
                         $slots = collect($day->slots ?? []);
                         // A day adjusted more than once lists each, oldest first, split by " | ".
                         $adjusted = $adjustments->get($key, collect());
+                        $leave = $day->expected['leave'] ?? null;
 
                         fputcsv($out, array_map($this->safeCell(...), [
                             ...$person,
                             $day->date->toDateString(),
                             $this->label($day->kind),
-                            $leaveOrHoliday($day->expected['leave'] ?? null, $day->expected['holiday'] ?? null),
+                            $leaveOrHoliday($leave, $day->expected['holiday'] ?? null),
                             $day->expected['schedule_name'] ?? null,
                             $slots->map(fn ($s) => strtoupper($s['type']).' '.$time($s['expected_at']))->join(', '),
                             collect($day->scans ?? [])->map(fn ($scan) => strtoupper($scan['role']).' '.$time($scan['at']).$how($scan['method'] ?? null))->join(', '),
@@ -376,6 +392,7 @@ class AttendanceController extends Controller
                             $adjusted->map(fn (AttendanceAdjustment $a) => $a->created_at->setTimezone($timezone)->format('Y-m-d H:i'))->join(' | '),
                             $adjusted->map(fn (AttendanceAdjustment $a) => $a->reason)->join(' | '),
                             $adjusted->map(fn (AttendanceAdjustment $a) => $this->describeAdjustment($a, $timezone))->join(' | '),
+                            ...$leaveCells($leave),
                             ...($withIds ? [$employee->id] : []),
                         ]));
                     }

@@ -1,6 +1,8 @@
 import { daysWith, duration, ISSUES, totalsOf, type IssueKind, type PersonInsight, type ReportDay } from "@/lib/attendance-insights";
-import { CALENDAR_CODES, type AttendanceCalendar } from "@/lib/excel/specs/time";
+import { CALENDAR_CODES, calendarLegend, type AttendanceCalendar } from "@/lib/excel/specs/time";
+import { COLOR_FILLS, lookInk } from "@/lib/attendance/status-codes";
 import { escapeHtml, printHtmlDocument, REPORT_FONTS } from "@/lib/pdf/print";
+import type { StatusLook } from "@/lib/api";
 
 /**
  * The attendance report as a printed document, saved as PDF by the browser.
@@ -37,11 +39,15 @@ const utc = (date: string) => new Date(`${date}T00:00:00Z`);
 const shortDate = (date: string) => utc(date).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
 const monthName = (month: string) => utc(`${month}-01`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
-// Calendar codes: a light fill with dark ink of the same hue, readable in colour and in greyscale.
-const CODE_INK: Record<string, string> = {
-  P: "#166534", L: "#92400e", E: "#854d0e", LE: "#78350f", M: "#9a3412", A: "#991b1b", "½": "#6d28d9", W: "#1e40af", LV: "#5b21b6", H: "#374151", OFF: "#6b7280",
-};
-const fill = (argb: string) => `#${argb.slice(2)}`;
+/**
+ * A status as inline style, from the company's status codes: a light fill with
+ * dark ink of the same hue (readable in colour and in greyscale), or the
+ * text colour and weight they picked. Half-day leave gets a dashed edge.
+ */
+function chipStyle(look: StatusLook, { half = false, unpaid = false } = {}): string {
+  const bg = `#${COLOR_FILLS[look.color].fill.slice(2)}`;
+  return `background:${bg};color:${lookInk(look, unpaid)};font-weight:${look.bold ? 700 : 400}${half ? `;outline:1px dashed ${COLOR_FILLS[look.color].ink};outline-offset:-1px` : ""}`;
+}
 
 function lateChip(minutes: number): string {
   const cls = minutes > 60 ? "sev3" : minutes >= 15 ? "sev2" : "sev1";
@@ -134,17 +140,16 @@ function calendarPage(calendar: AttendanceCalendar, people: PersonInsight[]): st
         ${p.cells
           .map((cell) => {
             if (!cell) return `<td class="cell"></td>`;
-            const c = CALENDAR_CODES.find((x) => x.code === cell.code)!;
-            return `<td class="cell"><span style="background:${fill(c.fill)};color:${CODE_INK[cell.code]}">${esc(cell.code)}</span></td>`;
+            return `<td class="cell"><span style="${chipStyle(cell.look, cell)}">${esc(cell.label)}</span></td>`;
           })
           .join("")}
         ${totals.map((code, i) => `<td class="tot${i === 0 ? " first" : ""}">${p.totals[code] || `<span class="muted">·</span>`}</td>`).join("")}
       </tr>`,
     )
     .join("");
-  const legend = CALENDAR_CODES.map(
-    (c) => `<span class="legend-item"><span class="code" style="background:${fill(c.fill)};color:${CODE_INK[c.code]}">${esc(c.code)}</span>${esc(c.legend)}</span>`,
-  ).join("");
+  const legend = calendarLegend(calendar)
+    .map((c) => `<span class="legend-item"><span class="code" style="${chipStyle(c.look, { half: c.code === "½" })}">${esc(c.label)}</span>${esc(c.legend)}</span>`)
+    .join("");
 
   return `<section class="landscape">
     <h2>Month at a glance</h2>

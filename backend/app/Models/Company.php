@@ -11,6 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * report_codes: the company's own look for each day status (App\Support\ReportCodes); null = the defaults.
+ *
+ * @property array<string, array{code: string, color: string, text?: string, bold?: bool}>|null $report_codes
+ */
 class Company extends Model
 {
     use HasFactory, SoftDeletes;
@@ -53,6 +58,7 @@ class Company extends Model
         'probation_length',
         'probation_unit',
         'probation_reminder_days',
+        'report_codes',
     ];
 
     /** How a probation length is counted. */
@@ -66,6 +72,7 @@ class Company extends Model
             'allow_self_approval' => 'boolean',
             'probation_length' => 'integer',
             'probation_reminder_days' => 'integer',
+            'report_codes' => 'array',
         ];
     }
 

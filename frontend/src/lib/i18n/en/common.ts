@@ -79,6 +79,7 @@ export const common = {
   // ── Messages ──────────────────────────────────────────────────────
   message: {
     loading: "Loading…",
+    takingLong: "This is taking longer than usual.",
     noData: "No data",
     loadFailed: "Couldn't load the data",
     saved: "Saved",
