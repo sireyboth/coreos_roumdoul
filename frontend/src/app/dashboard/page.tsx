@@ -210,12 +210,15 @@ export default function DashboardPage() {
   // them to the first page they can use.
   // Phones get the app-style home screen instead; its Overview tile comes
   // back with ?view=full to see this page anyway.
+  // The query string is carried along, so alert links like ?birthday={id}
+  // (from the bell or a tapped push) still open their popup after the redirect.
   useEffect(() => {
     if (!me) return;
+    const query = window.location.search;
     const phone = window.matchMedia("(max-width: 767px)").matches;
-    const full = new URLSearchParams(window.location.search).get("view") === "full";
-    if (phone && !full) router.replace("/dashboard/home");
-    else if (!canDashboard) router.replace(homeFor(me));
+    const full = new URLSearchParams(query).get("view") === "full";
+    if (phone && !full) router.replace(`/dashboard/home${query}`);
+    else if (!canDashboard) router.replace(`${homeFor(me)}${query}`);
   }, [me, canDashboard, router]);
 
   // Everything on this page comes from one small request that the server counts for us.
