@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { PhotoCropDialog } from "@/components/dashboard/employees/photo-crop-dialog";
+import { MyPay } from "@/components/dashboard/payroll/my-pay";
 import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError } from "@/lib/api";
@@ -241,6 +242,13 @@ export default function ProfilePage() {
     <div className="p-4 text-ink sm:p-6 lg:p-8">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
         <ProfileHero />
+
+        {/* Your own pay: only people with an employee record have one, and only with payroll on. */}
+        {me.employee && me.modules.payroll && (
+          <FormCard title={t("payroll.myPay.title")} hint={t("payroll.myPay.hint")}>
+            <MyPay />
+          </FormCard>
+        )}
 
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <FormCard

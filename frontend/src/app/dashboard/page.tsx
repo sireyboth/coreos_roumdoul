@@ -25,7 +25,7 @@ import { useApi } from "@/hooks/use-api";
 import { api, DashboardSummary } from "@/lib/api";
 import { companyStatusLabel } from "@/components/dashboard/layout/account-banner";
 import { dateLocale, pageLabel, translate, useLang, useT, type Lang, type TKey } from "@/lib/i18n";
-import { DAY_STATUS } from "@/lib/schedule";
+import { DayStatusBadge } from "@/components/dashboard/attendance/day-status-badge";
 import { cn } from "@/lib/utils";
 
 // Module codes with a name in app.dashboard.module; any other code shows as is.
@@ -187,7 +187,7 @@ function RecentActivity({ recent }: { recent: NonNullable<DashboardSummary["atte
               </p>
             </div>
             {s.late_minutes > 0 && <Badge variant="warning">{t("app.dashboard.recent.late", { n: s.late_minutes })}</Badge>}
-            <Badge variant={DAY_STATUS[s.status].tone}>{t(`attendance.status.day.${s.status}`)}</Badge>
+            <DayStatusBadge status={s.status} />
           </div>
         ))}
       </CardContent>

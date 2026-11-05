@@ -35,6 +35,7 @@ export const profilePage: Dictionary["employees"]["profilePage"] = {
   tabProfile: "ប្រវត្តិរូប",
   tabSchedule: "កាលវិភាគការងារ",
   tabPay: "ប្រាក់បៀវត្សរ៍",
+  tabPassword: "ពាក្យសម្ងាត់",
 
   // ── Edit form ────────────────────────────────────────────────────
   emailIsSignIn: "នេះជាអ៊ីមែលសម្រាប់ចូលប្រព័ន្ធ។ សូមកែប្រែនៅទំព័រអ្នកប្រើប្រាស់។",
@@ -49,4 +50,17 @@ export const profilePage: Dictionary["employees"]["profilePage"] = {
 
   // ── Schedule tab ─────────────────────────────────────────────────
   oneOffChanges: "ការផ្លាស់ប្តូរម្តងម្កាល",
+
+  // ── Password tab ─────────────────────────────────────────────────
+  passwordTitle: "កំណត់ពាក្យសម្ងាត់ឡើងវិញ",
+  passwordHint: "កំណត់ពាក្យសម្ងាត់ថ្មីសម្រាប់ {name} ប្រសិនបើភ្លេចពាក្យសម្ងាត់។",
+  passwordSignOut: "{name} នឹងត្រូវចាកចេញពីគ្រប់ឧបករណ៍ ហើយត្រូវចូលប្រព័ន្ធម្តងទៀតដោយប្រើពាក្យសម្ងាត់ថ្មី។",
+  passwordMin: "យ៉ាងតិច ៨ តួអក្សរ។",
+  passwordMismatch: "ពាក្យសម្ងាត់ទាំងពីរមិនដូចគ្នាទេ។",
+  passwordShow: "បង្ហាញពាក្យសម្ងាត់",
+  passwordHide: "លាក់ពាក្យសម្ងាត់",
+  passwordSave: "កំណត់ពាក្យសម្ងាត់ឡើងវិញ",
+  passwordSaving: "កំពុងកំណត់…",
+  passwordDone: "បានកំណត់ពាក្យសម្ងាត់ឡើងវិញ",
+  passwordDoneHint: "សូមប្រាប់ពាក្យសម្ងាត់ថ្មីដល់ {name} ដោយផ្ទាល់ ឬតាមទូរស័ព្ទ — កុំផ្ញើក្នុងក្រុមជជែក។",
 };

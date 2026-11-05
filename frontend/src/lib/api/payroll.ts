@@ -208,6 +208,20 @@ export type PayslipBody = {
 
 export type Payslip = PayslipBody & { id: number; pay_run_id: number; month: string; status: PayRunStatus };
 
+// Your own pay (profile page): only payslips of approved or paid runs, without the company's cost or HR's warnings.
+export type MyPayslip = Omit<Payslip, "employer_cost"> & { paid_at: string | null };
+export type MyPayslipRow = Pick<MyPayslip, "id" | "currency" | "gross" | "nssf_employee" | "tax" | "net" | "month" | "status" | "paid_at" | "pay_group"> & {
+  period_start: string;
+  period_end: string;
+  period_label: string;
+};
+export type MyPay = {
+  // The salary in force today; null when none is set.
+  salary: { amount: Amount; currency: PayCurrency; pay_type: "monthly" | "daily"; effective_from: string } | null;
+  // Newest first.
+  payslips: MyPayslipRow[];
+};
+
 export type PayrollAdjustment = {
   id: number;
   // Lands in the pay run whose period holds this date.
@@ -396,5 +410,10 @@ export const payrollApi = {
     // Everyone's pay setup today, for the employee Excel export.
     everyone: () => request<EveryonesPay>("/api/payroll/employee-pay"),
     itemOptions: () => request<PayItemComponent[]>("/api/payroll/item-options"),
+  },
+  // The signed-in person's own pay — no salary or payroll permission needed.
+  myPay: {
+    get: () => request<MyPay>("/api/profile/pay"),
+    payslip: (id: number) => request<MyPayslip>(`/api/profile/payslips/${id}`),
   },
 };

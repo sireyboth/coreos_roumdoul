@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CalendarDays, FileDown, ListTree, Search, Table2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowDown, ArrowUp, CalendarDays, FileDown, ListTree, Palette, Search, Table2 } from "lucide-react";
+import { useMe } from "@/contexts/me-context";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +12,17 @@ import { AttendanceDayDialog } from "@/components/dashboard/attendance/attendanc
 import { AttendanceLateDetail } from "@/components/dashboard/attendance/attendance-late-detail";
 import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance/attendance-month-close";
 import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/schedules/calendar-shared";
+import { COLOR_STYLE, StatusChip } from "@/components/dashboard/shared/status-chip";
 import { useApi } from "@/hooks/use-api";
-import { api, type AttendanceDay } from "@/lib/api";
+import { api, type AttendanceDay, type DayStatus } from "@/lib/api";
+import { useStatusCodes } from "@/hooks/use-status-codes";
 import { buildInsights, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
 import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
 import { formatMinutes } from "@/lib/schedule";
 import {
   buildAttendanceCalendar,
   CALENDAR_CODES,
+  calendarLegend,
   DAILY_TOTALS,
   readAttendanceReport,
   type AttendanceCalendar,
@@ -27,21 +32,6 @@ import { notifyError } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none";
-
-// The same codes as the Calendar sheet, in the app's own colours (light and dark).
-const CODE_STYLE: Record<string, { cell: string; dot: string }> = {
-  P: { cell: "bg-success/15 text-success", dot: "bg-success" },
-  L: { cell: "bg-warning/20 text-warning", dot: "bg-warning" },
-  E: { cell: "bg-yellow-400/20 text-yellow-700 dark:text-yellow-300", dot: "bg-yellow-500" },
-  LE: { cell: "bg-amber-500/30 text-amber-800 dark:text-amber-200", dot: "bg-amber-600" },
-  M: { cell: "bg-orange-500/15 text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
-  A: { cell: "bg-destructive/15 text-destructive", dot: "bg-destructive" },
-  "½": { cell: "border border-dashed border-violet-500/60 bg-violet-500/5 text-violet-700 dark:text-violet-300", dot: "bg-violet-400" },
-  LV: { cell: "bg-violet-500/15 text-violet-700 dark:text-violet-300", dot: "bg-violet-500" },
-  W: { cell: "bg-info/15 text-info", dot: "bg-info" },
-  H: { cell: "bg-muted text-foreground/70", dot: "bg-muted-foreground" },
-  OFF: { cell: "text-muted-foreground", dot: "bg-muted-foreground/40" },
-};
 
 // Codes that have a stored day behind them, so clicking opens its details.
 const OPENABLE = new Set(["P", "L", "E", "LE", "M", "A", "½", "W"]);
@@ -148,7 +138,8 @@ export function AttendanceReport({
   // The period before, only for the trend arrows — a failure just leaves them out.
   const { data: previous } = useApi(rangeProblem ? null : () => load(previousRange({ from, to })), [from, to, reloads]);
 
-  const calendar = useMemo(() => (report ? buildAttendanceCalendar(report, range) : null), [report, range.from, range.to]); // eslint-disable-line react-hooks/exhaustive-deps
+  const statusCodes = useStatusCodes();
+  const calendar = useMemo(() => (report ? buildAttendanceCalendar(report, range, statusCodes) : null), [report, range.from, range.to, statusCodes]); // eslint-disable-line react-hooks/exhaustive-deps
   const insights = useMemo(() => (report ? buildInsights(report, minLate) : []), [report, minLate]);
   const previousInsights = useMemo(() => (previous ? buildInsights(previous, minLate) : null), [previous, minLate]);
 
@@ -397,6 +388,7 @@ function CalendarGrid({
 }) {
   const t = useT();
   const today = iso(new Date());
+  const canCustomize = useMe().me?.permissions.includes("attendance.manage") ?? false;
 
   // Day totals follow the rows shown.
   const daily = useMemo(() => {
@@ -420,12 +412,22 @@ function CalendarGrid({
   return (
     <>
       <div className="flex flex-wrap gap-x-4 gap-y-2 rounded-xl border border-border bg-card px-4 py-3 text-xs shadow-sm">
-        {CALENDAR_CODES.map((c) => (
-          <span key={c.code} className="flex items-center gap-1.5">
-            <span className={cn("flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-[11px] font-semibold", CODE_STYLE[c.code].cell)}>{c.code}</span>
-            {t(codeKey(c.code, "legend"))}
+        {calendarLegend(calendar).map((c) => (
+          <span key={c.label} className="flex items-center gap-1.5">
+            <StatusChip look={c.look} half={c.code === "½"} size="sm">
+              {c.label}
+            </StatusChip>
+            {/* A leave type's own name, else the translated meaning of the code. */}
+            {c.code === "LV" && c.label !== "LV" ? c.legend : t(codeKey(c.code, "legend"))}
           </span>
         ))}
+        {/* The codes and colours are the company's own, set in one place for every screen. */}
+        {canCustomize && (
+          <Link href="/dashboard/attendance/status-codes" className="ml-auto flex items-center gap-1 font-medium text-primary hover:underline">
+            <Palette className="size-3.5" />
+            {t("attendance.statusCodes.customize")}
+          </Link>
+        )}
       </div>
 
       <div className="max-h-[70vh] overflow-auto rounded-xl border border-border bg-card shadow-sm">
@@ -474,7 +476,9 @@ function CalendarGrid({
                     const tip = cell ? `${person.name} · ${date}\n${cell.note}` : undefined;
                     const openable = cell && OPENABLE.has(cell.code) && insight?.employeeId;
                     const chip = cell && (
-                      <span className={cn("mx-auto flex h-7 min-w-7 items-center justify-center rounded-md px-1 text-[11px] font-semibold", CODE_STYLE[cell.code].cell)}>{cell.code}</span>
+                      <StatusChip look={cell.look} half={cell.half} unpaid={cell.unpaid} className="mx-auto flex">
+                        {cell.label}
+                      </StatusChip>
                     );
                     return (
                       <td key={date} className={cn("border-b border-border p-0.5 text-center group-hover:bg-accent/40", date === today && "bg-primary/5")}>
@@ -510,7 +514,7 @@ function CalendarGrid({
               <tr key={code}>
                 <th className="sticky left-0 z-10 border-b border-r border-border bg-muted px-2 py-1 text-left text-[11px] font-semibold sm:px-3">
                   <span className="flex items-center gap-1.5">
-                    <span className={cn("size-2 rounded-full", CODE_STYLE[code].dot)} />
+                    <span className={cn("size-2 rounded-full", COLOR_STYLE[calendar.codes.statuses[code as DayStatus].color].dot)} />
                     {t(codeKey(code, "total"))}
                   </span>
                 </th>

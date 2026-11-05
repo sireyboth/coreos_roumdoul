@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { api, ApiError, type LateEarlySettings, type LeaveAdjustment, type LeaveBalances, type LeaveType, type LeaveTypeInput } from "@/lib/api";
+import { StatusChip } from "@/components/dashboard/shared/status-chip";
 import { dateLocale, translate, useLang, useT, type Lang } from "@/lib/i18n";
 import { notifyError, notifySuccess } from "@/lib/notify";
 
@@ -53,7 +54,7 @@ function rules(lt: LeaveType, lang: Lang): string {
     .join(" · ");
 }
 
-type Form = Record<keyof Omit<LeaveType, "id" | "requires_balance" | "allow_half_day" | "allowed_during_probation" | "is_active">, string> & {
+type Form = Record<keyof Omit<LeaveType, "id" | "requires_balance" | "allow_half_day" | "allowed_during_probation" | "is_active" | "report_code" | "color" | "text_color" | "bold">, string> & {
   requires_balance: boolean;
   allow_half_day: boolean;
   allowed_during_probation: boolean;
@@ -509,9 +510,18 @@ export default function LeavePolicyPage() {
       header: t("leave.policyPage.colLeave"),
       primary: true,
       cell: (lt) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{lt.name}</span>
-          {lt.name_km && <span className="text-xs text-muted-foreground">{lt.name_km}</span>}
+        <div className="flex items-center gap-2.5">
+          {/* How this type shows everywhere; changed in Attendance → Status codes, with every other status. */}
+          <StatusChip
+            look={{ code: lt.report_code ?? "LV", color: lt.color ?? "violet", text: lt.text_color ?? "auto", bold: lt.bold ?? true }}
+            unpaid={lt.pay_percent === 0}
+            title={t("leave.policyPage.reportCode")}
+            className="shrink-0"
+          />
+          <div className="flex flex-col">
+            <span className="font-medium">{lt.name}</span>
+            {lt.name_km && <span className="text-xs text-muted-foreground">{lt.name_km}</span>}
+          </div>
         </div>
       ),
       sortValue: (lt) => lt.sort_order ?? 9999,

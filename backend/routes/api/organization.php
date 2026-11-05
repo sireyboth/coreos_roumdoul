@@ -57,6 +57,7 @@ Route::middleware('company_permission:employees.manage')->group(function () {
     Route::post('/employees/{employee}/photo', [EmployeePhotoController::class, 'store']);
     Route::delete('/employees/{employee}/photo', [EmployeePhotoController::class, 'destroy']);
     Route::post('/employees/{employee}/login', [EmployeeController::class, 'createLogin']);
+    Route::put('/employees/{employee}/password', [EmployeeController::class, 'resetPassword']);
     Route::put('/probation/settings', [ProbationController::class, 'updateSettings']);
     Route::post('/employees/{employee}/probation/pass', [ProbationController::class, 'pass']);
     Route::post('/employees/{employee}/probation/extend', [ProbationController::class, 'extend']);

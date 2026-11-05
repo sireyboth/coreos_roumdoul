@@ -7,6 +7,7 @@ import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoaderCard, LogoSpinner } from "@/components/ui/loader-card";
 import { PageLoadGate } from "@/components/ui/page-load-gate";
+import { SlowLoadRetry } from "@/components/ui/slow-load-retry";
 import { AccountBanner } from "@/components/dashboard/layout/account-banner";
 import { AiAssistant, AssistantLauncher } from "@/components/dashboard/layout/ai-assistant";
 import { BirthdayCelebration } from "@/components/dashboard/employees/birthday-celebration";
@@ -173,7 +174,9 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       return (
         <div role="status" aria-live="polite" className="flex h-dvh items-center justify-center p-6">
           <GlassBackdrop />
-          <LoaderCard label={t("common.message.loading")} glass />
+          <LoaderCard label={t("common.message.loading")} glass>
+            <SlowLoadRetry />
+          </LoaderCard>
         </div>
       );
     }
@@ -183,6 +186,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       <div role="status" aria-live="polite" className="flex h-dvh flex-col items-center justify-center gap-6 bg-background px-6 text-center">
         <LogoSpinner className="size-28 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-90 duration-500" />
         <p className="text-sm font-medium text-muted-foreground motion-safe:animate-pulse">{t("app.shell.loadingWorkspace")}</p>
+        <SlowLoadRetry />
       </div>
     );
   }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\Api\Requests;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\LeaveAdjustment;
 use App\Models\LeaveType;
 use App\Models\RequestTypeSetting;
 use App\Services\Requests\ApprovalChain;
 use App\Services\Requests\LeaveBalance;
+use App\Support\ReportCodes;
 use App\Support\SelfApproval;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -39,9 +41,11 @@ class LeaveController extends Controller
 
     public function storeType(Request $request)
     {
+        $request->merge($this->upperReportCode($request));
         $data = $request->validate([
             'code' => ['required', 'string', 'max:30', 'regex:/^[a-z0-9_]+$/', Rule::unique('leave_types', 'code')->where('company_id', $request->user()->company_id)],
             ...$this->typeRules(),
+            ...$this->reportCodeRules($request),
         ]);
 
         return response()->json(LeaveType::query()->create($this->checkedType($data)), 201);
@@ -50,8 +54,9 @@ class LeaveController extends Controller
     public function updateType(Request $request, LeaveType $leaveType)
     {
         // The code stays: reports and integrations rely on it.
-        $data = $request->validate($this->typeRules(partial: true));
-        $leaveType->update($this->checkedType([...$leaveType->only(array_keys($this->typeRules())), ...$data]));
+        $request->merge($this->upperReportCode($request));
+        $data = $request->validate([...$this->typeRules(partial: true), ...$this->reportCodeRules($request, $leaveType)]);
+        $leaveType->update($this->checkedType([...$leaveType->only([...array_keys($this->typeRules()), 'report_code', 'color']), ...$data]));
 
         return $leaveType;
     }
@@ -196,6 +201,32 @@ class LeaveController extends Controller
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'between:0,9999'],
         ];
+    }
+
+    /**
+     * The short code and colour the attendance report shows for this type.
+     * Letters or digits in any script (Khmer too), unique in the company, and
+     * never a code a day status already uses — "M" can't mean both a missed
+     * scan and maternity leave.
+     */
+    private function reportCodeRules(Request $request, ?LeaveType $type = null): array
+    {
+        return [
+            'report_code' => [
+                'nullable', 'string', 'max:3', 'regex:/^[\p{L}\p{M}\p{N}]+$/u',
+                Rule::notIn(ReportCodes::taken(Company::query()->findOrFail($request->user()->company_id))),
+                Rule::unique('leave_types', 'report_code')->where('company_id', $request->user()->company_id)->ignore($type?->id),
+            ],
+            'color' => ['nullable', Rule::in(LeaveType::COLORS)],
+        ];
+    }
+
+    /** "al" and "Al" are the same code as "AL"; Khmer has no case and stays as typed. */
+    private function upperReportCode(Request $request): array
+    {
+        $code = $request->input('report_code');
+
+        return is_string($code) ? ['report_code' => mb_strtoupper(trim($code)) ?: null] : [];
     }
 
     /** Settings that only make sense together. */

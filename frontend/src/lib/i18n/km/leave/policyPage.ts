@@ -28,6 +28,7 @@ export const policyPage: Dictionary["leave"]["policyPage"] = {
   codePlaceholder: "ឧ. study",
   codeHint: "អក្សរឡាតាំងតូច លេខ និង _ ។ មិនអាចកែប្រែបាននៅពេលក្រោយទេ។",
   nameKm: "ឈ្មោះជាភាសាខ្មែរ",
+  reportCode: "កូដ និងពណ៌ក្នុងរបាយការណ៍",
   pay: "ប្រាក់ឈ្នួល (%)",
   payHint: "0 = គ្មានប្រាក់ឈ្នួល, 50 = ប្រាក់ឈ្នួលពាក់កណ្តាល។",
   counts: "របៀបរាប់ថ្ងៃ",

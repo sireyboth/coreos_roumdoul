@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { currentMonth, parseDate, shiftMonth } from "@/components/dashboard/schedules/calendar-shared";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
+import { useStatusCodes } from "@/hooks/use-status-codes";
 import { api, ApiError, Employee } from "@/lib/api";
 import { buildInsights, ISSUES, type IssueKind } from "@/lib/attendance-insights";
 import { withBusy } from "@/lib/busy";
@@ -136,6 +137,8 @@ function ExportForm({
 }) {
   const t = useT();
   const { me } = useMe();
+  // The company's status codes, so the files look like the screen.
+  const statusCodes = useStatusCodes();
   const initial = monthRange(month);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -203,7 +206,7 @@ function ExportForm({
           range: { from, to },
           scope: chosen ?? (canPickEmployee ? "All employees" : "My attendance"),
           people: buildInsights(report, layout.pdf.minLate),
-          calendar: layout.pdf.calendar && calendarFits ? buildAttendanceCalendar(report, { from, to }) : null,
+          calendar: layout.pdf.calendar && calendarFits ? buildAttendanceCalendar(report, { from, to }, statusCodes) : null,
           detail: layout.pdf.detail ? { kinds: layout.pdf.kinds, minLate: layout.pdf.minLate } : null,
           minLate: layout.pdf.minLate,
         });
@@ -216,6 +219,7 @@ function ExportForm({
         charts: layout.charts,
         calendar: layout.calendar,
         range: { from, to },
+        codes: statusCodes,
       });
       notifySuccess(t("common.excel.downloaded"), saved);
       onDone();

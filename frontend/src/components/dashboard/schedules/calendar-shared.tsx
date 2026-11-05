@@ -22,6 +22,7 @@ import { dateLocale, translate, useLang, useT, type Lang } from "@/lib/i18n";
 import { khmerDay } from "@/lib/khmer";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { EXCEPTIONS, formatMinutes, slotsSummary } from "@/lib/schedule";
+import { AttendanceMarkBadge } from "@/components/dashboard/attendance/day-status-badge";
 
 // English names, kept for code that hasn't moved to keys. On screen use
 // t(`calendar.shared.weekday.short.${WEEKDAY_KEYS[day]}`) (also .min and .full).
@@ -212,7 +213,7 @@ export function DayDialog({
               {day.label && day.type !== "work" && day.type !== "weekly_off" && (
                 <span className="text-muted-foreground">{day.label}</span>
               )}
-              {day.attendance && <Badge variant={ATTENDANCE[day.attendance].variant}>{t(`calendar.shared.attendance.${day.attendance}`)}</Badge>}
+              {day.attendance && <AttendanceMarkBadge attendance={day.attendance} />}
               {/* Half a day on leave: still a work day, with only the other half expected. */}
               {day.leave && day.leave.part !== "full" && (
                 <Badge variant="outline" className="border-violet-500/40 text-violet-600 dark:text-violet-400">

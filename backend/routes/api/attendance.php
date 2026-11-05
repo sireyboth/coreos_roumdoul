@@ -6,6 +6,7 @@
 use App\Http\Controllers\Api\Attendance\AttendanceController;
 use App\Http\Controllers\Api\Attendance\AttendanceCorrectionController;
 use App\Http\Controllers\Api\Attendance\AttendanceReviewController;
+use App\Http\Controllers\Api\Attendance\ReportCodeController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:attendance')->group(function () {
@@ -24,6 +25,8 @@ Route::middleware('module:attendance')->group(function () {
         // Everyone gets their own row; managers get everyone's.
         Route::get('/attendance/summary', [AttendanceReviewController::class, 'summary']);
         Route::get('/attendance/periods', [AttendanceReviewController::class, 'periods']);
+        // How the report shows each day status (codes and colours).
+        Route::get('/attendance/report-codes', [ReportCodeController::class, 'show']);
     });
 
     Route::middleware('company_permission:attendance.manage')->group(function () {
@@ -37,6 +40,8 @@ Route::middleware('module:attendance')->group(function () {
         Route::post('/attendance/days/{day}/overtime/reject', [AttendanceReviewController::class, 'rejectOvertime']);
         Route::post('/attendance/periods', [AttendanceReviewController::class, 'lock']);
         Route::delete('/attendance/periods/{month}', [AttendanceReviewController::class, 'unlock'])->where('month', '\d{4}-\d{2}');
+        Route::put('/attendance/report-codes', [ReportCodeController::class, 'update']);
+        Route::delete('/attendance/report-codes', [ReportCodeController::class, 'destroy']);
     });
 
 });

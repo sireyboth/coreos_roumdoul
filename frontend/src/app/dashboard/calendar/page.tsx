@@ -1,5 +1,6 @@
 "use client";
 
+import { useStatusDot } from "@/components/dashboard/attendance/day-status-badge";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight, ListChecks, Moon, Settings2, Users } from "lucide-react";
@@ -35,6 +36,8 @@ import { cn } from "@/lib/utils";
 export default function CalendarPage() {
   const { me } = useMe();
   const t = useT();
+  // Attendance marks in the company's colours (Attendance → Status codes).
+  const statusDot = useStatusDot();
   const lang = useLang();
   const canManage = me?.permissions.includes("schedules.manage") ?? false;
 
@@ -230,7 +233,7 @@ export default function CalendarPage() {
                             {khmer.isSil && <Moon className="size-3 text-muted-foreground" aria-label={t("calendar.shared.silDay")} />}
                             {day.attendance && (
                               <span
-                                className={cn("size-2 rounded-full", ATTENDANCE[day.attendance].dot)}
+                                className={cn("size-2 rounded-full", statusDot(day.attendance))}
                                 title={t(`calendar.shared.attendance.${day.attendance}`)}
                               />
                             )}
@@ -277,7 +280,7 @@ export default function CalendarPage() {
                     </span>
                   {(Object.keys(ATTENDANCE) as CalendarAttendance[]).map((status) => (
                     <span key={status} className="flex items-center gap-1.5">
-                      <span className={cn("size-2 rounded-full", ATTENDANCE[status].dot)} />
+                      <span className={cn("size-2 rounded-full", statusDot(status))} />
                       {t(`calendar.shared.attendance.${status}`)}
                     </span>
                   ))}

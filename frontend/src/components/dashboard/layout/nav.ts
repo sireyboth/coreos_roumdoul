@@ -13,6 +13,7 @@ import {
   MapPin,
   Network,
   PartyPopper,
+  Palette,
   Scale,
   ScrollText,
   ShieldCheck,
@@ -59,6 +60,8 @@ export const NAV_GROUPS: { id: NavGroupId; label: string; items: NavItem[] }[] =
       { href: "/dashboard/work-schedules", label: "Work Schedules", icon: CalendarClock, tone: "from-amber-500 to-orange-500", permission: "work_schedules.view" },
       { href: "/dashboard/holidays", label: "Holidays", icon: PartyPopper, tone: "from-pink-500 to-rose-500", permission: "holidays.view" },
       { href: "/dashboard/leave-policy", label: "Leave Policy", icon: Scale, tone: "from-purple-500 to-indigo-500", permission: "leave_policies.manage", module: "attendance" },
+      // How every status looks (report, calendar, attendance list, Excel, PDF) — one place for all of them.
+      { href: "/dashboard/attendance/status-codes", label: "Status Codes", icon: Palette, tone: "from-fuchsia-500 to-pink-500", permission: "attendance.manage", module: "attendance" },
     ],
   },
   {

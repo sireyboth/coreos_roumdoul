@@ -284,6 +284,9 @@ export const organizationApi = {
       request<{ deleted: number }>("/api/employees/bulk-delete", { method: "POST", body: JSON.stringify({ ids }) }),
     createLogin: (id: number, data: LoginSetup) =>
       request<Employee>(`/api/employees/${id}/login`, { method: "POST", body: JSON.stringify(data) }),
+    // An admin sets a new password for someone who forgot theirs; they're signed out everywhere.
+    resetPassword: (id: number, data: { password: string; password_confirmation: string }) =>
+      request<{ message: string }>(`/api/employees/${id}/password`, { method: "PUT", body: JSON.stringify(data) }),
     // A PDF (to print), not JSON, so it can't go through request() — same
     // reasoning as attendance.export below.
     card: async (id: number): Promise<Blob> => (await fetchCard(`/api/employees/${id}/card`, "application/pdf")).blob(),

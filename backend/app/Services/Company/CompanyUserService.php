@@ -2,9 +2,11 @@
 
 namespace App\Services\Company;
 
+use App\Models\CompanyMembership;
 use App\Models\CompanyRole;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Creates a login inside an existing company: the User, its company
@@ -55,6 +57,44 @@ class CompanyUserService
         ]);
 
         return $user->fresh();
+    }
+
+    /**
+     * An admin sets a new password for someone who forgot theirs. Every device
+     * they were signed in on is signed out, so the old password stops working
+     * everywhere at once.
+     *
+     * Two guards: your own password is changed from your Profile (which asks
+     * for the current one), and only a company admin can reset a company
+     * admin's — otherwise an HR manager could take over the owner's account.
+     */
+    public function resetPassword(User $actor, User $user, string $password): void
+    {
+        if ($actor->is($user)) {
+            throw ValidationException::withMessages([
+                'password' => [__('Change your own password from your Profile.')],
+            ]);
+        }
+
+        if ($this->isCompanyAdmin($user) && ! $this->isCompanyAdmin($actor)) {
+            throw ValidationException::withMessages([
+                'password' => [__('Only a company admin can reset a company admin\'s password.')],
+            ]);
+        }
+
+        $user->update(['password' => $password]);
+        $user->tokens()->delete();
+
+        // Never the password itself — just that it happened and who did it.
+        AuditLogger::record('user.password_reset', $user, ['name' => $user->name]);
+    }
+
+    private function isCompanyAdmin(User $user): bool
+    {
+        return CompanyMembership::query()
+            ->where('user_id', $user->id)
+            ->whereHas('roles', fn ($query) => $query->where('code', 'company-admin'))
+            ->exists();
     }
 
     public static function normaliseLoginId(string $loginId): string

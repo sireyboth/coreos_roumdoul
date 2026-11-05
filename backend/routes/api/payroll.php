@@ -4,6 +4,7 @@
 // Loaded by routes/api.php inside the signed-in, active-company group.
 
 use App\Http\Controllers\Api\Payroll\EmployeePayController;
+use App\Http\Controllers\Api\Payroll\MyPayController;
 use App\Http\Controllers\Api\Payroll\PayGroupController;
 use App\Http\Controllers\Api\Payroll\PayrollAdjustmentController;
 use App\Http\Controllers\Api\Payroll\PayrollSettingsController;
@@ -11,6 +12,10 @@ use App\Http\Controllers\Api\Payroll\PayRunController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('module:payroll')->group(function () {
+    // Your own salary and released payslips: no permission, only ever your own record.
+    Route::get('/profile/pay', [MyPayController::class, 'show']);
+    Route::get('/profile/payslips/{payslip}', [MyPayController::class, 'payslip'])->whereNumber('payslip');
+
     // One person's pay setup: pay group, salary history, tax/NSSF profile, recurring items.
     Route::get('/employees/{employee}/pay', [EmployeePayController::class, 'show'])->middleware('company_permission:salary.view');
     // Everyone's pay setup today, for the employee Excel export.

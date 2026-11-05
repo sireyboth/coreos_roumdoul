@@ -19,6 +19,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceAdjustScans } from "@/components/dashboard/attendance/attendance-adjust-scans";
 import { parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { clock, DAY_STATUS, EXCEPTIONS, formatMinutes } from "@/lib/schedule";
+import { DayStatusBadge } from "@/components/dashboard/attendance/day-status-badge";
 import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -201,7 +202,7 @@ export function AttendanceDayDialog({
           <div className="flex flex-col gap-5">
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label={t("common.field.status")}>
-                <Badge variant={status.tone}>{t(`attendance.status.day.${day.status}`)}</Badge>
+                <DayStatusBadge status={day.status} />
               </Field>
               <Field label={t("attendance.day.worked")}>
                 {formatMinutes(day.worked_minutes, lang)}

@@ -189,6 +189,10 @@ class AttendanceExportTest extends TestCase
         $this->assertSame(['Leave', 'Unpaid leave', 'Off'], [$leave['Day type'], $leave['Leave / holiday'], $leave['Status']]);
         $half = $days['Sok Dara|2026-09-09'];
         $this->assertSame(['Work', 'Unpaid leave (morning)'], [$half['Day type'], $half['Leave / holiday']]);
+        // The report shows the type's short code and colour, and the day's pay (0 = unpaid).
+        $this->assertSame(['UL', 'slate', '0'], [$leave['Leave code'], $leave['Leave colour'], $leave['Leave pay %']]);
+        $this->assertSame('UL', $half['Leave code']);
+        $this->assertSame(['', '', ''], [$days['Sok Dara|2026-09-15']['Leave code'], $days['Sok Dara|2026-09-15']['Leave colour'], $days['Sok Dara|2026-09-15']['Leave pay %']]);
         $this->assertSame(['Holiday', 'Pchum Ben', 'Off'], [$days['Sok Dara|2026-09-22']['Day type'], $days['Sok Dara|2026-09-22']['Leave / holiday'], $days['Sok Dara|2026-09-22']['Status']]);
         $this->assertSame(['Weekly off', 'Off'], [$days['Sok Dara|2026-09-06']['Day type'], $days['Sok Dara|2026-09-06']['Status']]);
 

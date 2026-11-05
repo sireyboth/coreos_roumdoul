@@ -4,6 +4,37 @@ import { currentLang } from "@/lib/i18n";
 import { API_URL, ApiError, getToken, request, requestAll } from "./client";
 import type { Paginated } from "./client";
 import type { Employee } from "./organization";
+import type { LeaveColor } from "./requests";
+
+// The report's day statuses. Only how each is shown (code, colour) can change, never what it means.
+export const DAY_STATUSES = ["P", "L", "E", "LE", "M", "A", "W", "H", "OFF"] as const;
+export type DayStatus = (typeof DAY_STATUSES)[number];
+// Colours a status can take; none is a leave type's colour, so leave always stands apart.
+export const DAY_COLORS = ["green", "amber", "yellow", "gold", "orange", "red", "blue", "gray", "light"] as const;
+export type DayColor = (typeof DAY_COLORS)[number];
+// Text colours for any code; "auto" = the background's own dark shade.
+export const TEXT_COLORS = ["auto", "dark", "white", "red", "green", "blue", "orange", "violet", "gray"] as const;
+export type TextColor = (typeof TEXT_COLORS)[number];
+
+// How one status looks wherever it is shown: its code, background, text colour and weight.
+export type StatusLook<C extends string = DayColor | LeaveColor> = { code: string; color: C; text: TextColor; bold: boolean };
+// A leave type's look (kept on the type itself), with what the settings page shows beside it.
+export type LeaveLook = {
+  id: number;
+  code: string;
+  name: string;
+  name_km: string | null;
+  report_code: string | null;
+  color: LeaveColor;
+  text: TextColor;
+  bold: boolean;
+  pay_percent: number;
+  is_active: boolean;
+};
+// Attendance → Status codes, loaded once for every screen: the company's own over the defaults.
+export type ReportCodes = { statuses: Record<DayStatus, StatusLook<DayColor>>; leave: LeaveLook[] };
+// What the settings page saves: every status, and the leave types it changed (by id).
+export type ReportCodesInput = { statuses: Record<DayStatus, StatusLook<DayColor>>; leave: Record<number, StatusLook<LeaveColor>> };
 
 export type AttendanceEvent = {
   id: number;
@@ -256,6 +287,11 @@ export const attendanceApi = {
     summary: (month: string, employeeId?: number) =>
       request<AttendanceSummary>(`/api/attendance/summary?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
     periods: () => request<AttendancePeriod[]>("/api/attendance/periods"),
+    // How the report shows each day status; managers change them, Reset brings back P, L, E…
+    reportCodes: () => request<ReportCodes>("/api/attendance/report-codes"),
+    updateReportCodes: (data: ReportCodesInput) =>
+      request<ReportCodes>("/api/attendance/report-codes", { method: "PUT", body: JSON.stringify(data) }),
+    resetReportCodes: () => request<ReportCodes>("/api/attendance/report-codes", { method: "DELETE" }),
     // ignorePendingOvertime: lock even though some overtime was never reviewed (it won't be paid).
     lockMonth: (month: string, ignorePendingOvertime = false) =>
       request<{ month: string; locked_at: string }>("/api/attendance/periods", {

@@ -6,6 +6,7 @@ export const nav = {
   "/dashboard/home": "Home",
   "/dashboard/attendance": "Attendance",
   "/dashboard/attendance/corrections": "Corrections",
+  "/dashboard/attendance/status-codes": "Status codes",
   "/dashboard/requests": "Leave",
   "/dashboard/calendar": "Calendar",
   "/dashboard/work-schedules": "Schedules",
