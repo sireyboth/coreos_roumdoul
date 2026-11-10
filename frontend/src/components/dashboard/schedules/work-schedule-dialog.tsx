@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Moon, Plus, X } from "lucide-react";
+import { AlarmClock, CalendarClock, Clock, Copy, FileText, Moon, Plus, Timer, X, CircleAlert } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,18 +9,18 @@ import {
   DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { api, ApiError, type OvertimeMode, type ScheduleSlot, type WorkSchedule, type WorkScheduleInput } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { formatMinutes, slotsOn, WEEK_ORDER, weekdayLong, weekdayShort } from "@/lib/schedule";
 import { translateNow, useLang, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
+import { ChoiceCards, FormField, FormSection, ToggleRow } from "@/components/dashboard/shared/form-section";
 
 /** One stretch of work: scan IN at `in`, scan OUT at `out`. */
 type Stretch = { in: string; out: string };
@@ -195,274 +195,247 @@ export function WorkScheduleDialog({
     }
   }
 
+
+  /** The working-day switch: on gives the day standard hours, off makes it a day without hours. */
+  function toggleWorking(weekday: number, working: boolean) {
+    if (working) addStretch(weekday);
+    else setDay(weekday, []);
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{schedule ? t("schedules.form.titleEdit", { name: schedule.name }) : t("schedules.form.titleNew")}</DialogTitle>
-          <DialogDescription>{t("schedules.form.description")}</DialogDescription>
+      <DialogContent className="flex h-[min(92dvh,920px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="flex-row items-center gap-3 border-b border-border px-5 py-4 pr-12 text-left">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-amber-500 to-orange-500 text-white shadow-sm">
+            <CalendarClock className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="text-lg">{schedule ? t("schedules.form.titleEdit", { name: schedule.name }) : t("schedules.form.titleNew")}</DialogTitle>
+            <DialogDescription>{t("schedules.form.description")}</DialogDescription>
+          </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ws-name">{t("schedules.form.name")}</Label>
-              <Input id="ws-name" required placeholder={t("schedules.form.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ws-description">{t("schedules.form.descriptionLabel")}</Label>
-              <Input id="ws-description" placeholder={t("schedules.form.descriptionPlaceholder")} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-4">
+              {/* 1. Basics. */}
+              <FormSection icon={FileText} tone="from-sky-500 to-indigo-500" title={t("schedules.form.basicsTitle")} hint={t("schedules.form.basicsHint")}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField id="ws-name" label={t("schedules.form.name")}>
+                    <Input id="ws-name" required placeholder={t("schedules.form.namePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
+                  </FormField>
+                  <FormField id="ws-description" label={t("schedules.form.descriptionLabel")}>
+                    <Input id="ws-description" placeholder={t("schedules.form.descriptionPlaceholder")} value={description} onChange={(e) => setDescription(e.target.value)} />
+                  </FormField>
+                </div>
+                <ToggleRow id="ws-auto" label={t("schedules.form.auto")} hint={t("schedules.form.autoHint")} checked={autoAttendance} onChange={setAutoAttendance} />
+                {schedule && <ToggleRow id="ws-active" label={t("schedules.form.active")} hint={t("schedules.form.activeHint")} checked={active} onChange={setActive} />}
+                <DisplayOrderField id="ws-order" value={sortOrder} onChange={setSortOrder} example={t("schedules.form.orderExample")} />
+              </FormSection>
+
+              {/* 2. Working hours, day by day. */}
+              <FormSection
+                icon={Clock}
+                tone="from-amber-500 to-orange-500"
+                title={t("schedules.form.hours")}
+                hint={t("schedules.form.hoursHint")}
+                aside={
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1 text-sm font-semibold tabular-nums">
+                    <Timer className="size-4 text-amber-500" />
+                    {t("schedules.form.weekTotal", { time: formatMinutes(weeklyMinutes, lang) })}
+                  </span>
+                }
+              >
+                <div className="flex justify-end">
+                  <Button type="button" variant="outline" size="sm" onClick={copyMondayToAll} disabled={week[1].length === 0}>
+                    <Copy className="size-3.5" />
+                    {t("schedules.form.copyMonday")}
+                  </Button>
+                </div>
+
+                {noHours && (
+                  <Alert variant={overtimeMode === "off" ? "warning" : "info"} title={t("schedules.form.overtimeOnlyTitle")}>
+                    {overtimeMode === "off" ? t("schedules.form.overtimeOnlyOff") : t("schedules.form.overtimeOnlyOn")}
+                  </Alert>
+                )}
+
+                <ul className="flex flex-col gap-2">
+                  {WEEK_ORDER.map((weekday) => {
+                    const stretches = week[weekday];
+                    const slots = toSlots(stretches);
+                    const working = stretches.length > 0;
+                    const day = weekdayLong(weekday, lang);
+                    return (
+                      <li
+                        key={weekday}
+                        className={cn(
+                          "flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-start",
+                          working ? "border-border bg-card" : "border-dashed border-border bg-transparent",
+                        )}
+                      >
+                        <div className="flex w-full shrink-0 items-center gap-2.5 pt-1 sm:w-44">
+                          <Switch checked={working} onCheckedChange={(on) => toggleWorking(weekday, on)} aria-label={t("schedules.form.dayWorking", { day })} />
+                          <span className={cn("text-sm font-medium", !working && "text-muted-foreground")}>{day}</span>
+                          {working && <span className="ml-auto text-xs text-muted-foreground tabular-nums sm:ml-0">{formatMinutes(dayMinutes(stretches), lang)}</span>}
+                        </div>
+
+                        <div className="flex min-w-0 flex-1 flex-col gap-2">
+                          {!working ? (
+                            <span className="pt-1.5 text-sm text-muted-foreground">{t("schedules.form.noHours")}</span>
+                          ) : (
+                            stretches.map((stretch, i) => (
+                              <div key={i} className="flex flex-wrap items-center gap-2">
+                                <span className="rounded bg-success/12 px-1.5 py-0.5 text-xs font-semibold text-success">{t("schedules.form.in")}</span>
+                                <Input
+                                  type="time"
+                                  required
+                                  aria-label={t("schedules.form.stretchIn", { day, n: i + 1 })}
+                                  value={stretch.in}
+                                  onChange={(e) => updateStretch(weekday, i, { in: e.target.value })}
+                                  className="w-30"
+                                />
+                                <span className="text-muted-foreground">→</span>
+                                <span className="rounded bg-destructive/12 px-1.5 py-0.5 text-xs font-semibold text-destructive">{t("schedules.form.out")}</span>
+                                <Input
+                                  type="time"
+                                  required
+                                  aria-label={t("schedules.form.stretchOut", { day, n: i + 1 })}
+                                  value={stretch.out}
+                                  onChange={(e) => updateStretch(weekday, i, { out: e.target.value })}
+                                  className="w-30"
+                                />
+                                {slots[i * 2 + 1]?.next_day && (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-info/12 px-1.5 py-0.5 text-xs text-info">
+                                    <Moon className="size-3" />
+                                    {t("schedules.form.nextDay")}
+                                  </span>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={t("schedules.form.removeHours")}
+                                  onClick={() => setDay(weekday, stretches.filter((_, j) => j !== i))}
+                                >
+                                  <X className="size-3.5" />
+                                </Button>
+                              </div>
+                            ))
+                          )}
+                          {working && stretches.length < 6 && (
+                            <Button type="button" variant="ghost" size="sm" className="self-start text-primary" onClick={() => addStretch(weekday)}>
+                              <Plus className="size-3.5" />
+                              {t("schedules.form.addStretch")}
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                {/* Suggested weekly days off (pre-filled when assigning). */}
+                <div className="flex flex-col gap-2 rounded-lg bg-muted/50 px-3 py-3">
+                  <div>
+                    <p className="text-sm font-medium">{t("schedules.form.daysOff")}</p>
+                    <p className="text-xs text-muted-foreground">{t("schedules.form.daysOffHint")}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WEEK_ORDER.map((weekday) => (
+                      <button
+                        key={weekday}
+                        type="button"
+                        aria-pressed={daysOff.includes(weekday)}
+                        onClick={() => toggleDayOff(weekday)}
+                        className={cn(
+                          "h-9 min-w-12 rounded-full border px-3 text-sm font-medium transition-colors",
+                          daysOff.includes(weekday) ? "border-primary bg-primary text-primary-foreground" : "border-input bg-card hover:bg-muted",
+                        )}
+                      >
+                        {weekdayShort(weekday, lang)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </FormSection>
+
+              {/* 3. Late, early leave and break. */}
+              <FormSection icon={AlarmClock} tone="from-rose-500 to-pink-500" title={t("schedules.form.tolerances")} hint={t("schedules.form.tolerancesHint")}>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <FormField id="ws-late" label={t("schedules.form.late")} hint={t("schedules.form.lateHint")}>
+                    <Input id="ws-late" type="number" min={0} max={240} value={lateGrace} onChange={(e) => setLateGrace(e.target.value)} />
+                  </FormField>
+                  <FormField id="ws-early" label={t("schedules.form.early")} hint={t("schedules.form.earlyHint")}>
+                    <Input id="ws-early" type="number" min={0} max={240} value={earlyGrace} onChange={(e) => setEarlyGrace(e.target.value)} />
+                  </FormField>
+                  <FormField id="ws-break" label={t("schedules.form.break")} hint={singleStretchDays ? t("schedules.form.breakHint") : t("schedules.form.breakNotNeeded")}>
+                    <Input
+                      id="ws-break"
+                      type="number"
+                      min={0}
+                      max={480}
+                      value={breakMinutes}
+                      onChange={(e) => setBreakMinutes(e.target.value)}
+                      disabled={!singleStretchDays}
+                    />
+                  </FormField>
+                </div>
+                {singleStretchDays && <ToggleRow id="ws-break-paid" label={t("schedules.form.breakPaid")} checked={breakPaid} onChange={setBreakPaid} />}
+              </FormSection>
+
+              {/* 4. Overtime. */}
+              <FormSection icon={Moon} tone="from-violet-500 to-fuchsia-500" title={t("schedules.form.overtime")} hint={t("schedules.form.overtimeHint")}>
+                <ChoiceCards
+                  name="overtime-mode"
+                  value={overtimeMode}
+                  onChange={setOvertimeMode}
+                  options={OVERTIME_MODES.map((mode) => ({
+                    value: mode,
+                    label: t(`schedules.form.mode.${mode}`),
+                    help: t(`schedules.form.mode.${mode}Help`),
+                  }))}
+                />
+
+                {overtimeMode !== "off" && (
+                  <div className="flex flex-col gap-3">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField id="ws-ot-min" label={t("schedules.form.ignoreShorter")}>
+                        <Input id="ws-ot-min" type="number" min={0} max={480} value={overtimeMin} onChange={(e) => setOvertimeMin(e.target.value)} />
+                      </FormField>
+                      <FormField id="ws-ot-round" label={t("schedules.form.roundDown")}>
+                        <select id="ws-ot-round" value={overtimeRound} onChange={(e) => setOvertimeRound(e.target.value)} className={SELECT_CLASS}>
+                          <option value="0">{t("schedules.form.exactMinutes")}</option>
+                          {[5, 10, 15, 30, 60].map((m) => (
+                            <option key={m} value={m}>
+                              {m === 60 ? t("schedules.form.wholeHours") : t("schedules.form.minutes", { n: m })}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                    </div>
+                    <ToggleRow id="ws-ot-early" label={t("schedules.form.countEarly")} checked={overtimeEarly} onChange={setOvertimeEarly} />
+                    <ToggleRow id="ws-ot-approval" label={t("schedules.form.needsApproval")} checked={overtimeApproval} onChange={setOvertimeApproval} />
+                    <p className="text-xs text-muted-foreground">{t("schedules.form.dayOffNote")}</p>
+                  </div>
+                )}
+              </FormSection>
             </div>
           </div>
 
-          {/* ── The week ── */}
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold">{t("schedules.form.hours")}</h3>
-                <p className="text-xs text-muted-foreground">{t("schedules.form.perWeek", { time: formatMinutes(weeklyMinutes, lang) })}</p>
-              </div>
-              <Button type="button" variant="outline" size="sm" onClick={copyMondayToAll} disabled={week[1].length === 0}>
-                <Copy className="size-3.5" />
-                {t("schedules.form.copyMonday")}
-              </Button>
-            </div>
-
-            {noHours && (
-              <Alert variant={overtimeMode === "off" ? "warning" : "info"} title={t("schedules.form.overtimeOnlyTitle")}>
-                {overtimeMode === "off" ? t("schedules.form.overtimeOnlyOff") : t("schedules.form.overtimeOnlyOn")}
-              </Alert>
+          {/* Footer: always in view, so Save is never a scroll away. */}
+          <div className="flex items-center justify-end gap-3 border-t border-border bg-popover px-5 py-3">
+            {/* The error sits next to Save, so it's seen right where the click happened. */}
+            {error && (
+              <p role="alert" className="mr-auto flex min-w-0 items-start gap-1.5 text-sm text-destructive">
+                <CircleAlert className="mt-0.5 size-4 shrink-0" />
+                <span className="line-clamp-2">{error}</span>
+              </p>
             )}
-
-            <ul className="divide-y divide-border rounded-lg border border-border">
-              {WEEK_ORDER.map((weekday) => {
-                const stretches = week[weekday];
-                const slots = toSlots(stretches);
-                return (
-                  <li key={weekday} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-start">
-                    <div className="flex w-32 shrink-0 items-center justify-between gap-2 pt-1.5 sm:justify-start">
-                      <span className="text-sm font-medium">{weekdayLong(weekday, lang)}</span>
-                      {stretches.length > 0 && <span className="text-xs text-muted-foreground">{formatMinutes(dayMinutes(stretches), lang)}</span>}
-                    </div>
-
-                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                      {stretches.length === 0 ? (
-                        <div className="flex items-center gap-3 pt-1">
-                          <span className="text-sm text-muted-foreground">{t("schedules.form.noHours")}</span>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => addStretch(weekday)}>
-                            <Plus className="size-3.5" />
-                            {t("schedules.form.addHours")}
-                          </Button>
-                        </div>
-                      ) : (
-                        stretches.map((stretch, i) => (
-                          <div key={i} className="flex flex-wrap items-center gap-2">
-                            <span className="w-8 text-xs font-semibold text-success">{t("schedules.form.in")}</span>
-                            <Input
-                              type="time"
-                              required
-                              aria-label={t("schedules.form.stretchIn", { day: weekdayLong(weekday, lang), n: i + 1 })}
-                              value={stretch.in}
-                              onChange={(e) => updateStretch(weekday, i, { in: e.target.value })}
-                              className="w-32"
-                            />
-                            <span className="text-muted-foreground">→</span>
-                            <span className="w-9 text-xs font-semibold text-destructive">{t("schedules.form.out")}</span>
-                            <Input
-                              type="time"
-                              required
-                              aria-label={t("schedules.form.stretchOut", { day: weekdayLong(weekday, lang), n: i + 1 })}
-                              value={stretch.out}
-                              onChange={(e) => updateStretch(weekday, i, { out: e.target.value })}
-                              className="w-32"
-                            />
-                            {slots[i * 2 + 1]?.next_day && (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-info/12 px-1.5 py-0.5 text-xs text-info">
-                                <Moon className="size-3" />
-                                {t("schedules.form.nextDay")}
-                              </span>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={t("schedules.form.removeHours")}
-                              onClick={() => setDay(weekday, stretches.filter((_, j) => j !== i))}
-                            >
-                              <X className="size-3.5" />
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                      {stretches.length > 0 && stretches.length < 6 && (
-                        <Button type="button" variant="ghost" size="sm" className="self-start" onClick={() => addStretch(weekday)}>
-                          <Plus className="size-3.5" />
-                          {t("schedules.form.addStretch")}
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          {/* ── Scanning ── */}
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">{t("schedules.form.scanning")}</h3>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={autoAttendance}
-                onChange={(e) => setAutoAttendance(e.target.checked)}
-                className="mt-0.5 size-4 rounded border-input"
-              />
-              <span className="flex flex-col">
-                {t("schedules.form.auto")}
-                <span className="text-xs text-muted-foreground">{t("schedules.form.autoHint")}</span>
-              </span>
-            </label>
-          </section>
-
-          {/* ── Tolerances ── */}
-          <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">{t("schedules.form.tolerances")}</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-late">{t("schedules.form.late")}</Label>
-                <Input id="ws-late" type="number" min={0} max={240} value={lateGrace} onChange={(e) => setLateGrace(e.target.value)} />
-                <p className="text-xs text-muted-foreground">{t("schedules.form.lateHint")}</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-early">{t("schedules.form.early")}</Label>
-                <Input id="ws-early" type="number" min={0} max={240} value={earlyGrace} onChange={(e) => setEarlyGrace(e.target.value)} />
-                <p className="text-xs text-muted-foreground">{t("schedules.form.earlyHint")}</p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="ws-break">{t("schedules.form.break")}</Label>
-                <Input
-                  id="ws-break"
-                  type="number"
-                  min={0}
-                  max={480}
-                  value={breakMinutes}
-                  onChange={(e) => setBreakMinutes(e.target.value)}
-                  disabled={!singleStretchDays}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {singleStretchDays ? t("schedules.form.breakHint") : t("schedules.form.breakNotNeeded")}
-                </p>
-              </div>
-            </div>
-            {singleStretchDays && (
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={breakPaid} onChange={(e) => setBreakPaid(e.target.checked)} className="size-4 rounded border-input" />
-                {t("schedules.form.breakPaid")}
-              </label>
-            )}
-          </section>
-
-          {/* ── Days off ── */}
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">{t("schedules.form.daysOff")}</h3>
-            <p className="-mt-1 text-xs text-muted-foreground">{t("schedules.form.daysOffHint")}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {WEEK_ORDER.map((weekday) => (
-                <button
-                  key={weekday}
-                  type="button"
-                  aria-pressed={daysOff.includes(weekday)}
-                  onClick={() => toggleDayOff(weekday)}
-                  className={cn(
-                    "h-8 w-12 rounded-md border text-sm font-medium transition-colors",
-                    daysOff.includes(weekday) ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-muted",
-                  )}
-                >
-                  {weekdayShort(weekday, lang)}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          {/* ── Overtime ── */}
-          <section className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold">{t("schedules.form.overtime")}</h3>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {OVERTIME_MODES.map((mode) => (
-                <label
-                  key={mode}
-                  className={cn(
-                    "flex cursor-pointer flex-col gap-1 rounded-lg border p-3 text-sm transition-colors",
-                    overtimeMode === mode ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
-                  )}
-                >
-                  <span className="flex items-center gap-2 font-medium">
-                    <input
-                      type="radio"
-                      name="overtime-mode"
-                      checked={overtimeMode === mode}
-                      onChange={() => setOvertimeMode(mode)}
-                      className="size-4"
-                    />
-                    {t(`schedules.form.mode.${mode}`)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{t(`schedules.form.mode.${mode}Help`)}</span>
-                </label>
-              ))}
-            </div>
-
-            {overtimeMode !== "off" && (
-              <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="ws-ot-min">{t("schedules.form.ignoreShorter")}</Label>
-                  <Input id="ws-ot-min" type="number" min={0} max={480} value={overtimeMin} onChange={(e) => setOvertimeMin(e.target.value)} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="ws-ot-round">{t("schedules.form.roundDown")}</Label>
-                  <select id="ws-ot-round" value={overtimeRound} onChange={(e) => setOvertimeRound(e.target.value)} className={SELECT_CLASS}>
-                    <option value="0">{t("schedules.form.exactMinutes")}</option>
-                    {[5, 10, 15, 30, 60].map((m) => (
-                      <option key={m} value={m}>
-                        {m === 60 ? t("schedules.form.wholeHours") : t("schedules.form.minutes", { n: m })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={overtimeEarly} onChange={(e) => setOvertimeEarly(e.target.checked)} className="size-4 rounded border-input" />
-                  {t("schedules.form.countEarly")}
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={overtimeApproval}
-                    onChange={(e) => setOvertimeApproval(e.target.checked)}
-                    className="size-4 rounded border-input"
-                  />
-                  {t("schedules.form.needsApproval")}
-                </label>
-                <p className="text-xs text-muted-foreground sm:col-span-2">{t("schedules.form.dayOffNote")}</p>
-              </div>
-            )}
-          </section>
-
-          {schedule && (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="size-4 rounded border-input" />
-              {t("schedules.form.active")}
-            </label>
-          )}
-
-          <DisplayOrderField id="ws-order" value={sortOrder} onChange={setSortOrder} example={t("schedules.form.orderExample")} />
-
-          {error && <Alert variant="destructive">{error}</Alert>}
-
-          <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
             <Button type="submit" disabled={saving}>
               {saving ? t("common.message.saving") : schedule ? t("common.action.saveChanges") : t("schedules.form.create")}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

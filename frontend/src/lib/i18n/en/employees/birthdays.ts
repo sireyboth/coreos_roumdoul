@@ -10,9 +10,22 @@ export const birthdays = {
   emptyTitle: "No birthdays yet",
   emptyHint: "Add a date of birth on an employee's profile and it will appear here.",
 
+  // ── Hero banner ──────────────────────────────────────────────────
+  heroToday: "Happy birthday!",
+  heroTodayHint: "Today is a special day for {names}. Don't forget to wish them well!",
+  heroNone: "No birthdays today",
+  heroNext: "Next up: {name}, {when} ({date})",
+  heroNothingSoon: "Nobody has a birthday coming up.",
+
   // ── Totals ───────────────────────────────────────────────────────
   next7Days: "Next 7 days",
   onFile: "With a birthday on file",
+
+  // ── Columns ──────────────────────────────────────────────────────
+  thisMonth: "This month",
+  next3Months: "Next 3 months",
+  later: "Later",
+  columnEmpty: "No birthdays here.",
 
   // ── List ─────────────────────────────────────────────────────────
   search: "Search by name, ID, branch or department…",

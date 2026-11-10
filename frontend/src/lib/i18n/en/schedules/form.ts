@@ -6,14 +6,18 @@ export const form = {
   titleEdit: "Edit \"{name}\"",
   description:
     "When people on this schedule should scan in and out. Add as many IN → OUT stretches per day as you need — a split shift is simply two.",
+  basicsTitle: "About this schedule",
+  basicsHint: "A name people will recognise when they assign it.",
   name: "Name",
   namePlaceholder: "Split shift",
   descriptionLabel: "Description (optional)",
   descriptionPlaceholder: "Shop floor, Mon–Sat",
 
   // ── Hours ─────────────────────────────────────────────────────────
-  hours: "Hours",
-  perWeek: "{time} per week. A time earlier than the one before it is the next morning (night shifts).",
+  hours: "Working hours",
+  hoursHint: "Turn each day on or off, then set when people scan IN and OUT. A time earlier than the one before it is the next morning (night shifts).",
+  weekTotal: "{time} / week",
+  dayWorking: "{day}: working day",
   copyMonday: "Copy Monday to every working day",
   overtimeOnlyTitle: "Overtime-only schedule",
   overtimeOnlyOff: "No day has hours. Turn overtime on below to save it as an overtime-only schedule, or add hours.",
@@ -30,13 +34,13 @@ export const form = {
   addStretch: "Add a stretch (e.g. after lunch)",
 
   // ── Scanning ──────────────────────────────────────────────────────
-  scanning: "Scanning",
   auto: "Automatic attendance — no scanning needed",
   autoHint:
     "For top management and others who don't scan. Each IN and OUT is recorded at its scheduled time once it passes, so they're never late or absent. Holidays and days off still apply.",
 
   // ── Tolerances ────────────────────────────────────────────────────
-  tolerances: "Tolerances",
+  tolerances: "Late, early leave & break",
+  tolerancesHint: "How much grace people get before a scan counts against them.",
   late: "Late after (min)",
   lateHint: "Grace after each IN before it counts as late.",
   early: "Early leave allowance (min)",
@@ -52,6 +56,7 @@ export const form = {
 
   // ── Overtime ──────────────────────────────────────────────────────
   overtime: "Overtime",
+  overtimeHint: "Whether time beyond the schedule counts as overtime.",
   mode: {
     off: "Don't count overtime",
     offHelp: "Time past the schedule is recorded as worked, but never as overtime.",
@@ -70,7 +75,8 @@ export const form = {
   dayOffNote: "Work on a day off or a holiday is overtime in full, recorded as day-off or holiday overtime.",
 
   // ── Status & order ────────────────────────────────────────────────
-  active: "Active — inactive schedules can't be newly assigned",
+  active: "Active",
+  activeHint: "Inactive schedules can't be newly assigned.",
   orderExample: "the most used schedule",
 
   // ── Footer & messages ─────────────────────────────────────────────

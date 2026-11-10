@@ -23,6 +23,9 @@ export const listPage: Dictionary["employees"]["listPage"] = {
   deleteN: "លុប {n}",
   emptyHint: "សូមបន្ថែមបុគ្គលិកដំបូង ដើម្បីចាប់ផ្តើមបង្កើតបញ្ជីបុគ្គលិករបស់លោកអ្នក។",
 
+  // ── Cards (grouped by branch) ────────────────────────────────────
+  noBranch: "គ្មានសាខា",
+
   // ── Delete ───────────────────────────────────────────────────────
   deleteManyTitle: "លុបបុគ្គលិក {n} នាក់?",
   deletedOne: "បានលុបបុគ្គលិក 1 នាក់",

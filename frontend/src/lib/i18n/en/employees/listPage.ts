@@ -21,6 +21,9 @@ export const listPage = {
   deleteN: "Delete {n}",
   emptyHint: "Add your first employee to start building your team directory.",
 
+  // ── Cards (grouped by branch) ────────────────────────────────────
+  noBranch: "No branch",
+
   // ── Delete ───────────────────────────────────────────────────────
   deleteManyTitle: "Delete {n} employees?",
   deletedOne: "1 employee deleted",

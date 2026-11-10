@@ -18,7 +18,6 @@ export const page = {
   // ── Table ─────────────────────────────────────────────────────────
   column: {
     schedule: "Schedule",
-    week: "Week",
     hours: "Hours / week",
     rules: "Rules",
     people: "People",
@@ -36,7 +35,6 @@ export const page = {
   emptyText: "Create one — for example 08:00–17:00, or a split shift 08:00–12:00 and 13:00–17:00 — then assign it to people.",
 
   // ── Row actions ───────────────────────────────────────────────────
-  people: "People ({n})",
   assign: "Assign",
 
   // ── Delete ────────────────────────────────────────────────────────

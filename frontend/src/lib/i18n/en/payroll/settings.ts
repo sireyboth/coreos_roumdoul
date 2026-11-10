@@ -8,6 +8,16 @@ export const settings = {
   lawTitle: "Tax on salary and NSSF are set by law",
   lawText: "Their rates are kept up to date by the platform and can't be changed here. Each employee's dependents and NSSF enrolment are on their Pay tab.",
 
+  // ── Tabs ──────────────────────────────────────────────────────────
+  tabs: {
+    start: "Quick start",
+    groups: "Pay groups",
+    rules: "Pay rules",
+    components: "Pay components",
+  },
+  nextStepBefore: "Next, check your",
+  nextStepAfter: "to choose when each group of staff gets paid.",
+
   // ── Presets ───────────────────────────────────────────────────────
   presetTitle: "Start from a preset",
   presetText: "Sets sensible rules in one click. You can fine-tune everything afterwards.",
@@ -21,6 +31,18 @@ export const settings = {
   policy: {
     title: "How pay is worked out",
     description: "Day and hour rates, missing scans and rounding, for every pay group that doesn't set its own. Changes apply the next time a pay run is calculated.",
+    rateGroup: "Daily & hourly rate",
+    rateGroupHint: "How a monthly salary turns into one day's and one hour's pay.",
+    attendanceGroup: "Attendance",
+    attendanceGroupHint: "What to do with missed scans and public holidays.",
+    moneyGroup: "Money & rounding",
+    moneyGroupHint: "Riel exchange rate and how net pay is rounded.",
+    lawGroup: "Labor law",
+    lawGroupHint: "Protection the Cambodian Labor Law gives your staff.",
+    example: "Example: a {salary} salary ÷ {days} days = {daily} a day, ÷ {hours} hours = {hourly} an hour.",
+    exampleVaries: "The real number of days changes each month or person; this example uses {days}.",
+    unsaved: "You have unsaved changes.",
+    undo: "Undo changes",
     dailyRate: "Daily rate",
     basisFixed: "Monthly salary ÷ a fixed number of days",
     basisCalendar: "Monthly salary ÷ days in the month",
@@ -42,7 +64,9 @@ export const settings = {
     round500: "Nearest 500 ៛",
     round1000: "Nearest 1,000 ៛",
     holidays: "Pay daily-paid staff for public holidays",
-    overtimeMinimums: "Hold overtime to the Labor Law minimums (150% on work days, 200% on days off and holidays)",
+    holidaysHint: "Only affects staff who are paid by the day.",
+    overtimeMinimums: "Keep overtime at the Labor Law minimums",
+    overtimeHint: "At least 150% on work days and 200% on days off and public holidays. Recommended.",
     overtimeWarning: "Overtime rates can now be set to any value. Paying below the Labor Law minimums may expose the company to back-pay claims and fines; the company is responsible for its overtime policy.",
     save: "Save settings",
     saved: "Payroll settings saved",

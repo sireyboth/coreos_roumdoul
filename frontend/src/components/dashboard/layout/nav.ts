@@ -115,6 +115,15 @@ export function canSee(item: NavItem, me: Access): boolean {
 }
 
 /**
+ * The URL a menu link should open. Phones are sent from /dashboard to the
+ * app-style home screen (app/dashboard/page.tsx), so a link that names the
+ * dashboard asks to stay with ?view=full — otherwise tapping it lands back on Home.
+ */
+export function navLink(href: string): string {
+  return href === "/dashboard" ? "/dashboard?view=full" : href;
+}
+
+/**
  * Where someone lands after signing in: the dashboard if their role has it,
  * otherwise the first page they can actually use (an employee's attendance).
  */

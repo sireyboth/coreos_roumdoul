@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarRange, Hourglass, KeyRound, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { CalendarRange, Hourglass, KeyRound, Plus, Trash2, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CreateLoginDialog } from "@/components/dashboard/employees/create-login-dialog";
 import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { EmployeeCardGrid } from "@/components/dashboard/employees/employee-card-grid";
 import { EMPLOYMENT_STATUSES, EMPLOYMENT_TYPES, labelIn, optionsIn, statusVariant } from "@/components/dashboard/employees/employee-form";
 import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { PlanLimitAlert } from "@/components/dashboard/layout/plan-limit-alert";
@@ -451,6 +452,21 @@ function EmployeesPageContent() {
               filters={filters}
               searchPlaceholder={t("employees.listPage.search")}
               onRowClick={open}
+              // Profile cards, one section per branch (the table columns above still drive search and sort).
+              pageSizeOptions={[24, 48, 96]}
+              renderRows={(rows, { checkbox, isSelected, allRows, anySelected }) => (
+                <EmployeeCardGrid
+                  employees={rows}
+                  checkbox={checkbox}
+                  isSelected={isSelected}
+                  allEmployees={allRows}
+                  anySelected={anySelected}
+                  canManage={canManage}
+                  onOpen={open}
+                  onDelete={handleDelete}
+                  onCreateLogin={setLoginFor}
+                />
+              )}
               bulkActions={
                 canManage
                   ? (selected, clearSelection) => (
@@ -466,20 +482,6 @@ function EmployeesPageContent() {
                 title: t("employees.shared.noEmployees"),
                 description: t("employees.listPage.emptyHint"),
               }}
-              rowActions={(employee) => (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => open(employee)}>
-                    <Pencil className="size-3.5" />
-                    {canManage ? t("common.action.edit") : t("common.action.view")}
-                  </Button>
-                  {canManage && (
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(employee)}>
-                      <Trash2 className="size-3.5" />
-                      {t("common.action.delete")}
-                    </Button>
-                  )}
-                </>
-              )}
             />
           </>
         )}

@@ -1,8 +1,23 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { BookOpen, Check, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Lightbulb,
+  Lock,
+  PlayCircle,
+  Rocket,
+  Users,
+  Wallet,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,14 +32,24 @@ import { useT } from "@/lib/i18n";
 
 export type GuideTopic = "start" | "groups" | "salary" | "run" | "adjustments" | "locks" | "faq";
 
-const TOPICS: GuideTopic[] = ["start", "groups", "salary", "run", "adjustments", "locks", "faq"];
+/** The topics in reading order, each with its icon and colour (side menu and heading). */
+const TOPICS: { key: GuideTopic; icon: LucideIcon; tone: string }[] = [
+  { key: "start", icon: Rocket, tone: "from-sky-500 to-indigo-500" },
+  { key: "groups", icon: Users, tone: "from-violet-500 to-fuchsia-500" },
+  { key: "salary", icon: Wallet, tone: "from-emerald-500 to-teal-500" },
+  { key: "run", icon: PlayCircle, tone: "from-amber-400 to-orange-500" },
+  { key: "adjustments", icon: ArrowUpDown, tone: "from-rose-500 to-pink-500" },
+  { key: "locks", icon: Lock, tone: "from-slate-500 to-slate-700" },
+  { key: "faq", icon: CircleHelp, tone: "from-cyan-500 to-blue-500" },
+];
 
+/** Numbered steps, each on its own soft row. */
 function Steps({ items }: { items: React.ReactNode[] }) {
   return (
-    <ol className="flex flex-col gap-2">
+    <ol className="flex flex-col gap-2.5">
       {items.map((item, i) => (
-        <li key={i} className="flex gap-3 text-sm">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{i + 1}</span>
+        <li key={i} className="flex gap-3.5 rounded-xl border border-border bg-card px-4 py-3 text-[15px] leading-relaxed">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">{i + 1}</span>
           <span className="pt-0.5">{item}</span>
         </li>
       ))}
@@ -32,27 +57,38 @@ function Steps({ items }: { items: React.ReactNode[] }) {
   );
 }
 
+/** A worked example: a titled card of "label … value" rows. */
 function Example({ title, rows, note }: { title: string; rows: [string, string][]; note?: string }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-3">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      {rows.map(([label, value]) => (
-        <div key={`${label}|${value}`} className="flex items-baseline justify-between gap-4 py-0.5 text-sm">
-          <span>{label}</span>
-          <span className="shrink-0 tabular-nums">{value}</span>
-        </div>
-      ))}
-      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <p className="border-b border-border bg-muted/50 px-4 py-2 text-sm font-semibold">{title}</p>
+      <div className="px-4 py-2.5">
+        {rows.map(([label, value]) => (
+          <div key={`${label}|${value}`} className="flex items-baseline justify-between gap-4 py-1 text-[15px]">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="shrink-0 font-medium tabular-nums">{value}</span>
+          </div>
+        ))}
+        {note && (
+          <p className="mt-1.5 flex gap-1.5 text-sm text-muted-foreground">
+            <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
+            {note}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
+/** Bullet lists inside a topic: same size and colour as the paragraphs. */
+const LIST = "flex list-disc flex-col gap-1.5 pl-5 text-[15px] leading-relaxed text-foreground/80 marker:text-primary";
+
 function H({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-semibold">{children}</h3>;
+  return <h3 className="pt-1 text-base font-semibold">{children}</h3>;
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>;
+  return <p className="text-[15px] leading-relaxed text-foreground/80">{children}</p>;
 }
 
 function Topic({ topic }: { topic: GuideTopic }) {
@@ -191,7 +227,7 @@ function Topic({ topic }: { topic: GuideTopic }) {
             ]}
           />
           <H>{t("payroll.guide.run.checkTitle")}</H>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground">
+          <ul className={LIST}>
             <li>{t("payroll.guide.run.check1")}</li>
             <li>{t("payroll.guide.run.check2")}</li>
             <li>{t("payroll.guide.run.check3")}</li>
@@ -212,7 +248,7 @@ function Topic({ topic }: { topic: GuideTopic }) {
             note={t("payroll.guide.adjustments.exNote")}
           />
           <H>{t("payroll.guide.adjustments.typesTitle")}</H>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground">
+          <ul className={LIST}>
             <li>
               <b>{t("payroll.shared.kind.earning")}</b> {t("payroll.guide.adjustments.earningText")}
             </li>
@@ -231,7 +267,7 @@ function Topic({ topic }: { topic: GuideTopic }) {
         <div className="flex flex-col gap-4">
           <P>{t("payroll.guide.locks.intro")}</P>
           <H>{t("payroll.guide.locks.cantTitle")}</H>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground">
+          <ul className={LIST}>
             <li>{t("payroll.guide.locks.cant1")}</li>
             <li>{t("payroll.guide.locks.cant2")}</li>
             <li>{t("payroll.guide.locks.cant3")}</li>
@@ -255,9 +291,12 @@ function Topic({ topic }: { topic: GuideTopic }) {
               ["payroll.guide.faq.q6", "payroll.guide.faq.a6"],
             ] as const
           ).map(([q, a]) => (
-            <div key={q}>
-              <H>{t(q)}</H>
-              <P>{t(a)}</P>
+            <div key={q} className="rounded-xl border border-border bg-card px-4 py-3">
+              <p className="flex gap-2 font-semibold">
+                <CircleHelp className="mt-0.5 size-4 shrink-0 text-cyan-500" />
+                {t(q)}
+              </p>
+              <p className="mt-1 pl-6 text-[15px] leading-relaxed text-foreground/80">{t(a)}</p>
             </div>
           ))}
         </div>
@@ -265,22 +304,29 @@ function Topic({ topic }: { topic: GuideTopic }) {
   }
 }
 
-/** The whole guide, opening on one topic. */
+/**
+ * The whole guide, opening on one topic: a big dialog with the topics in a side
+ * menu (a scrolling row on a phone), the topic on the right, and Back / Next so
+ * it reads like a short course.
+ */
 export function PayrollGuideDialog({ open, onOpenChange, topic = "start" }: { open: boolean; onOpenChange: (o: boolean) => void; topic?: GuideTopic }) {
   const t = useT();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="size-4" /> {t("payroll.guide.title")}
-          </DialogTitle>
-          <DialogDescription>
-            {t("payroll.guide.description")}{" "}
-            <Link href="/docs-cthh5ueij8/payroll" target="_blank" className="text-primary underline-offset-4 hover:underline">
-              {t("payroll.guide.docs")}
-            </Link>
-          </DialogDescription>
+      <DialogContent className="flex h-[min(88dvh,780px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
+        <DialogHeader className="flex-row items-center gap-3 border-b border-border px-5 py-4 pr-12 text-left">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-fuchsia-500 text-white shadow-sm">
+            <BookOpen className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="text-lg">{t("payroll.guide.title")}</DialogTitle>
+            <DialogDescription>
+              {t("payroll.guide.description")}{" "}
+              <Link href="/docs-cthh5ueij8/payroll" target="_blank" className="text-primary underline-offset-4 hover:underline">
+                {t("payroll.guide.docs")}
+              </Link>
+            </DialogDescription>
+          </div>
         </DialogHeader>
         {/* Keyed so every opening starts on the topic it was opened for. */}
         <GuideBody key={open ? topic : "closed"} topic={topic} />
@@ -292,30 +338,83 @@ export function PayrollGuideDialog({ open, onOpenChange, topic = "start" }: { op
 function GuideBody({ topic }: { topic: GuideTopic }) {
   const t = useT();
   const [current, setCurrent] = useState(topic);
+  const scroller = useRef<HTMLDivElement>(null);
+  const index = TOPICS.findIndex((item) => item.key === current);
+  const active = TOPICS[index];
+  const previous = TOPICS[index - 1];
+  const next = TOPICS[index + 1];
+
+  /** Opens a topic and starts reading it from the top. */
+  function go(key: GuideTopic) {
+    setCurrent(key);
+    scroller.current?.scrollTo({ top: 0 });
+  }
 
   return (
-    <>
-      <div className="flex flex-wrap gap-1.5" role="tablist">
-        {TOPICS.map((key) => (
+    <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      {/* Topics: a side menu on wide screens, a scrolling row on a phone. */}
+      <nav
+        role="tablist"
+        aria-orientation="vertical"
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-muted/30 p-2 md:w-60 md:flex-col md:overflow-y-auto md:border-r md:border-b-0 md:p-3"
+      >
+        {TOPICS.map(({ key, icon: Icon, tone }) => (
           <button
             key={key}
             type="button"
             role="tab"
             aria-selected={current === key}
-            onClick={() => setCurrent(key)}
+            onClick={() => go(key)}
             className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              current === key ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground hover:text-foreground",
+              "flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium whitespace-nowrap transition-colors",
+              current === key ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
             )}
           >
+            <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg bg-linear-to-br text-white", tone)}>
+              <Icon className="size-4" />
+            </span>
             {t(`payroll.guide.topic.${key}`)}
           </button>
         ))}
+      </nav>
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6">
+          <div className="mx-auto flex max-w-2xl flex-col gap-5">
+            <div className="flex items-center gap-3">
+              <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl bg-linear-to-br text-white shadow-sm", active.tone)}>
+                <active.icon className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground tabular-nums">
+                  {index + 1} / {TOPICS.length}
+                </p>
+                <h2 className="text-xl font-bold tracking-tight">{t(`payroll.guide.topic.${current}`)}</h2>
+              </div>
+            </div>
+            <Topic topic={current} />
+          </div>
+        </div>
+
+        {/* Back / Next, named so you know where you're going. */}
+        <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-3">
+          {previous ? (
+            <Button variant="outline" onClick={() => go(previous.key)}>
+              <ChevronLeft className="size-4" />
+              <span className="max-w-36 truncate">{t(`payroll.guide.topic.${previous.key}`)}</span>
+            </Button>
+          ) : (
+            <span />
+          )}
+          {next && (
+            <Button onClick={() => go(next.key)}>
+              <span className="max-w-36 truncate">{t(`payroll.guide.topic.${next.key}`)}</span>
+              <ChevronRight className="size-4" />
+            </Button>
+          )}
+        </div>
       </div>
-      <div className="pt-1">
-        <Topic topic={current} />
-      </div>
-    </>
+    </div>
   );
 }
 
