@@ -21,6 +21,20 @@ export const adjustments = {
   removeText: "For {employee}, {date}.",
   thisEmployee: "this employee",
 
+  // ── Report preview (view only) ────────────────────────────────────
+  preview: {
+    button: "Preview report",
+    title: "Payroll report · {month}",
+    description: "The pay run's report, to check how these adjustments land. View only — print or save it from the pay run.",
+    chooseRun: "Pay run",
+    noRun: "No pay run for this month yet",
+    noRunText: "Create the pay run for this month on the Payroll page, then preview its report here.",
+    stale: "Not recalculated yet",
+    staleText: "Something changed since this run was last calculated (for example a new adjustment), so these figures don't include it yet. Recalculate the run to see it.",
+    openRun: "Open pay run",
+    frameTitle: "Payroll report preview",
+  },
+
   // ── Add dialog ────────────────────────────────────────────────────
   dialog: {
     description: "A one-off amount — a bonus, commission, penalty or back pay. It goes on the payslip of the pay period that holds its date.",

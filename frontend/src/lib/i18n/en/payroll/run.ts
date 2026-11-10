@@ -22,6 +22,12 @@ export const run = {
   pdfPaymentsHint: "Adds bank accounts and a cash signature sheet",
   csv: "Spreadsheet (CSV)",
   csvHint: "One row per payslip, for the bank or accountant",
+  missingBankOne: "{n} person paid by bank has no bank account",
+  missingBankOther: "{n} people paid by bank have no bank account",
+  missingBankText: "Their bank name or account number is missing, so the bank can't pay them. Add it on their employee profile first, or export anyway.",
+  missingBankMore: "and {n} more",
+  exportAnyway: "Export anyway",
+  goBackFix: "Go back and fix",
 
   // ── Actions ───────────────────────────────────────────────────────
   recalculate: "Recalculate",

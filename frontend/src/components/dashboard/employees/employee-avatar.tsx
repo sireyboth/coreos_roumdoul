@@ -4,10 +4,12 @@ import { useState } from "react";
 import { photoSrc } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+/** First letter of the first two words. Skips brackets and symbols, so "SREYNA (KIM) MOEUN" gives "SK", not "S(". */
 function initialsOf(name: string): string {
   return name
-    .split(" ")
-    .map((part) => part[0])
+    .split(/\s+/)
+    .map((part) => part.match(/[\p{L}\p{N}]/u)?.[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join("")
     .toUpperCase();

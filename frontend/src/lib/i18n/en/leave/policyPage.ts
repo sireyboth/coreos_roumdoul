@@ -21,6 +21,14 @@ export const policyPage = {
 
   // ── Leave type dialog ─────────────────────────────────────────────
   newType: "New leave type",
+  basicsTitle: "About this leave",
+  basicsHint: "The name staff see when they ask for it.",
+  payTitle: "Pay & counting",
+  payTitleHint: "How much of the day's pay they keep, and which days count.",
+  allowanceTitle: "How many days",
+  allowanceHint: "The yearly allowance and when it becomes usable. Leave it empty for no limit.",
+  askTitle: "Who can take it & how to ask",
+  askHint: "Limits and paperwork for each request.",
   typeDescription: "Changes apply to new requests and to balances from now on.",
   code: "Code",
   codePlaceholder: "e.g. study",
@@ -51,11 +59,12 @@ export const policyPage = {
   order: "Display order",
   allowHalf: "Allow half days (morning / afternoon)",
   allowProbation: "Can be taken during probation",
-  activeHint: "Active — staff can choose it",
+  activeHint: "Staff can choose it when they ask for leave.",
   typeSaved: "Leave type saved",
   typeAdded: "Leave type added",
 
   // ── Late arrival / early leave rules ──────────────────────────────
+  lateEarlyHint: "Short requests to arrive late or leave early, separate from leave days.",
   staffCanAsk: "Staff can ask for it",
   excused: "Excused time",
   excusedPaid: "Paid — counted as worked",
@@ -65,6 +74,8 @@ export const policyPage = {
 
   // ── Adjust a balance ──────────────────────────────────────────────
   adjustTitle: "Adjust a balance",
+  adjustHint: "See one person's leave for a year, and add or take days with a reason — for carry-over or corrections.",
+  pickPerson: "Choose a person to see their balances.",
   left: "{n} left",
   earned: "{n} earned",
   adjusted: "{n} adjusted",
@@ -79,6 +90,10 @@ export const policyPage = {
 
   // ── Page ──────────────────────────────────────────────────────────
   title: "Leave policy",
+  tabs: {
+    types: "Leave types",
+    balances: "Balances",
+  },
   description: "The kinds of leave staff can ask for, and how each is earned.",
   addType: "Add leave type",
   lawTitle: "Starts from Cambodian Labour Law",

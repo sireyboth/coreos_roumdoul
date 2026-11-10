@@ -29,8 +29,8 @@ const CONFETTI = Array.from({ length: 40 }, (_, i) => ({
   round: i % 3 === 0,
 }));
 
-/** Falling confetti behind the dialog's content. */
-function Confetti() {
+/** Falling confetti behind a festive band (this card and the Birthdays page hero). */
+export function Confetti() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
       {CONFETTI.map((piece, i) => (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileSpreadsheet, HandCoins, Plus } from "lucide-react";
+import { Eye, FileSpreadsheet, HandCoins, Plus } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ExcelImportDialog } from "@/components/dashboard/excel/excel-import-dialog";
 import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { PayrollGuideButton } from "@/components/dashboard/payroll/payroll-guide";
+import { ReportPreviewDialog } from "@/components/dashboard/payroll/report-preview-dialog";
 import { currentMonth, dateInMonth, dateLabel, money, monthLabel, previousMonth } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
@@ -198,6 +199,7 @@ export default function PayrollAdjustmentsPage() {
   const [month, setMonth] = useState(previousMonth);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const spec = useMemo(() => adjustmentImport(dateInMonth(month)), [month]);
 
   const { data, error, reload } = useApi(() => api.payroll.adjustments(month), [month], { notify: true });
@@ -259,6 +261,10 @@ export default function PayrollAdjustmentsPage() {
         action={
           <div className="flex flex-wrap gap-2">
             <PayrollGuideButton topic="adjustments" />
+            <Button variant="outline" onClick={() => setPreviewing(true)}>
+              <Eye className="size-4" />
+              {t("payroll.adjustments.preview.button")}
+            </Button>
             {canManage && (
               <>
                 <Button variant="outline" onClick={() => setImporting(true)}>
@@ -289,6 +295,7 @@ export default function PayrollAdjustmentsPage() {
 
       {adding && <AddDialog month={month} onOpenChange={setAdding} onSaved={reload} />}
       <ExcelImportDialog spec={spec} open={importing} onOpenChange={setImporting} onImported={reload} />
+      {previewing && <ReportPreviewDialog month={month} onOpenChange={setPreviewing} />}
     </div>
   );
 }

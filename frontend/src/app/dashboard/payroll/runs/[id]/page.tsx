@@ -25,6 +25,7 @@ import { api, type PayRunDetail, type PayslipRow } from "@/lib/api";
 import { withBusy } from "@/lib/busy";
 import { saveBlob } from "@/lib/export/download";
 import { printPayrollPdf } from "@/lib/pdf/payroll";
+import { missingBankDetails } from "@/lib/payroll-report";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 
@@ -118,6 +119,26 @@ export default function PayRunPage() {
     setBusy("export");
     try {
       const report = await withBusy(() => api.payroll.runReport(run.id));
+      // Paid by bank but no account on file: say so before the PDF goes to the bank or accountant.
+      const missing = missingBankDetails(report.payslips);
+      if (missing.length > 0) {
+        const names = missing.map((s) => s.employee?.name ?? t("payroll.run.someone"));
+        const ok = await confirm({
+          title: t(missing.length === 1 ? "payroll.run.missingBankOne" : "payroll.run.missingBankOther", { n: missing.length }),
+          description: (
+            <>
+              {t("payroll.run.missingBankText")}
+              <span className="mt-2 block font-medium text-foreground">
+                {names.slice(0, 8).join(", ")}
+                {names.length > 8 && ` ${t("payroll.run.missingBankMore", { n: names.length - 8 })}`}
+              </span>
+            </>
+          ),
+          confirmLabel: t("payroll.run.exportAnyway"),
+          cancelLabel: t("payroll.run.goBackFix"),
+        });
+        if (!ok) return;
+      }
       await printPayrollPdf({ company: me?.company?.name ?? "Business OS", generatedBy: me?.user.name, report, includePayments });
     } catch (err) {
       notifyError(err);

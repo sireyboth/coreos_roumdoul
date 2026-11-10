@@ -102,6 +102,17 @@ export type DataTableProps<T> = {
   initialFilters?: Record<string, string>;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
+  /**
+   * Draws the current page's rows yourself (e.g. a card grid) instead of the
+   * table / phone cards. Search, filters, sort, paging and the bulk bar still
+   * come from the table. `checkbox` is null when there are no bulk actions.
+   * `allRows` is every row after search, filters and sort (not just this page) — for totals.
+   * `anySelected` is true while anything is ticked (e.g. to keep every card's tick box visible).
+   */
+  renderRows?: (
+    rows: T[],
+    helpers: { checkbox: (row: T) => React.ReactNode; isSelected: (row: T) => boolean; allRows: T[]; anySelected: boolean },
+  ) => React.ReactNode;
 };
 
 type Sort = { columnId: string; direction: "asc" | "desc" } | null;
@@ -151,6 +162,7 @@ export function DataTable<T>({
   initialFilters,
   pageSizeOptions = [10, 25, 50],
   defaultPageSize,
+  renderRows,
 }: DataTableProps<T>) {
   const t = useT();
   const [search, setSearch] = useState("");
@@ -233,6 +245,22 @@ export function DataTable<T>({
         aria-label={t("common.table.selectRow")}
         checked={selectedIds.has(id)}
         onChange={(e) => setSelected([id], e.target.checked)}
+        className="size-4 cursor-pointer rounded border-input accent-primary"
+      />
+    );
+  }
+
+  /** Ticks or unticks every row on this page (table header, or the bar above cards). */
+  function pageCheckbox() {
+    return (
+      <input
+        type="checkbox"
+        aria-label={t("common.table.selectPage")}
+        checked={allPageSelected}
+        ref={(el) => {
+          if (el) el.indeterminate = pageSelected > 0 && !allPageSelected;
+        }}
+        onChange={(e) => setSelected(pageRows.map(getRowId), e.target.checked)}
         className="size-4 cursor-pointer rounded border-input accent-primary"
       />
     );
@@ -420,24 +448,31 @@ export function DataTable<T>({
             </div>
           )}
 
+          {/* Cards have no header row, so "select this page" gets its own line. */}
+          {renderRows && bulkActions && (
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              {pageCheckbox()}
+              {t("common.table.selectPage")}
+            </label>
+          )}
+
+          {renderRows &&
+            renderRows(pageRows, {
+              checkbox: (row) => (bulkActions ? rowCheckbox(row) : null),
+              isSelected: (row) => selectedIds.has(getRowId(row)),
+              allRows: rows,
+              anySelected: selectedIds.size > 0,
+            })}
+
           {/* Desktop: a real table. */}
+          {!renderRows && (
+          <>
           <div className="hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
                   {bulkActions && (
-                    <TableHead className={cn("left-0 w-12 min-w-12 max-w-12", PIN_HEAD)}>
-                      <input
-                        type="checkbox"
-                        aria-label={t("common.table.selectPage")}
-                        checked={allPageSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = pageSelected > 0 && !allPageSelected;
-                        }}
-                        onChange={(e) => setSelected(pageRows.map(getRowId), e.target.checked)}
-                        className="size-4 cursor-pointer rounded border-input accent-primary"
-                      />
-                    </TableHead>
+                    <TableHead className={cn("left-0 w-12 min-w-12 max-w-12", PIN_HEAD)}>{pageCheckbox()}</TableHead>
                   )}
                   {columns.map((column, index) => {
                     const sorted = sort?.columnId === column.id ? sort.direction : null;
@@ -543,6 +578,8 @@ export function DataTable<T>({
               </li>
             ))}
           </ul>
+          </>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
             <p>

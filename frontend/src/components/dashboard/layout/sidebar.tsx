@@ -16,7 +16,7 @@ import {
   Warehouse,
   type LucideIcon,
 } from "lucide-react";
-import { canSee, homeFor, NAV_GROUPS } from "@/components/dashboard/layout/nav";
+import { canSee, homeFor, NAV_GROUPS, navLink } from "@/components/dashboard/layout/nav";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useMe } from "@/contexts/me-context";
@@ -83,7 +83,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={navLink(item.href)}
                 onClick={onNavigate}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget;

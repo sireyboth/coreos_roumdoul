@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SortableGrid } from "@/components/ui/sortable-grid";
 import { KbachCorner, KbachPattern, surfaceCard as card } from "@/components/dashboard/shared/kbach";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
-import { canSee, findNavItem, type NavItem } from "@/components/dashboard/layout/nav";
+import { canSee, findNavItem, navLink, type NavItem } from "@/components/dashboard/layout/nav";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useMe } from "@/contexts/me-context";
 import { useApi } from "@/hooks/use-api";
@@ -46,9 +46,6 @@ const CHIPS = [
   "/dashboard/attendance/corrections",
   "/dashboard/audit",
 ];
-
-// The full dashboard sends phones here, so the Overview tile asks to stay.
-const HREF_OVERRIDE: Record<string, string> = { "/dashboard": "/dashboard?view=full" };
 
 /**
  * Stat chips: one strong colour per meaning, readable (AA) in light and dark.
@@ -260,7 +257,7 @@ function Tile({ item, label }: { item: NavItem; label: string }) {
   const tight = useTight();
   return (
     <Link
-      href={HREF_OVERRIDE[item.href] ?? item.href}
+      href={navLink(item.href)}
       className="press relative isolate flex min-h-24 flex-col items-center justify-center gap-2 overflow-hidden rounded-[20px] border border-surface-border bg-surface px-2 py-3 text-center shadow-[0_1px_2px_rgb(43_27_18/0.05)] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06)]"
     >
       <KbachPattern />

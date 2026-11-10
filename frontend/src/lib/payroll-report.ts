@@ -92,3 +92,12 @@ export function groupTotals(
   for (const r of rows) groups.set(label(r), [...(groups.get(label(r)) ?? []), r]);
   return [...groups].map(([name, rs]) => ({ name, people: rs.length, ...totalsOf(rs) }));
 }
+
+/**
+ * People paid by bank transfer who have something to receive but no bank name
+ * or account number on file — the bank can't pay them. Same rule the payment
+ * list uses to mark a row "Missing". Checked before a PDF is exported.
+ */
+export function missingBankDetails(slips: PayRunReportRow[]): PayRunReportRow[] {
+  return slips.filter((s) => s.employee && s.employee.payment_method !== "cash" && n(s.net) > 0 && (!s.employee.bank_name || !s.employee.bank_account_number));
+}
