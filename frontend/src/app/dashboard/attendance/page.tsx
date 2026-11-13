@@ -149,6 +149,7 @@ function AttendancePageContent() {
   const [pendingCorrections, setPendingCorrections] = useState(0);
 
   const { data: page, error: pageError } = useApi(() => api.attendance.list({ ...monthBounds(month), per_page: 1000 }), [month, reloads]);
+  const { data: branches } = useApi(() => (canManage ? api.branches.list() : Promise.resolve(null)), [canManage]);
   const result = page ?? (pageError ? { data: [] as AttendanceDay[], total: 0 } : null);
   const days = result?.data ?? null;
   const missedCount = days?.filter((d) => d.slots.some((s) => s.scan_id === null && s.status === "missing")).length ?? 0;
@@ -295,6 +296,9 @@ function AttendancePageContent() {
     .map(([value, label]) => ({ value: String(value), label }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
+  // The company's branches; the filter only shows when there is more than one.
+  const branchOptions = (branches?.data ?? []).map((b) => ({ value: String(b.id), label: b.name })).sort((a, b) => a.label.localeCompare(b.label));
+
   const filters: DataTableFilter<AttendanceDay>[] = [
     {
       type: "select",
@@ -312,6 +316,17 @@ function AttendancePageContent() {
       // A day can have several problems; it matches if it has the chosen one.
       matches: (d, selected) => d.exceptions.includes(selected as AttendanceException),
     },
+    ...(canManage && branchOptions.length > 1
+      ? [
+          {
+            type: "select" as const,
+            id: "branch",
+            label: t("common.field.branch"),
+            options: branchOptions,
+            getValue: (d: AttendanceDay) => String(d.employee?.branch?.id ?? ""),
+          },
+        ]
+      : []),
     ...(canManage
       ? [
           {
