@@ -14,6 +14,16 @@ export type PayTemplate = "overtime" | "attendance_bonus" | "absence" | "unpaid_
 
 export type LatenessMode = "per_minute" | "per_time" | "count_based" | "tiers" | "none";
 
+// How each kind of overtime day is paid: every hour, every hour up to a daily cap, or one amount per OT day.
+export type OvertimeType = "workday" | "day_off" | "holiday";
+export type OvertimePayMode = "per_hour" | "capped" | "fixed";
+export type OvertimeModeRule = { mode: OvertimePayMode; cap_hours: number | null; amount: number | null; min_hours: number | null };
+// workday/day_off/holiday: the rate for paid hours (1.5 = 150%). modes: left out = every type per hour.
+export type OvertimeParams = { workday: number; day_off: number; holiday: number; modes?: Partial<Record<OvertimeType, OvertimeModeRule>> };
+// One overtime day on a payslip line (details.days), when a cap or fixed amount is used. worked_hours = approved;
+// recorded_hours = what the scans showed, when approved in part; paid_hours is null for a fixed amount.
+export type OvertimeDay = { date: string; type: OvertimeType; worked_hours: number; recorded_hours?: number | null; paid_hours: number | null; amount: number; note: string | null };
+
 export type LatenessTier = { up_to_minutes: number | null; amount: number; day_fraction: number };
 
 export type LatenessParams = { mode: LatenessMode; grace_minutes: number; amount: number; free_count: number; every_n: number; tiers: LatenessTier[] };

@@ -533,6 +533,7 @@ class AttendanceController extends Controller
             'overtime_minutes' => $day->overtime_minutes,
             'overtime_type' => $day->overtime_type,
             'overtime_status' => $day->overtime_status,
+            'overtime_approved_minutes' => $day->overtime_approved_minutes,
             'exceptions' => $day->exceptions ?? [],
             // Who changed this day by hand, when, and why — oldest first.
             'adjustments' => ($adjustments?->get($day->employee_id.'|'.$day->date->toDateString()) ?? collect())

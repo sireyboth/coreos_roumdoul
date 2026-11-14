@@ -35,7 +35,7 @@ class AttendanceDay extends Model
         'slots', 'extra_scans', 'scan_count', 'first_scan_at', 'last_scan_at',
         'status', 'is_closed',
         'scheduled_minutes', 'worked_minutes', 'late_minutes', 'early_leave_minutes', 'night_minutes',
-        'overtime_minutes', 'overtime_type', 'overtime_status', 'overtime_reviewed_by', 'overtime_reviewed_at',
+        'overtime_minutes', 'overtime_type', 'overtime_status', 'overtime_approved_minutes', 'overtime_reviewed_by', 'overtime_reviewed_at',
         'exceptions', 'calculated_at',
     ];
 
@@ -60,6 +60,7 @@ class AttendanceDay extends Model
             'early_leave_minutes' => 'integer',
             'night_minutes' => 'integer',
             'overtime_minutes' => 'integer',
+            'overtime_approved_minutes' => 'integer',
         ];
     }
 
@@ -71,6 +72,16 @@ class AttendanceDay extends Model
     public function workSchedule(): BelongsTo
     {
         return $this->belongsTo(WorkSchedule::class)->withTrashed();
+    }
+
+    /** Overtime minutes payroll pays: what a manager approved, or all of it when approved in full. 0 unless approved. */
+    public function payableOvertimeMinutes(): int
+    {
+        if ($this->overtime_status !== 'approved') {
+            return 0;
+        }
+
+        return min((int) $this->overtime_minutes, $this->overtime_approved_minutes ?? (int) $this->overtime_minutes);
     }
 
     public function overtimeReviewedBy(): BelongsTo

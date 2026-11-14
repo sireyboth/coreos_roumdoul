@@ -213,7 +213,15 @@ export default function PayrollSettingsPage() {
       {/* Pay rules stays mounted while hidden, so unsaved edits survive a look at another tab. */}
       {settings && (
         <div hidden={tab !== "rules"}>
-          <PolicyForm key={JSON.stringify(settings.policy)} policy={settings.policy} onSaved={(policy) => setSettings((s) => (s ? { ...s, policy } : s))} />
+          <PolicyForm
+            key={JSON.stringify(settings.policy)}
+            policy={settings.policy}
+            onSaved={(policy) => setSettings((s) => (s ? { ...s, policy } : s))}
+            onEditOvertime={(() => {
+              const overtime = settings.components.find((c) => c.code === "OVERTIME");
+              return overtime ? () => setEditing({ component: overtime }) : undefined;
+            })()}
+          />
         </div>
       )}
 

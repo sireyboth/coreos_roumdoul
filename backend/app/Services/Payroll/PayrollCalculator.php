@@ -241,6 +241,7 @@ class PayrollCalculator
             'ot_workday_hours' => round($attendance['overtime_workday_minutes'] / 60, 2),
             'ot_day_off_hours' => round($attendance['overtime_day_off_minutes'] / 60, 2),
             'ot_holiday_hours' => round($attendance['overtime_holiday_minutes'] / 60, 2),
+            'ot_by_day' => $attendance['overtime_by_day'] ?? [],
             'enforce_overtime_minimums' => (bool) ($policy->enforce_overtime_minimums ?? true),
         ];
 
@@ -258,6 +259,12 @@ class PayrollCalculator
             $override = $overrides->get($component->id);
             if ($override !== null) {
                 $line = $this->overriddenLine($line, $override, $currency);
+            }
+
+            // Labor Law minimums switched off: say so when the overtime rule pays less than they would.
+            $legal = $line['details']['legal_amount'] ?? null;
+            if ($override === null && $legal !== null && ! $vars['enforce_overtime_minimums'] && $line['amount'] < $legal) {
+                $warnings[] = $this->warning('overtime_below_law', 'Overtime is paid '.Money::format($line['amount'], $currency).'; the Labor Law minimums would pay '.Money::format($legal, $currency).'.', false);
             }
 
             if ($line !== null && ($line['amount'] > 0 || $override !== null)) {
@@ -344,8 +351,8 @@ class PayrollCalculator
             'employer_cost' => Money::round($gross + array_sum($statutory['employer']), $currency),
             'warnings' => $warnings,
             'inputs' => [
-                'attendance' => collect($attendance)->except(['late_by_day', 'early_leave_by_day'])->all(),
-                'variables' => collect($vars)->except(['late_by_day', 'early_leave_by_day'])->all(),
+                'attendance' => collect($attendance)->except(['late_by_day', 'early_leave_by_day', 'overtime_by_day'])->all(),
+                'variables' => collect($vars)->except(['late_by_day', 'early_leave_by_day', 'ot_by_day'])->all(),
                 'rate_basis' => ['method' => $policy->rate_basis, 'days' => $basis, 'hours_per_day' => $policy->hours_per_day],
                 'missing_scan_policy' => $policy->missing_scan_policy,
                 'period' => ['start' => $ctx['start']->toDateString(), 'end' => $ctx['end']->toDateString(), 'days' => $ctx['days_in_period'], 'salary_share' => $ctx['salary_share']],
@@ -445,7 +452,11 @@ class PayrollCalculator
         return $result === null ? null : [
             'amount' => $result['amount'],
             'explanation' => $result['explanation'],
-            'details' => ['template' => $component->template, 'params' => $component->params, 'formula' => $result['formula'], 'variables' => $result['variables']],
+            'details' => [
+                'template' => $component->template, 'params' => $component->params, 'formula' => $result['formula'], 'variables' => $result['variables'],
+                ...(isset($result['days']) ? ['days' => $result['days']] : []),
+                ...(isset($result['legal_amount']) ? ['legal_amount' => $result['legal_amount']] : []),
+            ],
         ];
     }
 

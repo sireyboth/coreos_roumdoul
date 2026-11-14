@@ -68,6 +68,8 @@ export const settings = {
     overtimeMinimums: "Keep overtime at the Labor Law minimums",
     overtimeHint: "At least 150% on work days and 200% on days off and public holidays. Recommended.",
     overtimeWarning: "Overtime rates can now be set to any value. Paying below the Labor Law minimums may expose the company to back-pay claims and fines; the company is responsible for its overtime policy.",
+    overtimeRuleText: "The rate, a daily cap or a fixed amount per overtime day are set on the Overtime pay component. Save this switch first.",
+    overtimeRuleLink: "Set how overtime is paid",
     save: "Save settings",
     saved: "Payroll settings saved",
   },
