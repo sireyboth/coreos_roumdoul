@@ -63,3 +63,32 @@ export function levelOf(group: PermissionGroup, selected: Set<string>): Level {
   if (group.permissions.some((p) => p.endsWith(".view") && selected.has(p))) return "view";
   return "none";
 }
+
+/**
+ * The areas whose rights change what a page lets you do — read by the role
+ * preview when a menu page is clicked. Keep in step with the page's own
+ * permission checks (e.g. employees/page.tsx reads employees, schedules,
+ * salary and branches). A page not listed falls back to the areas in its
+ * nav permission(s).
+ */
+export const PAGE_AREAS: Record<string, string[]> = {
+  "/dashboard": ["dashboard"],
+  "/dashboard/attendance": ["attendance"],
+  "/dashboard/requests": ["requests"],
+  "/dashboard/calendar": ["schedules", "holidays"],
+  "/dashboard/work-schedules": ["work_schedules", "schedules"],
+  "/dashboard/leave-policy": ["leave_policies"],
+  "/dashboard/attendance/status-codes": ["attendance"],
+  "/dashboard/payroll": ["payroll"],
+  "/dashboard/payroll/adjustments": ["payroll"],
+  "/dashboard/payroll/settings": ["payroll"],
+  "/dashboard/employees": ["employees", "schedules", "salary", "branches"],
+  "/dashboard/id-cards": ["employees"],
+  "/dashboard/birthdays": ["employees"],
+};
+
+export function pageAreas(item: { href: string; permission?: string; anyPermission?: string[] }): string[] {
+  if (PAGE_AREAS[item.href]) return PAGE_AREAS[item.href];
+  const codes = [item.permission, ...(item.anyPermission ?? [])].filter((c): c is string => !!c);
+  return [...new Set(codes.map((c) => c.split(".")[0]))];
+}

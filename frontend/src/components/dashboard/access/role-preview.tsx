@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { Ban, Eye, PencilLine, Star, type LucideIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Ban, Check, ChevronRight, Eye, Minus, PencilLine, Star, type LucideIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { canSee, NAV_GROUPS } from "@/components/dashboard/layout/nav";
-import { areaOf, extrasOf, isExtra, levelOf, orderedGroups } from "@/components/dashboard/access/role-areas";
+import { canSee, NAV_GROUPS, type NavItem } from "@/components/dashboard/layout/nav";
+import { areaOf, extrasOf, isExtra, levelOf, orderedGroups, pageAreas, type Level } from "@/components/dashboard/access/role-areas";
 import { useMe } from "@/contexts/me-context";
 import type { PermissionGroup, Role } from "@/lib/api";
 import { pageLabel, useLang, useT } from "@/lib/i18n";
@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
  *
  * Left: the sidebar menu they would get. It runs the same canSee() rule as the
  * real sidebar (layout/nav.ts) with this company's modules, so a page only
- * appears here if it would really appear for them.
+ * appears here if it would really appear for them. Each page can be clicked.
  * Right: every area sorted into Can change / View only / Extra rights / No access,
- * using the same levelOf() as the role editor (role-areas.ts).
+ * using the same levelOf() as the role editor (role-areas.ts) — or, when a page
+ * is picked, what they can do on that page (its areas from PAGE_AREAS).
  *
  * Used live inside the role editor, and on its own from the Roles table.
  * Sizes are deliberately larger than the editor's: this screen is for reading.
@@ -31,18 +32,29 @@ type Bucket = {
   items: string[];
 };
 
+const TONE: Record<Level | "extra", string> = {
+  manage: "bg-success/10 text-success ring-success/25",
+  view: "bg-sky-500/10 text-sky-700 ring-sky-500/25 dark:text-sky-300",
+  extra: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300",
+  none: "bg-muted text-muted-foreground ring-border",
+};
+
 export function RolePreview({ permissions, groups }: { permissions: string[]; groups: PermissionGroup[] }) {
   const t = useT();
   const lang = useLang();
   const { me } = useMe();
 
   const selected = useMemo(() => new Set(permissions), [permissions]);
+  const [page, setPage] = useState<string | null>(null);
 
   // The menu: same filter as the real sidebar, with this company's modules.
   const menu = useMemo(() => {
     const access = { permissions, modules: me?.modules ?? {} };
     return NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => canSee(item, access)) })).filter((g) => g.items.length > 0);
   }, [permissions, me?.modules]);
+
+  // The picked page, if it is still in their menu (it drops out when its access is turned off in the editor).
+  const pageItem = useMemo(() => menu.flatMap((g) => g.items).find((i) => i.href === page) ?? null, [menu, page]);
 
   // The abilities: each area lands in exactly one level bucket; extras are listed on their own.
   const buckets = useMemo<Bucket[]>(() => {
@@ -61,10 +73,10 @@ export function RolePreview({ permissions, groups }: { permissions: string[]; gr
       }
     }
     return [
-      { id: "manage", icon: PencilLine, tone: "bg-success/10 text-success ring-success/25", items: manage },
-      { id: "view", icon: Eye, tone: "bg-sky-500/10 text-sky-700 ring-sky-500/25 dark:text-sky-300", items: view },
-      { id: "extra", icon: Star, tone: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300", items: extra },
-      { id: "none", icon: Ban, tone: "bg-muted text-muted-foreground ring-border", items: none },
+      { id: "manage", icon: PencilLine, tone: TONE.manage, items: manage },
+      { id: "view", icon: Eye, tone: TONE.view, items: view },
+      { id: "extra", icon: Star, tone: TONE.extra, items: extra },
+      { id: "none", icon: Ban, tone: TONE.none, items: none },
     ];
   }, [groups, selected, t]);
 
@@ -83,13 +95,25 @@ export function RolePreview({ permissions, groups }: { permissions: string[]; gr
                 <p className="px-2 pb-0.5 text-xs font-semibold tracking-wide text-sidebar-foreground/55 uppercase">{t(`sidebar.group.${group.id}`)}</p>
                 {group.items.map((item) => {
                   const Icon = item.icon;
+                  const active = page === item.href;
                   return (
-                    <div key={item.href} className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-[0.95rem] font-medium text-sidebar-foreground/85">
+                    <button
+                      key={item.href}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setPage(active ? null : item.href)}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-lg px-2 py-1.5 text-left text-[0.95rem] font-medium transition-colors",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        active ? "bg-sidebar-accent text-sidebar-accent-foreground ring-1 ring-border" : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60",
+                      )}
+                    >
                       <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-md bg-linear-to-br text-white shadow-sm", item.tone)}>
                         <Icon className="size-4" />
                       </span>
-                      <span className="truncate">{pageLabel(lang, item.href, item.label)}</span>
-                    </div>
+                      <span className="min-w-0 flex-1 truncate">{pageLabel(lang, item.href, item.label)}</span>
+                      <ChevronRight className={cn("size-4 shrink-0 text-muted-foreground transition-opacity", active ? "opacity-100" : "opacity-0 group-hover:opacity-100")} />
+                    </button>
                   );
                 })}
               </div>
@@ -99,41 +123,113 @@ export function RolePreview({ permissions, groups }: { permissions: string[]; gr
         <p className="text-sm text-muted-foreground">{t("access.rolePreview.menuHint")}</p>
       </section>
 
-      {/* ── What they can do ─────────────────────────────────────── */}
-      <section className="flex flex-col gap-2.5">
-        <h3 className="text-base font-semibold">{t("access.rolePreview.abilitiesTitle")}</h3>
-        <div className="flex flex-col gap-3">
-          {buckets.map((b) => {
-            const Icon = b.icon;
-            return (
-              <div key={b.id} className="flex flex-col gap-3 rounded-xl border border-border p-4">
-                <div className="flex items-center gap-3">
-                  <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg ring-1", b.tone)}>
-                    <Icon className="size-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold">{t(`access.rolePreview.bucket.${b.id}.title`)}</p>
-                    <p className="text-sm text-muted-foreground">{t(`access.rolePreview.bucket.${b.id}.hint`)}</p>
+      {/* ── What they can do (whole system, or one picked page) ─── */}
+      {pageItem ? (
+        <PageDetail item={pageItem} groups={groups} selected={selected} onBack={() => setPage(null)} />
+      ) : (
+        <section className="flex flex-col gap-2.5">
+          <h3 className="text-base font-semibold">{t("access.rolePreview.abilitiesTitle")}</h3>
+          <div className="flex flex-col gap-3">
+            {buckets.map((b) => {
+              const Icon = b.icon;
+              return (
+                <div key={b.id} className="flex flex-col gap-3 rounded-xl border border-border p-4">
+                  <div className="flex items-center gap-3">
+                    <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg ring-1", b.tone)}>
+                      <Icon className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold">{t(`access.rolePreview.bucket.${b.id}.title`)}</p>
+                      <p className="text-sm text-muted-foreground">{t(`access.rolePreview.bucket.${b.id}.hint`)}</p>
+                    </div>
+                    <span className={cn("rounded-full px-3 py-1 text-sm font-semibold tabular-nums ring-1", b.tone)}>{b.items.length}</span>
                   </div>
-                  <span className={cn("rounded-full px-3 py-1 text-sm font-semibold tabular-nums ring-1", b.tone)}>{b.items.length}</span>
+                  {b.items.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {b.items.map((name) => (
+                        <span key={name} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium ring-1", b.tone)}>
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">{t("access.rolePreview.nothing")}</p>
+                  )}
                 </div>
-                {b.items.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {b.items.map((name) => (
-                      <span key={name} className={cn("rounded-lg px-3 py-1.5 text-sm font-medium ring-1", b.tone)}>
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">{t("access.rolePreview.nothing")}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
+  );
+}
+
+/** What the role can do on one page: each area the page reads, its level, and its extra rights. */
+function PageDetail({ item, groups, selected, onBack }: { item: NavItem; groups: PermissionGroup[]; selected: Set<string>; onBack: () => void }) {
+  const t = useT();
+  const lang = useLang();
+  const Icon = item.icon;
+
+  const rows = useMemo(() => {
+    const byResource = new Map(groups.map((g) => [g.resource, g]));
+    return pageAreas(item)
+      .map((r) => byResource.get(r))
+      .filter((g): g is PermissionGroup => !!g)
+      .map((g) => ({
+        resource: g.resource,
+        area: areaOf(t, g.resource),
+        level: levelOf(g, selected),
+        extras: extrasOf(g).map((code) => {
+          const action = code.split(".")[1];
+          return { code, on: selected.has(code), label: isExtra(action) ? t(`access.roleDialog.extra.${action}`) : action };
+        }),
+      }));
+  }, [item, groups, selected, t]);
+
+  return (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold">{t("access.rolePreview.page.title")}</h3>
+        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+          <ArrowLeft className="size-4" />
+          {t("access.rolePreview.page.back")}
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-xl border border-border p-4">
+        <div className="flex items-center gap-3 border-b border-border pb-4">
+          <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg bg-linear-to-br text-white shadow-sm", item.tone)}>
+            <Icon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-base font-semibold">{pageLabel(lang, item.href, item.label)}</p>
+            <p className="text-sm text-muted-foreground">{t("access.rolePreview.page.hint")}</p>
+          </div>
+        </div>
+
+        {rows.map((row) => (
+          <div key={row.resource} className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[0.95rem] font-semibold">{row.area.name}</p>
+              <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1", TONE[row.level])}>{t(`access.roleDialog.level.${row.level}`)}</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{t(`access.rolePreview.page.level.${row.level}`)}</p>
+            {row.area.hint && <p className="text-xs text-muted-foreground/80">{row.area.hint}</p>}
+            {row.extras.length > 0 && (
+              <ul className="flex flex-wrap gap-2 pt-0.5">
+                {row.extras.map((x) => (
+                  <li key={x.code} className={cn("inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ring-1", x.on ? TONE.extra : TONE.none)}>
+                    {x.on ? <Check className="size-3.5" /> : <Minus className="size-3.5" />}
+                    {x.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

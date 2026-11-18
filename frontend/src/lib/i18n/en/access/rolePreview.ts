@@ -9,7 +9,19 @@ export const rolePreview = {
   // ── Menu ─────────────────────────────────────────────────────────
   menuTitle: "Menu they will see",
   menuEmpty: "No pages — they can only open their own profile.",
-  menuHint: "Pages from modules your company hasn't turned on are not shown.",
+  menuHint: "Click a page to see what they can do there. Pages from modules your company hasn't turned on are not shown.",
+
+  // ── One page (a menu item clicked) ───────────────────────────────
+  page: {
+    title: "On this page",
+    back: "All areas",
+    hint: "What this role can see and do here.",
+    level: {
+      manage: "Can see everything here and add, edit or delete.",
+      view: "Can open and read this part, but not change it.",
+      none: "This part is hidden from them on this page.",
+    },
+  },
 
   // ── Abilities ────────────────────────────────────────────────────
   abilitiesTitle: "What they can do",
