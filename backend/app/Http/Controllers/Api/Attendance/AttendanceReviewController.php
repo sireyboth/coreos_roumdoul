@@ -55,6 +55,8 @@ class AttendanceReviewController extends Controller
                 'overtime_minutes' => $day->overtime_minutes,
                 'overtime_type' => $day->overtime_type,
                 'overtime_status' => $day->overtime_status,
+                // Approved in part: fewer minutes than worked. null = all of them (or not approved).
+                'overtime_approved_minutes' => $day->overtime_approved_minutes,
                 'reviewed_by' => $day->overtimeReviewedBy ? ['id' => $day->overtimeReviewedBy->id, 'name' => $day->overtimeReviewedBy->name] : null,
                 'reviewed_at' => $day->overtime_reviewed_at?->toIso8601String(),
                 'last_scan_at' => $day->last_scan_at?->toIso8601String(),
@@ -80,11 +82,18 @@ class AttendanceReviewController extends Controller
         if ($day->overtime_minutes <= 0) {
             throw ValidationException::withMessages(['overtime' => [__('This day has no overtime to review.')]]);
         }
+        // Optional: approve only part of the overtime, e.g. 120 of 210 minutes. Left out = all of it.
+        $minutes = $decision === 'approved'
+            ? $request->validate(['minutes' => ['nullable', 'integer', 'min:1', 'max:'.$day->overtime_minutes]], [
+                'minutes.max' => __('You can approve at most the :max minutes of overtime worked.', ['max' => $day->overtime_minutes]),
+            ])['minutes'] ?? null
+            : null;
         SelfApproval::assertNotSelf($request->user(), $day->employee_id, 'overtime', 'review overtime for');
         $this->recorder->assertUnlocked($day->company_id, $day->date->toDateString(), 'overtime', $day->employee_id);
 
         $day->update([
             'overtime_status' => $decision,
+            'overtime_approved_minutes' => $minutes !== null && $minutes < $day->overtime_minutes ? $minutes : null,
             'overtime_reviewed_by' => $request->user()->id,
             'overtime_reviewed_at' => now(),
             'exceptions' => array_values(array_diff($day->exceptions ?? [], ['overtime_pending'])),
@@ -92,9 +101,10 @@ class AttendanceReviewController extends Controller
 
         AuditLogger::record("attendance.overtime_{$decision}", $day, [
             'employee_id' => $day->employee_id, 'date' => $day->date->toDateString(), 'minutes' => $day->overtime_minutes,
+            'approved_minutes' => $day->overtime_approved_minutes,
         ]);
 
-        return ['id' => $day->id, 'overtime_status' => $day->overtime_status];
+        return ['id' => $day->id, 'overtime_status' => $day->overtime_status, 'overtime_approved_minutes' => $day->overtime_approved_minutes];
     }
 
     // ───────────────────────────── Monthly summary ─────────────────────────────

@@ -172,10 +172,13 @@ class AttendanceRecorder
             && $existing->overtime_minutes === $attributes['overtime_minutes']
             && $existing->overtime_type === $attributes['overtime_type']) {
             $attributes['overtime_status'] = $existing->overtime_status;
+            $attributes['overtime_approved_minutes'] = $existing->overtime_approved_minutes;
             $attributes['exceptions'] = array_values(array_diff($attributes['exceptions'], ['overtime_pending']));
         } else {
             $attributes['overtime_reviewed_by'] = null;
             $attributes['overtime_reviewed_at'] = null;
+            // The overtime changed, so an approval in part no longer fits it.
+            $attributes['overtime_approved_minutes'] = null;
         }
 
         $day = $existing ?? new AttendanceDay([

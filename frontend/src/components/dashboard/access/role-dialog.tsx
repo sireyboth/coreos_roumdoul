@@ -1,59 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Lock, Search, Sparkles } from "lucide-react";
+import { Eye, Lock, PencilLine, Search, Sparkles } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DisplayOrderField, fromSortOrder, toSortOrder } from "@/components/dashboard/shared/display-order";
+import { areaOf, extrasOf, isExtra, levelOf, SECTIONS, type Level } from "@/components/dashboard/access/role-areas";
+import { RolePreview } from "@/components/dashboard/access/role-preview";
 import { api, ApiError, type PermissionGroup, type Role } from "@/lib/api";
 import { notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
-import { useT, type TKey } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 
 /*
  * Create or edit a role. Each area of the system is one row with a simple
  * No access / View / Manage switch (plus extras such as payroll Approve),
  * grouped into sections, with one-click starting templates.
  */
-
-type Level = "none" | "view" | "manage";
-
-/** Areas with plain words (name + what access means) in access.roleDialog.area. */
-const AREAS = [
-  "dashboard", "company", "audit", "branches", "departments", "teams", "employees", "users", "roles", "work_locations",
-  "work_schedules", "holidays", "schedules", "attendance", "requests", "leave_policies", "salary", "payroll",
-] as const;
-type Area = (typeof AREAS)[number];
-
-function isArea(resource: string): resource is Area {
-  return (AREAS as readonly string[]).includes(resource);
-}
-
-/** An area's name and hint in the chosen language; an unknown one shows its code, made readable. */
-function areaOf(t: (key: TKey) => string, resource: string): { name: string; hint: string } {
-  return isArea(resource)
-    ? { name: t(`access.roleDialog.area.${resource}.name`), hint: t(`access.roleDialog.area.${resource}.hint`) }
-    : { name: resource.replace(/_/g, " "), hint: "" };
-}
-
-type SectionId = "general" | "people" | "time" | "requests" | "pay" | "other";
-
-const SECTIONS: { id: SectionId; resources: string[] }[] = [
-  { id: "general", resources: ["dashboard", "company", "audit"] },
-  { id: "people", resources: ["employees", "branches", "departments", "teams", "users", "roles"] },
-  { id: "time", resources: ["attendance", "schedules", "work_schedules", "work_locations", "holidays"] },
-  { id: "requests", resources: ["requests", "leave_policies"] },
-  { id: "pay", resources: ["salary", "payroll"] },
-];
-
-const EXTRAS = ["approve", "set_pay"] as const;
-
-function isExtra(action: string): action is (typeof EXTRAS)[number] {
-  return (EXTRAS as readonly string[]).includes(action);
-}
 
 /** One-click starting points; only permissions that exist are applied. */
 const TEMPLATES: { id: "employee" | "supervisor" | "hrOffice" | "payrollApprover"; permissions: string[] }[] = [
@@ -76,12 +42,6 @@ const TEMPLATES: { id: "employee" | "supervisor" | "hrOffice" | "payrollApprover
   },
   { id: "payrollApprover", permissions: ["dashboard.view", "employees.view", "salary.view", "payroll.view", "payroll.approve"] },
 ];
-
-function levelOf(group: PermissionGroup, selected: Set<string>): Level {
-  if (group.permissions.some((p) => p.endsWith(".manage") && selected.has(p))) return "manage";
-  if (group.permissions.some((p) => p.endsWith(".view") && selected.has(p))) return "view";
-  return "none";
-}
 
 function LevelSwitch({ group, level, onChange }: { group: PermissionGroup; level: Level; onChange: (l: Level) => void }) {
   const options: Level[] = ["none", ...(group.permissions.some((p) => p.endsWith(".view")) ? (["view"] as Level[]) : []), ...(group.permissions.some((p) => p.endsWith(".manage")) ? (["manage"] as Level[]) : [])];
@@ -133,6 +93,9 @@ export function RoleDialog({
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Preview swaps the area list for "what this role will see and do", built from
+  // the switches as they are right now (nothing is saved until Save).
+  const [previewing, setPreviewing] = useState(false);
   const locked = role?.protected ?? false;
 
   const byResource = useMemo(() => new Map(groups.map((g) => [g.resource, g])), [groups]);
@@ -226,7 +189,8 @@ export function RoleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      {/* Wider while previewing so the menu and the abilities sit side by side. */}
+      <DialogContent className={cn("flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 transition-[max-width]", previewing ? "sm:max-w-5xl" : "sm:max-w-2xl")}>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader className="border-b border-border px-5 py-4 pr-12">
             <DialogTitle>{role ? t("access.roleDialog.editTitle", { name: role.name }) : t("access.roleDialog.createTitle")}</DialogTitle>
@@ -248,7 +212,9 @@ export function RoleDialog({
               <DisplayOrderField id="role-order" value={order} onChange={setOrder} example={t("access.roleDialog.orderExample")} />
             </div>
 
-            {locked ? (
+            {previewing ? (
+              <RolePreview permissions={locked ? [...allCodes] : [...selected]} groups={groups} />
+            ) : locked ? (
               <Alert variant="info" title={t("access.roleDialog.fullAccess")}>
                 <span className="inline-flex items-center gap-1.5">
                   <Lock className="size-3.5" /> {t("access.roleDialog.fullAccessHint")}
@@ -306,7 +272,7 @@ export function RoleDialog({
                       <div className="divide-y divide-border rounded-lg border border-border">
                         {shown.map((g) => {
                           const level = levelOf(g, selected);
-                          const extras = g.permissions.filter((p) => !p.endsWith(".view") && !p.endsWith(".manage"));
+                          const extras = extrasOf(g);
                           const area = areaOf(t, g.resource);
                           return (
                             <div key={g.resource} className={cn("flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between", level === "none" && "bg-muted/20")}>
@@ -353,6 +319,10 @@ export function RoleDialog({
           <DialogFooter className="mx-0 mb-0 flex-row items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3 sm:justify-between">
             <span className="text-xs text-muted-foreground tabular-nums">{locked ? t("access.roleDialog.allPermissions") : t("access.roleDialog.permissionCount", { n: count, total })}</span>
             <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setPreviewing((p) => !p)} aria-pressed={previewing}>
+                {previewing ? <PencilLine className="size-4" /> : <Eye className="size-4" />}
+                {previewing ? t("access.rolePreview.backToEdit") : t("access.rolePreview.button")}
+              </Button>
               <DialogClose render={<Button type="button" variant="outline" />}>{t("common.action.cancel")}</DialogClose>
               <Button type="submit" disabled={saving || !name.trim()}>
                 {saving ? t("common.message.saving") : role ? t("common.action.saveChanges") : t("access.roleDialog.create")}

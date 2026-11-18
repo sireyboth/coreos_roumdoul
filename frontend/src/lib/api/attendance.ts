@@ -133,6 +133,8 @@ export type AttendanceDay = {
   overtime_minutes: number;
   overtime_type: "workday" | "day_off" | "holiday" | null;
   overtime_status: "pending" | "approved" | "rejected" | null;
+  // Approved in part: fewer minutes than worked. null = all of it (or not approved).
+  overtime_approved_minutes?: number | null;
   exceptions: AttendanceException[];
   // Admin adjustments to this day, oldest first. changes: "Removed 09:30; Added 08:00".
   adjustments: { id: number; at: string; by: string | null; reason: string; changes: string }[];
@@ -181,6 +183,8 @@ export type OvertimeEntry = {
   overtime_minutes: number;
   overtime_type: "workday" | "day_off" | "holiday";
   overtime_status: "pending" | "approved" | "rejected";
+  // Approved in part: fewer minutes than worked. null = all of it (or not approved).
+  overtime_approved_minutes: number | null;
   reviewed_by: { id: number; name: string } | null;
   reviewed_at: string | null;
   last_scan_at: string | null;
@@ -280,8 +284,12 @@ export const attendanceApi = {
       const query = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]);
       return request<OvertimeEntry[]>(`/api/attendance/overtime${query.size ? `?${query}` : ""}`);
     },
-    approveOvertime: (dayId: number) =>
-      request<{ id: number; overtime_status: string }>(`/api/attendance/days/${dayId}/overtime/approve`, { method: "POST", body: "{}" }),
+    // minutes: approve only part of the day's overtime (e.g. 120 of 210). Left out = all of it.
+    approveOvertime: (dayId: number, minutes?: number) =>
+      request<{ id: number; overtime_status: string; overtime_approved_minutes: number | null }>(`/api/attendance/days/${dayId}/overtime/approve`, {
+        method: "POST",
+        body: JSON.stringify(minutes === undefined ? {} : { minutes }),
+      }),
     rejectOvertime: (dayId: number) =>
       request<{ id: number; overtime_status: string }>(`/api/attendance/days/${dayId}/overtime/reject`, { method: "POST", body: "{}" }),
     summary: (month: string, employeeId?: number) =>

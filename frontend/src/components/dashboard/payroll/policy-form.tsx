@@ -27,7 +27,7 @@ const EXAMPLE_DAYS: Record<PayrollPolicy["rate_basis"], number | null> = { fixed
 
 const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
 
-export function PolicyForm({ policy, onSaved }: { policy: PayrollPolicy; onSaved: (p: PayrollPolicy) => void }) {
+export function PolicyForm({ policy, onSaved, onEditOvertime }: { policy: PayrollPolicy; onSaved: (p: PayrollPolicy) => void; onEditOvertime?: () => void }) {
   const t = useT();
   const [form, setForm] = useState(policy);
   const [saving, setSaving] = useState(false);
@@ -154,6 +154,15 @@ export function PolicyForm({ policy, onSaved }: { policy: PayrollPolicy; onSaved
           onChange={(v) => set({ enforce_overtime_minimums: v })}
         />
         {!form.enforce_overtime_minimums && <Alert variant="warning">{t("payroll.settings.policy.overtimeWarning")}</Alert>}
+        {/* How overtime is paid lives on the Overtime pay component; a way there from the switch people look at first. */}
+        {onEditOvertime && (
+          <p className="text-xs text-muted-foreground">
+            {t("payroll.settings.policy.overtimeRuleText")}{" "}
+            <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={onEditOvertime}>
+              {t("payroll.settings.policy.overtimeRuleLink")}
+            </button>
+          </p>
+        )}
       </FormSection>
 
       {/* Save bar: stays in view at the bottom while there are unsaved changes. */}

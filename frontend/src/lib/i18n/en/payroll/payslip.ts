@@ -48,4 +48,13 @@ export const payslip = {
     useRule: "Use the rule's amount",
     saved: "Payslip updated.",
   },
+  otDays: {
+    show: "Show {n} overtime days",
+    hide: "Hide overtime days",
+    approvedOf: "{approved} h approved of {recorded} h",
+    hours: "{worked} h",
+    capped: "{worked} h worked, {paid} h paid",
+    fixed: "{worked} h, fixed amount",
+    type: { workday: "Work day", day_off: "Day off", holiday: "Holiday" },
+  },
 };
