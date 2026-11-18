@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\Payroll;
 
+use App\Models\AttendanceDay;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Plan;
@@ -124,6 +125,50 @@ class MyPayTest extends TestCase
         $this->actingAs($this->staff)->getJson("/api/profile/payslips/{$this->slipOf($august, $this->colleague)}")->assertNotFound();
         $this->actingAs($this->staff)->getJson("/api/profile/payslips/{$this->slipOf($september, $this->own)}")->assertNotFound();
         $this->actingAs($this->staff)->getJson("/api/profile/payslips/{$this->slipOf($august, $this->own)}")->assertOk();
+    }
+
+    public function test_an_employee_sees_a_waived_deduction_with_the_company_message_but_never_hr_reasons(): void
+    {
+        AttendanceDay::query()->create([
+            'company_id' => $this->company->id, 'employee_id' => $this->own->id, 'date' => '2026-09-01',
+            'kind' => 'work', 'status' => 'absent', 'scan_count' => 0, 'is_closed' => true,
+            'slots' => [], 'scans' => [], 'extra_scans' => [], 'exceptions' => [],
+        ]);
+        $run = $this->payRun('2026-09');
+        $hrSlip = $this->actingAs($this->admin)->getJson("/api/payroll/payslips/{$this->slipOf($run, $this->own)}")->assertOk()->json();
+        $absence = collect($hrSlip['lines'])->firstWhere('code', 'ABSENCE');
+        $base = collect($hrSlip['lines'])->firstWhere('code', 'BASE');
+        $this->assertGreaterThan(0, $absence['amount']);
+        $lineUrl = fn (array $line) => "/api/payroll/runs/{$run['id']}/employees/{$this->own->id}/lines/{$line['pay_component_id']}";
+
+        // The whole absence forgiven, with a message; and the salary line set by hand for an internal reason.
+        $this->actingAs($this->admin)->putJson($lineUrl($absence), [
+            'amount' => 0, 'reason' => 'Internal: owner decided', 'is_waiver' => true, 'employee_message' => 'Thank you for your hard work.',
+        ])->assertOk();
+        $this->actingAs($this->admin)->putJson($lineUrl($base), ['amount' => 390, 'reason' => 'Internal: salary dispute'])->assertOk();
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/approve")->assertOk()->json();
+
+        $response = $this->actingAs($this->staff)->getJson("/api/v1/profile/payslips/{$this->slipOf($run, $this->own)}")->assertOk();
+        $lines = collect($response->json('lines'));
+
+        $waived = $lines->firstWhere('code', 'ABSENCE');
+        $this->assertEquals(0, $waived['amount']);
+        $this->assertSame($absence['explanation'], $waived['explanation']);
+        $this->assertEquals($absence['amount'], $waived['waiver']['original_amount']);
+        $this->assertEquals($absence['amount'], $waived['waiver']['waived_amount']);
+        $this->assertSame('Thank you for your hard work.', $waived['waiver']['message']);
+        $this->assertFalse($waived['adjusted']);
+
+        // Set by hand but not a waiver: the employee only learns it was adjusted.
+        $adjusted = $lines->firstWhere('code', 'BASE');
+        $this->assertEquals(390, $adjusted['amount']);
+        $this->assertTrue($adjusted['adjusted']);
+        $this->assertNull($adjusted['explanation']);
+        $this->assertNull($adjusted['waiver']);
+
+        // HR's internal notes and who set them never reach the employee.
+        $this->assertStringNotContainsString('Internal:', $response->getContent());
+        $this->assertArrayNotHasKey('details', $waived);
     }
 
     public function test_someone_without_an_employee_record_or_without_the_module_gets_no_pay(): void

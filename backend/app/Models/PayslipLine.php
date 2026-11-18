@@ -5,7 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** One line of a payslip, with the words and the rule that produced it. */
+/**
+ * One line of a payslip, with the words and the rule that produced it.
+ *
+ * @property array<string, mixed>|null $details how it was worked out; `override` when HR set it by hand
+ */
 class PayslipLine extends Model
 {
     public $timestamps = false;

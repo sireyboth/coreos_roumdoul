@@ -166,20 +166,49 @@ class PayRunService
      * the rule works out. Kept through every recalculation (approval included)
      * until removed; the person's payslip is recalculated straight away.
      */
-    public function setOverride(PayRun $run, int $employeeId, PayComponent $component, float $amount, string $reason, User $by): PayRun
+    /**
+     * HR's amount for one line. As a waiver ($waiver), the company forgives part or
+     * all of a deduction: only on a deduction line, only below what the rule works
+     * out, and the employee sees the original amount with $employeeMessage.
+     */
+    public function setOverride(PayRun $run, int $employeeId, PayComponent $component, float $amount, string $reason, User $by, bool $waiver = false, ?string $employeeMessage = null): PayRun
     {
         $this->assertEditable($run);
-        if (! $run->payslips()->where('employee_id', $employeeId)->exists()) {
+        $payslip = Payslip::query()->where('pay_run_id', $run->id)->where('employee_id', $employeeId)->first();
+        if ($payslip === null) {
             throw ValidationException::withMessages(['employee_id' => [__('This person has no payslip in this pay run.')]]);
+        }
+
+        if ($waiver) {
+            $this->assertWaivable($payslip, $component, $amount);
         }
 
         $override = PayslipOverride::query()->firstOrNew(['pay_run_id' => $run->id, 'employee_id' => $employeeId, 'pay_component_id' => $component->id]);
         $override->fill([
             'company_id' => $run->company_id, 'amount' => $amount, 'reason' => $reason,
+            'is_waiver' => $waiver, 'employee_message' => $waiver ? $employeeMessage : null,
             'created_by' => $override->created_by ?? $by->id, 'updated_by' => $by->id,
         ])->save();
 
         return $this->calculateEmployee($run, $employeeId, $by);
+    }
+
+    /** A waiver lowers a deduction the rule worked out: not an earning, not money already owed back (advances). */
+    private function assertWaivable(Payslip $payslip, PayComponent $component, float $amount): void
+    {
+        if ($component->kind !== 'deduction') {
+            throw ValidationException::withMessages(['is_waiver' => [__('Only a deduction can be waived.')]]);
+        }
+
+        $line = PayslipLine::query()->where('payslip_id', $payslip->id)->where('pay_component_id', $component->id)->first();
+        // What the rule works out, even if HR already set this line by hand.
+        $calculated = $line === null ? 0.0 : (float) ($line->details['override']['calculated'] ?? $line->amount);
+        if ($calculated <= 0) {
+            throw ValidationException::withMessages(['is_waiver' => [__('Nothing was deducted on this line, so there is nothing to waive.')]]);
+        }
+        if ($amount >= $calculated) {
+            throw ValidationException::withMessages(['amount' => [__('A waiver must deduct less than the :amount the rule works out.', ['amount' => number_format($calculated, 2)])]]);
+        }
     }
 
     /** Back to what the rule works out. */

@@ -11,12 +11,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * HR's amount for one payslip line, in place of what the rule worked out.
  * Kept across recalculations (payslips are rebuilt, this is not) and gone
  * with the run. Auditable: every set, change and removal is logged.
+ *
+ * A waiver (is_waiver) is the company forgiving part or all of a deduction:
+ * the employee sees the original amount and employee_message, never `reason`.
  */
 class PayslipOverride extends Model
 {
     use Auditable, BelongsToCompany;
 
-    protected $fillable = ['company_id', 'pay_run_id', 'employee_id', 'pay_component_id', 'amount', 'reason', 'created_by', 'updated_by'];
+    protected $fillable = ['company_id', 'pay_run_id', 'employee_id', 'pay_component_id', 'amount', 'reason', 'is_waiver', 'employee_message', 'created_by', 'updated_by'];
 
     protected $hidden = ['company_id'];
 
@@ -24,6 +27,7 @@ class PayslipOverride extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'is_waiver' => 'boolean',
         ];
     }
 

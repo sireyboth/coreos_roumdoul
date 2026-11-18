@@ -803,6 +803,53 @@ class PayrollTest extends TestCase
             ->assertJsonValidationErrors(['employee_id']);
     }
 
+    public function test_hr_can_waive_a_deduction_but_only_lower_it(): void
+    {
+        TaxExchangeRate::query()->create(['month' => '2026-09', 'rate' => 4100]);
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520);
+        $this->day($sokha, '2026-09-01', ['status' => 'absent', 'scan_count' => 0]);
+
+        $run = $this->createRun()->json();
+        $slipId = fn (array $run) => collect($run['payslips'])->firstWhere('employee.id', $sokha->id)['id'];
+        $slip = $this->payslip($slipId($run));
+        $absence = $this->line($slip, 'ABSENCE');
+        $this->assertEquals(20, $absence['amount']);
+        $url = fn (int $componentId) => "/api/payroll/runs/{$run['id']}/employees/{$sokha->id}/lines/{$componentId}";
+
+        // Forgive $15 of the $20: the line keeps the rule's working, the waiver and its message are in the details.
+        $run = $this->actingAs($this->admin)->putJson($url($absence['pay_component_id']), [
+            'amount' => 5, 'reason' => 'Manager approved', 'is_waiver' => true, 'employee_message' => '  Get well soon.  ',
+        ])->assertOk()->json();
+        $slip = $this->payslip($slipId($run));
+        $line = $this->line($slip, 'ABSENCE');
+        $this->assertEquals(5, $line['amount']);
+        $this->assertSame($absence['explanation'], $line['explanation']);
+        $this->assertTrue($line['details']['override']['is_waiver']);
+        $this->assertSame('Get well soon.', $line['details']['override']['employee_message']);
+        $this->assertSame('Manager approved', $line['details']['override']['reason']);
+        $this->assertEquals(20, $line['details']['override']['calculated']);
+        $this->assertEquals(515, $slip['gross']);
+
+        // A waiver can't deduct as much as, or more than, the rule.
+        $this->actingAs($this->admin)->putJson($url($absence['pay_component_id']), ['amount' => 20, 'reason' => 'x', 'is_waiver' => true])
+            ->assertJsonValidationErrors(['amount']);
+        // Only deductions: not the salary or another earning.
+        $this->actingAs($this->admin)->putJson($url($this->line($slip, 'BASE')['pay_component_id']), ['amount' => 0, 'reason' => 'x', 'is_waiver' => true])
+            ->assertJsonValidationErrors(['is_waiver']);
+        // Nothing deducted (no lateness), nothing to waive.
+        $late = PayComponent::query()->where('company_id', $this->company->id)->where('code', 'LATE')->value('id');
+        $this->actingAs($this->admin)->putJson($url($late), ['amount' => 0, 'reason' => 'x', 'is_waiver' => true])
+            ->assertJsonValidationErrors(['is_waiver']);
+
+        // The absence is corrected away: the waiver has nothing left to forgive, so no line is left behind.
+        AttendanceDay::query()->where('employee_id', $sokha->id)->delete();
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk()->json();
+        $slip = $this->payslip($slipId($run));
+        $this->assertNull($this->line($slip, 'ABSENCE'));
+        $this->assertEquals(520, $slip['gross']);
+    }
+
     public function test_a_hand_set_amount_cant_change_once_the_run_is_approved(): void
     {
         $this->company->update(['allow_self_approval' => true]);

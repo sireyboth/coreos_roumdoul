@@ -204,5 +204,9 @@
     "resigned": "បានលាឈប់",
     "terminated": "បានបញ្ចប់កិច្ចសន្យា",
     "contract_ended": "ផុតកំណត់កិច្ចសន្យា",
-    "retired": "ចូលនិវត្តន៍"
+    "retired": "ចូលនិវត្តន៍",
+
+    "Only a deduction can be waived.": "អាចលើកលែងបានតែការកាត់ប្រាក់ប៉ុណ្ណោះ។",
+    "Nothing was deducted on this line, so there is nothing to waive.": "បន្ទាត់នេះមិនមានការកាត់ប្រាក់ទេ ដូច្នេះគ្មានអ្វីត្រូវលើកលែងទេ។",
+    "A waiver must deduct less than the :amount the rule works out.": "ការលើកលែងត្រូវកាត់តិចជាង :amount ដែលច្បាប់គណនាបាន។"
 }

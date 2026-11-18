@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\PayRun;
 use App\Models\Payslip;
+use App\Models\PayslipLine;
 use App\Services\Payroll\EmployeeSalaryService;
 use App\Services\Payroll\PayRunService;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,7 @@ class MyPayController extends Controller
     public function payslip(Request $request, int $payslip)
     {
         $slip = $this->released($this->ownEmployee($request))
-            ->with(['lines', 'employee', 'payRun.payGroup:id,name'])
+            ->with(['employee', 'payRun.payGroup:id,name'])
             ->findOrFail($payslip);
 
         // Same shape as HR's payslip, less what is the company's business: its own cost and HR's warnings.
@@ -57,7 +58,30 @@ class MyPayController extends Controller
             ...$this->period($slip),
             'warnings' => null,
             'employee' => $slip->employee?->only(['id', 'name', 'employee_code']),
-            'lines' => $slip->lines->map->only(['id', 'code', 'name', 'kind', 'amount', 'explanation']),
+            'lines' => PayslipLine::query()->where('payslip_id', $slip->id)->orderBy('sort_order')->orderBy('id')->get()
+                ->map(fn (PayslipLine $line) => $this->line($line)),
+        ];
+    }
+
+    /**
+     * One line as the employee sees it. HR's internal reason for a hand-set amount
+     * is never sent: a waiver shows what the rule worked out and the company's
+     * message to the employee; any other hand-set amount just says it was adjusted.
+     */
+    private function line(PayslipLine $line): array
+    {
+        $override = $line->details['override'] ?? null;
+        $waived = $override !== null && ($override['is_waiver'] ?? false);
+
+        return [
+            ...$line->only(['id', 'code', 'name', 'kind', 'amount']),
+            'explanation' => $override === null || $waived ? $line->explanation : null,
+            'adjusted' => $override !== null && ! $waived,
+            'waiver' => $waived ? [
+                'original_amount' => (float) $override['calculated'],
+                'waived_amount' => round((float) $override['calculated'] - (float) $line->amount, 2),
+                'message' => $override['employee_message'] ?? null,
+            ] : null,
         ];
     }
 
