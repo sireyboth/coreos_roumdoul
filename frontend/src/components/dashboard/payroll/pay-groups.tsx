@@ -107,8 +107,19 @@ export function PayGroupDialog({
     set({ schedule, cutoff_days: schedule === "semi_monthly" ? [15, 31] : schedule === "monthly" ? [form.cutoff_days[0] ?? 31] : form.cutoff_days });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Empty = use the company setting; anything typed must be 1–24.
+  const hoursValue = Number(form.hours_per_day);
+  const hoursError = form.hours_per_day.trim() !== "" && !(hoursValue >= 1 && hoursValue <= 24) ? t("common.message.numberRange", { min: 1, max: 24 }) : null;
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // Fields out of range are already red; say so at the Save button and jump to the first one.
+    const invalid = e.currentTarget.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (invalid) {
+      setError(translateNow("common.message.fixFields"));
+      invalid.focus();
+      return;
+    }
     setSaving(true);
     setError(null);
     const componentRules: Record<string, PayComponentRule> = {};
@@ -150,7 +161,7 @@ export function PayGroupDialog({
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
           <DialogHeader>
             <DialogTitle>{group ? t("payrollSetup.payGroups.dialog.editTitle", { name: group.name }) : t("payrollSetup.payGroups.dialog.addTitle")}</DialogTitle>
             <DialogDescription>{t("payrollSetup.payGroups.dialog.text")}</DialogDescription>
@@ -248,11 +259,13 @@ export function PayGroupDialog({
                   type="number"
                   min={1}
                   max={24}
-                  step="0.5"
+                  step="any"
                   placeholder={t("payrollSetup.payGroups.own.companySetting", { value: policy.hours_per_day })}
                   value={form.hours_per_day}
+                  aria-invalid={!!hoursError || undefined}
                   onChange={(e) => set({ hours_per_day: e.target.value })}
                 />
+                {hoursError && <p className="text-xs font-medium text-destructive">{hoursError}</p>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="pg-missing">{t("payrollSetup.payGroups.own.missingScan")}</Label>

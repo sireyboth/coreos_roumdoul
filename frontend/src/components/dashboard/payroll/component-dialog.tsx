@@ -52,15 +52,24 @@ function defaultParams(template: PayTemplate | null): Params {
   }
 }
 
-function NumberField({ id, label, value, onChange, hint, step = "1", min = 0, suffix }: { id: string; label: string; value: unknown; onChange: (n: number) => void; hint?: string; step?: string; min?: number; suffix?: string }) {
+function NumberField({ id, label, value, onChange, hint, step = "1", min = 0, max, suffix }: { id: string; label: string; value: unknown; onChange: (n: number) => void; hint?: string; step?: string; min?: number; max?: number; suffix?: string }) {
+  const t = useT();
+  const n = Number(value);
+  // Out of range shows in red under the box, so the reason is clear before saving.
+  const outOfRange = !Number.isFinite(n) || n < min || (max !== undefined && n > max);
+  const error = outOfRange ? (max !== undefined ? t("common.message.numberRange", { min, max }) : t("common.message.numberMin", { min })) : null;
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       <div className="flex items-center gap-2">
-        <Input id={id} type="number" inputMode="decimal" min={min} step={step} value={String(value ?? "")} onChange={(e) => onChange(Number(e.target.value))} />
+        <Input id={id} type="number" inputMode="decimal" min={min} max={max} step={step} value={String(value ?? "")} aria-invalid={outOfRange || undefined} aria-describedby={`${id}-help`} onChange={(e) => onChange(Number(e.target.value))} />
         {suffix && <span className="shrink-0 text-sm text-muted-foreground">{suffix}</span>}
       </div>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {(error || hint) && (
+        <p id={`${id}-help`} className={cn("text-xs", error ? "font-medium text-destructive" : "text-muted-foreground")}>
+          {error ?? hint}
+        </p>
+      )}
     </div>
   );
 }
@@ -131,8 +140,9 @@ export function TemplateFields({
                       label={t("payrollSetup.componentDialog.fields.otRate")}
                       suffix="%"
                       min={enforceOvertimeMinimums ? pct : 0}
-                      step="5"
-                      value={Math.round(Number(p[key]) * 100)}
+                      max={1000}
+                      step="any"
+                      value={Math.round(Number(p[key]) * 10000) / 100}
                       onChange={(n) => set({ [key]: n / 100 })}
                       hint={rateHint}
                     />
@@ -143,7 +153,8 @@ export function TemplateFields({
                       label={t("payrollSetup.componentDialog.fields.otCap")}
                       suffix={t("payrollSetup.componentDialog.fields.hoursPerDay")}
                       min={0.25}
-                      step="0.5"
+                      max={24}
+                      step="any"
                       value={rule.cap_hours}
                       onChange={(n) => setRule(key, { cap_hours: n })}
                       hint={t("payrollSetup.componentDialog.fields.otCapExample", { cap: rule.cap_hours ?? 0 })}
@@ -154,6 +165,7 @@ export function TemplateFields({
                       <NumberField
                         id={`ot-${key}-amount`}
                         label={t("payrollSetup.componentDialog.fields.otAmountPerDay")}
+                        min={0.01}
                         step="0.01"
                         value={rule.amount}
                         onChange={(n) => setRule(key, { amount: n })}
@@ -163,7 +175,8 @@ export function TemplateFields({
                         id={`ot-${key}-min`}
                         label={t("payrollSetup.componentDialog.fields.otMinHours")}
                         suffix={t("payrollSetup.componentDialog.fields.hours")}
-                        step="0.5"
+                        max={24}
+                        step="any"
                         value={rule.min_hours}
                         onChange={(n) => setRule(key, { min_hours: n })}
                         hint={enforceOvertimeMinimums ? t("payrollSetup.componentDialog.fields.otFixedLawOn", { pct }) : t("payrollSetup.componentDialog.fields.otMinHoursHint")}
@@ -205,8 +218,9 @@ export function TemplateFields({
         id="abs-mult"
         label={t("payrollSetup.componentDialog.fields.chargePerAbsentDay")}
         suffix={t("payrollSetup.componentDialog.fields.pctOfDay")}
-        step="10"
-        value={Math.round(Number(params.multiplier) * 100)}
+        max={500}
+        step="any"
+        value={Math.round(Number(params.multiplier) * 10000) / 100}
         onChange={(n) => set({ multiplier: n / 100 })}
         hint={t("payrollSetup.componentDialog.fields.absenceHint")}
       />
@@ -394,8 +408,15 @@ export function ComponentDialog({
   const [saving, setSaving] = useState(false);
   const isBase = method === "base";
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // A field out of range is already red; say so at the Save button and jump to the first one.
+    const invalid = e.currentTarget.querySelector<HTMLElement>('[aria-invalid="true"]');
+    if (invalid || !name.trim()) {
+      setError(translateNow("common.message.fixFields"));
+      (invalid ?? document.getElementById("pc-name"))?.focus();
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -421,7 +442,7 @@ export function ComponentDialog({
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className={cn("max-h-[92vh] overflow-y-auto", method === "template" && template === "overtime" ? "sm:max-w-6xl" : "sm:max-w-2xl")}>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{isNew ? t("payrollSetup.componentDialog.dialog.addTitle") : name || component.name}</DialogTitle>
             <DialogDescription>
@@ -436,7 +457,7 @@ export function ComponentDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="pc-name">{t("payrollSetup.componentDialog.dialog.nameOnPayslip")}</Label>
-              <Input id="pc-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder={t("payrollSetup.componentDialog.dialog.namePlaceholder")} required />
+              <Input id="pc-name" value={name} aria-invalid={(error !== null && !name.trim()) || undefined} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder={t("payrollSetup.componentDialog.dialog.namePlaceholder")} required />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="pc-kind">{t("payrollSetup.componentDialog.dialog.type")}</Label>
