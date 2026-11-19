@@ -47,12 +47,12 @@ export function FormSection({
 }
 
 /** A label, the input, and a small hint under it. */
-export function FormField({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: React.ReactNode }) {
+export function FormField({ id, label, hint, error, children }: { id?: string; label: string; hint?: string; error?: string | null; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {(error || hint) && <p className={cn("text-xs", error ? "font-medium text-destructive" : "text-muted-foreground")}>{error || hint}</p>}
     </div>
   );
 }

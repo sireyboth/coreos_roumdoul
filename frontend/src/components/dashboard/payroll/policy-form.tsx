@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { ChoiceCards, FormField, FormSection, ToggleRow } from "@/components/dashboard/shared/form-section";
 import { api, type PayrollPolicy } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { toast } from "sonner";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +35,16 @@ export function PolicyForm({ policy, onSaved, onEditOvertime }: { policy: Payrol
   const set = (patch: Partial<PayrollPolicy>) => setForm((f) => ({ ...f, ...patch }));
   const changed = JSON.stringify(form) !== JSON.stringify(policy);
 
+  // Hours per day divides the daily rate, so it must be 1–24.
+  const hoursError = !(form.hours_per_day >= 1 && form.hours_per_day <= 24) ? t("common.message.numberRange", { min: 1, max: 24 }) : null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (hoursError) {
+      toast.error(t("common.message.fixFields"));
+      document.getElementById("pol-hours")?.focus();
+      return;
+    }
     setSaving(true);
     try {
       onSaved(await api.payroll.updatePolicy({ ...form, fallback_exchange_rate: form.fallback_exchange_rate || null }));
@@ -53,7 +62,7 @@ export function PolicyForm({ policy, onSaved, onEditOvertime }: { policy: Payrol
   const hourly = form.hours_per_day > 0 ? daily / form.hours_per_day : 0;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">{t("payroll.settings.policy.description")}</p>
 
       {/* 1. Daily and hourly rate. */}
@@ -76,8 +85,8 @@ export function PolicyForm({ policy, onSaved, onEditOvertime }: { policy: Payrol
               <Input id="pol-days" type="number" min={1} max={31} value={form.rate_basis_days} onChange={(e) => set({ rate_basis_days: Number(e.target.value) })} />
             </FormField>
           )}
-          <FormField id="pol-hours" label={t("payroll.settings.policy.hours")} hint={t("payroll.settings.policy.hoursHint")}>
-            <Input id="pol-hours" type="number" min={1} max={24} step="0.5" value={form.hours_per_day} onChange={(e) => set({ hours_per_day: Number(e.target.value) })} />
+          <FormField id="pol-hours" label={t("payroll.settings.policy.hours")} hint={t("payroll.settings.policy.hoursHint")} error={hoursError}>
+            <Input id="pol-hours" type="number" min={1} max={24} step="any" aria-invalid={!!hoursError || undefined} value={form.hours_per_day} onChange={(e) => set({ hours_per_day: Number(e.target.value) })} />
           </FormField>
         </div>
         <div className="flex gap-2.5 rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">

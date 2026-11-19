@@ -74,9 +74,15 @@ class PayRunController extends Controller
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:0', 'max:999999999999'],
             'reason' => ['required', 'string', 'max:500'],
+            // A waiver: the company forgives a deduction and the employee sees it, with this optional message.
+            'is_waiver' => ['sometimes', 'boolean'],
+            'employee_message' => ['nullable', 'string', 'max:500'],
         ]);
 
-        return $this->detail($request, $this->runs->setOverride($run, $employee, $component, (float) $data['amount'], $data['reason'], $request->user()));
+        return $this->detail($request, $this->runs->setOverride(
+            $run, $employee, $component, (float) $data['amount'], $data['reason'], $request->user(),
+            (bool) ($data['is_waiver'] ?? false), filled($data['employee_message'] ?? null) ? trim($data['employee_message']) : null,
+        ));
     }
 
     /** Back to what the rule works out. */

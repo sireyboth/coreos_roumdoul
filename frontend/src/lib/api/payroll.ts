@@ -165,7 +165,20 @@ export type PayRunReportRow = Omit<PayslipRow, "is_stale" | "employee"> & {
 export type PayRunReport = PayRun & { payslips: PayRunReportRow[] };
 
 // An amount HR set by hand in place of the rule's, kept across recalculations.
-export type PayslipLineOverride = { id: number; calculated: number; calculated_explanation: string | null; reason: string; by: string | null; at: string | null };
+// is_waiver: the company forgave part or all of a deduction; the employee sees employee_message, never reason.
+export type PayslipLineOverride = {
+  id: number;
+  calculated: number;
+  calculated_explanation: string | null;
+  reason: string;
+  is_waiver?: boolean;
+  employee_message?: string | null;
+  by: string | null;
+  at: string | null;
+};
+
+// On the employee's own payslip: what the rule deducted, how much the company forgave, and its message.
+export type PayslipLineWaiver = { original_amount: number; waived_amount: number; message: string | null };
 
 export type PayslipLine = {
   id?: number;
@@ -177,6 +190,9 @@ export type PayslipLine = {
   amount: Amount;
   explanation: string | null;
   details?: ({ override?: PayslipLineOverride } & Record<string, unknown>) | null;
+  // Employee's own payslip only (HR sees details.override instead).
+  waiver?: PayslipLineWaiver | null;
+  adjusted?: boolean;
 };
 
 export type PayslipInputs = {
@@ -358,7 +374,8 @@ export const payrollApi = {
     calculateEmployee: (id: number, employeeId: number) =>
       request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/calculate`, { method: "POST", body: "{}" }),
     // HR's own amount for one payslip line (by its rule), kept across recalculations; recalculates that person.
-    setLine: (id: number, employeeId: number, componentId: number, data: { amount: number; reason: string }) =>
+    // With is_waiver, a deduction the company forgives: the employee sees it with employee_message.
+    setLine: (id: number, employeeId: number, componentId: number, data: { amount: number; reason: string; is_waiver?: boolean; employee_message?: string | null }) =>
       request<PayRunDetail>(`/api/payroll/runs/${id}/employees/${employeeId}/lines/${componentId}`, { method: "PUT", body: JSON.stringify(data) }),
     // Back to what the rule works out.
     clearLine: (id: number, employeeId: number, componentId: number) =>

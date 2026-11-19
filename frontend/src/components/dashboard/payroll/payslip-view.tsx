@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil } from "lucide-react";
+import { HeartHandshake, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ import { api, type MyPayslip, type OvertimeDay, type Payslip, type PayLineKind, 
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { useLang, useT } from "@/lib/i18n";
+import { ChoiceCards } from "@/components/dashboard/shared/form-section";
 import { LINE_SECTIONS, WarningList, dateLabel, money, monthLabel } from "./shared";
 
 /** An overtime line's days, folded away: what was worked and what was paid each day, when a cap or fixed amount applies. */
@@ -53,9 +54,12 @@ function OvertimeDays({ days, currency }: { days: OvertimeDay[]; currency: strin
   );
 }
 
+/** What HR sets on one line: an amount and an internal reason, or a waiver with a message the employee sees. */
+export type LineChange = { amount: number; reason: string; is_waiver: boolean; employee_message: string | null };
+
 /** Setting a line by hand, from a saved payslip in a run that can still change. */
 export type LineEditing = {
-  save: (line: PayslipLine, amount: number, reason: string) => Promise<boolean>;
+  save: (line: PayslipLine, change: LineChange) => Promise<boolean>;
   clear: (line: PayslipLine) => Promise<boolean>;
 };
 
@@ -89,16 +93,31 @@ function Row({ label, value, strong, muted }: { label: React.ReactNode; value: s
 }
 
 /**
- * HR's own amount for one line, with the reason (shown on the payslip and
- * kept in the audit log). Opens under the line it changes.
+ * HR's own amount for one line, opened under the line it changes. On a
+ * deduction it can be a waiver: the company forgives part or all of it, and
+ * the employee sees the original amount and the message. The reason is
+ * internal (HR and the audit log only).
  */
 function LineOverrideForm({ line, currency, editing, onDone }: { line: PayslipLine; currency: string; editing: LineEditing; onDone: () => void }) {
   const t = useT();
   const current = line.details?.override;
+  const calculated = Number(current?.calculated ?? line.amount);
+  const canWaive = line.kind === "deduction" && calculated > 0;
+  const [mode, setMode] = useState<"correct" | "waive">(current?.is_waiver && canWaive ? "waive" : "correct");
   const [amount, setAmount] = useState(String(Number(line.amount)));
   const [reason, setReason] = useState(current?.reason ?? "");
+  const [message, setMessage] = useState(current?.employee_message ?? "");
   const [busy, setBusy] = useState(false);
-  const valid = amount.trim() !== "" && Number(amount) >= 0 && reason.trim() !== "";
+  const waiving = mode === "waive";
+  const n = Number(amount);
+  const tooMuch = waiving && amount.trim() !== "" && n >= calculated;
+  const valid = amount.trim() !== "" && n >= 0 && !tooMuch && reason.trim() !== "";
+
+  function switchMode(next: "correct" | "waive") {
+    setMode(next);
+    // Waiving starts from forgiving it all; anything not below the rule's amount isn't a waiver.
+    if (next === "waive" && !(Number(amount) < calculated)) setAmount("0");
+  }
 
   async function run(action: () => Promise<boolean>) {
     setBusy(true);
@@ -107,18 +126,53 @@ function LineOverrideForm({ line, currency, editing, onDone }: { line: PayslipLi
     if (ok) onDone();
   }
 
+  const id = (field: string) => `override-${field}-${line.code}`;
+
   return (
     <div className="mb-2 flex flex-col gap-3 rounded-md bg-muted/50 p-3">
-      <p className="text-xs text-muted-foreground">
-        {t("payroll.payslip.override.ruleSays", { amount: money(current?.calculated ?? line.amount, currency) })}
-      </p>
+      <p className="text-xs text-muted-foreground">{t("payroll.payslip.override.ruleSays", { amount: money(calculated, currency) })}</p>
+      {canWaive && (
+        <ChoiceCards
+          name={id("mode")}
+          value={mode}
+          onChange={switchMode}
+          options={[
+            { value: "waive", label: t("payroll.payslip.override.modeWaive"), help: t("payroll.payslip.override.modeWaiveHelp") },
+            { value: "correct", label: t("payroll.payslip.override.modeCorrect"), help: t("payroll.payslip.override.modeCorrectHelp") },
+          ]}
+        />
+      )}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`override-amount-${line.code}`}>{t("payroll.payslip.override.amount")}</Label>
-        <Input id={`override-amount-${line.code}`} type="number" inputMode="decimal" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <Label htmlFor={id("amount")}>{t(waiving ? "payroll.payslip.override.stillDeduct" : "payroll.payslip.override.amount")}</Label>
+        <Input
+          id={id("amount")}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={waiving ? calculated : undefined}
+          step="0.01"
+          value={amount}
+          aria-invalid={tooMuch || undefined}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        {waiving && (
+          <p className={cn("text-xs", tooMuch ? "font-medium text-destructive" : "text-muted-foreground")}>
+            {tooMuch
+              ? t("payroll.payslip.override.waiveTooMuch", { amount: money(calculated, currency) })
+              : t("payroll.payslip.override.stillDeductHint", { amount: money(calculated, currency) })}
+          </p>
+        )}
       </div>
+      {waiving && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={id("message")}>{t("payroll.payslip.override.message")}</Label>
+          <Textarea id={id("message")} rows={2} maxLength={500} placeholder={t("payroll.payslip.override.messagePlaceholder")} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <p className="text-xs text-muted-foreground">{t("payroll.payslip.override.messageHint")}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`override-reason-${line.code}`}>{t("payroll.payslip.override.reason")}</Label>
-        <Textarea id={`override-reason-${line.code}`} rows={2} maxLength={500} placeholder={t("payroll.payslip.override.reasonHint")} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <Label htmlFor={id("reason")}>{t(waiving ? "payroll.payslip.override.internalReason" : "payroll.payslip.override.reason")}</Label>
+        <Textarea id={id("reason")} rows={2} maxLength={500} placeholder={t("payroll.payslip.override.reasonHint")} value={reason} onChange={(e) => setReason(e.target.value)} />
       </div>
       <div className="flex flex-wrap justify-end gap-2">
         {current && (
@@ -129,7 +183,13 @@ function LineOverrideForm({ line, currency, editing, onDone }: { line: PayslipLi
         <Button variant="outline" size="sm" disabled={busy} onClick={onDone}>
           {t("common.action.cancel")}
         </Button>
-        <Button size="sm" disabled={busy || !valid} onClick={() => run(() => editing.save(line, Number(amount), reason.trim()))}>
+        <Button
+          size="sm"
+          disabled={busy || !valid}
+          onClick={() =>
+            run(() => editing.save(line, { amount: n, reason: reason.trim(), is_waiver: waiving, employee_message: waiving ? message.trim() || null : null }))
+          }
+        >
           {busy ? t("common.message.saving") : t("common.action.save")}
         </Button>
       </div>
@@ -201,32 +261,69 @@ export function PayslipView({
               {lines.map((line, i) => {
                 const override = line.details?.override;
                 const componentId = line.pay_component_id ?? null;
+                // The employee's own payslip carries `waiver` / `adjusted`; HR's carries details.override.
+                const waiver = line.waiver;
+                const hrWaiver = override?.is_waiver ? override : null;
                 return (
                   <div key={`${line.code}-${i}`}>
                     <div className={cn("flex items-start justify-between gap-4 py-2", highlight && line.code === highlight && "-mx-3 bg-primary/5 px-3")}>
                       <div className="min-w-0">
                         <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                           {line.name}
-                          {override && <Badge variant="warning">{t("payroll.payslip.override.badge")}</Badge>}
+                          {(waiver || hrWaiver) && <Badge variant="success">{t("payroll.payslip.override.waivedBadge")}</Badge>}
+                          {override && !hrWaiver && <Badge variant="warning">{t("payroll.payslip.override.badge")}</Badge>}
+                          {line.adjusted && <Badge variant="secondary">{t("payroll.payslip.adjusted")}</Badge>}
                         </p>
-                        {override ? (
+                        {override && !hrWaiver ? (
                           <p className="text-xs text-muted-foreground">{t("payroll.payslip.override.because", { reason: override.reason })}</p>
                         ) : (
                           line.explanation && <p className="text-xs text-muted-foreground">{line.explanation}</p>
                         )}
                         {Array.isArray(line.details?.days) && <OvertimeDays days={line.details.days as OvertimeDay[]} currency={c} />}
-                        {override && (
+                        {hrWaiver && (
+                          <div className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
+                            <p className="font-medium text-success">
+                              {t("payroll.payslip.override.waivedOf", { waived: money(hrWaiver.calculated - Number(line.amount), c), original: money(hrWaiver.calculated, c) })}
+                            </p>
+                            {hrWaiver.employee_message && <p>{t("payroll.payslip.override.employeeSees", { message: hrWaiver.employee_message })}</p>}
+                            <p>
+                              {t("payroll.payslip.override.because", { reason: hrWaiver.reason })}
+                              {hrWaiver.by && ` · ${hrWaiver.by}`}
+                            </p>
+                          </div>
+                        )}
+                        {override && !hrWaiver && (
                           <p className="text-xs text-muted-foreground">
                             {t("payroll.payslip.override.wasRule", { amount: money(override.calculated, c) })}
                             {override.by && ` · ${override.by}`}
                           </p>
                         )}
+                        {waiver && (
+                          <div className="mt-1.5 flex gap-2 rounded-md border border-success/30 bg-success/10 px-2.5 py-2 text-xs">
+                            <HeartHandshake className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden />
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                              <p className="font-medium text-success">
+                                {Number(line.amount) > 0
+                                  ? t("payroll.payslip.waiver.part", { amount: money(waiver.waived_amount, c) })
+                                  : t("payroll.payslip.waiver.all")}
+                              </p>
+                              {waiver.message && <p className="text-foreground">“{waiver.message}”</p>}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
-                        <p className={cn("text-sm font-medium tabular-nums", tone.text)}>
-                          {section.sign && `${section.sign} `}
-                          {money(line.amount, c)}
-                        </p>
+                        <div className="text-right">
+                          <p className={cn("text-sm font-medium tabular-nums", tone.text)}>
+                            {section.sign && `${section.sign} `}
+                            {money(line.amount, c)}
+                          </p>
+                          {(waiver || hrWaiver) && (
+                            <p className="text-xs tabular-nums text-muted-foreground line-through">
+                              {money(waiver ? waiver.original_amount : hrWaiver!.calculated, c)}
+                            </p>
+                          )}
+                        </div>
                         {editing && componentId !== null && (
                           <Button
                             variant="ghost"
@@ -329,7 +426,7 @@ export function PayslipDialog({
   const editing: LineEditing | undefined =
     slip && employeeId && onRunChange
       ? {
-          save: (line, amount, reason) => apply(() => api.payroll.setLine(slip.pay_run_id, employeeId, line.pay_component_id!, { amount, reason })),
+          save: (line, change) => apply(() => api.payroll.setLine(slip.pay_run_id, employeeId, line.pay_component_id!, change)),
           clear: (line) => apply(() => api.payroll.clearLine(slip.pay_run_id, employeeId, line.pay_component_id!)),
         }
       : undefined;

@@ -273,7 +273,7 @@ function ApprovePartDialog({ entry, busy, onOpenChange, onApprove }: { entry: Ov
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="ot-part-minutes">{t("attendance.overtime.partMinutes")}</Label>
-              <Input id="ot-part-minutes" type="number" inputMode="numeric" min={0} max={59} step={5} value={minutes} onChange={(ev) => setMinutes(ev.target.value)} />
+              <Input id="ot-part-minutes" type="number" inputMode="numeric" min={0} max={59} step={1} value={minutes} onChange={(ev) => setMinutes(ev.target.value)} />
             </div>
           </div>
           <p className={cn("text-xs", tooMuch || !wellFormed ? "text-destructive" : "text-muted-foreground")}>

@@ -257,7 +257,10 @@ class PayrollCalculator
 
             // HR's amount wins, even 0 or where the rule gave nothing, so the payslip shows it was set by hand.
             $override = $overrides->get($component->id);
-            if ($override !== null) {
+            if ($override !== null && $override->is_waiver && (float) ($line['amount'] ?? 0) <= 0) {
+                // A waiver forgives a deduction; with nothing deducted this time there is nothing to show.
+                $override = null;
+            } elseif ($override !== null) {
                 $line = $this->overriddenLine($line, $override, $currency);
             }
 
@@ -469,10 +472,16 @@ class PayrollCalculator
     private function overriddenLine(?array $line, PayslipOverride $override, string $currency): array
     {
         $calculated = (float) ($line['amount'] ?? 0);
+        $amount = Money::round((float) $override->amount, $currency);
+        if ($override->is_waiver) {
+            // A waiver only ever lowers the deduction, even if attendance changed since it was set.
+            $amount = min($amount, Money::round($calculated, $currency));
+        }
 
         return [
-            'amount' => Money::round((float) $override->amount, $currency),
-            'explanation' => 'Set by hand: '.$override->reason,
+            'amount' => $amount,
+            // A waiver keeps the rule's working (e.g. "2 days × $15"): it is shown to the employee, the internal reason is not.
+            'explanation' => $override->is_waiver ? ($line['explanation'] ?? null) : 'Set by hand: '.$override->reason,
             'details' => [
                 ...($line['details'] ?? []),
                 'override' => [
@@ -480,6 +489,8 @@ class PayrollCalculator
                     'calculated' => $calculated,
                     'calculated_explanation' => $line['explanation'] ?? null,
                     'reason' => $override->reason,
+                    'is_waiver' => $override->is_waiver,
+                    'employee_message' => $override->employee_message,
                     'by' => $override->updatedBy?->name,
                     'at' => $override->updated_at?->toIso8601String(),
                 ],
