@@ -364,6 +364,105 @@ class PayrollTest extends TestCase
         $this->assertSame('6 h × 2.5 × 150% + 4 h × 2.5 × 200%', $this->line($slip, 'OVERTIME')['explanation']);
     }
 
+    public function test_overtime_can_be_capped_per_day_once_the_minimums_are_off(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')->assertOk();
+        $overtime = PayComponent::query()->where('code', 'OVERTIME')->first();
+        $capped = ['workday' => 1.5, 'day_off' => 2, 'holiday' => 2, 'modes' => ['workday' => ['mode' => 'capped', 'cap_hours' => 2]]];
+
+        // A cap pays worked hours below the law, so it needs the minimums switched off.
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => $capped])
+            ->assertJsonValidationErrors('params.modes.workday.mode');
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['enforce_overtime_minimums' => false])->assertOk();
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => ['workday' => 1.5, 'day_off' => 2, 'holiday' => 2, 'modes' => ['workday' => ['mode' => 'capped']]]])
+            ->assertJsonValidationErrors('params.modes.workday.cap_hours');
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => $capped])->assertOk();
+        // Types left out are filled in as paid per hour.
+        $this->assertSame('per_hour', $overtime->fresh()->params['modes']['day_off']['mode']);
+
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520)->assertCreated();
+        $this->day($sokha, '2026-09-04', ['overtime_minutes' => 210, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+        $this->day($sokha, '2026-09-05', ['overtime_minutes' => 90, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+        $this->day($sokha, '2026-09-06', ['kind' => 'weekly_off', 'overtime_minutes' => 240, 'overtime_type' => 'day_off', 'overtime_status' => 'approved']);
+
+        $run = $this->createRun()->assertCreated()->json();
+        $slip = $this->payslip($run['payslips'][0]['id']);
+        $line = $this->line($slip, 'OVERTIME');
+        // 2 h + 1.5 h of 5 h worked × 2.5 × 150% = 13.13, plus the day off per hour: 4 h × 2.5 × 200% = 20.
+        $this->assertSame('5 h worked, 3.5 h paid (max 2 h a day) × 2.5 × 150% + 4 h × 2.5 × 200%', $line['explanation']);
+        $this->assertEquals(33.13, $line['amount']);
+        $this->assertCount(3, $line['details']['days']);
+        $this->assertSame(['date' => '2026-09-04', 'type' => 'workday', 'worked_hours' => 3.5, 'recorded_hours' => null, 'paid_hours' => 2, 'amount' => 7.5, 'note' => 'cap 2 h'], $line['details']['days'][0]);
+        $this->assertContains('overtime_below_law', collect($slip['warnings'])->pluck('code'));
+
+        // Minimums switched back on: the saved cap is ignored and every approved hour is paid, 5 h × 2.5 × 150% + 20.
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['enforce_overtime_minimums' => true])->assertOk();
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk()->json();
+        $line = $this->line($this->payslip($run['payslips'][0]['id']), 'OVERTIME');
+        $this->assertSame('5 h × 2.5 × 150% + 4 h × 2.5 × 200%', $line['explanation']);
+        $this->assertEquals(38.75, $line['amount']);
+    }
+
+    public function test_overtime_can_be_a_fixed_amount_per_day(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')->assertOk();
+        $overtime = PayComponent::query()->where('code', 'OVERTIME')->first();
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => [
+            'workday' => 1.5, 'day_off' => 2, 'holiday' => 2,
+            'modes' => ['workday' => ['mode' => 'fixed', 'amount' => 20, 'min_hours' => 1]],
+        ]])->assertOk();
+        // A fixed amount of nothing is a mistake, not a policy.
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => [
+            'workday' => 1.5, 'day_off' => 2, 'holiday' => 2, 'modes' => ['workday' => ['mode' => 'fixed', 'amount' => 0]],
+        ]])->assertJsonValidationErrors('params.modes.workday.amount');
+
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520)->assertCreated();
+        $this->day($sokha, '2026-09-04', ['overtime_minutes' => 120, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+        $this->day($sokha, '2026-09-05', ['overtime_minutes' => 30, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+
+        // Minimums on: the short day (under 1 h, no fixed amount) is still paid at the legal 150%: 0.5 h × 2.5 × 150%.
+        $run = $this->createRun()->assertCreated()->json();
+        $line = $this->line($this->payslip($run['payslips'][0]['id']), 'OVERTIME');
+        $this->assertSame('1 day × 20.00 (1 raised to the legal 150%)', $line['explanation']);
+        $this->assertEquals(21.88, $line['amount']);
+
+        // Minimums off: only the fixed amount, for days of at least 1 h.
+        $this->actingAs($this->admin)->putJson('/api/payroll/policy', ['enforce_overtime_minimums' => false])->assertOk();
+        $run = $this->actingAs($this->admin)->postJson("/api/payroll/runs/{$run['id']}/calculate")->assertOk()->json();
+        $slip = $this->payslip($run['payslips'][0]['id']);
+        $line = $this->line($slip, 'OVERTIME');
+        $this->assertSame('1 day × 20.00', $line['explanation']);
+        $this->assertEquals(20, $line['amount']);
+        $this->assertSame('under 1 h', $line['details']['days'][1]['note']);
+        $this->assertNotContains('overtime_below_law', collect($slip['warnings'])->pluck('code'));
+    }
+
+    public function test_overtime_approved_in_part_pays_only_the_approved_hours(): void
+    {
+        $sokha = $this->employee('Sokha');
+        $this->salary($sokha, 520)->assertCreated();
+        // 3.5 h worked, 2 h approved.
+        $this->day($sokha, '2026-09-04', ['overtime_minutes' => 210, 'overtime_approved_minutes' => 120, 'overtime_type' => 'workday', 'overtime_status' => 'approved']);
+
+        $run = $this->createRun()->assertCreated()->json();
+        $line = $this->line($this->payslip($run['payslips'][0]['id']), 'OVERTIME');
+        $this->assertSame('2 h × 2.5 × 150%', $line['explanation']);
+        $this->assertEquals(7.5, $line['amount']);
+    }
+
+    public function test_overtime_modes_all_per_hour_keep_the_rule_as_it_was(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/payroll/settings')->assertOk();
+        $overtime = PayComponent::query()->where('code', 'OVERTIME')->first();
+        $this->actingAs($this->admin)->putJson("/api/payroll/components/{$overtime->id}", ['params' => [
+            'workday' => 1.5, 'day_off' => 2, 'holiday' => 2, 'modes' => ['workday' => ['mode' => 'per_hour']],
+        ]])->assertOk();
+
+        $this->assertArrayNotHasKey('modes', $overtime->fresh()->params);
+    }
+
     public function test_presets_tune_policy_and_rules(): void
     {
         $this->actingAs($this->admin)->postJson('/api/payroll/presets', ['preset' => 'factory'])->assertOk();

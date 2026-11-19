@@ -8,6 +8,7 @@ export const photo = {
   formats: "JPG, PNG or WebP. You can drag and zoom to crop it.",
   notImage: "Please choose an image file.",
   unusable: "Couldn't use that image.",
+  view: "View photo",
 
   // ── Crop dialog ──────────────────────────────────────────────────
   cropTitle: "Adjust photo",

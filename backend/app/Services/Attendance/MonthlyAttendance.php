@@ -68,7 +68,8 @@ class MonthlyAttendance
 
             $mine = $days->get($employee->id, collect());
             $worked = $mine->filter(fn (AttendanceDay $d) => $d->scan_count > 0);
-            $approvedOt = fn (string $type) => (int) $mine->where('overtime_status', 'approved')->where('overtime_type', $type)->sum('overtime_minutes');
+            // Approved overtime counts what was approved, which can be less than was worked.
+            $approvedOt = fn (string $type) => (int) $mine->where('overtime_type', $type)->sum(fn (AttendanceDay $d) => $d->payableOvertimeMinutes());
 
             return [$employee->id => [
                 'planned' => $planned,
@@ -93,6 +94,14 @@ class MonthlyAttendance
                 'overtime_day_off_minutes' => $approvedOt('day_off'),
                 'overtime_holiday_minutes' => $approvedOt('holiday'),
                 'overtime_pending_minutes' => (int) $mine->where('overtime_status', 'pending')->sum('overtime_minutes'),
+                // Approved overtime per day, so payroll can cap a day or pay a fixed amount per overtime day.
+                // minutes = approved (what is paid); recorded_minutes = what the scans show.
+                'overtime_by_day' => $mine->filter(fn (AttendanceDay $d) => $d->payableOvertimeMinutes() > 0)
+                    ->map(fn (AttendanceDay $d) => [
+                        'date' => CarbonImmutable::parse($d->date)->toDateString(), 'type' => (string) $d->overtime_type,
+                        'minutes' => $d->payableOvertimeMinutes(), 'recorded_minutes' => (int) $d->overtime_minutes,
+                    ])
+                    ->values()->all(),
             ]];
         });
     }

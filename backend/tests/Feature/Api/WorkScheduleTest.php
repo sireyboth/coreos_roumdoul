@@ -352,6 +352,50 @@ class WorkScheduleTest extends TestCase
         $this->as($this->user)->postJson("/api/attendance/days/{$pending['id']}/overtime/reject")->assertForbidden();
     }
 
+    public function test_overtime_can_be_approved_in_part(): void
+    {
+        $normal = $this->makeWorkSchedule($this->company, attributes: [
+            'name' => 'Normal', 'overtime_mode' => 'after_last_out', 'overtime_min_minutes' => 30, 'overtime_requires_approval' => true,
+        ]);
+        $this->assignSchedule($this->employee, $normal, '2026-10-01');
+
+        $this->at('2026-10-05 08:00');
+        $this->as($this->user)->postJson('/api/attendance/scan', $this->atHq)->assertCreated();
+        $this->at('2026-10-05 18:30');
+        $this->as($this->user)->postJson('/api/attendance/scan', $this->atHq)->assertCreated();
+        $day = $this->as($this->admin)->getJson('/api/attendance/overtime?status=pending')->assertOk()->json('0');
+        $this->assertSame(90, $day['overtime_minutes']);
+
+        // Never more than was worked.
+        $this->as($this->admin)->postJson("/api/attendance/days/{$day['id']}/overtime/approve", ['minutes' => 120])
+            ->assertJsonValidationErrors('minutes');
+
+        $this->as($this->admin)->postJson("/api/attendance/days/{$day['id']}/overtime/approve", ['minutes' => 60])->assertOk()
+            ->assertJsonPath('overtime_status', 'approved')->assertJsonPath('overtime_approved_minutes', 60);
+
+        $summary = fn () => collect($this->as($this->admin)->getJson('/api/attendance/summary?month=2026-10')->assertOk()->json('rows'))
+            ->firstWhere('employee.id', $this->employee->id);
+        $this->assertSame(60, $summary()['overtime_workday_minutes']);
+
+        // A recalculation that doesn't change the overtime keeps the decision and the approved minutes.
+        app(AttendanceRecorder::class)->recalculate($this->employee, '2026-10-05');
+        $this->assertSame(60, AttendanceDay::query()->find($day['id'])->overtime_approved_minutes);
+        $this->assertSame(60, $summary()['overtime_workday_minutes']);
+
+        // The overtime changes (here: the stored minutes no longer match the scans): it goes back for review, with nothing approved.
+        AttendanceDay::query()->whereKey($day['id'])->update(['overtime_minutes' => 100]);
+        app(AttendanceRecorder::class)->recalculate($this->employee, '2026-10-05');
+        $fresh = AttendanceDay::query()->find($day['id']);
+        $this->assertSame('pending', $fresh->overtime_status);
+        $this->assertNull($fresh->overtime_approved_minutes);
+        $this->assertSame(0, $summary()['overtime_workday_minutes']);
+
+        // Approving all of it (no minutes, as older apps send) leaves nothing partial.
+        $this->as($this->admin)->postJson("/api/attendance/days/{$day['id']}/overtime/approve")->assertOk()
+            ->assertJsonPath('overtime_approved_minutes', null);
+        $this->assertSame($fresh->overtime_minutes, $summary()['overtime_workday_minutes']);
+    }
+
     public function test_a_locked_month_cannot_be_changed_until_it_is_reopened(): void
     {
         $normal = $this->makeWorkSchedule($this->company, attributes: ['name' => 'Normal']);

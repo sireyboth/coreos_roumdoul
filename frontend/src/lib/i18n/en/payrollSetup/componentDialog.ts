@@ -28,8 +28,31 @@ export const componentDialog = {
     none: "Recorded in attendance, never deducted.",
   },
 
+  // ── Overtime: how each kind of day is paid ────────────────────────
+  otMode: {
+    per_hour: "Every hour",
+    capped: "Every hour, up to a daily cap",
+    fixed: "Fixed amount per overtime day",
+  },
+  otModeHint: {
+    per_hour: "Hours worked × hourly rate × the rate.",
+    capped: "Hours above the cap are recorded but not paid.",
+    fixed: "The same amount for each overtime day, however long.",
+    capNeedsLawOff: "A daily cap needs the Labour Law minimums switched off in Payroll Settings.",
+  },
+
   // ── Rule fields ───────────────────────────────────────────────────
   fields: {
+    otHowPaid: "How it is paid",
+    otRate: "Rate",
+    otCap: "Pay at most",
+    hoursPerDay: "hours a day",
+    hours: "hours",
+    otCapExample: "e.g. 3.5 h worked → {cap} h paid.",
+    otAmountPerDay: "Amount per day",
+    otMinHours: "Counts from",
+    otMinHoursHint: "A day with less overtime than this is not paid.",
+    otFixedLawOn: "Labour Law minimums are on: a day is never paid less than its hours at {pct}%.",
     lawAtLeast: "At least {pct}% by law.",
     lawBelow: "Below the {pct}% Labour Law minimum.",
     lawMinimum: "Labour Law minimum: {pct}%.",

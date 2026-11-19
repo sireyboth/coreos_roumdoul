@@ -4,10 +4,11 @@
 import { usersPage } from "./usersPage";
 import { rolesPage } from "./rolesPage";
 import { roleDialog } from "./roleDialog";
+import { rolePreview } from "./rolePreview";
 import { auditPage } from "./auditPage";
 import { profilePage } from "./profilePage";
 import { createLogin } from "./createLogin";
 import { loginLink } from "./loginLink";
 import { signInMethod } from "./signInMethod";
 
-export const access = { usersPage, rolesPage, roleDialog, auditPage, profilePage, createLogin, loginLink, signInMethod };
+export const access = { usersPage, rolesPage, roleDialog, rolePreview, auditPage, profilePage, createLogin, loginLink, signInMethod };

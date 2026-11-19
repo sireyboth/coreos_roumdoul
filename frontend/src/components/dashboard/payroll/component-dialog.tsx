@@ -8,9 +8,10 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { api, ApiError, type LatenessMode, type LatenessParams, type PayComponent, type PayKind, type PayslipBody, type PayTemplate } from "@/lib/api";
+import { api, ApiError, type LatenessMode, type LatenessParams, type OvertimeModeRule, type OvertimeParams, type OvertimePayMode, type OvertimeType, type PayComponent, type PayKind, type PayslipBody, type PayTemplate } from "@/lib/api";
 import { translateNow, useT, type TKey } from "@/lib/i18n";
 import { notifySuccess } from "@/lib/notify";
+import { cn } from "@/lib/utils";
 import { PayslipView } from "./payslip-view";
 import { KIND_LABELS, previousMonth } from "./shared";
 
@@ -23,6 +24,17 @@ const TEMPLATES: PayTemplate[] = ["overtime", "attendance_bonus", "absence", "un
 const templateLabel = (template: PayTemplate): TKey => `payrollSetup.componentDialog.template.${template}`;
 
 const LATENESS_MODES: LatenessMode[] = ["per_minute", "per_time", "count_based", "tiers", "none"];
+
+const OVERTIME_MODES: OvertimePayMode[] = ["per_hour", "capped", "fixed"];
+
+// Each kind of overtime day, its label and the Labor Law minimum rate.
+const OVERTIME_TYPES: { key: OvertimeType; label: TKey; legal: number }[] = [
+  { key: "workday", label: "payrollSetup.componentDialog.fields.workday", legal: 1.5 },
+  { key: "day_off", label: "payrollSetup.componentDialog.fields.dayOff", legal: 2 },
+  { key: "holiday", label: "payrollSetup.componentDialog.fields.holiday", legal: 2 },
+];
+
+const PER_HOUR: OvertimeModeRule = { mode: "per_hour", cap_hours: null, amount: null, min_hours: null };
 
 function defaultParams(template: PayTemplate | null): Params {
   switch (template) {
@@ -70,26 +82,102 @@ export function TemplateFields({
   const set = (patch: Params) => onChange({ ...params, ...patch });
 
   if (template === "overtime") {
-    const field = (key: string, label: string, legal: number) => {
-      const belowLaw = Number(params[key]) < legal;
-      const pct = legal * 100;
-      const hint = enforceOvertimeMinimums
-        ? t("payrollSetup.componentDialog.fields.lawAtLeast", { pct })
-        : belowLaw
-          ? t("payrollSetup.componentDialog.fields.lawBelow", { pct })
-          : t("payrollSetup.componentDialog.fields.lawMinimum", { pct });
-      return (
-        <NumberField id={`ot-${key}`} label={label} suffix="%" min={enforceOvertimeMinimums ? legal * 100 : 0} step="5" value={Math.round(Number(params[key]) * 100)} onChange={(n) => set({ [key]: n / 100 })} hint={hint} />
-      );
+    const p = params as unknown as OvertimeParams;
+    const ruleFor = (type: OvertimeType): OvertimeModeRule => ({ ...PER_HOUR, ...p.modes?.[type] });
+    const setRule = (type: OvertimeType, patch: Partial<OvertimeModeRule>) => {
+      const modes = Object.fromEntries(OVERTIME_TYPES.map(({ key }) => [key, ruleFor(key)])) as Record<OvertimeType, OvertimeModeRule>;
+      modes[type] = { ...modes[type], ...patch };
+      set({ modes });
     };
+    const setMode = (type: OvertimeType, mode: OvertimePayMode) =>
+      setRule(type, {
+        mode,
+        cap_hours: mode === "capped" ? (ruleFor(type).cap_hours ?? 2) : null,
+        amount: mode === "fixed" ? (ruleFor(type).amount ?? 0) : null,
+        min_hours: mode === "fixed" ? (ruleFor(type).min_hours ?? 1) : null,
+      });
+
+    // A container, so the three day types sit side by side wherever the rule has the room (wide dialog or pay group panel).
     return (
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {field("workday", t("payrollSetup.componentDialog.fields.workday"), 1.5)}
-          {field("day_off", t("payrollSetup.componentDialog.fields.dayOff"), 2)}
-          {field("holiday", t("payrollSetup.componentDialog.fields.holiday"), 2)}
+      <div className="flex flex-col gap-3 @container">
+        <div className="grid grid-cols-1 gap-3 @3xl:grid-cols-3">
+          {OVERTIME_TYPES.map(({ key, label, legal }) => {
+            const rule = ruleFor(key);
+            const belowLaw = Number(p[key]) < legal;
+            const pct = legal * 100;
+            const rateHint = enforceOvertimeMinimums
+              ? t("payrollSetup.componentDialog.fields.lawAtLeast", { pct })
+              : belowLaw
+                ? t("payrollSetup.componentDialog.fields.lawBelow", { pct })
+                : t("payrollSetup.componentDialog.fields.lawMinimum", { pct });
+            return (
+              <fieldset key={key} className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3">
+                <legend className="px-1 text-sm font-medium">{t(label)}</legend>
+                <div className="grid grid-cols-1 gap-3 @md:grid-cols-2 @3xl:grid-cols-1">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`ot-${key}-mode`}>{t("payrollSetup.componentDialog.fields.otHowPaid")}</Label>
+                    <select id={`ot-${key}-mode`} className={SELECT_CLASS} value={rule.mode} onChange={(e) => setMode(key, e.target.value as OvertimePayMode)}>
+                      {OVERTIME_MODES.map((m) => (
+                        <option key={m} value={m} disabled={m === "capped" && enforceOvertimeMinimums && rule.mode !== "capped"}>
+                          {t(`payrollSetup.componentDialog.otMode.${m}`)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">{t(`payrollSetup.componentDialog.otModeHint.${rule.mode}`)}</p>
+                  </div>
+                  {rule.mode !== "fixed" && (
+                    <NumberField
+                      id={`ot-${key}`}
+                      label={t("payrollSetup.componentDialog.fields.otRate")}
+                      suffix="%"
+                      min={enforceOvertimeMinimums ? pct : 0}
+                      step="5"
+                      value={Math.round(Number(p[key]) * 100)}
+                      onChange={(n) => set({ [key]: n / 100 })}
+                      hint={rateHint}
+                    />
+                  )}
+                  {rule.mode === "capped" && (
+                    <NumberField
+                      id={`ot-${key}-cap`}
+                      label={t("payrollSetup.componentDialog.fields.otCap")}
+                      suffix={t("payrollSetup.componentDialog.fields.hoursPerDay")}
+                      min={0.25}
+                      step="0.5"
+                      value={rule.cap_hours}
+                      onChange={(n) => setRule(key, { cap_hours: n })}
+                      hint={t("payrollSetup.componentDialog.fields.otCapExample", { cap: rule.cap_hours ?? 0 })}
+                    />
+                  )}
+                  {rule.mode === "fixed" && (
+                    <>
+                      <NumberField
+                        id={`ot-${key}-amount`}
+                        label={t("payrollSetup.componentDialog.fields.otAmountPerDay")}
+                        step="0.01"
+                        value={rule.amount}
+                        onChange={(n) => setRule(key, { amount: n })}
+                        hint={t("payrollSetup.componentDialog.fields.inSalaryCurrency")}
+                      />
+                      <NumberField
+                        id={`ot-${key}-min`}
+                        label={t("payrollSetup.componentDialog.fields.otMinHours")}
+                        suffix={t("payrollSetup.componentDialog.fields.hours")}
+                        step="0.5"
+                        value={rule.min_hours}
+                        onChange={(n) => setRule(key, { min_hours: n })}
+                        hint={enforceOvertimeMinimums ? t("payrollSetup.componentDialog.fields.otFixedLawOn", { pct }) : t("payrollSetup.componentDialog.fields.otMinHoursHint")}
+                      />
+                    </>
+                  )}
+                </div>
+              </fieldset>
+            );
+          })}
         </div>
-        {!enforceOvertimeMinimums && <p className="text-xs text-muted-foreground">{t("payrollSetup.componentDialog.fields.lawOff")}</p>}
+        <p className="text-xs text-muted-foreground">
+          {t(enforceOvertimeMinimums ? "payrollSetup.componentDialog.otModeHint.capNeedsLawOff" : "payrollSetup.componentDialog.fields.lawOff")}
+        </p>
       </div>
     );
   }
@@ -332,7 +420,7 @@ export function ComponentDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className={cn("max-h-[92vh] overflow-y-auto", method === "template" && template === "overtime" ? "sm:max-w-6xl" : "sm:max-w-2xl")}>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{isNew ? t("payrollSetup.componentDialog.dialog.addTitle") : name || component.name}</DialogTitle>
@@ -395,7 +483,7 @@ export function ComponentDialog({
           )}
 
           {!isBase && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
               {kind === "earning" && (
                 <>
                   <label className="flex items-center gap-2 text-sm">

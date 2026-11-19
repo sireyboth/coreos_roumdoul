@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, ShieldCheck } from "lucide-react";
+import { Eye, Plus, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { displayOrderColumn } from "@/components/dashboard/shared/display-order";
 import { PageHeader } from "@/components/dashboard/layout/page-header";
 import { RoleDialog } from "@/components/dashboard/access/role-dialog";
+import { RolePreviewDialog } from "@/components/dashboard/access/role-preview";
 import { useMe } from "@/contexts/me-context";
 import { api, PermissionGroup, Role } from "@/lib/api";
 import { exportRoles, roleImport } from "@/lib/excel/specs/people";
@@ -25,6 +26,8 @@ export default function RolesPage() {
   const [groups, setGroups] = useState<PermissionGroup[]>([]);
   // Which role the dialog is open for: null = a new one.
   const [dialog, setDialog] = useState<{ role: Role | null } | null>(null);
+  // Which saved role is being previewed (read-only).
+  const [preview, setPreview] = useState<Role | null>(null);
 
   function load() {
     api.roles.list().then(setRoles).catch(() => setRoles([]));
@@ -121,25 +124,30 @@ export default function RolesPage() {
           columns={columns}
           searchPlaceholder={t("access.rolesPage.search")}
           emptyState={{ icon: ShieldCheck, title: t("access.rolesPage.empty"), description: t("access.rolesPage.emptyHint") }}
-          rowActions={
-            canManage
-              ? (role) =>
-                  role.protected ? (
+          rowActions={(role) => (
+            <>
+              {/* Anyone who can open this page can preview; editing needs roles.manage. */}
+              <Button variant="ghost" size="sm" onClick={() => setPreview(role)} title={t("access.rolePreview.button")}>
+                <Eye className="size-3.5" />
+                {t("access.rolePreview.button")}
+              </Button>
+              {canManage &&
+                (role.protected ? (
+                  <Button variant="outline" size="sm" onClick={() => setDialog({ role })}>
+                    {t("access.rolesPage.editOrder")}
+                  </Button>
+                ) : (
+                  <>
                     <Button variant="outline" size="sm" onClick={() => setDialog({ role })}>
-                      {t("access.rolesPage.editOrder")}
+                      {t("common.action.edit")}
                     </Button>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => setDialog({ role })}>
-                        {t("common.action.edit")}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(role)}>
-                        {t("common.action.delete")}
-                      </Button>
-                    </>
-                  )
-              : undefined
-          }
+                    <Button variant="outline" size="sm" onClick={() => handleDelete(role)}>
+                      {t("common.action.delete")}
+                    </Button>
+                  </>
+                ))}
+            </>
+          )}
         />
 
         {canManageCompany && me?.company && (
@@ -163,6 +171,8 @@ export default function RolesPage() {
             </CardContent>
           </Card>
         )}
+
+        {preview && <RolePreviewDialog role={preview} groups={groups} onOpenChange={(open) => !open && setPreview(null)} />}
 
         {dialog && (
           <RoleDialog

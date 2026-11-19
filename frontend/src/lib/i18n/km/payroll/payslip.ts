@@ -50,4 +50,13 @@ export const payslip: Dictionary["payroll"]["payslip"] = {
     useRule: "ប្រើចំនួនតាមច្បាប់គណនា",
     saved: "បានធ្វើបច្ចុប្បន្នភាពប័ណ្ណបើកប្រាក់បៀវត្សរ៍។",
   },
+  otDays: {
+    show: "បង្ហាញថ្ងៃធ្វើម៉ោងបន្ថែម {n} ថ្ងៃ",
+    hide: "លាក់ថ្ងៃធ្វើម៉ោងបន្ថែម",
+    approvedOf: "អនុម័ត {approved} ម៉ោង ក្នុងចំណោម {recorded} ម៉ោង",
+    hours: "{worked} ម៉ោង",
+    capped: "ធ្វើ {worked} ម៉ោង បើកប្រាក់ {paid} ម៉ោង",
+    fixed: "{worked} ម៉ោង ចំនួនទឹកប្រាក់ថេរ",
+    type: { workday: "ថ្ងៃធ្វើការ", day_off: "ថ្ងៃឈប់សម្រាក", holiday: "ថ្ងៃបុណ្យ" },
+  },
 };

@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { PhotoCropDialog } from "@/components/dashboard/employees/photo-crop-dialog";
+import { PhotoViewerDialog } from "@/components/dashboard/employees/photo-viewer-dialog";
 import { MyPay } from "@/components/dashboard/payroll/my-pay";
 import { KbachCorner, surfaceCard } from "@/components/dashboard/shared/kbach";
 import { useMe } from "@/contexts/me-context";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, photoSrc } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useLang, useT } from "@/lib/i18n";
@@ -33,8 +34,11 @@ function OwnPhoto({ name }: { name: string }) {
   // The picked file as an object URL while the crop dialog is open.
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Full-size view of the photo (tap it to open).
+  const [viewing, setViewing] = useState(false);
 
   const photoUrl = me?.employee?.photo_url ?? null;
+  const fullSrc = photoSrc(photoUrl);
   const avatar = <EmployeeAvatar name={name || "?"} photoUrl={photoUrl} className="size-16 text-lg ring-2 ring-surface" />;
   if (!me?.employee) return avatar;
 
@@ -74,7 +78,19 @@ function OwnPhoto({ name }: { name: string }) {
   return (
     <div className="flex shrink-0 flex-col items-center gap-1">
       <div className={cn("relative", busy && "opacity-60")}>
-        {avatar}
+        {fullSrc ? (
+          <button
+            type="button"
+            onClick={() => setViewing(true)}
+            aria-label={t("employees.photo.view")}
+            title={t("employees.photo.view")}
+            className="block cursor-zoom-in rounded-full transition-transform hover:scale-105 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            {avatar}
+          </button>
+        ) : (
+          avatar
+        )}
         <button
           type="button"
           disabled={busy}
@@ -103,6 +119,17 @@ function OwnPhoto({ name }: { name: string }) {
         onOpenChange={closeCropDialog}
         onCropped={(photo) => save(() => api.profile.uploadPhoto(photo), t("employees.profilePage.photoUpdated"))}
       />
+      {fullSrc && (
+        <PhotoViewerDialog
+          open={viewing}
+          onOpenChange={setViewing}
+          name={name}
+          src={fullSrc}
+          busy={busy}
+          onChange={() => input.current?.click()}
+          onRemove={() => save(() => api.profile.removePhoto(), t("employees.profilePage.photoRemoved"))}
+        />
+      )}
     </div>
   );
 }

@@ -10,11 +10,48 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
-import { api, type MyPayslip, type Payslip, type PayLineKind, type PayRunDetail, type PayslipBody, type PayslipLine } from "@/lib/api";
+import { api, type MyPayslip, type OvertimeDay, type Payslip, type PayLineKind, type PayRunDetail, type PayslipBody, type PayslipLine } from "@/lib/api";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { useLang, useT } from "@/lib/i18n";
 import { LINE_SECTIONS, WarningList, dateLabel, money, monthLabel } from "./shared";
+
+/** An overtime line's days, folded away: what was worked and what was paid each day, when a cap or fixed amount applies. */
+function OvertimeDays({ days, currency }: { days: OvertimeDay[]; currency: string }) {
+  const t = useT();
+  const lang = useLang();
+  const [open, setOpen] = useState(false);
+  if (days.length === 0) return null;
+
+  return (
+    <div className="mt-1">
+      <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => setOpen(!open)} aria-expanded={open}>
+        {t(open ? "payroll.payslip.otDays.hide" : "payroll.payslip.otDays.show", { n: days.length })}
+      </button>
+      {open && (
+        <ul className="mt-1.5 flex flex-col gap-1 border-l-2 border-border pl-3">
+          {days.map((day) => {
+            const cut = day.paid_hours !== null && day.paid_hours < day.worked_hours;
+            return (
+              <li key={`${day.date}-${day.type}`} className="flex items-baseline justify-between gap-4 text-xs">
+                <span className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{dateLabel(day.date, lang)}</span> · {t(`payroll.payslip.otDays.type.${day.type}`)} ·{" "}
+                  {day.recorded_hours ? `${t("payroll.payslip.otDays.approvedOf", { recorded: day.recorded_hours, approved: day.worked_hours })} · ` : ""}
+                  {day.paid_hours === null
+                    ? t("payroll.payslip.otDays.fixed", { worked: day.worked_hours })
+                    : cut
+                      ? t("payroll.payslip.otDays.capped", { worked: day.worked_hours, paid: day.paid_hours })
+                      : t("payroll.payslip.otDays.hours", { worked: day.worked_hours })}
+                </span>
+                <span className="shrink-0 tabular-nums">{money(day.amount, currency)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /** Setting a line by hand, from a saved payslip in a run that can still change. */
 export type LineEditing = {
@@ -177,6 +214,7 @@ export function PayslipView({
                         ) : (
                           line.explanation && <p className="text-xs text-muted-foreground">{line.explanation}</p>
                         )}
+                        {Array.isArray(line.details?.days) && <OvertimeDays days={line.details.days as OvertimeDay[]} currency={c} />}
                         {override && (
                           <p className="text-xs text-muted-foreground">
                             {t("payroll.payslip.override.wasRule", { amount: money(override.calculated, c) })}
