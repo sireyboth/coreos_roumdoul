@@ -10,6 +10,7 @@ export const photo: Dictionary["employees"]["photo"] = {
   formats: "JPG, PNG ឬ WebP។ លោកអ្នកអាចអូស និងពង្រីក ដើម្បីកាត់រូបថត។",
   notImage: "សូមជ្រើសរើសឯកសាររូបភាព។",
   unusable: "មិនអាចប្រើរូបភាពនេះបានទេ។",
+  view: "មើលរូបថត",
 
   // ── Crop dialog ──────────────────────────────────────────────────
   cropTitle: "កែសម្រួលរូបថត",

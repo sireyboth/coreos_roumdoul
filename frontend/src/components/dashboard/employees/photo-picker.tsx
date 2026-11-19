@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PhotoCropDialog } from "@/components/dashboard/employees/photo-crop-dialog";
+import { PhotoViewerDialog } from "@/components/dashboard/employees/photo-viewer-dialog";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,8 @@ export function PhotoPicker({
   // The freshly-picked file, as an object URL, while the crop dialog is
   // open — cleared (and revoked) once the dialog closes either way.
   const [pickedUrl, setPickedUrl] = useState<string | null>(null);
+  // Full-size view of the current photo (tap the photo to open).
+  const [viewing, setViewing] = useState(false);
 
   const initials = name
     .split(" ")
@@ -73,21 +76,29 @@ export function PhotoPicker({
     }
   }
 
+  // Only a photo that actually loaded can be opened full-size.
+  const showsPhoto = src !== null && failed !== src;
+  const tile = cn(
+    "relative flex size-36 items-center justify-center overflow-hidden rounded-3xl bg-linear-to-br from-indigo-500 to-fuchsia-500 text-4xl font-semibold text-white shadow-lg shadow-primary/20",
+    busy && "opacity-60",
+  );
+
   return (
     <div className="flex flex-col items-center gap-3">
-      <div
-        className={cn(
-          "relative flex size-36 items-center justify-center overflow-hidden rounded-3xl bg-linear-to-br from-indigo-500 to-fuchsia-500 text-4xl font-semibold text-white shadow-lg shadow-primary/20",
-          busy && "opacity-60",
-        )}
-      >
-        {src && failed !== src ? (
-          // eslint-disable-next-line @next/next/no-img-element
+      {showsPhoto ? (
+        <button
+          type="button"
+          onClick={() => setViewing(true)}
+          aria-label={t("employees.photo.view")}
+          title={t("employees.photo.view")}
+          className={cn(tile, "cursor-zoom-in transition-transform hover:scale-[1.02] focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none")}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={name || t("employees.photo.alt")} onError={() => setFailed(src)} className="size-full object-cover" />
-        ) : (
-          initials || <Camera className="size-8" />
-        )}
-      </div>
+        </button>
+      ) : (
+        <div className={tile}>{initials || <Camera className="size-8" />}</div>
+      )}
 
       {canEdit && (
         <>
@@ -110,6 +121,17 @@ export function PhotoPicker({
       {error && <p className="text-center text-xs text-destructive">{error}</p>}
 
       <PhotoCropDialog imageUrl={pickedUrl} open={pickedUrl !== null} onOpenChange={closeCropDialog} onCropped={handleCropped} />
+      {showsPhoto && (
+        <PhotoViewerDialog
+          open={viewing}
+          onOpenChange={setViewing}
+          name={name}
+          src={src}
+          busy={busy}
+          onChange={canEdit ? () => input.current?.click() : undefined}
+          onRemove={canEdit ? onRemove : undefined}
+        />
+      )}
     </div>
   );
 }
