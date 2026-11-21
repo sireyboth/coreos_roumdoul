@@ -18,6 +18,7 @@ import {
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
+  Trophy,
   User,
   Users,
   UsersRound,
@@ -55,6 +56,7 @@ export const NAV_GROUPS: { id: NavGroupId; label: string; items: NavItem[] }[] =
     label: "Time & Attendance",
     items: [
       { href: "/dashboard/attendance", label: "Attendance", icon: Clock, tone: "from-emerald-500 to-teal-500", permission: "attendance.view", module: "attendance" },
+      { href: "/dashboard/ranking", label: "Top Employees", icon: Trophy, tone: "from-amber-500 to-orange-500", permission: "attendance.view", module: "attendance" },
       { href: "/dashboard/requests", label: "Leave & Requests", icon: CalendarHeart, tone: "from-violet-500 to-purple-500", permission: "requests.view", module: "attendance" },
       { href: "/dashboard/calendar", label: "Calendar", icon: CalendarDays, tone: "from-teal-500 to-cyan-500", permission: "schedules.view" },
       { href: "/dashboard/work-schedules", label: "Work Schedules", icon: CalendarClock, tone: "from-amber-500 to-orange-500", permission: "work_schedules.view" },

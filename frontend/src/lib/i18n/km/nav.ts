@@ -6,6 +6,7 @@ export const nav: Dictionary["nav"] = {
   "/dashboard": "ទិដ្ឋភាពទូទៅ",
   "/dashboard/home": "ទំព័រដើម",
   "/dashboard/attendance": "វត្តមាន",
+  "/dashboard/ranking": "បុគ្គលិកឆ្នើម",
   "/dashboard/attendance/corrections": "ការកែតម្រូវវត្តមាន",
   "/dashboard/attendance/status-codes": "កូដស្ថានភាព",
   "/dashboard/requests": "ច្បាប់ឈប់សម្រាក",

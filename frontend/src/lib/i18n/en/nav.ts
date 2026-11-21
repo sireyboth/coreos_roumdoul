@@ -5,6 +5,7 @@ export const nav = {
   "/dashboard": "Overview",
   "/dashboard/home": "Home",
   "/dashboard/attendance": "Attendance",
+  "/dashboard/ranking": "Top employees",
   "/dashboard/attendance/corrections": "Corrections",
   "/dashboard/attendance/status-codes": "Status codes",
   "/dashboard/requests": "Leave",

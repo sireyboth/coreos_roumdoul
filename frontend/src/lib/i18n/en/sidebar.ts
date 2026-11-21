@@ -15,6 +15,7 @@ export const sidebar = {
   items: {
     "/dashboard": "Dashboard",
     "/dashboard/attendance": "Attendance",
+    "/dashboard/ranking": "Top Employees",
     "/dashboard/requests": "Leave & Requests",
     "/dashboard/calendar": "Calendar",
     "/dashboard/work-schedules": "Work Schedules",

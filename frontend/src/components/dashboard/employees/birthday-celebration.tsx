@@ -25,23 +25,32 @@ const CONFETTI = Array.from({ length: 40 }, (_, i) => ({
   delay: spread(i, 2) * 1.5,
   duration: 2.5 + spread(i, 3) * 2,
   size: 6 + spread(i, 4) * 6,
-  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
   round: i % 3 === 0,
 }));
 
-/** Falling confetti behind a festive band (this card and the Birthdays page hero). */
-export function Confetti() {
+/** The longest any piece takes to land (delay + duration), for callers that remove a one-time burst. */
+export const CONFETTI_MS = 6000;
+
+/**
+ * Falling confetti behind a festive band (birthday card, Birthdays page hero,
+ * Top Employees podium). `colors` swaps the palette; `once` lets every piece
+ * fall a single time instead of looping. Hidden for reduced motion.
+ */
+export function Confetti({ colors = CONFETTI_COLORS, once = false }: { colors?: string[]; once?: boolean }) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
       {CONFETTI.map((piece, i) => (
         <span
           key={i}
-          className="absolute -top-4 animate-[confetti-fall_linear_infinite] motion-reduce:hidden"
+          className={cn(
+            "absolute -top-4 motion-reduce:hidden",
+            once ? "animate-[confetti-fall_linear_both]" : "animate-[confetti-fall_linear_infinite]",
+          )}
           style={{
             left: `${piece.left}%`,
             width: piece.size,
             height: piece.round ? piece.size : piece.size * 0.4,
-            backgroundColor: piece.color,
+            backgroundColor: colors[i % colors.length],
             borderRadius: piece.round ? "9999px" : "1px",
             animationDelay: `${piece.delay}s`,
             animationDuration: `${piece.duration}s`,
