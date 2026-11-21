@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircleQuestion, RotateCcw, Send, X } from "lucide-react";
+import { RotateCcw, Send, X } from "lucide-react";
+import { AssistantRobot } from "./assistant-robot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe } from "@/contexts/me-context";
@@ -33,7 +34,7 @@ export function AssistantLauncher() {
   if (!useAssistantAvailable()) return null;
   return (
     <Button variant="ghost" size="icon" onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))} aria-label={t("app.assistant.open")}>
-      <MessageCircleQuestion />
+      <AssistantRobot className="size-8" />
     </Button>
   );
 }
@@ -111,15 +112,17 @@ export function AiAssistant() {
 
   if (!open) {
     // Desktop only: on phones the header's Help button (AssistantLauncher) opens the panel.
+    // A round robot icon with no text; the name shows as a tooltip and is read by screen readers.
     return (
-      <Button
+      <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 hidden h-12 rounded-full shadow-lg transition-transform duration-150 animate-in fade-in-0 zoom-in-90 hover:scale-105 active:scale-95 motion-reduce:animate-none motion-reduce:transition-none md:inline-flex"
+        title={t("app.assistant.button")}
+        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 hidden size-16 rounded-full shadow-lg shadow-primary/30 transition-transform duration-150 animate-in fade-in-0 zoom-in-90 hover:scale-110 hover:-rotate-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-95 motion-reduce:animate-none motion-reduce:transition-none md:block"
         aria-label={t("app.assistant.open")}
       >
-        <MessageCircleQuestion className="mr-2 h-5 w-5" />
-        {t("app.assistant.button")}
-      </Button>
+        <AssistantRobot className="size-16" />
+      </button>
     );
   }
 
@@ -140,9 +143,12 @@ export function AiAssistant() {
       }`}
     >
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold">{t("app.assistant.title")}</h2>
-          <p className="text-xs text-muted-foreground">{t("app.assistant.subtitle")}</p>
+        <div className="flex items-center gap-3">
+          <AssistantRobot className="size-10 shrink-0" />
+          <div>
+            <h2 className="text-sm font-semibold">{t("app.assistant.title")}</h2>
+            <p className="text-xs text-muted-foreground">{t("app.assistant.subtitle")}</p>
+          </div>
         </div>
         <Button variant="ghost" size="icon" onClick={close} aria-label={t("common.action.close")}>
           <X className="h-4 w-4" />

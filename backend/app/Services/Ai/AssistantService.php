@@ -18,6 +18,12 @@ class AssistantService
     /** How many earlier messages to resend (keeps cost down). */
     private const HISTORY_LIMIT = 6;
 
+    /**
+     * Longest reply, in tokens. Khmer takes several times more tokens than
+     * English for the same text, so 600 cut Khmer answers off mid-sentence.
+     */
+    private const MAX_REPLY_TOKENS = 2000;
+
     public function ask(string $question, array $history, string $role): array
     {
         $messages = collect($history)
@@ -38,7 +44,7 @@ class AssistantService
             ->timeout(30)
             ->post('https://api.anthropic.com/v1/messages', [
                 'model' => config('services.anthropic.model'),
-                'max_tokens' => 600,
+                'max_tokens' => self::MAX_REPLY_TOKENS,
                 'system' => [
                     // The big, unchanging part is cached: much cheaper on repeat calls.
                     [
@@ -74,7 +80,12 @@ class AssistantService
         } elseif (str_starts_with($raw, '[UNKNOWN]')) {
             $status = 'unknown';
         }
-        $answer = trim(preg_replace('/^\[(OFF_TOPIC|UNKNOWN)\]\s*/', '', $raw));
+        $answer = $this->plainText(preg_replace('/^\[(OFF_TOPIC|UNKNOWN)\]\s*/', '', $raw));
+
+        // Still cut off at the cap: log it so the cap can be raised if it happens often.
+        if ($response->json('stop_reason') === 'max_tokens') {
+            Log::warning('ai.assistant.cut_off', ['question' => $question]);
+        }
 
         // Questions the guide could not answer: review these weekly
         // and add the answers to system-guide.md.
@@ -87,6 +98,20 @@ class AssistantService
             'status' => $status,
             'usage' => $response->json('usage'),
         ];
+    }
+
+    /**
+     * The chat shows plain text, so remove any Markdown the model still writes
+     * (the rules ask it not to): **bold**, __bold__, `code`, "# " headings,
+     * and "- " / "* " bullets become "• ".
+     */
+    private function plainText(string $text): string
+    {
+        $text = str_replace(['**', '__', '`'], '', $text);
+        $text = preg_replace('/^#{1,6}\s+/m', '', $text);
+        $text = preg_replace('/^(\s*)[-*]\s+/m', '$1• ', $text);
+
+        return trim($text);
     }
 
     private function staticPrompt(): string
