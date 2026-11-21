@@ -178,23 +178,19 @@ export default function NewEmployeePage() {
           </Card>
 
           <div className="flex flex-col gap-6">
-            <Card>
-              <CardContent>
-                <EmployeeFormFields
-                  idPrefix="new"
-                  form={form}
-                  onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
-                  branches={branches ?? []}
-                  departments={departments}
-                  teams={teams}
-                  managers={managers ?? undefined}
-                  emailRequired={loginPassword !== "" && method === "email"}
-                  codeRequired={loginPassword !== "" && method === "employee_id"}
-                  codeHint={loginPassword !== "" && method === "employee_id" ? t("employees.newPage.codeHint") : undefined}
-                  salary={canEditSalary ? "edit" : "none"}
-                />
-              </CardContent>
-            </Card>
+            <EmployeeFormFields
+              idPrefix="new"
+              form={form}
+              onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+              branches={branches ?? []}
+              departments={departments}
+              teams={teams}
+              managers={managers ?? undefined}
+              emailRequired={loginPassword !== "" && method === "email"}
+              codeRequired={loginPassword !== "" && method === "employee_id"}
+              codeHint={loginPassword !== "" && method === "employee_id" ? t("employees.newPage.codeHint") : undefined}
+              salary={canEditSalary ? "edit" : "none"}
+            />
 
             {payGroups.length > 1 && (
               <Card>
