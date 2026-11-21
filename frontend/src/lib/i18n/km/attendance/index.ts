@@ -16,5 +16,6 @@ import { lateDetail } from "./lateDetail";
 import { monthClose } from "./monthClose";
 import { exportDialog } from "./exportDialog";
 import { statusCodes } from "./statusCodes";
+import { lateWarnings } from "./lateWarnings";
 
-export const attendance = { status, page, today, scan, add, fillMissed, missedScans, day, adjust, corrections, overtime, report, lateDetail, monthClose, exportDialog, statusCodes };
+export const attendance = { status, page, today, scan, add, fillMissed, missedScans, day, adjust, corrections, overtime, report, lateDetail, monthClose, exportDialog, statusCodes, lateWarnings };

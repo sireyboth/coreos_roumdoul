@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Account\AuthController;
 use App\Http\Controllers\Api\Organization\EmployeePhotoController;
 use App\Http\Controllers\Api\Requests\EmployeeRequestController;
+use App\Http\Controllers\Api\Telegram\TelegramWebhookController;
 use App\Http\Middleware\CatchUpAttendance;
 use App\Http\Middleware\EnsureCompanyIsActive;
 use Illuminate\Http\Request;
@@ -30,6 +31,10 @@ Route::get('/attachments/{attachment}', [EmployeeRequestController::class, 'atta
     ->whereNumber('attachment')
     ->name('attachments.show');
 
+// Telegram's webhook (group links, bot removed). Public, but only Telegram
+// knows the secret header it must carry — see TelegramWebhookController.
+Route::post('/telegram/webhook', TelegramWebhookController::class)->middleware('throttle:120,1');
+
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
@@ -54,4 +59,5 @@ Route::middleware(['auth:sanctum', EnsureCompanyIsActive::class, CatchUpAttendan
     require __DIR__.'/api/payroll.php';
     require __DIR__.'/api/attendance.php';
     require __DIR__.'/api/requests.php';
+    require __DIR__.'/api/telegram.php';
 });

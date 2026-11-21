@@ -20,4 +20,5 @@ export const nav: Dictionary["nav"] = {
   "/dashboard/teams": "ក្រុម",
   "/dashboard/payroll": "ប្រាក់បៀវត្សរ៍",
   "/dashboard/audit": "កំណត់ហេតុសកម្មភាព",
+  "/dashboard/telegram": "តេឡេក្រាម",
 };

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { CalendarCheck, CalendarPlus, ScanLine, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
+import { BellRing, CalendarCheck, CalendarPlus, ScanLine, Clock, Eye, FileClock, FileDown, Hourglass, ListChecks, Table2, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { notifyError, notifySuccess } from "@/lib/notify";
 import { AttendanceExportDialog } from "@/components/dashboard/attendance/attendance-export-dialog";
 import { AttendanceFillMissedDialog } from "@/components/dashboard/attendance/attendance-fill-missed-dialog";
 import { MissedScansDialog } from "@/components/dashboard/attendance/missed-scans-dialog";
+import { LateWarningsDialog } from "@/components/dashboard/attendance/late-warnings-dialog";
 import { AttendanceReport } from "@/components/dashboard/attendance/attendance-report";
 import { AttendanceTodayCard } from "@/components/dashboard/attendance/attendance-today-card";
 import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/schedules/calendar-shared";
@@ -143,6 +144,7 @@ function AttendancePageContent() {
   // The days chosen for "Fill missed scans", and how to clear the table's selection once done.
   const [filling, setFilling] = useState<{ days: AttendanceDay[]; clear: () => void } | null>(null);
   const [missedOpen, setMissedOpen] = useState(false);
+  const [lateWarningsOpen, setLateWarningsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [pendingOvertime, setPendingOvertime] = useState(0);
@@ -359,6 +361,20 @@ function AttendancePageContent() {
             <div className="flex flex-wrap gap-2">
               {/* Export has its own dialog (date range, employee), so only Import comes from here. */}
               {canManage && (
+                <Button variant="outline" onClick={() => setLateWarningsOpen(true)}>
+                  <BellRing className="size-4" />
+                  {t("attendance.lateWarnings.button")}
+                  {/* The rule at a glance: "3×" (soft tint) or "Off". */}
+                  {me?.company?.late_warning_limit != null ? (
+                    <span className="rounded-full bg-primary/10 px-1.5 text-xs font-semibold tabular-nums text-primary">
+                      {t("attendance.lateWarnings.times", { n: me.company.late_warning_limit })}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t("attendance.lateWarnings.off")}</span>
+                  )}
+                </Button>
+              )}
+              {canManage && (
                 <Button variant="outline" onClick={() => setMissedOpen(true)}>
                   <ScanLine className="size-4" />
                   {t("attendance.page.missedScans")}
@@ -511,6 +527,7 @@ function AttendancePageContent() {
 
       <AttendanceExportDialog open={exportOpen} onOpenChange={setExportOpen} month={month} canPickEmployee={canManage} />
       {/* Keyed by month, so opening it for another month (e.g. from the report's close-month checklist) starts on that month. */}
+      {lateWarningsOpen && <LateWarningsDialog open onOpenChange={setLateWarningsOpen} />}
       {canManage && <MissedScansDialog key={month} open={missedOpen} onOpenChange={setMissedOpen} initialMonth={month} onChanged={load} />}
       {canManage && (
         <AttendanceAddDialog

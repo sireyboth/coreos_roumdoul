@@ -58,6 +58,8 @@ class Company extends Model
         'probation_length',
         'probation_unit',
         'probation_reminder_days',
+        'late_warning_limit',
+        'late_warning_counts_early',
         'report_codes',
     ];
 
@@ -72,6 +74,8 @@ class Company extends Model
             'allow_self_approval' => 'boolean',
             'probation_length' => 'integer',
             'probation_reminder_days' => 'integer',
+            'late_warning_limit' => 'integer',
+            'late_warning_counts_early' => 'boolean',
             'report_codes' => 'array',
         ];
     }

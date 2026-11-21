@@ -10,6 +10,7 @@ export * from "./schedules";
 export * from "./attendance";
 export * from "./requests";
 export * from "./payroll";
+export * from "./telegram";
 
 import { accountApi } from "./account";
 import { organizationApi } from "./organization";
@@ -18,6 +19,7 @@ import { schedulesApi } from "./schedules";
 import { attendanceApi } from "./attendance";
 import { requestsApi } from "./requests";
 import { payrollApi } from "./payroll";
+import { telegramApi } from "./telegram";
 
 export const api = {
   ...accountApi,
@@ -27,4 +29,5 @@ export const api = {
   ...attendanceApi,
   ...requestsApi,
   ...payrollApi,
+  ...telegramApi,
 };

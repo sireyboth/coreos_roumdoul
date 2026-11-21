@@ -2,9 +2,12 @@
 
 namespace App\Services\Requests;
 
+use App\Models\Employee;
 use App\Models\EmployeeRequest;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\Telegram\TelegramCard;
+use App\Services\Telegram\TelegramGroupPoster;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -18,12 +21,15 @@ use Illuminate\Support\Facades\DB;
  *                 approvers' alerts are closed so nobody acts on it twice
  *  - cancelled  → the approvers while it was waiting, or whoever approved it
  *  - type_changed / pay_changed → the employee, and whoever approved it
+ *
+ * Sent and decided are also posted once to the company's Telegram group, if
+ * it has one — name, dates and outcome only: no reason, remark or pay.
  */
 final class RequestNotifier
 {
     public const LINK = '/dashboard/requests';
 
-    public function __construct(private readonly ApprovalChain $chain) {}
+    public function __construct(private readonly ApprovalChain $chain, private readonly TelegramGroupPoster $telegram) {}
 
     public function sent(EmployeeRequest $request): void
     {
@@ -33,6 +39,11 @@ final class RequestNotifier
             foreach ($this->chain->approversToNotify($request) as $approver) {
                 $this->send($approver, $request, 'requested', $this->emoji($request)." {$this->kind($request)} request from {$name}", $this->summary($request).$this->reason($request));
             }
+
+            $this->postToGroups(
+                $request, 'requests', "request_sent:{$request->id}",
+                $this->emoji($request).' '.mb_strtoupper($this->kind($request)).' REQUEST', '⏳ Waiting for approval',
+            );
         });
     }
 
@@ -49,6 +60,13 @@ final class RequestNotifier
             foreach ($this->people($request, except: $by) as $user) {
                 $this->send($user, $request, 'decided', $title, $body, $by);
             }
+
+            $approved = $request->status === 'approved';
+            $this->postToGroups(
+                $request, 'request_decisions', "request_decided:{$request->id}:{$request->status}",
+                ($approved ? '✅ ' : '❌ ').mb_strtoupper($this->kind($request)).($approved ? ' APPROVED' : ' REJECTED'),
+                '✍️ '.($approved ? 'Approved' : 'Rejected').' by '.trim($by->name),
+            );
         });
     }
 
@@ -131,12 +149,24 @@ final class RequestNotifier
      */
     public function summary(EmployeeRequest $request): string
     {
+        return implode(' · ', $this->what($request));
+    }
+
+    /**
+     * The request as [what, when]: ["Annual leave", "Mon 12 – Wed 14 Oct · 3 days"]
+     * or ["Late arrival", "Thu 1 Oct · in at 09:00 (60 min)"]. One line in
+     * the app (summary), two in a Telegram card.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function what(EmployeeRequest $request): array
+    {
         if ($request->type === 'late_early') {
             $details = $request->details ?? [];
             $when = ($details['kind'] ?? 'late') === 'late' ? 'in at' : 'out at';
 
-            return $request->label().' · '.Carbon::parse($request->start_date)->format('D j M')
-                ." · {$when} ".($details['time'] ?? '?').' ('.($details['minutes'] ?? 0).' min)';
+            return [$request->label(), Carbon::parse($request->start_date)->format('D j M')
+                ." · {$when} ".($details['time'] ?? '?').' ('.($details['minutes'] ?? 0).' min)'];
         }
 
         $start = Carbon::parse($request->start_date);
@@ -148,7 +178,22 @@ final class RequestNotifier
         : $start->format('D j M').' – '.$end->format('D j M');
         $days = $request->days == 1 ? '1 day' : rtrim(rtrim(number_format($request->days, 1), '0'), '.').' days';
 
-        return ($request->leaveType?->name ?? 'Leave')." · {$dates} · {$days}";
+        return [$request->leaveType?->name ?? 'Leave', "{$dates} · {$days}"];
+    }
+
+    /** The group post: who (TelegramCard), what and when, then $footer. No reason, remark or pay. */
+    private function postToGroups(EmployeeRequest $request, string $event, string $key, string $heading, string $footer): void
+    {
+        [$what, $when] = $this->what($request);
+        $employee = $request->employee instanceof Employee ? $request->employee : null;
+        $details = ["📅 {$what}", "      {$when}", $footer];
+
+        $this->telegram->post(
+            $request->company_id, $event, $key, $employee,
+            fn (string $detail) => $employee
+                ? TelegramCard::make($heading, $employee, $details, $detail)
+                : implode("\n", [$heading, ...$details]),
+        );
     }
 
     private function reason(EmployeeRequest $request): string

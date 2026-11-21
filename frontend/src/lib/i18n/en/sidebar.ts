@@ -34,6 +34,7 @@ export const sidebar = {
     "/dashboard/users": "Users",
     "/dashboard/roles": "Roles",
     "/dashboard/audit": "Activity Log",
+    "/dashboard/telegram": "Telegram",
     "/dashboard/attendance/corrections": "Corrections",
     "/dashboard/profile": "Profile",
   },

@@ -6,6 +6,7 @@
 use App\Http\Controllers\Api\Attendance\AttendanceController;
 use App\Http\Controllers\Api\Attendance\AttendanceCorrectionController;
 use App\Http\Controllers\Api\Attendance\AttendanceReviewController;
+use App\Http\Controllers\Api\Attendance\LateWarningSettingsController;
 use App\Http\Controllers\Api\Attendance\ReportCodeController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,6 +42,7 @@ Route::middleware('module:attendance')->group(function () {
         Route::post('/attendance/periods', [AttendanceReviewController::class, 'lock']);
         Route::delete('/attendance/periods/{month}', [AttendanceReviewController::class, 'unlock'])->where('month', '\d{4}-\d{2}');
         Route::put('/attendance/report-codes', [ReportCodeController::class, 'update']);
+        Route::put('/attendance/late-warnings', [LateWarningSettingsController::class, 'update']);
         Route::delete('/attendance/report-codes', [ReportCodeController::class, 'destroy']);
     });
 

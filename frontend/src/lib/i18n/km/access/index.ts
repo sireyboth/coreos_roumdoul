@@ -9,5 +9,6 @@ import { profilePage } from "./profilePage";
 import { createLogin } from "./createLogin";
 import { loginLink } from "./loginLink";
 import { signInMethod } from "./signInMethod";
+import { telegramPage } from "./telegramPage";
 
-export const access = { usersPage, rolesPage, roleDialog, rolePreview, auditPage, profilePage, createLogin, loginLink, signInMethod };
+export const access = { usersPage, rolesPage, roleDialog, rolePreview, auditPage, profilePage, createLogin, loginLink, signInMethod, telegramPage };

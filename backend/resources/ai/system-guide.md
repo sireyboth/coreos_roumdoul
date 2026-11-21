@@ -208,6 +208,7 @@ The bell shows notifications (requests, approvals, birthdays). "Turn on notifica
 - **Fill missed scans** (bulk): select rows → "Fill missed scans" → "Scheduled times" or "Set times", reason, "Fill N scans". Up to 500 days.
 - **Delete** (single or bulk, up to 200): removes all scans for the day for good; use it only for test data. Use Adjust scans to fix real records.
 - **Import**: Excel rows become corrections or leave; "Approve imported records right away" is on by default.
+- **Late warnings** (header button, shows "3×" or "Off"): turn on "Send late warnings", set "Warn after … times a month" (1–31) and whether "Leaving early counts too" (a day both late and early counts once). When someone reaches the number in a calendar month, they and the managers of their branch get a notification (and a phone alert), listing each day; again at each multiple (3, 6, 9…). Checked every hour from 8:00; each warning is sent once. Approved late/early requests and corrected days don't count. Off by default.
 
 ### Overtime and corrections
 
@@ -227,7 +228,7 @@ To record leave for someone else (e.g. a sick call), use "New request", pick the
 
 ### Report and export
 
-"Attendance" → "Report": a month or date range, with tiles for late rate, absence rate, missed scans and leave days, and a calendar grid (P present on time, L late, E left early, LE late and left early, M missed a scan, A absent, ½ half-day leave, W worked a day off, H holiday, OFF day off). Leave shows each leave type's own code and colour (AL annual, SL sick, UL unpaid…; a type without a code shows LV), and unpaid leave is red. The screen, Excel and PDF show the same codes, and a "Customize codes" link opens "Status Codes". "Late detail" ranks lateness and absences.
+"Attendance" → "Report": a month or date range, with tiles for late rate, absence rate, missed scans and leave days, and a calendar grid (P present on time, L late, E left early, LE late and left early, M missed a scan, A absent, ½ half-day leave, W worked a day off, H holiday, OFF day off). Leave shows each leave type's own code and colour (AL annual, SL sick, UL unpaid…; a type without a code shows LV), and unpaid leave is red. A day with scans but no schedule (e.g. a new starter whose schedule starts later) shows W, never blank; a blank day is still to come, or has no schedule and no scans. If a new employee's first days show W instead of P/L, their schedule's "From" date is later than their first day: edit the assignment on their page → "Schedules". The screen, Excel and PDF show the same codes, and a "Customize codes" link opens "Status Codes". "Late detail" ranks lateness and absences.
 
 Time & Attendance → "Status Codes" (people who manage attendance): how every status looks, in one place — the report, the calendars, the attendance list, Excel and PDF all follow it. Each day status (Present, Late, Left early, Late and left early, Missed a scan, Absent, Worked on a day off, Holiday, Day off) and each leave type has a "Code" (up to 3 letters or numbers, Khmer too), a "Background" colour, a "Text" colour ("Auto" matches the background) and "Bold". The preview at the top shows them all. One code means one thing: two statuses or leave types can't share a code. Only the look changes — a day is still late or absent because of its scans and schedule, and totals and payroll stay the same. "Reset to default" brings back P, L, E… and AL, SL… in their usual colours.
 
@@ -244,6 +245,14 @@ Time & Attendance → "Status Codes" (people who manage attendance): how every s
 Employees → "Roster". A roster entry makes someone follow another schedule on a given day. It overrides holidays.
 
 "Add to roster": pick "Employees", "Work schedule", optional "Work location", "Dates" (quick buttons or From/To), "Days of the week", "Skip public holidays" (on by default), then "Add N roster days". Limits: 93 days, 100 employees and 3,000 entries at once. Existing entries aren't overwritten.
+
+### Telegram groups
+
+Access → "Telegram" (company-admin): posts to your company's own Telegram groups — up to 20, e.g. one management group for every branch and one HR group per branch. "Connect a group" first asks "Which branches?" ("All branches", or chosen branches), then opens Telegram — pick your group (you must be its admin); the bot says "Connected" in the group and the window closes by itself. The link works once and expires after 30 minutes. A post about an employee goes to every "All branches" group plus the groups for that employee's current branch; someone with no branch only reaches "All branches" groups.
+
+"Manage" on a group sets: which branches it covers; "How much to show" — "Full card" (name, Khmer name, ID code, job title, department, branch) or "Name and branch" (for groups many people read); and what it gets: "New requests", "Approvals and rejections", "Late warnings". A new group starts with requests and decisions only — late warnings name who was late and on which days, so they're opt-in (and need late warnings turned on in Attendance). Posts never include pay, phone numbers, leave reasons or managers' remarks. An empty field (no ID code, no department …) is simply left out. Telegram has no roles: everyone in a group reads every post in it, so to let staff see some posts but not others, use separate groups. "Send test message" checks it works; "Disconnect" makes the bot leave. If the bot is removed from a group in Telegram, the link is dropped and company admins get a notification. If the page says "Telegram isn't set up yet", the system provider must add the bot first.
+
+Telegram is only a copy of the news: everything is always in the app first. If Telegram is busy or down, posts wait and retry for up to 6 hours; late warnings that still fail are posted again by a later hourly run.
 
 ### Audit Log
 

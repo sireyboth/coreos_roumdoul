@@ -19,4 +19,5 @@ export const nav = {
   "/dashboard/teams": "Teams",
   "/dashboard/payroll": "Payroll",
   "/dashboard/audit": "Activity Log",
+  "/dashboard/telegram": "Telegram",
 };

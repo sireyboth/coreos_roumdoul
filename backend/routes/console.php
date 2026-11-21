@@ -18,6 +18,9 @@ Schedule::command('birthdays:notify')->hourly();
 // Probation reminders to HR: N days before it ends, and on the day, from 8:00 local time (never twice).
 Schedule::command('probation:notify')->hourly();
 
+// Late warnings to the employee and HR at N late days a month (companies that turned it on), from 8:00 local time (never twice).
+Schedule::command('attendance:late-warnings')->hourly();
+
 // Clears read alerts older than 90 days (unread ones are kept).
 Schedule::command('model:prune', ['--model' => [Notification::class]])->daily();
 
