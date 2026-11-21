@@ -41,6 +41,7 @@ const GRID = [
 const CHIPS = [
   "/dashboard/holidays",
   "/dashboard/birthdays",
+  "/dashboard/ranking",
   "/dashboard/branches",
   "/dashboard/teams",
   "/dashboard/attendance/corrections",

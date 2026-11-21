@@ -6,6 +6,7 @@
 use App\Http\Controllers\Api\Attendance\AttendanceController;
 use App\Http\Controllers\Api\Attendance\AttendanceCorrectionController;
 use App\Http\Controllers\Api\Attendance\AttendanceReviewController;
+use App\Http\Controllers\Api\Attendance\RankingController;
 use App\Http\Controllers\Api\Attendance\ReportCodeController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,8 @@ Route::middleware('module:attendance')->group(function () {
         Route::post('/attendance/corrections/{correction}/cancel', [AttendanceCorrectionController::class, 'cancel']);
         // Everyone gets their own row; managers get everyone's.
         Route::get('/attendance/summary', [AttendanceReviewController::class, 'summary']);
+        // Top employees of the month: Top 10 + own rank for everyone, the full list for attendance.manage.
+        Route::get('/attendance/ranking', [RankingController::class, 'show']);
         Route::get('/attendance/periods', [AttendanceReviewController::class, 'periods']);
         // How the report shows each day status (codes and colours).
         Route::get('/attendance/report-codes', [ReportCodeController::class, 'show']);

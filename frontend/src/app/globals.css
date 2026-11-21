@@ -321,6 +321,19 @@
   }
 }
 
+/* Top Employees: a soft brand-coloured halo that swells out from the #1 avatar
+   (components/dashboard/attendance/ranking-board.tsx). Transform/opacity only. */
+@keyframes winner-glow {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
 /* Birthday envelope: a gentle wiggle while it waits to be opened. Uses `rotate`,
    not `transform`, so it never fights the flap/letter transforms inside. */
 @keyframes envelope-wiggle {

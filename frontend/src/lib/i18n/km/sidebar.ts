@@ -16,6 +16,7 @@ export const sidebar: Dictionary["sidebar"] = {
   items: {
     "/dashboard": "ផ្ទាំងគ្រប់គ្រង",
     "/dashboard/attendance": "វត្តមាន",
+    "/dashboard/ranking": "បុគ្គលិកឆ្នើម",
     "/dashboard/requests": "ច្បាប់ឈប់សម្រាក និងសំណើ",
     "/dashboard/calendar": "ប្រតិទិន",
     "/dashboard/work-schedules": "កាលវិភាគការងារ",

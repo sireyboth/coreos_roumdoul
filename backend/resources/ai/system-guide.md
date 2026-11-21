@@ -192,6 +192,12 @@ Your balances show on "My requests". Requests go to your line manager, or to an 
 
 The bell shows notifications (requests, approvals, birthdays). "Turn on notifications on this device" enables phone alerts. On iPhone, first "Add to Home Screen" and open the app from the icon.
 
+### Top Employees
+
+"Top Employees" (under Time & Attendance) ranks everyone on one month of attendance. Score out of 100: 60 points for coming to work (days they came ÷ days they were scheduled) and 40 points for being on time (days they arrived on time ÷ days they came). Approved leave, holidays and days off never count against anyone; a late arrival approved in advance is judged against the approved time; today only counts once it is over. To be ranked someone needs at least 5 scheduled work days in the month; people who have left are not ranked. Equal scores: more days at work comes first, then fewer late minutes.
+
+Everyone sees the Top 10 (a podium for the first three) and their own place ("#5 of 14") with their own numbers — never anyone else's absences or late minutes. Managers with attendance management also see "Everyone": the full list with each person's days and late minutes, for the branches they can see. Pick a month with the arrows (the current month counts the days finished so far) and, with several branches, rank one branch on its own.
+
 ## Every day (managers and HR)
 
 ### Dashboard

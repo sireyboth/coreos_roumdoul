@@ -246,8 +246,36 @@ export type AttendanceCorrection = {
   reviewed_by: { id: number; name: string } | null;
 };
 
+// ───────────────────────────── Top employees ─────────────────────────────
 
-// ───────────────────────────── Payroll ─────────────────────────────
+/** One ranked person as everyone may see them: who, where, rank and score (out of 100). */
+export type RankingEntry = {
+  rank: number;
+  score: number;
+  employee_id: number;
+  name: string;
+  name_km: string | null;
+  job_title: string | null;
+  branch: string | null;
+  photo_url: string | null;
+};
+
+/** The numbers behind a score — only for the person themselves, or a manager. */
+export type RankingNumbers = { scheduled_days: number; present_days: number; on_time_days: number; late_minutes: number };
+
+export type Ranking = {
+  month: string;
+  /** score = attendance_weight × attendance + on_time_weight × on time; at least min_days scheduled days to be ranked. */
+  rule: { attendance_weight: number; on_time_weight: number; min_days: number };
+  /** How many people are ranked. */
+  ranked: number;
+  top: RankingEntry[];
+  /** The viewer's own place, if they are ranked. */
+  me: (RankingEntry & RankingNumbers) | null;
+  /** Managers only (attendance.manage): everyone they may see, with numbers. */
+  all: (RankingEntry & RankingNumbers)[] | null;
+  branches: { id: number; name: string }[];
+};
 
 export const attendanceApi = {
   attendance: {
@@ -295,6 +323,9 @@ export const attendanceApi = {
     summary: (month: string, employeeId?: number) =>
       request<AttendanceSummary>(`/api/attendance/summary?month=${month}${employeeId ? `&employee_id=${employeeId}` : ""}`),
     periods: () => request<AttendancePeriod[]>("/api/attendance/periods"),
+    // Top employees of a month ("2026-10"); branchId ranks one branch on its own.
+    ranking: (month: string, branchId?: number | null) =>
+      request<Ranking>(`/api/attendance/ranking?month=${month}${branchId ? `&branch_id=${branchId}` : ""}`),
     // How the report shows each day status; managers change them, Reset brings back P, L, E…
     reportCodes: () => request<ReportCodes>("/api/attendance/report-codes"),
     updateReportCodes: (data: ReportCodesInput) =>
