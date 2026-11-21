@@ -871,6 +871,27 @@ class LeaveRequestTest extends TestCase
         $this->as($other->users()->first())->postJson("/api/requests/{$id}/approve")->assertNotFound();
     }
 
+    /** The attendance report opens a leave cell by asking for one employee's approved request on that date. */
+    public function test_the_list_finds_one_employees_approved_leave_covering_a_date(): void
+    {
+        $id = $this->ask($this->staff, 'annual', '2026-10-07', '2026-10-09')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$id}/approve")->assertOk();
+        [$colleague, $sokha] = $this->person('Sokha', 'employee');
+        $other = $this->ask($colleague, 'annual', '2026-10-08')->assertCreated()->json('id');
+        $this->as($this->admin)->postJson("/api/requests/{$other}/approve")->assertOk();
+
+        $url = fn (int $employeeId, string $date) => "/api/requests?scope=all&status=approved&employee_id={$employeeId}&from={$date}&to={$date}";
+
+        // A day inside the range finds it; only that employee's.
+        $this->as($this->admin)->getJson($url($this->dara->id, '2026-10-08'))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id)->assertJsonPath('data.0.leave_type.code', 'annual');
+        // A day outside it finds nothing.
+        $this->as($this->admin)->getJson($url($this->dara->id, '2026-10-12'))->assertOk()->assertJsonCount(0, 'data');
+        // Staff without requests.manage can still look up their own.
+        $this->as($this->staff)->getJson("/api/requests?scope=mine&status=approved&employee_id={$this->dara->id}&from=2026-10-09&to=2026-10-09")
+            ->assertOk()->assertJsonCount(1, 'data');
+    }
+
     // ───────────────────────────── deleting test data ─────────────────────────────
 
     public function test_deleting_approved_leave_removes_it_everywhere_and_gives_the_days_back(): void

@@ -235,6 +235,26 @@ class AttendanceExportTest extends TestCase
         $this->assertNotContains('Employee key', $this->rows($this->actingAs($this->admin)->get('/api/attendance/export?from=2026-09-01&to=2026-09-30'))[0]);
     }
 
+    /**
+     * A new starter scanned before their schedule's From date. The report grid
+     * shows "Unscheduled + scans" as W (worked) so the day is never hidden, and
+     * leaves "Unscheduled, no scans" blank — so both must come out this way.
+     */
+    public function test_a_worked_day_with_no_schedule_keeps_its_scans(): void
+    {
+        $employee = Employee::query()->create(['company_id' => $this->company->id, 'name' => 'Sok Dara', 'hire_date' => '2026-09-08']);
+        $this->assignSchedule($employee, $this->schedule, '2026-09-15');
+        $this->shiftFor($employee, '2026-09-10');
+
+        $days = $this->byDay($this->rows($this->actingAs($this->admin)->get('/api/attendance/export?from=2026-09-08&to=2026-09-16')));
+
+        $worked = $days['Sok Dara|2026-09-10'];
+        $this->assertSame(['Unscheduled', 'IN 08:05, OUT 17:30'], [$worked['Status'], $worked['Scans']]);
+        $this->assertSame(['Unscheduled', ''], [$days['Sok Dara|2026-09-11']['Status'], $days['Sok Dara|2026-09-11']['Scans']]);
+        // From the schedule's start, the same no-scan day is judged as usual.
+        $this->assertSame('Office', $days['Sok Dara|2026-09-16']['Schedule']);
+    }
+
     public function test_days_before_someone_started_are_left_out(): void
     {
         $employee = $this->employee('Sok Dara');
