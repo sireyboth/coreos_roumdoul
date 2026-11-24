@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 /**
  * Help assistant for CoreOS Roumdoul.
@@ -38,7 +39,12 @@ class AssistantService
             ->timeout(30)
             ->post('https://api.anthropic.com/v1/messages', [
                 'model' => config('services.anthropic.model'),
-                'max_tokens' => 600,
+                // Haiku 5.5 thinks before answering and that thinking counts
+                // toward max_tokens: with too little room it can stop
+                // (stop_reason max_tokens) before writing any answer at all.
+                // Low effort keeps the thinking short for simple how-to questions.
+                'max_tokens' => 2000,
+                'output_config' => ['effort' => 'low'],
                 'system' => [
                     // The big, unchanging part is cached: much cheaper on repeat calls.
                     [
@@ -67,6 +73,18 @@ class AssistantService
             ->where('type', 'text')
             ->pluck('text')
             ->implode("\n"));
+
+        // No text (cut off while thinking, or a refusal) is a failure, never
+        // a blank answer: the controller turns it into "try again" and gives
+        // the question back.
+        if ($raw === '' || $response->json('stop_reason') === 'refusal') {
+            Log::warning('ai.assistant.empty', [
+                'stop_reason' => $response->json('stop_reason'),
+                'usage' => $response->json('usage'),
+            ]);
+
+            throw new RuntimeException('The assistant returned no answer (stop_reason: '.$response->json('stop_reason').').');
+        }
 
         $status = 'answered';
         if (str_starts_with($raw, '[OFF_TOPIC]')) {

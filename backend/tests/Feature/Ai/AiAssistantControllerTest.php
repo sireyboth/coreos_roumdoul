@@ -170,6 +170,22 @@ class AiAssistantControllerTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_a_reply_with_no_text_is_a_503_not_a_blank_answer(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'content' => [['type' => 'thinking', 'thinking' => '', 'signature' => 'x']],
+            'stop_reason' => 'max_tokens',
+            'usage' => ['input_tokens' => 10, 'output_tokens' => 2000],
+        ])]);
+
+        $staff = $this->createUserWithRole($this->company, 'employee');
+
+        $this->actingAs($staff)
+            ->postJson('/api/ai/assistant', ['question' => 'How do I request leave?'])
+            ->assertStatus(503)
+            ->assertJsonMissing(['answer' => '']);
+    }
+
     public function test_an_api_failure_is_a_503_and_is_not_counted(): void
     {
         Http::fake(['api.anthropic.com/*' => Http::response(['error' => 'overloaded'], 529)]);
