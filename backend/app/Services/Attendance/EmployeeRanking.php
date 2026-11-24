@@ -21,6 +21,9 @@ use Illuminate\Support\Collection;
  *  - Only scheduled work days count: approved leave, holidays and days off
  *    are other kinds of day, so they never lower anyone's score. A late
  *    arrival approved in advance is judged against the approved time.
+ *  - Automatic attendance days (auto_attendance schedules) aren't counted:
+ *    nobody scanned, so there's nothing to rank. Someone on auto all month
+ *    isn't ranked.
  *  - At least MIN_DAYS scheduled days to be ranked, so a new starter isn't
  *    compared on one day; people who have left aren't ranked.
  *  - Ties: more days present first (steady attendance), then fewer late
@@ -55,6 +58,9 @@ final class EmployeeRanking
             ->withoutGlobalScopes()
             ->where('company_id', $company->id)
             ->where('kind', 'work')
+            // Days filled in by automatic attendance (no real scan) don't count.
+            ->where(fn ($q) => $q->whereNull('expected->rules->auto_attendance')
+                ->orWhere('expected->rules->auto_attendance', false))
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
             ->groupBy('employee_id')

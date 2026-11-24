@@ -79,7 +79,7 @@ class RankingTest extends TestCase
      * Work days from 1 October: "P" on time, "L" late 10 min, "A" absent.
      * Other kinds of day (leave, holiday) via $kind.
      */
-    private function days(Employee $employee, string $pattern, string $start = '2026-10-01', string $kind = 'work'): void
+    private function days(Employee $employee, string $pattern, string $start = '2026-10-01', string $kind = 'work', bool $auto = false): void
     {
         $date = Carbon::parse($start);
         foreach (str_split($pattern) as $code) {
@@ -89,6 +89,7 @@ class RankingTest extends TestCase
                     'A' => 'absent', default => 'complete'
                 },
                 'late_minutes' => $code === 'L' ? 10 : 0,
+                'expected' => ['kind' => $kind, 'rules' => ['auto_attendance' => $auto]],
             ]);
             $date = $date->addDay();
         }
@@ -123,6 +124,20 @@ class RankingTest extends TestCase
         $this->assertEquals([100, 94, 80], array_column($response->json('top'), 'score'));
         $this->assertSame([1, 2, 3], array_column($response->json('top'), 'rank'));
         $this->assertSame(['attendance_weight' => 60, 'on_time_weight' => 40, 'min_days' => 5], $response->json('rule'));
+    }
+
+    public function test_automatic_attendance_days_are_not_ranked(): void
+    {
+        $this->days($this->person('Boss'), 'PPPPPPPPPP', auto: true);     // auto all month → not ranked
+        $mixed = $this->person('Mixed');
+        $this->days($mixed, 'PPPPP', '2026-10-01', auto: true);           // 5 auto days, left out
+        $this->days($mixed, 'PPPPL', '2026-10-06');                       // 5 real days, one late
+        $this->days($this->person('Dara'), 'PPPPPPPPPA');
+
+        $all = $this->ranking($this->admin)->assertOk()->json('all');
+
+        $this->assertSame(['Dara', 'Mixed'], array_column($all, 'name'));
+        $this->assertSame([5, 4], [$all[1]['scheduled_days'], $all[1]['on_time_days']]);
     }
 
     public function test_leave_holidays_and_today_never_count_against_anyone(): void

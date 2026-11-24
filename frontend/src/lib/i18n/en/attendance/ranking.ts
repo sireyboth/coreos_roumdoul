@@ -25,6 +25,6 @@ export const ranking = {
   // ── How it works ─────────────────────────────────────────────────
   howAttendance: "{weight} points for coming to work: days they came ÷ days they were scheduled.",
   howOnTime: "{weight} points for being on time: days they arrived on time ÷ days they came.",
-  howFair: "Approved leave, holidays and days off never count against anyone. Today only counts once it's over.",
+  howFair: "Approved leave, holidays and days off never count against anyone. Today only counts once it's over. Automatic attendance days (no scan) aren't counted.",
   howMin: "Needs at least {n} work days in the month. Equal scores: more days at work comes first.",
 };
