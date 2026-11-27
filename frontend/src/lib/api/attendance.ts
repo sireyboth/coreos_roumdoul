@@ -244,6 +244,9 @@ export type AttendanceCorrection = {
   employee: Employee;
   requested_by: { id: number; name: string };
   reviewed_by: { id: number; name: string } | null;
+  // When it was asked for, and when it was approved / rejected / cancelled (ISO).
+  created_at: string;
+  reviewed_at: string | null;
 };
 
 // ───────────────────────────── Top employees ─────────────────────────────

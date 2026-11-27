@@ -20,6 +20,8 @@ export const corrections: Dictionary["attendance"]["corrections"] = {
   requestedHint: "ប្រធានរបស់លោកអ្នកនឹងពិនិត្យសំណើនេះ។",
 
   // ── Table ────────────────────────────────────────────────────────
+  colMissedDay: "ថ្ងៃខកខាន",
+  colRequestedOn: "ថ្ងៃស្នើសុំ",
   colScans: "ការស្កេនត្រូវបន្ថែម",
   sortEarliest: "ពីម៉ោងដំបូងទៅចុងក្រោយ",
   sortLatest: "ពីម៉ោងចុងក្រោយទៅដំបូង",
@@ -32,8 +34,10 @@ export const corrections: Dictionary["attendance"]["corrections"] = {
   open: "បើក",
 
   // ── Review dialog ────────────────────────────────────────────────
+  activity: "សកម្មភាព",
+  requestedBy: "បានស្នើសុំដោយ {name}",
+  waiting: "កំពុងរង់ចាំប្រធានពិនិត្យ",
   title: "ការកែតម្រូវវត្តមាន",
-  add: "បន្ថែម៖",
   decidedBy: "{status} ដោយ {name}",
   remark: "កំណត់សម្គាល់ជូនបុគ្គលិក",
   reasonOptional: "មូលហេតុ (ស្រេចចិត្ត)",

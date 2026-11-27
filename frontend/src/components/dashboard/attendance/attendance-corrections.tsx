@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileEdit, Plus, X } from "lucide-react";
+import { CalendarCheck, CalendarX, CheckCircle2, Clock, FileEdit, MessageSquareText, Plus, X, XCircle, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { ExcelActions } from "@/components/dashboard/excel/excel-actions";
 import { useMe } from "@/contexts/me-context";
+import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
+import { cn } from "@/lib/utils";
 import { displayOrderColumn } from "@/components/dashboard/shared/display-order";
 import { monthBounds, MonthBar } from "@/components/dashboard/schedules/calendar-shared";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
@@ -31,16 +33,87 @@ import { dateLocale, useLang, useT, type Lang } from "@/lib/i18n";
 
 // Labels are common.status.<key>.
 const STATUS = {
-  pending: { variant: "warning" },
-  approved: { variant: "success" },
-  rejected: { variant: "destructive" },
-  cancelled: { variant: "secondary" },
+  pending: { variant: "warning", dot: "bg-warning" },
+  approved: { variant: "success", dot: "bg-success" },
+  rejected: { variant: "destructive", dot: "bg-destructive" },
+  cancelled: { variant: "secondary", dot: "bg-muted-foreground" },
 } as const;
 
+/** The two dates people look for first: the day that went wrong (red) and when it was reported (green). */
+const TONE = { missed: "text-destructive", requested: "text-success" } as const;
+
+/** The status as a soft pill with a coloured dot — the same everywhere on this tab. */
+function StatusPill({ status }: { status: AttendanceCorrection["status"] }) {
+  const t = useT();
+  return (
+    <Badge variant={STATUS[status].variant} className="gap-1.5">
+      <span className={cn("size-1.5 rounded-full", STATUS[status].dot)} />
+      {t(`common.status.${status}`)}
+    </Badge>
+  );
+}
+
+/** One label / value line in the grouped list, like a row in a phone's Settings screen. */
+function DetailRow({
+  icon: IconCmp,
+  label,
+  tone,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  /** Colours the icon and value: red for the missed day, green for when it was asked. */
+  tone?: "missed" | "requested";
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 px-4 py-3">
+      <IconCmp className={cn("mt-0.5 size-4 shrink-0", tone ? TONE[tone] : "text-muted-foreground")} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <div className={cn("text-sm font-medium", tone && TONE[tone])}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** A step in the request's history: filled dot when it happened, hollow while waiting. */
+function TimelineStep({
+  title,
+  time,
+  note,
+  dot,
+  last,
+  waiting,
+}: {
+  title: string;
+  time?: string;
+  note?: string | null;
+  dot: string;
+  last?: boolean;
+  waiting?: boolean;
+}) {
+  return (
+    <li className="relative flex gap-3 pb-4 last:pb-0">
+      {!last && <span className="absolute top-3 left-[5px] h-full w-px bg-border" aria-hidden />}
+      <span
+        className={cn("relative mt-1 size-[11px] shrink-0 rounded-full", waiting ? "border-2 border-dashed border-muted-foreground/60 bg-background" : dot)}
+        aria-hidden
+      />
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className={cn("text-sm", waiting ? "text-muted-foreground" : "font-medium")}>{title}</span>
+        {time && <span className="text-xs tabular-nums text-muted-foreground">{time}</span>}
+        {note && <p className="mt-1 rounded-lg bg-muted/60 px-3 py-2 text-sm text-foreground/90">“{note}”</p>}
+      </div>
+    </li>
+  );
+}
+
 /**
- * One correction with what can be done to it. Every decision can carry a
- * remark the employee reads: optional when approving, required when
- * rejecting or when a manager cancels someone else's.
+ * One correction with what can be done to it — a bottom sheet on phones, a
+ * card on wider screens. Every decision can carry a remark the employee
+ * reads: optional when approving, required when rejecting or when a manager
+ * cancels someone else's.
  */
 function CorrectionReviewDialog({
   correction,
@@ -60,17 +133,16 @@ function CorrectionReviewDialog({
   const [remark, setRemark] = useState("");
   const [missing, setMissing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const c = correction;
+  // What the sheet shows. It keeps the last correction while the sheet slides
+  // away — clearing it at once would empty the box mid-animation (a visible
+  // jump) — and lets go only when the close animation has finished.
+  const [shown, setShown] = useState(correction);
+  if (correction && correction !== shown) setShown(correction);
+  const c = shown;
   const pending = c?.status === "pending";
   const canDecide = canManage && pending && !isOwn;
   const canCancel = pending && (isOwn || canManage);
   const remarkRequiredToCancel = canCancel && !isOwn;
-
-  function close() {
-    setRemark("");
-    setMissing(false);
-    onClose();
-  }
 
   async function act(action: "approve" | "reject" | "cancel") {
     if (!c) return;
@@ -92,7 +164,7 @@ function CorrectionReviewDialog({
             : t("attendance.corrections.cancelled"),
         action === "approve" ? t("attendance.corrections.approvedHint") : undefined,
       );
-      close();
+      onClose();
       onDone();
     } catch (err) {
       notifyError(err);
@@ -102,41 +174,89 @@ function CorrectionReviewDialog({
   }
 
   return (
-    <Dialog open={c !== null} onOpenChange={(open) => !open && close()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog
+      open={correction !== null}
+      onOpenChange={(open) => !open && onClose()}
+      onOpenChangeComplete={(open) => {
+        if (open) return;
+        setShown(null);
+        setRemark("");
+        setMissing(false);
+      }}
+    >
+      <DialogContent
+        className={cn(
+          "gap-0 p-0 sm:max-w-md",
+          // Phones: a sheet that slides up from the bottom edge, like a native app.
+          "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[92dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-3xl max-sm:duration-300 max-sm:data-open:slide-in-from-bottom max-sm:data-open:zoom-in-100 max-sm:data-closed:slide-out-to-bottom max-sm:data-closed:zoom-out-100",
+        )}
+      >
         {c && (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {t("attendance.corrections.title")} <Badge variant={STATUS[c.status].variant}>{t(`common.status.${c.status}`)}</Badge>
-              </DialogTitle>
-              <DialogDescription>
-                {c.employee.name} ·{" "}
-                {new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString(dateLocale(lang), {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </DialogDescription>
-            </DialogHeader>
+            {/* Grab handle — a phone sheet's cue that it can be dismissed. */}
+            <div className="flex justify-center pt-2.5 sm:hidden" aria-hidden>
+              <span className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+            </div>
 
-            <div className="flex flex-col gap-3 text-sm">
-              <p>
-                {t("attendance.corrections.add")}{" "}
-                <span className="font-medium tabular-nums">{c.requested_times.map((time) => formatTime(time, lang)).join(" · ") || "—"}</span>
-              </p>
-              <p className="rounded-md bg-muted/50 px-3 py-2">{c.reason}</p>
-              {c.reviewed_by && (
-                <p className="text-xs text-muted-foreground">
-                  {t("attendance.corrections.decidedBy", { status: t(`common.status.${c.status}`), name: c.reviewed_by.name })}
-                  {c.review_notes ? ` — “${c.review_notes}”` : ""}
-                </p>
-              )}
+            <div className="flex flex-col gap-5 overflow-y-auto px-5 pt-4 pb-5 sm:pt-5">
+              {/* Who, and where the request stands. */}
+              <div className="flex items-center gap-3 pr-8">
+                <EmployeeAvatar name={c.employee.name} photoUrl={c.employee.photo_url} className="size-12 text-sm" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <DialogTitle className="truncate text-base font-semibold">{c.employee.name}</DialogTitle>
+                  <DialogDescription className="truncate text-xs">
+                    {[t("attendance.corrections.title"), c.employee.job_title].filter(Boolean).join(" · ")}
+                  </DialogDescription>
+                </div>
+                <StatusPill status={c.status} />
+              </div>
+
+              {/* The request itself, as a grouped list. */}
+              <div className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
+                <DetailRow icon={CalendarX} label={t("attendance.corrections.colMissedDay")} tone="missed">
+                  {formatMissedDay(c.date, lang, "long")}
+                </DetailRow>
+                <DetailRow icon={CalendarCheck} label={t("attendance.corrections.colRequestedOn")} tone="requested">
+                  <span className="tabular-nums">{formatMoment(c.created_at, lang)}</span>
+                </DetailRow>
+                <DetailRow icon={Clock} label={t("attendance.corrections.colScans")}>
+                  <ScanChips times={c.requested_times} lang={lang} />
+                </DetailRow>
+                <DetailRow icon={MessageSquareText} label={t("common.field.reason")}>
+                  <span className="font-normal leading-relaxed">{c.reason}</span>
+                </DetailRow>
+              </div>
+
+              {/* What happened, in order. */}
+              <div className="flex flex-col gap-3">
+                <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{t("attendance.corrections.activity")}</h3>
+                <ol className="flex flex-col">
+                  <TimelineStep
+                    title={t("attendance.corrections.requestedBy", { name: c.requested_by?.name ?? c.employee.name })}
+                    time={formatMoment(c.created_at, lang)}
+                    dot="bg-success"
+                  />
+                  {pending ? (
+                    <TimelineStep title={t("attendance.corrections.waiting")} waiting dot="" last />
+                  ) : (
+                    <TimelineStep
+                      title={
+                        c.reviewed_by
+                          ? t("attendance.corrections.decidedBy", { status: t(`common.status.${c.status}`), name: c.reviewed_by.name })
+                          : t(`common.status.${c.status}`)
+                      }
+                      time={c.reviewed_at ? formatMoment(c.reviewed_at, lang) : undefined}
+                      note={c.review_notes}
+                      dot={STATUS[c.status].dot}
+                      last
+                    />
+                  )}
+                </ol>
+              </div>
 
               {(canDecide || canCancel) && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="correction-remark">
+                  <Label htmlFor="correction-remark" className="text-xs text-muted-foreground">
                     {canDecide ? t("attendance.corrections.remark") : isOwn ? t("attendance.corrections.reasonOptional") : t("attendance.corrections.remark")}
                   </Label>
                   <Textarea
@@ -147,7 +267,9 @@ function CorrectionReviewDialog({
                       setMissing(false);
                     }}
                     maxLength={500}
+                    rows={2}
                     aria-invalid={missing}
+                    className="rounded-xl"
                     placeholder={canDecide ? t("attendance.corrections.remarkPlaceholder") : ""}
                   />
                   {missing && <p className="text-xs text-destructive">{t("attendance.corrections.remarkMissing")}</p>}
@@ -155,30 +277,73 @@ function CorrectionReviewDialog({
               )}
             </div>
 
+            {/* Big, thumb-friendly actions pinned to the bottom. */}
             {(canDecide || canCancel) && (
-              <DialogFooter>
+              <div className="flex flex-col gap-2 border-t bg-muted/30 px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {canDecide && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="lg" className="h-11 rounded-xl text-destructive hover:text-destructive" onClick={() => act("reject")} disabled={busy}>
+                      <XCircle className="size-4" />
+                      {t("common.action.reject")}
+                    </Button>
+                    <Button size="lg" className="h-11 rounded-xl" onClick={() => act("approve")} disabled={busy}>
+                      <CheckCircle2 className="size-4" />
+                      {t("common.action.approve")}
+                    </Button>
+                  </div>
+                )}
                 {canCancel && (
-                  <Button variant="outline" onClick={() => act("cancel")} disabled={busy} className="sm:mr-auto">
+                  <Button
+                    variant={canDecide ? "ghost" : "outline"}
+                    size="lg"
+                    className={cn("h-11 rounded-xl", canDecide && "text-muted-foreground")}
+                    onClick={() => act("cancel")}
+                    disabled={busy}
+                  >
                     {t("attendance.corrections.cancelRequest")}
                   </Button>
                 )}
-                {canDecide && (
-                  <>
-                    <Button variant="outline" onClick={() => act("reject")} disabled={busy}>
-                      {t("common.action.reject")}
-                    </Button>
-                    <Button onClick={() => act("approve")} disabled={busy}>
-                      {t("common.action.approve")}
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
+              </div>
             )}
           </>
         )}
       </DialogContent>
     </Dialog>
   );
+}
+
+/** The scan times as small clock chips: "08:00" "17:30". */
+function ScanChips({ times, lang }: { times: string[]; lang: Lang }) {
+  if (times.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {times.map((time) => (
+        <span key={time} className="inline-flex items-center rounded-md bg-background px-2 py-0.5 text-xs font-medium tabular-nums ring-1 ring-border">
+          {formatTime(time, lang)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The day being corrected, e.g. "Mon, 5 Oct 2026". A date column, so no timezone shift. */
+function formatMissedDay(date: string, lang: Lang, style: "short" | "long" = "short"): string {
+  return new Date(dateOnly(date) + "T00:00:00").toLocaleDateString(dateLocale(lang), {
+    weekday: style,
+    day: "numeric",
+    month: style,
+    year: "numeric",
+  });
+}
+
+/** Just the date part of a moment, on the viewer's clock: "4 Nov 2026". */
+function formatMomentDate(iso: string, lang: Lang): string {
+  return new Date(iso).toLocaleDateString(dateLocale(lang), { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** A moment (when it was asked for or decided) on the viewer's clock, e.g. "6 Oct 2026, 08:15". */
+function formatMoment(iso: string, lang: Lang): string {
+  return new Date(iso).toLocaleString(dateLocale(lang), { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function formatTime(iso: string, lang: Lang): string {
@@ -274,6 +439,7 @@ export function AttendanceCorrections({
   const [reviewing, setReviewing] = useState<AttendanceCorrection | null>(null);
   const isOwn = (c: AttendanceCorrection) => c.employee.id === me?.employee?.id || c.requested_by?.id === me?.user.id;
 
+  // Every cell is two quiet lines at most: the fact, then a muted detail under it.
   const columns: DataTableColumn<AttendanceCorrection>[] = [
     ...(canManage
       ? [
@@ -281,7 +447,15 @@ export function AttendanceCorrections({
             id: "employee",
             header: t("common.field.employee"),
             primary: true,
-            cell: (c: AttendanceCorrection) => <span className="font-medium">{c.employee.name}</span>,
+            cell: (c: AttendanceCorrection) => (
+              <div className="flex items-center gap-2.5">
+                <EmployeeAvatar name={c.employee.name} photoUrl={c.employee.photo_url} className="size-8 text-[11px]" />
+                <div className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium">{c.employee.name}</span>
+                  {c.employee.job_title && <span className="truncate text-xs text-muted-foreground">{c.employee.job_title}</span>}
+                </div>
+              </div>
+            ),
             sortValue: (c: AttendanceCorrection) => c.employee.name,
             searchValue: (c: AttendanceCorrection) => c.employee.name,
           },
@@ -290,40 +464,62 @@ export function AttendanceCorrections({
       : []),
     {
       id: "date",
-      header: t("common.field.date"),
+      header: t("attendance.corrections.colMissedDay"),
       primary: !canManage,
       className: "whitespace-nowrap",
-      cell: (c) =>
-        new Date(dateOnly(c.date) + "T00:00:00").toLocaleDateString(dateLocale(lang), { year: "numeric", month: "short", day: "numeric" }),
+      cell: (c) => {
+        const day = new Date(dateOnly(c.date) + "T00:00:00");
+        return (
+          <div className="flex flex-col">
+            <span className={cn("font-medium", TONE.missed)}>{day.toLocaleDateString(dateLocale(lang), { day: "numeric", month: "short", year: "numeric" })}</span>
+            <span className="text-xs text-muted-foreground">{day.toLocaleDateString(dateLocale(lang), { weekday: "long" })}</span>
+          </div>
+        );
+      },
       sortValue: (c) => dateOnly(c.date),
+    },
+    {
+      id: "requested_at",
+      header: t("attendance.corrections.colRequestedOn"),
+      className: "whitespace-nowrap",
+      cell: (c) => (
+        <div className="flex flex-col">
+          <span className={cn("font-medium", TONE.requested)}>{formatMomentDate(c.created_at, lang)}</span>
+          <span className="text-xs tabular-nums text-muted-foreground">{formatTime(c.created_at, lang)}</span>
+        </div>
+      ),
+      sortValue: (c) => c.created_at,
     },
     {
       id: "scans",
       header: t("attendance.corrections.colScans"),
-      cell: (c) => (
-        <span className="tabular-nums text-muted-foreground">{c.requested_times.map((time) => formatTime(time, lang)).join(" · ") || "—"}</span>
-      ),
+      cell: (c) => <ScanChips times={c.requested_times} lang={lang} />,
       sortValue: (c) => c.requested_times[0],
       sortLabels: [t("attendance.corrections.sortEarliest"), t("attendance.corrections.sortLatest")],
     },
     {
       id: "reason",
       header: t("common.field.reason"),
-      // Truncated in the table; wraps in full on a phone card.
-      className: "max-w-48 truncate",
-      cell: (c) => <span className="text-muted-foreground">{c.reason}</span>,
+      // One line in the table (full text in the sheet); wraps on a phone card.
+      className: "max-w-56",
+      cell: (c) => <span className="line-clamp-1 text-muted-foreground md:block md:truncate">{c.reason}</span>,
       searchValue: (c) => c.reason,
       sortValue: (c) => c.reason,
     },
     {
       id: "status",
       header: t("common.field.status"),
+      className: "whitespace-nowrap",
       cell: (c) => (
-        <div className="flex flex-col items-start gap-0.5">
-          <Badge variant={STATUS[c.status].variant}>{t(`common.status.${c.status}`)}</Badge>
-          {c.reviewed_by && <span className="text-xs text-muted-foreground">{t("attendance.corrections.reviewedBy", { name: c.reviewed_by.name })}</span>}
-          {/* The remark the employee reads. */}
-          {c.review_notes && <span className="max-w-56 text-xs italic text-muted-foreground">“{c.review_notes}”</span>}
+        <div className="flex flex-col items-start gap-1">
+          <StatusPill status={c.status} />
+          {c.reviewed_at && (
+            <span className="text-xs text-muted-foreground">
+              {[c.reviewed_by && t("attendance.corrections.reviewedBy", { name: c.reviewed_by.name }), formatMomentDate(c.reviewed_at, lang)]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          )}
         </div>
       ),
       sortValue: (c) => c.status,
@@ -362,7 +558,7 @@ export function AttendanceCorrections({
                 </DialogHeader>
                 <form onSubmit={handleCreate} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="date">{t("common.field.date")}</Label>
+                    <Label htmlFor="date">{t("attendance.corrections.colMissedDay")}</Label>
                     <Input id="date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -440,7 +636,7 @@ export function AttendanceCorrections({
                 },
               ]
             : []),
-          { type: "date-range", id: "date", label: t("common.field.date"), getValue: (correction) => dateOnly(correction.date) },
+          { type: "date-range", id: "date", label: t("attendance.corrections.colMissedDay"), getValue: (correction) => dateOnly(correction.date) },
         ]}
         searchPlaceholder={canManage ? t("attendance.corrections.searchManager") : t("attendance.corrections.searchOwn")}
         initialFilters={initialStatus && initialStatus in STATUS ? { status: initialStatus } : undefined}

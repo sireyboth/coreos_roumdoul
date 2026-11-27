@@ -18,6 +18,8 @@ export const corrections = {
   requestedHint: "Your manager will review it.",
 
   // ── Table ────────────────────────────────────────────────────────
+  colMissedDay: "Missed day",
+  colRequestedOn: "Requested on",
   colScans: "Scans to add",
   sortEarliest: "Earliest first",
   sortLatest: "Latest first",
@@ -30,8 +32,10 @@ export const corrections = {
   open: "Open",
 
   // ── Review dialog ────────────────────────────────────────────────
+  activity: "Activity",
+  requestedBy: "Requested by {name}",
+  waiting: "Waiting for a manager to review",
   title: "Correction",
-  add: "Add:",
   decidedBy: "{status} by {name}",
   remark: "Remark to the employee",
   reasonOptional: "Reason (optional)",

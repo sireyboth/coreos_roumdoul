@@ -1238,6 +1238,13 @@ const localTime = (iso: string) => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+/** A UTC timestamp as the viewer's calendar day (Cambodia is a day ahead of UTC until 07:00). */
+const localDay = (iso: string | null) => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export async function exportCorrections(): Promise<string> {
   const filename = `attendance-corrections-${today()}.xlsx`;
   await downloadSheet(filename, {
@@ -1246,12 +1253,14 @@ export async function exportCorrections(): Promise<string> {
     columns: [
       { header: "Employee ID", value: (c) => c.employee?.employee_code },
       { header: "Employee", value: (c) => c.employee?.name },
-      { header: "Date", value: (c) => dateOnly(c.date), type: "date" },
+      { header: "Missed day", value: (c) => dateOnly(c.date), type: "date" },
       { header: "Scans to add", value: (c) => c.requested_times.map(localTime).join(", ") },
       { header: "Reason", value: (c) => c.reason, width: 40 },
       { header: "Status", value: (c) => c.status.charAt(0).toUpperCase() + c.status.slice(1) },
       { header: "Requested by", value: (c) => c.requested_by?.name },
+      { header: "Requested on", value: (c) => localDay(c.created_at), type: "date" },
       { header: "Reviewed by", value: (c) => c.reviewed_by?.name },
+      { header: "Reviewed on", value: (c) => localDay(c.reviewed_at), type: "date" },
       { header: "Review notes", value: (c) => c.review_notes },
     ],
   });

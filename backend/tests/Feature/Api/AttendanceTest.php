@@ -150,6 +150,37 @@ class AttendanceTest extends TestCase
         $this->assertEquals(540, $days[0]['worked_minutes']);
     }
 
+    public function test_correction_list_says_which_day_was_missed_and_when_it_was_asked_and_decided(): void
+    {
+        $company = app(CompanyProvisioner::class)->provision('Delta', 'Boss', 'boss@delta.test', 'password123');
+        $this->subscribeToGrowth($company->id);
+        $admin = $company->users()->first();
+
+        $user = $this->createUserWithRole($company, 'employee');
+        Employee::query()->create(['company_id' => $company->id, 'name' => 'Forgetful', 'user_id' => $user->id]);
+
+        Carbon::setTestNow('2026-09-17 01:30:00');
+        $id = $this->actingAs($user)->postJson('/api/attendance/corrections', [
+            'date' => '2026-09-15',
+            'reason' => 'Forgot to scan out',
+            'scans' => ['2026-09-15T17:00'],
+        ])->assertCreated()->json('id');
+
+        $row = $this->actingAs($user)->getJson('/api/attendance/corrections')->json('data.0');
+        $this->assertSame('2026-09-15', substr($row['date'], 0, 10));
+        $this->assertSame('pending', $row['status']);
+        $this->assertSame('2026-09-17T01:30:00', substr($row['created_at'], 0, 19));
+        $this->assertNull($row['reviewed_at']);
+
+        Carbon::setTestNow('2026-09-18 02:00:00');
+        $this->actingAs($admin)->postJson("/api/attendance/corrections/{$id}/approve")->assertOk();
+
+        $row = $this->actingAs($user)->getJson('/api/attendance/corrections')->json('data.0');
+        $this->assertSame('approved', $row['status']);
+        $this->assertSame('2026-09-18T02:00:00', substr($row['reviewed_at'], 0, 19));
+        Carbon::setTestNow();
+    }
+
     public function test_approving_a_correction_skips_scans_already_on_record(): void
     {
         $company = app(CompanyProvisioner::class)->provision('Zeta', 'Boss', 'boss@zeta.test', 'password123');
