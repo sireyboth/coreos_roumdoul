@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { money, today } from "@/components/dashboard/payroll/shared";
 import { api, type PayRun, type PayRunReport, type PayrollPolicy } from "@/lib/api";
-import { BANK_FORMATS, bankTransfers, defaultRemarks, downloadBankFile, isBank, type BankFormat, type SkippedSlip } from "@/lib/export/bank";
+import { BANK_FORMATS, bankTransfers, defaultRemarks, downloadBankFile, isBank, rememberChipmong, type BankFormat, type SkippedSlip } from "@/lib/export/bank";
 import { notifyError, notifySuccess } from "@/lib/notify";
 import { useT } from "@/lib/i18n";
 import { cn } from "cn";
@@ -70,13 +70,7 @@ export function BankExportDialog({ run, open, onOpenChange, canManage }: { run: 
   async function download() {
     setBusy(true);
     try {
-      if (format === "chipmong" && canManage) {
-        const next = { company_code: companyCode.trim(), debit_account: debitAccount.trim() };
-        if (next.company_code !== (saved?.chipmong?.company_code ?? "") || next.debit_account !== (saved?.chipmong?.debit_account ?? "")) {
-          const policy = await api.payroll.updatePolicy({ bank_exports: { ...saved, chipmong: next } });
-          setSaved(policy.bank_exports);
-        }
-      }
+      if (format === "chipmong" && canManage) setSaved(await rememberChipmong(saved, companyCode, debitAccount));
       await downloadBankFile({
         format,
         currency,

@@ -73,5 +73,6 @@ export const payrollRun = {
     s2: "Pay your staff through the bank or in cash.",
     s3: "<path>Mark as paid</path> — records who paid and when.",
     columns: "CSV columns: Employee ID, Employee, Period start, Period end, Currency, Base salary, Gross, NSSF (employee), Tax on salary, Net pay, Employer cost, Payment method, Bank, Account number, Account name.",
+    many: "Several runs in one file: on <path>Pay runs</path>, click <path>Export to Excel</path>, tick the runs you want (any groups or periods), then <path>Download Excel</path>. The file opens on a Summary sheet (one row per run, with totals per currency), then All payslips (every run together, with Period and Pay group columns), then one sheet per run. Pick Chip Mong Bank or ABA Bank as the format instead to get the bank's bulk upload layout: the first sheet (All USD / All KHR) holds every transfer together to upload at once, followed by one sheet per run.",
   },
 };

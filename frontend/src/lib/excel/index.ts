@@ -31,6 +31,8 @@ export type SheetSpec<T> = {
   name: string;
   columns: SheetColumn<T>[];
   rows: T[];
+  /** Total rows under the data, in bold with a line above — left out of the filter range. */
+  footer?: T[];
 };
 
 const HEADER_FILL = "FF1E293B"; // slate-800
@@ -40,6 +42,22 @@ const BORDER = { style: "thin" as const, color: { argb: "FFE2E8F0" } };
 /** Excel forbids these in sheet names, and caps them at 31 characters. */
 function sheetName(name: string): string {
   return name.replace(/[\\/?*[\]:]/g, " ").slice(0, 31) || "Sheet1";
+}
+
+/**
+ * A valid sheet name not yet used in this workbook. Two long names can end up
+ * the same after the 31-character cut, and ExcelJS throws on a duplicate,
+ * so the later one gets " (2)", " (3)", … (case-insensitive, as Excel compares).
+ */
+function freeSheetName(workbook: Workbook, name: string): string {
+  const base = sheetName(name);
+  const taken = (candidate: string) => workbook.worksheets.some((s) => s.name.toLowerCase() === candidate.toLowerCase());
+  if (!taken(base)) return base;
+  for (let n = 2; ; n++) {
+    const suffix = ` (${n})`;
+    const candidate = base.slice(0, 31 - suffix.length) + suffix;
+    if (!taken(candidate)) return candidate;
+  }
 }
 
 /** A YYYY-MM-DD string as a date Excel shows the same everywhere (no time zone drift). */
@@ -73,20 +91,31 @@ function cellValue<T>(column: SheetColumn<T>, value: SheetValue): Date | string 
 }
 
 function addSheet<T>(workbook: Workbook, spec: SheetSpec<T>) {
-  const sheet = workbook.addWorksheet(sheetName(spec.name));
+  const sheet = workbook.addWorksheet(freeSheetName(workbook, spec.name));
   sheet.addRow(spec.columns.map((c) => c.header));
 
   const widths = spec.columns.map((c) => c.header.length);
-
-  for (const row of spec.rows) {
+  const addValues = (row: T) => {
     const values = spec.columns.map((column, i) => {
       const value = column.value(row);
       widths[i] = Math.max(widths[i], value == null ? 0 : String(value).length);
       return cellValue(column, value);
     });
-    const added = sheet.addRow(values);
-    added.eachCell((cell) => (cell.border = { bottom: BORDER }));
+    return sheet.addRow(values);
+  };
+
+  for (const row of spec.rows) {
+    addValues(row).eachCell((cell) => (cell.border = { bottom: BORDER }));
   }
+
+  spec.footer?.forEach((row, i) => {
+    const added = addValues(row);
+    added.font = { bold: true };
+    // The line goes above the first total row only.
+    if (i === 0) {
+      for (let col = 1; col <= spec.columns.length; col++) added.getCell(col).border = { top: { style: "thin", color: { argb: "FF94A3B8" } } };
+    }
+  });
 
   spec.columns.forEach((column, i) => {
     const col = sheet.getColumn(i + 1);
@@ -149,7 +178,7 @@ export type WorkbookBuilder = {
 const ROW_PX = 20;
 
 function addChartSheet(workbook: Workbook, name: string) {
-  const sheet = workbook.addWorksheet(sheetName(name), { views: [{ showGridLines: false }] });
+  const sheet = workbook.addWorksheet(freeSheetName(workbook, name), { views: [{ showGridLines: false }] });
   let top = 1;
 
   return {
@@ -207,7 +236,7 @@ export async function downloadWorkbook(filename: string, build: (book: WorkbookB
   build({
     sheet: (spec) => void addSheet(workbook, spec),
     chartSheet: (name) => addChartSheet(workbook, name),
-    worksheet: (name, fill) => fill(workbook.addWorksheet(sheetName(name))),
+    worksheet: (name, fill) => fill(workbook.addWorksheet(freeSheetName(workbook, name))),
   });
   await download(workbook, filename);
 }

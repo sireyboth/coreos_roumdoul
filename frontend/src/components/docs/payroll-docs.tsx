@@ -217,6 +217,7 @@ export function PayrollDocs() {
           <Section id="pay" step={10} title={p.toc.pay}>
             <Steps items={[rich(r.pay.s1), r.pay.s2, rich(r.pay.s3)]} />
             <P>{r.pay.columns}</P>
+            <P>{rich(r.pay.many)}</P>
           </Section>
 
           {/* ───────────────────────────── Calculation ───────────────────────────── */}

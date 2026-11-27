@@ -76,5 +76,6 @@ export const payrollRun: Dictionary["docs"]["payrollRun"] = {
     s2: "សូមបើកប្រាក់ជូនបុគ្គលិកតាមធនាគារ ឬជាសាច់ប្រាក់។",
     s3: "<path>កត់ត្រាថាបានបើកប្រាក់</path> — កត់ត្រាថាអ្នកណាជាអ្នកបើកប្រាក់ និងនៅពេលណា។",
     columns: "ជួរឈរ CSV (ជាភាសាអង់គ្លេសក្នុងឯកសារ)៖ Employee ID, Employee, Period start, Period end, Currency, Base salary, Gross, NSSF (employee), Tax on salary, Net pay, Employer cost, Payment method, Bank, Account number, Account name។",
+    many: "ការបើកប្រាក់បៀវត្សរ៍ច្រើនក្នុងឯកសារតែមួយ៖ នៅទំព័រ <path>ការបើកប្រាក់បៀវត្សរ៍</path> សូមចុច <path>នាំចេញជា Excel</path> ធីកការបើកប្រាក់ដែលចង់បាន (ក្រុម ឬរយៈពេលណាក៏បាន) រួចចុច <path>ទាញយក Excel</path>។ ឯកសារចាប់ផ្តើមដោយសន្លឹក Summary (មួយជួរសម្រាប់ការបើកប្រាក់នីមួយៗ និងសរុបតាមរូបិយប័ណ្ណ) បន្ទាប់មក All payslips (ការបើកប្រាក់ទាំងអស់រួមគ្នា មានជួរឈរ Period និង Pay group) រួចមួយសន្លឹកសម្រាប់ការបើកប្រាក់នីមួយៗ។ ឬជ្រើសរើស Chip Mong Bank ឬ ABA Bank ជាទម្រង់ ដើម្បីទទួលបានប្លង់ផ្ទុកឡើងជាដុំរបស់ធនាគារ៖ សន្លឹកទីមួយ (All USD / All KHR) មានការផ្ទេរប្រាក់ទាំងអស់រួមគ្នា សម្រាប់ផ្ទុកឡើងក្នុងពេលតែមួយ បន្ទាប់មកមួយសន្លឹកសម្រាប់ការបើកប្រាក់នីមួយៗ។",
   },
 };

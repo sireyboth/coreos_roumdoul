@@ -23,6 +23,7 @@ import { useMe } from "@/contexts/me-context";
 import { EmployeeAvatar } from "@/components/dashboard/employees/employee-avatar";
 import { cn } from "@/lib/utils";
 import { displayOrderColumn } from "@/components/dashboard/shared/display-order";
+import { PHONE_SHEET, SheetHandle } from "@/components/dashboard/shared/phone-sheet";
 import { monthBounds, MonthBar } from "@/components/dashboard/schedules/calendar-shared";
 import { api, ApiError, AttendanceCorrection } from "@/lib/api";
 import { Alert } from "@/components/ui/alert";
@@ -185,18 +186,12 @@ function CorrectionReviewDialog({
       }}
     >
       <DialogContent
-        className={cn(
-          "gap-0 p-0 sm:max-w-md",
-          // Phones: a sheet that slides up from the bottom edge, like a native app.
-          "max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-h-[92dvh] max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-3xl max-sm:duration-300 max-sm:data-open:slide-in-from-bottom max-sm:data-open:zoom-in-100 max-sm:data-closed:slide-out-to-bottom max-sm:data-closed:zoom-out-100",
-        )}
+        // Phones: a sheet that slides up from the bottom edge, like a native app.
+        className={cn("gap-0 p-0 sm:max-w-md", PHONE_SHEET)}
       >
         {c && (
           <>
-            {/* Grab handle — a phone sheet's cue that it can be dismissed. */}
-            <div className="flex justify-center pt-2.5 sm:hidden" aria-hidden>
-              <span className="h-1 w-10 rounded-full bg-muted-foreground/30" />
-            </div>
+            <SheetHandle />
 
             <div className="flex flex-col gap-5 overflow-y-auto px-5 pt-4 pb-5 sm:pt-5">
               {/* Who, and where the request stands. */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Wallet } from "lucide-react";
+import { Plus, Sheet, Wallet } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { GettingStartedCard, PayrollGuideButton } from "@/components/dashboard/p
 import { RUN_STATUS, money, scheduleSummary, today } from "@/components/dashboard/payroll/shared";
 import { useMe } from "@/contexts/me-context";
 import { api, ApiError, type PayGroup, type PayPeriodOption, type PayRun } from "@/lib/api";
+import { ExportRunsDialog } from "@/components/dashboard/payroll/export-runs-dialog";
 import { notifyError } from "@/lib/notify";
 import { dateLocale, useLang, useT } from "@/lib/i18n";
 
@@ -166,6 +167,7 @@ export default function PayRunsPage() {
   const [groups, setGroups] = useState<PayGroup[]>([]);
   const [groupFilter, setGroupFilter] = useState("");
   const [creating, setCreating] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     api.payroll.runs().then(setRuns).catch((err) => {
@@ -215,6 +217,10 @@ export default function PayRunsPage() {
         action={
           <div className="flex flex-wrap gap-2">
             <PayrollGuideButton topic="run" />
+            <Button variant="outline" onClick={() => setExportOpen(true)} disabled={!runs?.length}>
+              <Sheet className="size-4" />
+              {t("payroll.runs.export.button")}
+            </Button>
             {canManage && (
               <Button onClick={() => setCreating(true)} disabled={groups.length === 0}>
                 <Plus className="size-4" />
@@ -253,6 +259,8 @@ export default function PayRunsPage() {
         }}
       />
       {creating && <NewRunDialog groups={groups} onOpenChange={setCreating} />}
+      {/* Always mounted, so it can slide in and out instead of popping. */}
+      <ExportRunsDialog open={exportOpen} runs={runs ?? []} groups={groups} initialGroup={groupFilter} canManage={canManage} onOpenChange={setExportOpen} />
     </div>
   );
 }
