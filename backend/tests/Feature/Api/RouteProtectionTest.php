@@ -17,6 +17,8 @@ class RouteProtectionTest extends TestCase
         'GET api/health',
         'POST api/auth/register',
         'POST api/auth/login',
+        // Telegram can't sign in; it proves itself with a secret header instead.
+        'POST api/telegram/webhook',
     ];
 
     /** Opened by <img> or a new tab, so a short-lived signed link stands in for the token. */

@@ -188,9 +188,10 @@ export const requestsApi = {
   },
   requests: {
     // mine = about me; approvals = waiting on me; all = my branches (requests.manage).
-    list: (params: { scope?: "mine" | "approvals" | "all"; status?: RequestStatus; from?: string; to?: string } = {}) => {
+    list: (params: { scope?: "mine" | "approvals" | "all"; status?: RequestStatus; employeeId?: number; from?: string; to?: string } = {}) => {
       const query = new URLSearchParams({ per_page: "500", scope: params.scope ?? "mine" });
       if (params.status) query.set("status", params.status);
+      if (params.employeeId) query.set("employee_id", String(params.employeeId));
       if (params.from) query.set("from", params.from);
       if (params.to) query.set("to", params.to);
       return request<Paginated<EmployeeRequest>>(`/api/requests?${query}`).then((page) => page.data);

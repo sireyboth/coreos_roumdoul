@@ -16,6 +16,7 @@ import {
   Palette,
   Scale,
   ScrollText,
+  Send,
   ShieldCheck,
   SlidersHorizontal,
   Trophy,
@@ -95,6 +96,7 @@ export const NAV_GROUPS: { id: NavGroupId; label: string; items: NavItem[] }[] =
       { href: "/dashboard/users", label: "Users", icon: KeyRound, tone: "from-orange-500 to-red-500", permission: "users.view" },
       { href: "/dashboard/roles", label: "Roles", icon: ShieldCheck, tone: "from-fuchsia-500 to-purple-500", permission: "roles.view" },
       { href: "/dashboard/audit", label: "Audit Log", icon: ScrollText, tone: "from-slate-500 to-slate-700", permission: "audit.view" },
+      { href: "/dashboard/telegram", label: "Telegram", icon: Send, tone: "from-sky-500 to-blue-500", permission: "company.manage" },
     ],
   },
 ];

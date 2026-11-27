@@ -82,6 +82,19 @@ class AiAssistantControllerTest extends TestCase
         $this->assertSame('employee', $this->sentRole());
     }
 
+    public function test_markdown_is_removed_and_the_reply_has_room_for_khmer(): void
+    {
+        $this->fakeAnswer("## Steps\n1. បើកមីនុយ **\"Attendance\"** ។\n- ចុច __\"Scan QR\"__ `now`");
+        $staff = $this->createUserWithRole($this->company, 'employee');
+
+        $this->actingAs($staff)
+            ->postJson('/api/ai/assistant', ['question' => 'ស្កេនវត្តមានយ៉ាងម៉េច?'])
+            ->assertOk()
+            ->assertJson(['answer' => "Steps\n1. បើកមីនុយ \"Attendance\" ។\n• ចុច \"Scan QR\" now"]);
+
+        Http::assertSent(fn (HttpRequest $request) => $request['max_tokens'] >= 2000);
+    }
+
     public function test_the_broadest_built_in_role_wins(): void
     {
         $this->fakeAnswer();

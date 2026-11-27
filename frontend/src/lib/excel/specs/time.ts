@@ -582,7 +582,7 @@ export const CALENDAR_CODES = [
   { code: "A", total: "Absent", legend: "Absent" },
   { code: "½", total: "Half-day leave", legend: "Half-day leave, worked the other half" },
   { code: "LV", total: "Leave", legend: "On leave (full day)" },
-  { code: "W", total: "Worked off", legend: "Worked on a day off / holiday / leave" },
+  { code: "W", total: "Worked off", legend: "Worked on a day off / holiday / leave, or with no schedule" },
   { code: "H", total: "Holiday", legend: "Holiday" },
   { code: "OFF", total: "Off", legend: "Day off / weekly off" },
 ];
@@ -598,13 +598,16 @@ export type CalendarLegendItem = { label: string; legend: string; code: string; 
 
 /**
  * A report row's status as one Calendar code; null for days not yet due or
- * with no schedule. A problem that needs fixing (absent, missed scan) wins
- * over half-day leave; half-day leave wins over late / early.
+ * with no schedule and no scans. A problem that needs fixing (absent, missed
+ * scan) wins over half-day leave; half-day leave wins over late / early.
+ * A day with scans is never left blank: worked with no schedule counts as W.
  */
-function calendarCode(status: string, dayType: string, leave: string, late: number, early: number): string | null {
+export function calendarCode(status: string, dayType: string, leave: string, late: number, early: number, hasScans = false): string | null {
   if (status === "Absent") return "A";
   if (status === "Incomplete") return "M";
   if (status === "Worked off") return "W";
+  // e.g. a new starter scanned before their schedule's From date.
+  if (status === "Unscheduled") return hasScans ? "W" : null;
   if (status === "Complete" || status === "In progress") {
     // Half a day's leave comes as "Annual leave (am)" on a work day.
     if (dayType === "Work" && /\((am|pm)\)$/.test(leave)) return "½";
@@ -685,7 +688,7 @@ export function buildAttendanceCalendar(report: AttendanceReport, range: { from:
     const d = column.get(at(row, "Date"));
     const late = Number(at(row, "Late (min)")) || 0;
     const early = Number(at(row, "Early leave (min)")) || 0;
-    const code = calendarCode(at(row, "Status"), at(row, "Day type"), at(row, "Leave / holiday"), late, early);
+    const code = calendarCode(at(row, "Status"), at(row, "Day type"), at(row, "Leave / holiday"), late, early, at(row, "Scans") !== "");
     if (d === undefined || !code) continue;
 
     // Leave wears its type's look; a type with no code of its own stays "LV".

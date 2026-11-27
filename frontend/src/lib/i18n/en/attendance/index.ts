@@ -18,5 +18,6 @@ import { monthClose } from "./monthClose";
 import { exportDialog } from "./exportDialog";
 import { statusCodes } from "./statusCodes";
 import { ranking } from "./ranking";
+import { lateWarnings } from "./lateWarnings";
 
-export const attendance = { status, page, today, scan, add, fillMissed, missedScans, day, adjust, corrections, overtime, report, lateDetail, monthClose, exportDialog, statusCodes, ranking };
+export const attendance = { status, page, today, scan, add, fillMissed, missedScans, day, adjust, corrections, overtime, report, lateDetail, monthClose, exportDialog, statusCodes, ranking, lateWarnings };

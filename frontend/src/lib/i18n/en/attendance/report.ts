@@ -50,7 +50,8 @@ export const report = {
     noMatch: "No one matches these filters.",
     latePct: "Late %",
     latePctHint: "Late days ÷ days attended",
-    hint: "Click a day to open it; hover for its scans. A blank day is still to come, or has no schedule.",
+    leaveNotFound: "No approved leave request was found for this day.",
+    hint: "Click a day to open it; hover for its scans. A blank day is still to come, or has no schedule and no scans.",
   },
 
   // Weekday column heads
@@ -74,7 +75,7 @@ export const report = {
     absent: { total: "Absent", legend: "Absent" },
     halfDay: { total: "Half-day leave", legend: "Half-day leave, worked the other half" },
     leave: { total: "Leave", legend: "On leave (full day)" },
-    workedOff: { total: "Worked off", legend: "Worked on a day off / holiday / leave" },
+    workedOff: { total: "Worked off", legend: "Worked on a day off / holiday / leave, or with no schedule" },
     holiday: { total: "Holiday", legend: "Holiday" },
     off: { total: "Off", legend: "Day off / weekly off" },
   },

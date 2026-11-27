@@ -137,7 +137,7 @@ class AuthController extends Controller
             'permissions' => $membership?->permissionCodes() ?? [],
             // photo_url (a short-lived signed link) and nickname: the profile page shows and changes both.
             'employee' => $user->employee?->append('photo_url')->only('id', 'name', 'nickname', 'photo_url'),
-            'company' => $company?->only('id', 'name', 'slug', 'status', 'trial_ends_at', 'allow_self_approval', 'probation_length', 'probation_unit', 'probation_reminder_days'),
+            'company' => $company?->only('id', 'name', 'slug', 'status', 'trial_ends_at', 'allow_self_approval', 'probation_length', 'probation_unit', 'probation_reminder_days', 'late_warning_limit', 'late_warning_counts_early'),
             'plan' => $company?->subscription?->plan?->only('name', 'max_employees', 'max_branches'),
             'usage' => $company ? [
                 'employees' => $company->employeeCount(),

@@ -1,6 +1,7 @@
 // Signing in, the signed-in user, notifications, push, profile and company settings.
 
 import { request } from "./client";
+import type { LateWarningSettings } from "./attendance";
 import type { ProbationSettings } from "./organization";
 
 export type MeResponse = {
@@ -12,6 +13,7 @@ export type MeResponse = {
   employee: { id: number; name: string; nickname: string | null; photo_url: string | null } | null;
   // allow_self_approval: people may approve or change their own attendance, leave balance and pay.
   // probation_*: the default probation for new people (e.g. 3 months) and how many days before it ends HR is reminded (null = on the day).
+  // late_warning_*: automatic late warnings (see LateWarningSettings).
   company: {
     id: number;
     name: string;
@@ -19,7 +21,7 @@ export type MeResponse = {
     status: string;
     trial_ends_at: string | null;
     allow_self_approval: boolean;
-  } & ProbationSettings | null;
+  } & ProbationSettings & LateWarningSettings | null;
   // null limits mean unlimited.
   plan: { name: string; max_employees: number | null; max_branches: number | null } | null;
   usage: { employees: number; branches: number } | null;

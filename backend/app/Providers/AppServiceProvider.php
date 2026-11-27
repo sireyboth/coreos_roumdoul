@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Jobs\SendTelegramMessage;
 use App\Services\Attendance\AttendanceRecorder;
 use App\Services\Push\PushSender;
 use App\Services\Push\WebPushSender;
@@ -53,5 +54,13 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(60)->by($request->ip())->response($tooMany),
             ];
         });
+
+        // Telegram posts (SendTelegramMessage), kept under Telegram's own limits —
+        // ~20 a minute into one group, ~30 a second for one bot — so a busy
+        // hour queues politely instead of being refused.
+        RateLimiter::for('telegram', fn (SendTelegramMessage $job) => [
+            Limit::perMinute(18)->by('telegram-group:'.$job->groupId),
+            Limit::perSecond(25)->by('telegram-bot'),
+        ]);
     }
 }

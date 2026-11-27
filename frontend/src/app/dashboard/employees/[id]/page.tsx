@@ -250,6 +250,8 @@ export default function EmployeePage() {
     );
   }
 
+  // Anything typed that differs from what's saved: the save bar then sticks to the bottom.
+  const dirty = JSON.stringify(form) !== JSON.stringify(formFromEmployee(employee));
   const idIsSignIn = employee.login?.method === "employee_id";
   // has_login without details means an older response — assume the safe case (email).
   const emailIsSignIn = employee.has_login && !idIsSignIn;
@@ -430,38 +432,45 @@ export default function EmployeePage() {
             )}
 
             {activeTab === "profile" && canManage && (
-              <form onSubmit={handleSave} className="flex flex-col gap-6">
-                <Card>
-                  <CardContent>
-                    <EmployeeFormFields
-                      idPrefix="edit"
-                      form={form}
-                      onChange={(patch) => setForm((f) => (f ? { ...f, ...patch } : f))}
-                      branches={branches}
-                      departments={departments}
-                      teams={teams}
-                      managers={managers ?? undefined}
-                      selfId={employee?.id}
-                      currentManager={employee?.manager}
-                      emailDisabled={emailIsSignIn}
-                      emailHint={emailIsSignIn ? t("employees.profilePage.emailIsSignIn") : undefined}
-                      codeDisabled={idIsSignIn}
-                      codeHint={idIsSignIn ? t("employees.profilePage.idIsSignIn") : undefined}
-                      salary={salaryAccess}
-                    />
-                  </CardContent>
-                </Card>
-                <p className="-mt-2 text-xs text-muted-foreground">
-                  {t("employees.profilePage.branchMoveHint")}
-                </p>
+              <form onSubmit={handleSave} className="flex flex-col gap-4">
+                <EmployeeFormFields
+                  idPrefix="edit"
+                  form={form}
+                  onChange={(patch) => setForm((f) => (f ? { ...f, ...patch } : f))}
+                  branches={branches}
+                  departments={departments}
+                  teams={teams}
+                  managers={managers ?? undefined}
+                  selfId={employee?.id}
+                  currentManager={employee?.manager}
+                  emailDisabled={emailIsSignIn}
+                  emailHint={emailIsSignIn ? t("employees.profilePage.emailIsSignIn") : undefined}
+                  codeDisabled={idIsSignIn}
+                  codeHint={idIsSignIn ? t("employees.profilePage.idIsSignIn") : undefined}
+                  salary={salaryAccess}
+                />
+                <p className="text-xs text-muted-foreground">{t("employees.profilePage.branchMoveHint")}</p>
                 {error && <Alert variant="destructive">{error}</Alert>}
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setForm(formFromEmployee(employee))} disabled={saving}>
-                    {t("employees.profilePage.reset")}
-                  </Button>
-                  <Button type="submit" disabled={saving || !form.name.trim()}>
-                    {saving ? t("common.message.saving") : t("common.action.saveChanges")}
-                  </Button>
+
+                {/* The save bar: sticks to the bottom of the screen while there are unsaved changes. */}
+                <div
+                  className={cn(
+                    "z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3 transition-shadow",
+                    dirty ? "sticky bottom-3 border-primary/30 bg-card/95 shadow-lg backdrop-blur" : "bg-card",
+                  )}
+                >
+                  <p className={cn("flex items-center gap-2 text-sm", dirty ? "font-medium" : "text-muted-foreground")}>
+                    {dirty && <span className="size-2 rounded-full bg-amber-500" />}
+                    {dirty ? t("employees.form.unsaved") : t("employees.form.upToDate")}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setForm(formFromEmployee(employee))} disabled={saving || !dirty}>
+                      {t("employees.form.undo")}
+                    </Button>
+                    <Button type="submit" disabled={saving || !dirty || !form.name.trim()}>
+                      {saving ? t("common.message.saving") : t("common.action.saveChanges")}
+                    </Button>
+                  </div>
                 </div>
               </form>
             )}

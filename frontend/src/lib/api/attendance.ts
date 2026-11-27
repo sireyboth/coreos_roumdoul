@@ -280,6 +280,16 @@ export type Ranking = {
   branches: { id: number; name: string }[];
 };
 
+/**
+ * Automatic late warnings (company setting, read from /me's company):
+ * warn the employee and HR at this many late days a month — null = off.
+ * counts_early: leaving early counts toward it too.
+ */
+export type LateWarningSettings = {
+  late_warning_limit: number | null;
+  late_warning_counts_early: boolean;
+};
+
 export const attendanceApi = {
   attendance: {
     // The API sends 50 rows unless asked for more (max 1000) — say so, or a busy
@@ -334,6 +344,8 @@ export const attendanceApi = {
     updateReportCodes: (data: ReportCodesInput) =>
       request<ReportCodes>("/api/attendance/report-codes", { method: "PUT", body: JSON.stringify(data) }),
     resetReportCodes: () => request<ReportCodes>("/api/attendance/report-codes", { method: "DELETE" }),
+    updateLateWarnings: (data: LateWarningSettings) =>
+      request<{ id: number } & LateWarningSettings>("/api/attendance/late-warnings", { method: "PUT", body: JSON.stringify(data) }),
     // ignorePendingOvertime: lock even though some overtime was never reviewed (it won't be paid).
     lockMonth: (month: string, ignorePendingOvertime = false) =>
       request<{ month: string; locked_at: string }>("/api/attendance/periods", {

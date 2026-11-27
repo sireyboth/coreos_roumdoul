@@ -51,4 +51,17 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-haiku-5-5'),
     ],
 
+    // One Telegram bot for every company (made with @BotFather); each company
+    // links its own group to it (TelegramGroupController). Empty token = off.
+    // webhook_secret: Telegram sends it back on every update, so only Telegram
+    // can reach the public webhook. Register it with: php artisan telegram:webhook
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'bot_username' => env('TELEGRAM_BOT_USERNAME'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        // Posts go on their own queue so a burst never delays phone pushes.
+        // A worker must listen to it: php artisan queue:work --queue=default,telegram
+        'queue' => env('TELEGRAM_QUEUE', 'telegram'),
+    ],
+
 ];

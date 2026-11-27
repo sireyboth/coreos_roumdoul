@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ArrowDown, ArrowUp, CalendarDays, FileDown, ListTree, Palette, Search, Table2 } from "lucide-react";
 import { useMe } from "@/contexts/me-context";
 import { Alert } from "@/components/ui/alert";
@@ -11,10 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AttendanceDayDialog } from "@/components/dashboard/attendance/attendance-day-dialog";
 import { AttendanceLateDetail } from "@/components/dashboard/attendance/attendance-late-detail";
 import { AttendanceMonthClose, type ResolveTarget } from "@/components/dashboard/attendance/attendance-month-close";
+import { RequestDetailDialog } from "@/components/dashboard/requests/request-detail-dialog";
 import { currentMonth, monthBounds, MonthBar, parseDate } from "@/components/dashboard/schedules/calendar-shared";
 import { COLOR_STYLE, StatusChip } from "@/components/dashboard/shared/status-chip";
 import { useApi } from "@/hooks/use-api";
-import { api, type AttendanceDay, type DayStatus } from "@/lib/api";
+import { api, type AttendanceDay, type DayStatus, type EmployeeRequest } from "@/lib/api";
 import { useStatusCodes } from "@/hooks/use-status-codes";
 import { buildInsights, totalsOf, type PersonInsight, type ReportTotals } from "@/lib/attendance-insights";
 import { dateLocale, useLang, useT, type TKey } from "@/lib/i18n";
@@ -35,6 +37,8 @@ const SELECT_CLASS = "h-9 rounded-md border border-input bg-transparent px-3 tex
 
 // Codes that have a stored day behind them, so clicking opens its details.
 const OPENABLE = new Set(["P", "L", "E", "LE", "M", "A", "½", "W"]);
+// A full day's leave has no scans to show, so clicking opens the leave request instead.
+const LEAVE_CODE = "LV";
 
 // A year, as the server allows.
 const MAX_DAYS = 366;
@@ -118,6 +122,9 @@ export function AttendanceReport({
   const [minLate, setMinLate] = useState(1);
   const [reloads, setReloads] = useState(0);
   const [openDay, setOpenDay] = useState<AttendanceDay | null>(null);
+  const [openLeave, setOpenLeave] = useState<EmployeeRequest | null>(null);
+  // Everyone's requests need requests.manage; without it only your own can be looked up.
+  const canSeeAllRequests = useMe().me?.permissions.includes("requests.manage") ?? false;
 
   const range = mode === "month" ? monthBounds(month) : custom;
   const rangeProblem =
@@ -176,6 +183,25 @@ export function AttendanceReport({
     try {
       const res = await api.attendance.list({ employee_id: person.employeeId, from: date, to: date, per_page: 1 });
       if (res.data[0]) setOpenDay(res.data[0]);
+    } catch (err) {
+      notifyError(err);
+    }
+  }
+
+  /** A leave cell: find the approved request that covers this date and open it. */
+  async function openLeaveRequest(person: PersonInsight | undefined, date: string) {
+    if (!person?.employeeId) return;
+    try {
+      const found = await api.requests.list({
+        scope: canSeeAllRequests ? "all" : "mine",
+        status: "approved",
+        employeeId: person.employeeId,
+        from: date,
+        to: date,
+      });
+      const leave = found.find((r) => r.leave_type !== null);
+      if (leave) setOpenLeave(leave);
+      else toast.info(t("attendance.report.calendar.leaveNotFound"));
     } catch (err) {
       notifyError(err);
     }
@@ -303,6 +329,7 @@ export function AttendanceReport({
           people={calendar.people.filter((p) => shownKeys.has(p.key))}
           insights={byKey}
           onOpen={(key, date) => open(byKey.get(key), date)}
+          onOpenLeave={(key, date) => openLeaveRequest(byKey.get(key), date)}
         />
       )}
 
@@ -325,6 +352,20 @@ export function AttendanceReport({
         canManage={canManage}
         onAdjusted={(day) => {
           setOpenDay(day);
+          setReloads((n) => n + 1);
+        }}
+      />
+
+      {/* Changing the leave (type, paid days, cancel) changes the grid, so it reloads. */}
+      <RequestDetailDialog
+        request={openLeave}
+        onOpenChange={(isOpen) => !isOpen && setOpenLeave(null)}
+        onChanged={(request) => {
+          setOpenLeave(request);
+          setReloads((n) => n + 1);
+        }}
+        onDeleted={() => {
+          setOpenLeave(null);
           setReloads((n) => n + 1);
         }}
       />
@@ -380,11 +421,13 @@ function CalendarGrid({
   people,
   insights,
   onOpen,
+  onOpenLeave,
 }: {
   calendar: AttendanceCalendar;
   people: AttendanceCalendar["people"];
   insights: Map<string, PersonInsight>;
   onOpen: (key: string, date: string) => void;
+  onOpenLeave: (key: string, date: string) => void;
 }) {
   const t = useT();
   const today = iso(new Date());
@@ -474,7 +517,8 @@ function CalendarGrid({
                   {person.cells.map((cell, d) => {
                     const date = calendar.dates[d];
                     const tip = cell ? `${person.name} · ${date}\n${cell.note}` : undefined;
-                    const openable = cell && OPENABLE.has(cell.code) && insight?.employeeId;
+                    const isLeave = cell?.code === LEAVE_CODE;
+                    const openable = cell && (OPENABLE.has(cell.code) || isLeave) && insight?.employeeId;
                     const chip = cell && (
                       <StatusChip look={cell.look} half={cell.half} unpaid={cell.unpaid} className="mx-auto flex">
                         {cell.label}
@@ -483,7 +527,7 @@ function CalendarGrid({
                     return (
                       <td key={date} className={cn("border-b border-border p-0.5 text-center group-hover:bg-accent/40", date === today && "bg-primary/5")}>
                         {openable ? (
-                          <button type="button" title={tip} aria-label={tip} onClick={() => onOpen(person.key, date)} className="block w-full rounded-md transition-transform hover:scale-110">
+                          <button type="button" title={tip} aria-label={tip} onClick={() => (isLeave ? onOpenLeave : onOpen)(person.key, date)} className="block w-full rounded-md transition-transform hover:scale-110">
                             {chip}
                           </button>
                         ) : (

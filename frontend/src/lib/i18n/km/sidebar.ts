@@ -36,6 +36,7 @@ export const sidebar: Dictionary["sidebar"] = {
     "/dashboard/users": "អ្នកប្រើប្រាស់",
     "/dashboard/roles": "តួនាទី និងសិទ្ធិ",
     "/dashboard/audit": "កំណត់ហេតុសកម្មភាព",
+    "/dashboard/telegram": "តេឡេក្រាម",
     "/dashboard/attendance/corrections": "ការកែតម្រូវវត្តមាន",
     "/dashboard/profile": "ប្រវត្តិរូប",
   },

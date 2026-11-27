@@ -1,8 +1,7 @@
 // Employee form fields (components/dashboard/employees/employee-form.tsx)
 
 export const form = {
-  // ── Basic info ───────────────────────────────────────────────────
-  basic: "Basic info",
+  // ── Name and contact ─────────────────────────────────────────────
   firstName: "First name",
   lastName: "Last name",
   fullName: "Full name",
@@ -15,8 +14,7 @@ export const form = {
   phone: "Phone (optional)",
   email: "Email (optional)",
 
-  // ── Work ─────────────────────────────────────────────────────────
-  work: "Work",
+  // ── Job ──────────────────────────────────────────────────────────
   department: "Department (optional)",
   team: "Team (optional)",
   none: "None",
@@ -32,31 +30,43 @@ export const form = {
   lastDay: "Last working day",
 
   // ── Personal ─────────────────────────────────────────────────────
-  personal: "Personal",
   gender: "Gender",
   dateOfBirth: "Date of birth",
   address: "Address",
   notesHint: "Personal details are only visible to people who can manage employees.",
 
-  // ── Identity documents ───────────────────────────────────────────
-  identity: "Identity documents",
   nationality: "Nationality",
   nationalityPlaceholder: "Cambodian",
+
+  // ── Documents ────────────────────────────────────────────────────
   nationalId: "National ID card number",
   passport: "Passport number",
   passportHint: "For foreign staff, or anyone without a national ID.",
-
-  // ── Payroll & compliance ─────────────────────────────────────────
-  compliance: "Payroll & compliance",
   nssf: "NSSF number",
   nssfHint: "National Social Security Fund.",
   taxId: "Tax ID",
 
-  // ── Salary ───────────────────────────────────────────────────────
-  salary: "Salary",
+  // ── Pay ──────────────────────────────────────────────────────────
   baseSalary: "Base salary (per month)",
   salaryViewHint: "You can see pay, but not change it.",
   salaryEditHint: "Only people with the salary permission can see this.",
   bank: "Bank",
   bankAccount: "Bank account number",
+
+  // ── Section cards (title + one line saying what goes there) ──────
+  section: {
+    name: { title: "Name", hint: "How they appear everywhere in the app, on payslips and on ID cards." },
+    contact: { title: "Contact", hint: "How to reach them." },
+    job: { title: "Job", hint: "Where they work, their role, and their status." },
+    personal: { title: "Personal", hint: "Only people who can manage employees see these." },
+    documents: { title: "Documents", hint: "ID, passport, social security and tax numbers." },
+    pay: { title: "Pay", hint: "Base salary and where it is paid." },
+    other: { title: "Other", hint: "Notes for HR and where they appear in lists." },
+  },
+  missing: "{n} missing",
+  complete: "Complete",
+  jumpTo: "Jump to a section",
+  unsaved: "You have unsaved changes",
+  upToDate: "No unsaved changes",
+  undo: "Undo changes",
 };
